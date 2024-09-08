@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pink or Purple</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+			background-color: rgb(206,0,196)
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Pink or Purple</h1>
+
+    <button onclick="pink()">Pink</button>
+    <button onclick="purple()">Purple</button>
+
+    <script>
+		let min = 0
+		let max = 100
+		let curr = 50
+		let counter = 0
+		
+        function pink() {
+            min = curr
+			curr = Math.floor((min+max)/2)
+			changeBackground("rgb(" + Math.floor(255 - curr/100*97) + ",0," + Math.floor(138 + curr/100*117) + ")")
+			count()
+        }
+
+        function purple() {
+            max = curr
+			curr = Math.floor((min+max)/2)
+			changeBackground("rgb(" + Math.floor(255 - curr/100*97) + ",0," + Math.floor(138 + curr/100*117) + ")")
+			count()
+        }
+		
+		function count() {
+			counter+=1
+			if (counter == 5) {
+				alert("your line is " + curr + "% of the way between the colors");
+			}
+		}
+		
+		function changeBackground(color) {
+			document.body.style.background = color;
+		}
+    </script>
+
+</body>
+</html>
