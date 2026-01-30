@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Come Back Soon, Brett!</title>
+
+    <!-- Fonts: Clash Display for headlines, Satoshi for body -->
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@400,600,700&f[]=satoshi@400,500,700&display=swap">
+
+    <style>
+        /* ===========================================
+           CSS CUSTOM PROPERTIES (THEME)
+           Change these to adjust the entire look
+           =========================================== */
+        :root {
+            /* Colors */
+            --bg-primary: #0f0f12;
+            --bg-card: #1a1a20;
+            --bg-card-hover: #22222a;
+            --text-primary: #ffffff;
+            --text-secondary: #8b8b9a;
+            --text-muted: #5a5a6a;
+            --accent: #ffd93d;
+            --accent-secondary: #6bcb77;
+            --danger: #ff6b6b;
+            --info: #4dabf7;
+
+            /* Typography */
+            --font-display: 'Clash Display', sans-serif;
+            --font-body: 'Satoshi', sans-serif;
+
+            /* Spacing */
+            --slide-padding: clamp(2rem, 5vw, 4rem);
+
+            /* Animation */
+            --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+            --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --duration-normal: 0.6s;
+        }
+
+        /* ===========================================
+           BASE STYLES
+           =========================================== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-snap-type: y mandatory;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Grid background - subtle tech feel */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ===========================================
+           SLIDE CONTAINER
+           Each section is one slide
+           =========================================== */
+        .slide {
+            min-height: 100vh;
+            padding: var(--slide-padding);
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .slide-content {
+            max-width: 1000px;
+            width: 100%;
+            text-align: center;
+        }
+
+        /* ===========================================
+           TYPOGRAPHY
+           =========================================== */
+        h1 {
+            font-family: var(--font-display);
+            font-size: clamp(3rem, 10vw, 7rem);
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 1rem;
+        }
+
+        h2 {
+            font-family: var(--font-display);
+            font-size: clamp(2rem, 6vw, 4rem);
+            font-weight: 600;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+        }
+
+        h3 {
+            font-family: var(--font-display);
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        p {
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            color: var(--text-secondary);
+        }
+
+        .highlight {
+            color: var(--accent);
+        }
+
+        .highlight-green {
+            color: var(--accent-secondary);
+        }
+
+        .highlight-red {
+            color: var(--danger);
+        }
+
+        .highlight-blue {
+            color: var(--info);
+        }
+
+        /* ===========================================
+           ANIMATIONS
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity var(--duration-normal) var(--ease-out-expo),
+                        transform var(--duration-normal) var(--ease-out-expo);
+        }
+
+        .slide.visible .reveal {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Staggered reveal for children */
+        .slide.visible .reveal:nth-child(1) { transition-delay: 0.1s; }
+        .slide.visible .reveal:nth-child(2) { transition-delay: 0.2s; }
+        .slide.visible .reveal:nth-child(3) { transition-delay: 0.3s; }
+        .slide.visible .reveal:nth-child(4) { transition-delay: 0.4s; }
+        .slide.visible .reveal:nth-child(5) { transition-delay: 0.5s; }
+        .slide.visible .reveal:nth-child(6) { transition-delay: 0.6s; }
+
+        .reveal-pop {
+            opacity: 0;
+            transform: scale(0.8);
+            transition: opacity 0.5s var(--ease-bounce),
+                        transform 0.5s var(--ease-bounce);
+        }
+
+        .slide.visible .reveal-pop {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Wiggle animation for emphasis */
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-5deg); }
+            75% { transform: rotate(5deg); }
+        }
+
+        .wiggle {
+            display: inline-block;
+            animation: wiggle 0.5s ease-in-out;
+            animation-delay: 1s;
+        }
+
+        /* Pulse animation */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* ===========================================
+           COMPONENTS: Status Bar
+           =========================================== */
+        .status-bar {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--bg-card);
+            padding: 0.75rem 1.5rem;
+            border-radius: 100px;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--danger);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-dot.online {
+            background: var(--accent-secondary);
+        }
+
+        .status-text {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* ===========================================
+           COMPONENTS: Cards
+           =========================================== */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+            text-align: left;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: transform 0.3s var(--ease-out-expo),
+                        background 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            background: var(--bg-card-hover);
+        }
+
+        .card-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .card h4 {
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .card p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        /* ===========================================
+           COMPONENTS: Stats
+           =========================================== */
+        .stats-row {
+            display: flex;
+            gap: 3rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 2rem 0;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-family: var(--font-display);
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 700;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-top: 0.5rem;
+        }
+
+        /* ===========================================
+           COMPONENTS: List
+           =========================================== */
+        .list {
+            text-align: left;
+            max-width: 600px;
+            margin: 2rem auto;
+        }
+
+        .list-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .list-item:last-child {
+            border-bottom: none;
+        }
+
+        .list-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .list-content h4 {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .list-content p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        /* ===========================================
+           COMPONENTS: Floating Notifications
+           =========================================== */
+        .floating-notifs {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .slide-1.visible ~ .floating-notifs {
+            opacity: 1;
+        }
+
+        .notif {
+            position: absolute;
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 0.875rem 1.25rem;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s var(--ease-out-expo),
+                        transform 0.6s var(--ease-out-expo);
+        }
+
+        .slide-1.visible ~ .floating-notifs .notif {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .notif-1 {
+            top: 12%;
+            left: 4%;
+            transition-delay: 1s;
+        }
+
+        .notif-2 {
+            top: 22%;
+            right: 5%;
+            transition-delay: 1.3s;
+        }
+
+        .notif-3 {
+            bottom: 25%;
+            left: 6%;
+            transition-delay: 1.6s;
+        }
+
+        .notif-icon {
+            font-size: 1.25rem;
+        }
+
+        .notif-text {
+            color: var(--text-secondary);
+        }
+
+        .notif-text strong {
+            color: var(--text-primary);
+        }
+
+        /* ===========================================
+           COMPONENTS: Emoji Display
+           =========================================== */
+        .emoji-large {
+            font-size: clamp(4rem, 12vw, 8rem);
+            margin: 1rem 0;
+        }
+
+        .emoji-row {
+            font-size: 2.5rem;
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin: 2rem 0;
+        }
+
+        /* ===========================================
+           COMPONENTS: Quote
+           =========================================== */
+        .quote {
+            font-family: var(--font-display);
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-weight: 500;
+            font-style: italic;
+            max-width: 800px;
+            margin: 0 auto;
+            color: var(--text-primary);
+        }
+
+        .quote-author {
+            margin-top: 1.5rem;
+            font-size: 1rem;
+            color: var(--text-muted);
+            font-style: normal;
+        }
+
+        /* ===========================================
+           COMPONENTS: Timeline
+           =========================================== */
+        .timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            max-width: 500px;
+            margin: 2rem auto;
+            text-align: left;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 1.5rem;
+            position: relative;
+        }
+
+        .timeline-marker {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .timeline-dot {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            flex-shrink: 0;
+        }
+
+        .timeline-line {
+            width: 2px;
+            flex: 1;
+            background: rgba(255,255,255,0.1);
+            min-height: 60px;
+        }
+
+        .timeline-item:last-child .timeline-line {
+            display: none;
+        }
+
+        .timeline-content {
+            padding-bottom: 2rem;
+        }
+
+        .timeline-content h4 {
+            font-family: var(--font-display);
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .timeline-content p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        /* ===========================================
+           NAVIGATION: Progress Bar
+           =========================================== */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: var(--accent);
+            z-index: 1000;
+            transition: width 0.3s var(--ease-out-expo);
+        }
+
+        /* ===========================================
+           NAVIGATION: Dots
+           =========================================== */
+        .nav-dots {
+            position: fixed;
+            right: 2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            z-index: 1000;
+        }
+
+        .nav-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.3s ease;
+        }
+
+        .nav-dot:hover {
+            background: rgba(255,255,255,0.4);
+            transform: scale(1.2);
+        }
+
+        .nav-dot.active {
+            background: var(--accent);
+        }
+
+        /* ===========================================
+           NAVIGATION: Keyboard Hint
+           =========================================== */
+        .keyboard-hint {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            opacity: 0.6;
+            z-index: 1000;
+        }
+
+        .key {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            height: 24px;
+            padding: 0 6px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 4px;
+            font-size: 0.7rem;
+        }
+
+        /* ===========================================
+           RESPONSIVE
+           =========================================== */
+        @media (max-width: 768px) {
+            .nav-dots,
+            .keyboard-hint,
+            .floating-notifs {
+                display: none;
+            }
+
+            .stats-row {
+                gap: 1.5rem;
+            }
+
+            .card-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ===========================================
+           REDUCED MOTION
+           =========================================== */
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+
+            .reveal,
+            .reveal-pop {
+                transition: opacity 0.3s ease;
+                transform: none;
+            }
+
+            .notif {
+                transition: opacity 0.3s ease;
+                transform: none;
+            }
+
+            .wiggle {
+                animation: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Progress bar -->
+    <div class="progress-bar" id="progress"></div>
+
+    <!-- Navigation dots -->
+    <nav class="nav-dots" id="navDots"></nav>
+
+    <!-- Keyboard hint -->
+    <div class="keyboard-hint">
+        <span class="key">←</span>
+        <span class="key">→</span>
+        <span>or</span>
+        <span class="key">Space</span>
+        <span>to navigate</span>
+    </div>
+
+    <!-- =========================================
+         SLIDE 1: Title
+         ========================================= -->
+    <section class="slide slide-1" data-slide="1">
+        <div class="slide-content">
+            <div class="status-bar reveal">
+                <span class="status-dot"></span>
+                <span class="status-text">Brett is away — Paternity Leave</span>
+            </div>
+
+            <h1 class="reveal">
+                SOS, <span class="highlight wiggle">Brett!</span>
+            </h1>
+
+            <p class="reveal" style="font-size: 1.5rem; margin-bottom: 2rem;">
+                Things are... not the same without you
+            </p>
+
+            <div class="stats-row reveal">
+                <div class="stat">
+                    <div class="stat-number">47</div>
+                    <div class="stat-label">Times we said "when Brett gets back"</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">∞</div>
+                    <div class="stat-label">Diet Dr. Pepper consumed</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Floating notifications (visible on slide 1) -->
+    <div class="floating-notifs">
+        <div class="notif notif-1">
+            <span class="notif-icon">🔥</span>
+            <span class="notif-text"><strong>Production</strong> is on fire (again)</span>
+        </div>
+        <div class="notif notif-2">
+            <span class="notif-icon">😭</span>
+            <span class="notif-text"><strong>3 PRs</strong> waiting for your review</span>
+        </div>
+        <div class="notif notif-3">
+            <span class="notif-icon">❓</span>
+            <span class="notif-text">"Who knows how this works?"</span>
+        </div>
+    </div>
+
+    <!-- =========================================
+         SLIDE 2: The Office Without You
+         ========================================= -->
+    <section class="slide" data-slide="2">
+        <div class="slide-content">
+            <h2 class="reveal">
+                The Office <span class="highlight-red">Without</span> Brett
+            </h2>
+
+            <p class="reveal">A dramatization of actual events</p>
+
+            <div class="card-grid reveal">
+                <div class="card">
+                    <div class="card-icon">🤷</div>
+                    <h4>"How did this program ever function?"</h4>
+                    <p>Said at least once per standup</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon">🕵️</div>
+                    <h4>Archaeological Expeditions</h4>
+                    <p>Into legacy code that only Brett understands</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon">📚</div>
+                    <h4>Reading Ancient Scrolls</h4>
+                    <p>AKA the git blame history</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon">🙏</div>
+                    <h4>Praying to the Deploy Gods</h4>
+                    <p>Without our usual safety net</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         SLIDE 3: Things That Broke
+         ========================================= -->
+    <section class="slide" data-slide="3">
+        <div class="slide-content">
+            <h2 class="reveal">
+                Things That <span class="highlight-red">Broke</span>
+            </h2>
+
+            <p class="reveal">While you were gone...</p>
+
+            <div class="list reveal">
+                <div class="list-item">
+                    <span class="list-icon">💥</span>
+                    <div class="list-content">
+                        <h4>That One Service</h4>
+                        <p>You know the one. We reverted half your shit.</p>
+                    </div>
+                </div>
+
+                <div class="list-item">
+                    <span class="list-icon">🔧</span>
+                    <div class="list-content">
+                        <h4>The Build Pipeline</h4>
+                        <p>We fixed it. Then broke it. Then fixed it again. Mostly.</p>
+                    </div>
+                </div>
+
+                <div class="list-item">
+                    <span class="list-icon">🧩</span>
+                    <div class="list-content">
+                        <h4>Our Confidence</h4>
+                        <p>In deploying anything on Fridays</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         SLIDE 4: Congratulations!
+         ========================================= -->
+    <section class="slide" data-slide="4">
+        <div class="slide-content">
+            <div class="emoji-large reveal-pop">👶</div>
+
+            <h2 class="reveal">
+                <span class="highlight-green">Congratulations!</span>
+            </h2>
+
+            <p class="reveal" style="font-size: 1.5rem; max-width: 600px; margin: 1rem auto;">
+                On the newest (and hopefully best-sleeping) member of your family
+            </p>
+
+            <div class="emoji-row reveal">
+                <span>🍼</span>
+                <span>💙</span>
+                <span>🎉</span>
+                <span>🧸</span>
+                <span>⭐</span>
+            </div>
+
+            <p class="reveal" style="color: var(--text-muted); margin-top: 2rem;">
+                We hope you're getting at least <em>some</em> sleep
+            </p>
+        </div>
+    </section>
+
+    <!-- =========================================
+         SLIDE 5: Things We Miss
+         ========================================= -->
+    <section class="slide" data-slide="5">
+        <div class="slide-content">
+            <h2 class="reveal">
+                Things We <span class="highlight-blue">Miss</span>
+            </h2>
+
+            <div class="card-grid reveal">
+                <div class="card">
+                    <div class="card-icon">🧠</div>
+                    <h4>Your Expertise</h4>
+                    <p>The way you just... know things</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon">⚡</div>
+                    <h4>Quick Debugging</h4>
+                    <p>"Oh, that's just the cache" — You, saving hours</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon">🎯</div>
+                    <h4>Code Reviews</h4>
+                    <p>That catch the things everyone else missed</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-icon">😄</div>
+                    <h4>Your Presence</h4>
+                    <p>The team just isn't the same without you</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         SLIDE 6: Come Back Soon
+         ========================================= -->
+    <section class="slide" data-slide="6">
+        <div class="slide-content">
+            <div class="status-bar reveal">
+                <span class="status-dot online"></span>
+                <span class="status-text">Brett is online</span>
+            </div>
+
+            <h1 class="reveal">
+                Come Back Soon, <span class="highlight">Brett!</span>
+            </h1>
+
+            <p class="reveal quote">
+                "The team that survives together, thrives together"
+            </p>
+
+            <p class="reveal quote-author">
+                — Us, probably, after this
+            </p>
+
+            <div class="emoji-row reveal">
+                <span>🎊</span>
+                <span>🙌</span>
+                <span>💪</span>
+                <span>🚀</span>
+                <span>❤️</span>
+            </div>
+
+            <p class="reveal" style="margin-top: 2rem; color: var(--text-secondary);">
+                We're genuinely excited to have you back.<br>
+                <span style="color: var(--text-muted);">(And not just because of the PRs)</span>
+            </p>
+        </div>
+    </section>
+
+    <script>
+        /* ===========================================
+           SLIDE PRESENTATION CONTROLLER
+           Handles navigation, animations, and interactions
+           =========================================== */
+
+        class SlidePresentation {
+            constructor() {
+                this.slides = document.querySelectorAll('.slide');
+                this.currentSlide = 0;
+                this.totalSlides = this.slides.length;
+                this.isScrolling = false;
+                this.scrollTimeout = null;
+
+                this.init();
+            }
+
+            init() {
+                this.createNavDots();
+                this.setupIntersectionObserver();
+                this.setupKeyboardNav();
+                this.setupScrollNav();
+                this.updateProgress();
+            }
+
+            /* -------------------------------------------
+               Navigation Dots
+               ------------------------------------------- */
+            createNavDots() {
+                const navContainer = document.getElementById('navDots');
+
+                this.slides.forEach((_, index) => {
+                    const dot = document.createElement('button');
+                    dot.className = 'nav-dot';
+                    dot.setAttribute('aria-label', `Go to slide ${index + 1}`);
+                    dot.addEventListener('click', () => this.goToSlide(index));
+                    navContainer.appendChild(dot);
+                });
+
+                this.navDots = document.querySelectorAll('.nav-dot');
+            }
+
+            /* -------------------------------------------
+               Intersection Observer for Scroll Detection
+               ------------------------------------------- */
+            setupIntersectionObserver() {
+                const options = {
+                    root: null,
+                    rootMargin: '0px',
+                    threshold: 0.5
+                };
+
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            // Add visible class for animations
+                            entry.target.classList.add('visible');
+
+                            // Update current slide
+                            const slideIndex = Array.from(this.slides).indexOf(entry.target);
+                            this.currentSlide = slideIndex;
+                            this.updateNavDots();
+                            this.updateProgress();
+                        }
+                    });
+                }, options);
+
+                this.slides.forEach(slide => observer.observe(slide));
+            }
+
+            /* -------------------------------------------
+               Keyboard Navigation
+               ------------------------------------------- */
+            setupKeyboardNav() {
+                document.addEventListener('keydown', (e) => {
+                    switch(e.key) {
+                        case 'ArrowDown':
+                        case 'ArrowRight':
+                        case ' ':
+                            e.preventDefault();
+                            this.nextSlide();
+                            break;
+                        case 'ArrowUp':
+                        case 'ArrowLeft':
+                            e.preventDefault();
+                            this.prevSlide();
+                            break;
+                    }
+                });
+            }
+
+            /* -------------------------------------------
+               Scroll/Wheel Navigation
+               ------------------------------------------- */
+            setupScrollNav() {
+                // Debounced scroll handler for manual scroll position detection
+                window.addEventListener('scroll', () => {
+                    clearTimeout(this.scrollTimeout);
+                    this.scrollTimeout = setTimeout(() => {
+                        this.updateProgress();
+                    }, 50);
+                });
+            }
+
+            /* -------------------------------------------
+               Navigation Methods
+               ------------------------------------------- */
+            goToSlide(index) {
+                if (index >= 0 && index < this.totalSlides) {
+                    this.slides[index].scrollIntoView({ behavior: 'smooth' });
+                    this.currentSlide = index;
+                }
+            }
+
+            nextSlide() {
+                if (this.currentSlide < this.totalSlides - 1) {
+                    this.goToSlide(this.currentSlide + 1);
+                }
+            }
+
+            prevSlide() {
+                if (this.currentSlide > 0) {
+                    this.goToSlide(this.currentSlide - 1);
+                }
+            }
+
+            /* -------------------------------------------
+               UI Updates
+               ------------------------------------------- */
+            updateNavDots() {
+                this.navDots.forEach((dot, index) => {
+                    dot.classList.toggle('active', index === this.currentSlide);
+                });
+            }
+
+            updateProgress() {
+                const progress = ((this.currentSlide + 1) / this.totalSlides) * 100;
+                document.getElementById('progress').style.width = `${progress}%`;
+            }
+        }
+
+        // Initialize presentation when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            new SlidePresentation();
+        });
+    </script>
+</body>
+</html>
