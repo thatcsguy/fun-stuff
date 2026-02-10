@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cube Algorithm Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;500;700;900&display=swap');
+
+  :root {
+    --bg: #0c0c0f;
+    --surface: #141418;
+    --surface-2: #1c1c22;
+    --surface-3: #24242c;
+    --border: #2a2a35;
+    --text: #e8e6f0;
+    --text-dim: #8886a0;
+    --text-muted: #5c5a70;
+    --accent: #c8a2ff;
+    --accent-dim: #8b6ab8;
+    --yellow: #ffff00;
+    --orange: #ee8800;
+    --red: #d00000;
+    --blue: #2040d0;
+    --green: #11aa00;
+    --white: #ffffff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* --- Header --- */
+  .header {
+    padding: 2.5rem 2rem 0;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .header .subtitle {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    font-weight: 300;
+    margin-top: 0.3rem;
+  }
+  .puzzle-label {
+    display: inline-block;
+    margin-top: 1rem;
+    padding: 0.3rem 0.9rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* --- Tabs --- */
+  .tabs-wrap {
+    max-width: 1200px;
+    margin: 1.5rem auto 0;
+    padding: 0 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg);
+    padding-top: 0.8rem;
+    padding-bottom: 0.8rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabs {
+    display: flex;
+    gap: 0.35rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-muted);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.5rem 1.1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .tab-btn:hover {
+    color: var(--text-dim);
+    background: var(--surface);
+  }
+  .tab-btn.active {
+    color: var(--accent);
+    background: var(--surface-2);
+    border-color: var(--border);
+  }
+  .tab-btn .count {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-left: 0.3rem;
+  }
+  .tab-btn.active .count { color: var(--accent-dim); }
+
+  /* --- Cases Grid --- */
+  .cases-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.5rem 2rem 4rem;
+  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .cases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+    gap: 1rem;
+  }
+  @media (max-width: 560px) {
+    .cases-grid { grid-template-columns: 1fr; }
+  }
+
+  /* --- Case Card --- */
+  .case-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem 1.4rem;
+    display: flex;
+    gap: 1.4rem;
+    align-items: flex-start;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .case-card:hover {
+    border-color: var(--accent-dim);
+    box-shadow: 0 0 20px rgba(200, 162, 255, 0.04);
+  }
+
+  /* --- SVG Cube Diagram --- */
+  .cube-diagram {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .cube-diagram svg {
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
+  }
+  .case-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  /* --- Algorithms --- */
+  .alg-list {
+    flex: 1;
+    min-width: 0;
+  }
+  .alg-item {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    line-height: 1.7;
+    color: var(--text);
+    padding: 0.25rem 0;
+    border-bottom: 1px solid var(--surface-3);
+    overflow-wrap: break-word;
+  }
+  .alg-item:last-child { border-bottom: none; }
+  .alg-item .alg-num {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    margin-right: 0.5rem;
+    user-select: none;
+  }
+  /* Highlight move notation */
+  .alg-item .prime { color: var(--accent); }
+
+  /* --- Footer --- */
+  .footer {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem 3rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Cube Algorithm Tracker</h1>
+  <div class="subtitle">Personal algorithm reference</div>
+  <div class="puzzle-label">2x2x2 CLL</div>
+</div>
+
+<div class="tabs-wrap">
+  <div class="tabs" id="tabs"></div>
+</div>
+
+<div class="cases-container" id="casesContainer"></div>
+
+<div class="footer">
+  Algorithms sourced from speedcubedb.com &middot; Edit cube.html to curate
+</div>
+
+<script>
+// ============================================================
+// DATA — Edit algorithms below to curate your personal set.
+// Remove unwanted algs from the arrays, reorder as you like.
+// ============================================================
+
+const CLL_DATA = {
+  "AS": [
+    {
+      name: "AS 1",
+      fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#ee8800","#ee8800","#ee8800","#d00000","#d00000","#d00000","#d00000","#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#ffff00","#ee8800","#11aa00","#ffff00","#d00000","#2040d0","#ffff00"],
+      algs: ["y R U2 R' U' R U' R'", "y2 L' U' L U' L' U2 L", "R' U' R U' R' U2 R", "U2 L' U' L U' L' U2 L"]
+    },
+    {
+      name: "AS 2",
+      fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#2040d0","#2040d0","#2040d0","#2040d0","#d00000","#d00000","#d00000","#d00000","#ee8800","#ffff00","#2040d0","#d00000","#ffff00","#11aa00","#ee8800","#ffff00"],
+      algs: ["R U2 R' F R' F' R U' R U' R'", "y2 R' U R U' R2 F R F' R U R' U' R", "L' U' L U' L F' L' F L' U2 L", "y' R U' R2 U R U B U2 B' R"]
+    },
+    {
+      name: "AS 3",
+      fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#ee8800","#ee8800","#ee8800","#ee8800","#2040d0","#2040d0","#2040d0","#2040d0","#d00000","#ffff00","#11aa00","#2040d0","#ffff00","#d00000","#ee8800","#ffff00"],
+      algs: ["y2 F' L F L' U2 L' U2 L", "R' U L U' R U L'", "y2 F' R U R' U2 R' F2 R", "y R' F R F' R U2 R' U' R' F R F'"]
+    },
+    {
+      name: "AS 4",
+      fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ee8800","#ee8800","#ee8800","#ee8800","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#ffff00","#11aa00","#2040d0","#ffff00","#ee8800","#d00000","#ffff00"],
+      algs: ["y2 R' F R F' R U R'", "U2 L' U R U' L U R'", "y2 L' U L F' R U R'", "x' R' F R U' R U R'"]
+    },
+    {
+      name: "AS 5",
+      fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#ee8800","#ee8800","#ee8800","#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#ffff00","#11aa00","#d00000","#ffff00","#ee8800","#2040d0","#ffff00"],
+      algs: ["y2 R U2 R' U2 R' F R F'", "L U2 L' U2 x' L' U L U'", "x' R U2 R' F2 R' F R U'", "y' z F R2 F' R' U' R' U z' y' R U' R'"]
+    },
+    {
+      name: "AS 6",
+      fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#ee8800","#ee8800","#ee8800","#11aa00","#11aa00","#11aa00","#11aa00","#2040d0","#2040d0","#2040d0","#2040d0","#d00000","#ffff00","#11aa00","#ee8800","#ffff00","#d00000","#2040d0","#ffff00"],
+      algs: ["y' R U2 R' U' R U' R' F R' F' R U R U' R' U'", "R2 F R U2 R U' R' U2 F' R", "y R U R2 F' R F R U' R2 F R", "R2 F' U' R2 F' R2 U F R2"]
+    }
+  ],
+  "H": [
+    {
+      name: "H 1",
+      fills: ["#d00000","#d00000","#d00000","#d00000","#2040d0","#2040d0","#2040d0","#2040d0","#ee8800","#ee8800","#ee8800","#ee8800","#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#ee8800","#ffff00","#ffff00","#11aa00","#d00000","#ffff00","#ffff00"],
+      algs: ["F R2 U' R2 U' R2 U R2 F'", "F R U' R' U R U2 R' U' R U R' U' F'", "y' R' U2 R y R' U R' U' R U' R", "y2 F R U R' U' R F' R U R' U' R'"]
+    },
+    {
+      name: "H 2",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#d00000","#d00000","#ffff00","#ffff00","#11aa00","#2040d0","#ffff00","#ffff00"],
+      algs: ["R U R' U R U R' F R' F' R", "y2 R' F' R U' R' F' R F' R U R'", "R U R' U R U L' U R' U' L", "y R U' R' F U2 R2 F R U' R"]
+    },
+    {
+      name: "H 3",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#ee8800","#ffff00","#ffff00","#d00000","#ee8800","#ffff00","#ffff00"],
+      algs: ["y F R U R' U' R U R' U' R U R' U' F'", "y x' U2 R U2 R2 F2 R U2 x", "R U' R' F R' F' R2 U' R' F R' F' R", "R' F R F' R U R2 F R F' R U R'"]
+    },
+    {
+      name: "H 4",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#d00000","#ffff00","#ffff00","#ee8800","#ee8800","#ffff00","#ffff00"],
+      algs: ["y R2 U2 R' U2 R2", "y R2 U2 R U2 R2", "R U R' U R U' R' U R U2 R'", "y' R U2 R' U' R U R' U' R U' R'"]
+    }
+  ],
+  "L": [
+    {
+      name: "L 1",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ee8800","#ee8800","#d00000","#11aa00","#d00000","#11aa00","#ffff00"],
+      algs: ["y R U2 R' F' R U2 R' U R' F2 R", "y R' U' R U2 R' F R' F' R U' R", "R' F' R U R' U' R' F R2 U' R' U2 R", "U' R U R' U R' F R F' U2 R' F R F'"]
+    },
+    {
+      name: "L 2",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#11aa00","#ee8800","#11aa00","#ee8800","#d00000","#d00000","#ffff00"],
+      algs: ["y2 R U2 R2 F2 R U R' F2 R F'", "R U' R' U R U' R' F R' F' R2 U R'", "R' U2 R' U' F R2 F' U R2", "y2 R' F2 R2 U2 R' U R' F2 R F'"]
+    },
+    {
+      name: "L 3",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#d00000","#d00000","#d00000","#d00000","#ffff00","#d00000","#ee8800","#11aa00","#ee8800","#11aa00","#2040d0","#ffff00"],
+      algs: ["y2 R' U R' U2 R U' R' U R U' R2", "y2 R2 U' R U2 R' U2 R U' R2", "y' R U R' U R U' R' U R U' R' U R U2 R'", "y R U' R U' R U2 R' U R' U R'"]
+    },
+    {
+      name: "L 4",
+      fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#11aa00","#11aa00","#ee8800","#2040d0","#d00000","#d00000","#ffff00"],
+      algs: ["y R U2 R2 F R F' R U2 R'", "R U2 R' F R' F' R2 U2 R'", "y2 R U R' L' U2 R U R' U2 L", "y' R' U' R U R' F' R U R' U' R' F R2"]
+    },
+    {
+      name: "L 5",
+      fills: ["#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#2040d0","#d00000","#11aa00","#ee8800","#d00000","#ee8800","#ffff00"],
+      algs: ["y F R' F' R U R U' R'", "y F R' F' U' R' U R", "y F' U R U' R' F2 R U' R'", "y' R' F' L' F R F' L F"]
+    },
+    {
+      name: "L 6",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#d00000","#ee8800","#d00000","#11aa00","#ee8800","#2040d0","#ffff00"],
+      algs: ["y2 F' R U R' U' R' F R", "y F R U' R' U' R U R' F'", "R U R U' R' F R' F'", "y R' F R U F U' F'"]
+    }
+  ],
+  "Pi": [
+    {
+      name: "Pi 1",
+      fills: ["#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#d00000","#d00000","#d00000","#ee8800","#ee8800","#ee8800","#ee8800","#11aa00","#11aa00","#11aa00","#11aa00","#ee8800","#2040d0","#ffff00","#2040d0","#ffff00","#ffff00","#ffff00","#d00000"],
+      algs: ["y F R' F' R U2 R U' R' U R U2 R'", "R' F2 R F' U2 R U' R' U' F", "U F U R U' R' U R U' R2 F' R U R U' R'", "y2 L' U2 L U L' U' L U2 L F' L' F"]
+    },
+    {
+      name: "Pi 2",
+      fills: ["#d00000","#d00000","#d00000","#d00000","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#ee8800","#ee8800","#ee8800","#ee8800","#11aa00","#ee8800","#ffff00","#d00000","#ffff00","#ffff00","#ffff00","#11aa00"],
+      algs: ["R U2 R' U' R U R' U2 R' F R F'", "y F' R U R' U2 R' F R U' R' F2 R", "R U R' U' R' F R2 U R' U' R U R' U' F'", "R2 U' R' U' F R2 U2 F' R2 F"]
+    },
+    {
+      name: "Pi 3",
+      fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#d00000","#d00000","#d00000","#d00000","#d00000","#d00000","#d00000","#d00000","#ee8800","#ee8800","#ee8800","#ee8800","#2040d0","#2040d0","#ffff00","#11aa00","#ffff00","#ffff00","#ffff00","#11aa00"],
+      algs: ["y F R2 U' R2 U R2 U R2 F'", "y' R U' R U' R' U R' F R2 F'", "y2 F R' F' R U2 F R' F' R2 U2 R'", "U' R' F R U F U' R U R' U' F'"]
+    },
+    {
+      name: "Pi 4",
+      fills: ["#d00000","#d00000","#d00000","#d00000","#d00000","#d00000","#d00000","#d00000","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#11aa00","#2040d0","#ffff00","#2040d0","#ffff00","#ffff00","#ffff00","#11aa00"],
+      algs: ["y2 R' F R F' R U' R' U' R U' R'", "R U' R' F R' F R U R' F R", "R U' R' F L' U L U L' U L", "y' R U' R2 D' R U R' D R2 U R'"]
+    },
+    {
+      name: "Pi 5",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#d00000","#d00000","#d00000","#d00000","#ee8800","#ee8800","#ee8800","#ee8800","#d00000","#ee8800","#ffff00","#11aa00","#ffff00","#ffff00","#ffff00","#11aa00"],
+      algs: ["y' R' U' R' F R F' R U' R' U2 R", "R2 U R' U' F R F' R U' R2", "U' R' U' R' F R F' R U' R' U2 R", "y' R U R' U R' F R F' R U' R' U R U2 R'"]
+    },
+    {
+      name: "Pi 6",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#d00000","#d00000","#ffff00","#2040d0","#ffff00","#ffff00","#ffff00","#11aa00"],
+      algs: ["F R U R' U' R U R' U' F'", "R U' R2 U R2 U R2 U' R", "R' U R2 U' R2 U' R2 U R'", "R U2 R2 U' R2 U' R2 U2 R"]
+    }
+  ],
+  "Sune": [
+    {
+      name: "Sune 1",
+      fills: ["#d00000","#d00000","#d00000","#d00000","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ee8800","#2040d0","#ffff00","#d00000","#ffff00","#11aa00","#ee8800"],
+      algs: ["L' U2 L U2 L F' L' F", "y2 R' U2 R U2 R B' R' B", "R' F2 R U2 R U' R' F", "R' F2 R U2 L F' L' F"]
+    },
+    {
+      name: "Sune 2",
+      fills: ["#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#d00000","#d00000","#d00000","#d00000","#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#2040d0","#d00000","#ffff00","#2040d0","#ffff00","#ee8800","#11aa00"],
+      algs: ["R U R' U' R' F R F' R U R' U R U2 R'", "R U2 R' F R U2 R' U R U' R' F", "y2 R U' R U' R' U R' U' y R U' R'", "R2 F' U' R2 F R2 U F R2"]
+    },
+    {
+      name: "Sune 3",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#d00000","#d00000","#d00000","#ffff00","#ee8800","#ee8800","#ffff00","#d00000","#ffff00","#11aa00","#2040d0"],
+      algs: ["R U' R' F R' F' R", "R U' R' F L' U' L", "L F' L' F L' U' L", "R U' L' U R' U' L"]
+    },
+    {
+      name: "Sune 4",
+      fills: ["#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#d00000","#d00000","#d00000","#d00000","#ffff00","#ee8800","#d00000","#ffff00","#ee8800","#ffff00","#11aa00","#2040d0"],
+      algs: ["F R' F' R U2 R U2 R'", "y2 x' U R' F' R F2 R U2 R'", "y R U' R' F R' F2 R U R U' R' F", "y' x' R U' R' U R' F2 R F R U' R' U x"]
+    },
+    {
+      name: "Sune 5",
+      fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#d00000","#d00000","#d00000","#d00000","#ffff00","#11aa00","#11aa00","#ffff00","#ee8800","#ffff00","#d00000","#2040d0"],
+      algs: ["y2 R U R' U R' F R F' R U2 R'", "y' R' F R2 F' U' R' U' R2 U R'", "U2 R U R' U R' F R F' R U2 R'", "R U R' U' R' F R F' R U' R' F R' F' R"]
+    },
+    {
+      name: "Sune 6",
+      fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#d00000","#d00000","#d00000","#ffff00","#2040d0","#11aa00","#ffff00","#d00000","#ffff00","#ee8800","#2040d0"],
+      algs: ["R U R' U R U2 R'", "R U R2 U' R2 U R", "y' R' U2 R U R' U R", "y L' U2 L U L' U L"]
+    }
+  ],
+  "T": [
+    {
+      name: "T 1",
+      fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#ee8800","#ffff00","#ffff00","#d00000","#2040d0","#11aa00","#d00000"],
+      algs: ["y' R U R' U' R' F R F'", "y2 R' U' R U F R F'", "U' x L U R' U' L' U R U' x'", "y R B R' U' R' U R F' z"]
+    },
+    {
+      name: "T 2",
+      fills: ["#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#d00000","#d00000","#d00000","#d00000","#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#2040d0","#ffff00","#ffff00","#2040d0","#d00000","#ee8800","#11aa00"],
+      algs: ["y L' U' L U L F' L' F", "y R' F' R U R U' R' F", "R U R' U' y L' U' L", "y' F R U' R' U R U R' F'"]
+    },
+    {
+      name: "T 3",
+      fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#d00000","#d00000","#d00000","#d00000","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#ee8800","#ffff00","#ffff00","#2040d0","#d00000","#11aa00","#11aa00"],
+      algs: ["F U' R U2 R' U' F2 R U R'", "y R U2 R2 F R F' R U' R' U R U2 R'", "y2 R U F R' F' R U2 R U2 R2", "y' R U' B U2 B' U' R2 F R F'"]
+    },
+    {
+      name: "T 4",
+      fills: ["#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#2040d0","#ffff00","#ffff00","#d00000","#2040d0","#ee8800","#d00000"],
+      algs: ["R' U R U2 R2 F' R U' R' F2 R2", "y R' U R' F U' R U F2 R2", "y2 R' U R' U2 R U2 R' U R2 U' R'", "u' R U R' U R U2 R' L' U' L U' L' U2 L U"]
+    },
+    {
+      name: "T 5",
+      fills: ["#d00000","#d00000","#d00000","#d00000","#ffff00","#ffff00","#ffff00","#ffff00","#d00000","#d00000","#d00000","#d00000","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#2040d0","#ffff00","#ffff00","#2040d0","#11aa00","#ee8800","#ee8800"],
+      algs: ["y2 F R U R' U' R U' R' U' R U R' F'", "y' R U R' U' R U' R' F' U' F R U R'", "y R U R' U2 R U R' U R' F R F'", "y R2 F' R U' R' F2 R F R' F' R2"]
+    },
+    {
+      name: "T 6",
+      fills: ["#d00000","#d00000","#d00000","#d00000","#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#2040d0","#ffff00","#ffff00","#11aa00","#2040d0","#ee8800","#d00000"],
+      algs: ["R' U R U2 R2 F R F' R", "U2 y z R U R' U' R' F R2 U' R' U' R U R' F'", "y2 R U' R' U2 L2 F' L' U L'", "y2 R' F R U2 R2 F R U' R"]
+    }
+  ],
+  "U": [
+    {
+      name: "U 1",
+      fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#2040d0","#ffff00","#2040d0","#d00000","#d00000"],
+      algs: ["y' F R U R' U' F'", "y F U R U' R' F'", "R' F' U' F U R", "y' R' U' F R' F' R U R"]
+    },
+    {
+      name: "U 2",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#d00000","#ee8800","#ee8800","#ffff00","#d00000","#2040d0","#11aa00"],
+      algs: ["R' U' R2 U R' U2 R U2 R' U R'", "y' R2 F2 R U R' F R2 U2 R' U' R", "R' F U' R U' R' U2 F2 R", "y2 R2 F2 R U R' F U' R U R2"]
+    },
+    {
+      name: "U 3",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#ee8800","#d00000","#ffff00","#11aa00","#d00000","#ee8800"],
+      algs: ["y2 F R U R' U2 F' R U' R' F", "R' F R U' R' U' R U R' F' R U R' U' R' F R F' R", "y' R U2 R U' R' F R' F2 U' F", "y' z' U2 R' U' R2 U' R' U' R U' R' U' x2"]
+    },
+    {
+      name: "U 4",
+      fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#ee8800","#ee8800","#ffff00","#2040d0","#d00000","#d00000"],
+      algs: ["y' F R' F' R U' R U' R' U2 R U' R'", "F R U' R' U R U R' U R U' R' F'", "R2 F R F' R' F2 R U R' F R2", "F' L' U' L U' L' U' L U L' U L F U'"]
+    },
+    {
+      name: "U 5",
+      fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#d00000","#ffff00","#ee8800","#d00000","#2040d0"],
+      algs: ["R U' R2 F R F' R U R' U' R U R'", "y2 R U2 R' U R' F2 R F' R' F2 R", "R2 D' R U2 R' D R U2 R", "y2 R2 U R2 F' R U R U' R' F R U' R2"]
+    },
+    {
+      name: "U 6",
+      fills: ["#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#d00000","#2040d0","#ffff00","#2040d0","#11aa00","#d00000"],
+      algs: ["R' U R' F R F' R U2 R' U R", "L' U L2 F' L' F L' U' L U L' U' L", "y' R' U' R2 U' R' U2 R B' R2 F z'", "R F' U' R' U' R2 U R' U' R' F R"]
+    }
+  ]
+};
+
+// ============================================================
+// SVG GENERATION
+// ============================================================
+
+function createCubeSVG(fills) {
+  const size = 100;
+  const cellSize = 24;
+  const sideWidth = 12;
+  const gap = 2;
+  const cornerR = 2;
+
+  // Center of the grid
+  const cx = size / 2;
+  const cy = size / 2;
+
+  // Top face positions (2x2 grid in center)
+  const topX = cx - cellSize - gap/2;
+  const topY = cy - cellSize - gap/2;
+
+  // Extract colors from fills
+  const UBL = fills[0];   // top-left of top face
+  const UFL = fills[4];   // bottom-left of top face
+  const UBR = fills[8];   // top-right of top face
+  const UFR = fills[12];  // bottom-right of top face
+  const backL  = fills[16];
+  const frontL = fills[17];
+  const leftT  = fills[18];
+  const rightT = fills[19];
+  const backR  = fills[20];
+  const frontR = fills[21];
+  const leftB  = fills[22];
+  const rightB = fills[23];
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`;
+
+  // Helper function for rounded rect
+  const rect = (x, y, w, h, fill, r = cornerR) =>
+    `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" ry="${r}" fill="${fill}" stroke="#0c0c0f" stroke-width="1.5"/>`;
+
+  // Top face (2x2 stickers)
+  svg += rect(topX, topY, cellSize, cellSize, UBL);
+  svg += rect(topX + cellSize + gap, topY, cellSize, cellSize, UBR);
+  svg += rect(topX, topY + cellSize + gap, cellSize, cellSize, UFL);
+  svg += rect(topX + cellSize + gap, topY + cellSize + gap, cellSize, cellSize, UFR);
+
+  // Side stickers (strips around the edges)
+  // Back side (top edge)
+  svg += rect(topX, topY - sideWidth - gap, cellSize, sideWidth, backL);
+  svg += rect(topX + cellSize + gap, topY - sideWidth - gap, cellSize, sideWidth, backR);
+
+  // Front side (bottom edge)
+  svg += rect(topX, topY + 2*cellSize + 2*gap, cellSize, sideWidth, frontL);
+  svg += rect(topX + cellSize + gap, topY + 2*cellSize + 2*gap, cellSize, sideWidth, frontR);
+
+  // Left side (left edge)
+  svg += rect(topX - sideWidth - gap, topY, sideWidth, cellSize, leftT);
+  svg += rect(topX - sideWidth - gap, topY + cellSize + gap, sideWidth, cellSize, leftB);
+
+  // Right side (right edge)
+  svg += rect(topX + 2*cellSize + 2*gap, topY, sideWidth, cellSize, rightT);
+  svg += rect(topX + 2*cellSize + 2*gap, topY + cellSize + gap, sideWidth, cellSize, rightB);
+
+  svg += `</svg>`;
+  return svg;
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+
+const groups = Object.keys(CLL_DATA);
+const tabsEl = document.getElementById('tabs');
+const containerEl = document.getElementById('casesContainer');
+
+// Create tabs
+groups.forEach((group, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'tab-btn' + (i === 0 ? ' active' : '');
+  btn.innerHTML = `${group}<span class="count">${CLL_DATA[group].length}</span>`;
+  btn.dataset.group = group;
+  btn.addEventListener('click', () => switchTab(group));
+  tabsEl.appendChild(btn);
+});
+
+// Create panels
+groups.forEach((group, i) => {
+  const panel = document.createElement('div');
+  panel.className = 'tab-panel' + (i === 0 ? ' active' : '');
+  panel.id = `panel-${group}`;
+
+  const grid = document.createElement('div');
+  grid.className = 'cases-grid';
+
+  CLL_DATA[group].forEach(caseData => {
+    const card = document.createElement('div');
+    card.className = 'case-card';
+
+    const diagramDiv = document.createElement('div');
+    diagramDiv.className = 'cube-diagram';
+    diagramDiv.innerHTML = createCubeSVG(caseData.fills);
+
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'case-name';
+    nameDiv.textContent = caseData.name;
+    diagramDiv.appendChild(nameDiv);
+
+    const algList = document.createElement('div');
+    algList.className = 'alg-list';
+
+    caseData.algs.forEach((alg, j) => {
+      const item = document.createElement('div');
+      item.className = 'alg-item';
+      item.innerHTML = `<span class="alg-num">${j + 1}.</span>${alg}`;
+      algList.appendChild(item);
+    });
+
+    card.appendChild(diagramDiv);
+    card.appendChild(algList);
+    grid.appendChild(card);
+  });
+
+  panel.appendChild(grid);
+  containerEl.appendChild(panel);
+});
+
+function switchTab(group) {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.group === group);
+  });
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.id === `panel-${group}`);
+  });
+}
+</script>
+</body>
+</html>

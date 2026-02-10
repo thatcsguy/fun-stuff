@@ -1,0 +1,3 @@
+[    1804ms] X
+[    2054ms] [WARNING] This page imports code from the following URL: "https://cdn.cubing.net/js/cubing/twisty". To ensure backwards compatibility, please update this to use the `/v0/` namespace: "https://cdn.cubing.net/v0/js/cubing/twisty" @ https://cdn.cubing.net/v0/js/chunks/chunk-4JKWPNFH.js:0
+[    2054ms] [WARNING] This page imports code from the following URL: "https://cdn.cubing.net/js/cubing/puzzles". To ensure backwards compatibility, please update this to use the `/v0/` namespace: "https://cdn.cubing.net/v0/js/cubing/puzzles" @ https://cdn.cubing.net/v0/js/chunks/chunk-4JKWPNFH.js:0
