@@ -153,6 +153,9 @@
     border-color: var(--accent-dim);
     box-shadow: 0 0 20px rgba(200, 162, 255, 0.04);
   }
+  .case-card.progress-green { background: rgba(17, 170, 0, 0.08); }
+  .case-card.progress-yellow { background: rgba(255, 255, 0, 0.07); }
+  .case-card.progress-red { background: rgba(208, 0, 0, 0.10); }
 
   /* --- SVG Cube Diagram --- */
   .cube-diagram {
@@ -236,87 +239,109 @@ const CLL_DATA = {
   "AS": [
     {
       name: "AS 1",
+      rotate: 180,
       fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#ee8800","#ee8800","#ee8800","#d00000","#d00000","#d00000","#d00000","#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#ffff00","#ee8800","#11aa00","#ffff00","#d00000","#2040d0","#ffff00"],
-      algs: ["y R U2 R' U' R U' R'", "y2 L' U' L U' L' U2 L", "R' U' R U' R' U2 R", "U2 L' U' L U' L' U2 L"]
+      algs: ["y' R U2 R' U' R U' R'"],
+      progress: "GREEN"
     },
     {
       name: "AS 2",
+      rotate: 180,
       fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#2040d0","#2040d0","#2040d0","#2040d0","#d00000","#d00000","#d00000","#d00000","#ee8800","#ffff00","#2040d0","#d00000","#ffff00","#11aa00","#ee8800","#ffff00"],
-      algs: ["R U2 R' F R' F' R U' R U' R'", "y2 R' U R U' R2 F R F' R U R' U' R", "L' U' L U' L F' L' F L' U2 L", "y' R U' R2 U R U B U2 B' R"]
+      algs: ["y2 R U2 R' F R' F' R U' R U' R'", "R' U R U' R2 F R F' R U R' U' R", "y2 L' U' L U' L F' L' F L' U2 L", "y R U' R2 U R U B U2 B' R"]
     },
     {
       name: "AS 3",
+      rotate: 180,
       fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#ee8800","#ee8800","#ee8800","#ee8800","#2040d0","#2040d0","#2040d0","#2040d0","#d00000","#ffff00","#11aa00","#2040d0","#ffff00","#d00000","#ee8800","#ffff00"],
-      algs: ["y2 F' L F L' U2 L' U2 L", "R' U L U' R U L'", "y2 F' R U R' U2 R' F2 R", "y R' F R F' R U2 R' U' R' F R F'"]
+      algs: ["F' L F L' U2 L' U2 L", "y2 R' U L U' R U L'", "F' R U R' U2 R' F2 R", "y' R' F R F' R U2 R' U' R' F R F'"]
     },
     {
       name: "AS 4",
+      rotate: 180,
       fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ee8800","#ee8800","#ee8800","#ee8800","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#ffff00","#11aa00","#2040d0","#ffff00","#ee8800","#d00000","#ffff00"],
-      algs: ["y2 R' F R F' R U R'", "U2 L' U R U' L U R'", "y2 L' U L F' R U R'", "x' R' F R U' R U R'"]
+      algs: ["R' F R F' R U R'"],
+      progress: "YELLOW"
     },
     {
       name: "AS 5",
+      rotate: 180,
       fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#ee8800","#ee8800","#ee8800","#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#ffff00","#11aa00","#d00000","#ffff00","#ee8800","#2040d0","#ffff00"],
-      algs: ["y2 R U2 R' U2 R' F R F'", "L U2 L' U2 x' L' U L U'", "x' R U2 R' F2 R' F R U'", "y' z F R2 F' R' U' R' U z' y' R U' R'"]
+      algs: ["R U2 R' U2 R' F R F'"],
+      progress: "GREEN"
     },
     {
       name: "AS 6",
+      rotate: 180,
       fills: ["#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#ee8800","#ee8800","#ee8800","#11aa00","#11aa00","#11aa00","#11aa00","#2040d0","#2040d0","#2040d0","#2040d0","#d00000","#ffff00","#11aa00","#ee8800","#ffff00","#d00000","#2040d0","#ffff00"],
-      algs: ["y' R U2 R' U' R U' R' F R' F' R U R U' R' U'", "R2 F R U2 R U' R' U2 F' R", "y R U R2 F' R F R U' R2 F R", "R2 F' U' R2 F' R2 U F R2"]
+      algs: ["y R U2 R' U' R U' R' F R' F' R U R U' R' U'", "y2 R2 F R U2 R U' R' U2 F' R", "y' R U R2 F' R F R U' R2 F R", "y2 R2 F' U' R2 F' R2 U F R2"]
     }
   ],
   "H": [
     {
       name: "H 1",
       fills: ["#d00000","#d00000","#d00000","#d00000","#2040d0","#2040d0","#2040d0","#2040d0","#ee8800","#ee8800","#ee8800","#ee8800","#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#ee8800","#ffff00","#ffff00","#11aa00","#d00000","#ffff00","#ffff00"],
-      algs: ["F R2 U' R2 U' R2 U R2 F'", "F R U' R' U R U2 R' U' R U R' U' F'", "y' R' U2 R y R' U R' U' R U' R", "y2 F R U R' U' R F' R U R' U' R'"]
+      algs: ["F R2 U' R2 U' R2 U R2 F'"],
+      progress: "GREEN"
     },
     {
       name: "H 2",
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#d00000","#d00000","#ffff00","#ffff00","#11aa00","#2040d0","#ffff00","#ffff00"],
-      algs: ["R U R' U R U R' F R' F' R", "y2 R' F' R U' R' F' R F' R U R'", "R U R' U R U L' U R' U' L", "y R U' R' F U2 R2 F R U' R"]
+      algs: ["R U R' U R U R' F R' F' R"],
+      progress: "GREEN"
     },
     {
       name: "H 3",
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#ee8800","#ffff00","#ffff00","#d00000","#ee8800","#ffff00","#ffff00"],
-      algs: ["y F R U R' U' R U R' U' R U R' U' F'", "y x' U2 R U2 R2 F2 R U2 x", "R U' R' F R' F' R2 U' R' F R' F' R", "R' F R F' R U R2 F R F' R U R'"]
+      algs: ["y F R U R' U' R U R' U' R U R' U' F'"],
+      progress: "GREEN"
     },
     {
       name: "H 4",
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#d00000","#ffff00","#ffff00","#ee8800","#ee8800","#ffff00","#ffff00"],
-      algs: ["y R2 U2 R' U2 R2", "y R2 U2 R U2 R2", "R U R' U R U' R' U R U2 R'", "y' R U2 R' U' R U R' U' R U' R'"]
+      algs: ["y R2 U2 R' U2 R2"],
+      progress: "GREEN"
     }
   ],
   "L": [
     {
       name: "L 1",
+      rotate: 90,
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ee8800","#ee8800","#d00000","#11aa00","#d00000","#11aa00","#ffff00"],
-      algs: ["y R U2 R' F' R U2 R' U R' F2 R", "y R' U' R U2 R' F R' F' R U' R", "R' F' R U R' U' R' F R2 U' R' U2 R", "U' R U R' U R' F R F' U2 R' F R F'"]
+      algs: ["R U2 R' F' R U2 R' U R' F2 R", "R' U' R U2 R' F R' F' R U' R"]
     },
     {
       name: "L 2",
+      rotate: 90,
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#11aa00","#ee8800","#11aa00","#ee8800","#d00000","#d00000","#ffff00"],
-      algs: ["y2 R U2 R2 F2 R U R' F2 R F'", "R U' R' U R U' R' F R' F' R2 U R'", "R' U2 R' U' F R2 F' U R2", "y2 R' F2 R2 U2 R' U R' F2 R F'"]
+      algs: ["y R U2 R2 F2 R U R' F2 R F'", "y' R U' R' U R U' R' F R' F' R2 U R'", "y' R' U2 R' U' F R2 F' U R2", "y R' F2 R2 U2 R' U R' F2 R F'"]
     },
     {
       name: "L 3",
+      rotate: 90,
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#d00000","#d00000","#d00000","#d00000","#ffff00","#d00000","#ee8800","#11aa00","#ee8800","#11aa00","#2040d0","#ffff00"],
-      algs: ["y2 R' U R' U2 R U' R' U R U' R2", "y2 R2 U' R U2 R' U2 R U' R2", "y' R U R' U R U' R' U R U' R' U R U2 R'", "y R U' R U' R U2 R' U R' U R'"]
+      algs: ["y R' U R' U2 R U' R' U R U' R2", "y R2 U' R U2 R' U2 R U' R2", "y2 R U R' U R U' R' U R U' R' U R U2 R'", "R U' R U' R U2 R' U R' U R'"]
     },
     {
       name: "L 4",
+      rotate: 90,
       fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#11aa00","#11aa00","#ee8800","#2040d0","#d00000","#d00000","#ffff00"],
-      algs: ["y R U2 R2 F R F' R U2 R'", "R U2 R' F R' F' R2 U2 R'", "y2 R U R' L' U2 R U R' U2 L", "y' R' U' R U R' F' R U R' U' R' F R2"]
+      algs: ["R U2 R2 F R F' R U2 R'"],
+      progress: "GREEN"
     },
     {
       name: "L 5",
+      rotate: 90,
       fills: ["#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#2040d0","#d00000","#11aa00","#ee8800","#d00000","#ee8800","#ffff00"],
-      algs: ["y F R' F' R U R U' R'", "y F R' F' U' R' U R", "y F' U R U' R' F2 R U' R'", "y' R' F' L' F R F' L F"]
+      algs: ["F R' F' R U R U' R'"],
+      progress: "GREEN"
     },
     {
       name: "L 6",
+      rotate: 90,
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#d00000","#ee8800","#d00000","#11aa00","#ee8800","#2040d0","#ffff00"],
-      algs: ["y2 F' R U R' U' R' F R", "y F R U' R' U' R U R' F'", "R U R U' R' F R' F'", "y R' F R U F U' F'"]
+      algs: ["y F' R U R' U' R' F R"],
+      progress: "GREEN"
     }
   ],
   "Pi": [
@@ -333,7 +358,8 @@ const CLL_DATA = {
     {
       name: "Pi 3",
       fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#d00000","#d00000","#d00000","#d00000","#d00000","#d00000","#d00000","#d00000","#ee8800","#ee8800","#ee8800","#ee8800","#2040d0","#2040d0","#ffff00","#11aa00","#ffff00","#ffff00","#ffff00","#11aa00"],
-      algs: ["y F R2 U' R2 U R2 U R2 F'", "y' R U' R U' R' U R' F R2 F'", "y2 F R' F' R U2 F R' F' R2 U2 R'", "U' R' F R U F U' R U R' U' F'"]
+      algs: ["y F R2 U' R2 U R2 U R2 F'"],
+      progress: "YELLOW"
     },
     {
       name: "Pi 4",
@@ -343,29 +369,34 @@ const CLL_DATA = {
     {
       name: "Pi 5",
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#2040d0","#d00000","#d00000","#d00000","#d00000","#ee8800","#ee8800","#ee8800","#ee8800","#d00000","#ee8800","#ffff00","#11aa00","#ffff00","#ffff00","#ffff00","#11aa00"],
-      algs: ["y' R' U' R' F R F' R U' R' U2 R", "R2 U R' U' F R F' R U' R2", "U' R' U' R' F R F' R U' R' U2 R", "y' R U R' U R' F R F' R U' R' U R U2 R'"]
+      algs: ["y' R' U' R' F R F' R U' R' U2 R"],
+      progress: "GREEN"
     },
     {
       name: "Pi 6",
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#11aa00","#11aa00","#11aa00","#11aa00","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#ee8800","#d00000","#d00000","#ffff00","#2040d0","#ffff00","#ffff00","#ffff00","#11aa00"],
-      algs: ["F R U R' U' R U R' U' F'", "R U' R2 U R2 U R2 U' R", "R' U R2 U' R2 U' R2 U R'", "R U2 R2 U' R2 U' R2 U2 R"]
+      algs: ["F R U R' U' R U R' U' F'"],
+      progress: "YELLOW"
     }
   ],
   "Sune": [
     {
       name: "Sune 1",
       fills: ["#d00000","#d00000","#d00000","#d00000","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ee8800","#2040d0","#ffff00","#d00000","#ffff00","#11aa00","#ee8800"],
-      algs: ["L' U2 L U2 L F' L' F", "y2 R' U2 R U2 R B' R' B", "R' F2 R U2 R U' R' F", "R' F2 R U2 L F' L' F"]
+      algs: ["L' U2 L U2 L F' L' F"],
+      progress: "GREEN"
     },
     {
       name: "Sune 2",
       fills: ["#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#d00000","#d00000","#d00000","#d00000","#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#2040d0","#d00000","#ffff00","#2040d0","#ffff00","#ee8800","#11aa00"],
-      algs: ["R U R' U' R' F R F' R U R' U R U2 R'", "R U2 R' F R U2 R' U R U' R' F", "y2 R U' R U' R' U R' U' y R U' R'", "R2 F' U' R2 F R2 U F R2"]
+      algs: ["R U R' U' R' F R F' R U R' U R U2 R'"],
+      progress: "GREEN"
     },
     {
       name: "Sune 3",
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#d00000","#d00000","#d00000","#ffff00","#ee8800","#ee8800","#ffff00","#d00000","#ffff00","#11aa00","#2040d0"],
-      algs: ["R U' R' F R' F' R", "R U' R' F L' U' L", "L F' L' F L' U' L", "R U' L' U R' U' L"]
+      algs: ["R U' R' F R' F' R"],
+      progress: "GREEN"
     },
     {
       name: "Sune 4",
@@ -380,19 +411,22 @@ const CLL_DATA = {
     {
       name: "Sune 6",
       fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#d00000","#d00000","#d00000","#d00000","#ffff00","#2040d0","#11aa00","#ffff00","#d00000","#ffff00","#ee8800","#2040d0"],
-      algs: ["R U R' U R U2 R'", "R U R2 U' R2 U R", "y' R' U2 R U R' U R", "y L' U2 L U L' U L"]
+      algs: ["R U R' U R U2 R'"],
+      progress: "GREEN"
     }
   ],
   "T": [
     {
       name: "T 1",
       fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#ee8800","#ffff00","#ffff00","#d00000","#2040d0","#11aa00","#d00000"],
-      algs: ["y' R U R' U' R' F R F'", "y2 R' U' R U F R F'", "U' x L U R' U' L' U R U' x'", "y R B R' U' R' U R F' z"]
+      algs: ["y' R U R' U' R' F R F'"],
+      progress: "GREEN"
     },
     {
       name: "T 2",
       fills: ["#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#d00000","#d00000","#d00000","#d00000","#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#2040d0","#ffff00","#ffff00","#2040d0","#d00000","#ee8800","#11aa00"],
-      algs: ["y L' U' L U L F' L' F", "y R' F' R U R U' R' F", "R U R' U' y L' U' L", "y' F R U' R' U R U R' F'"]
+      algs: ["y L' U' L U L F' L' F"],
+      progress: "GREEN"
     },
     {
       name: "T 3",
@@ -407,29 +441,34 @@ const CLL_DATA = {
     {
       name: "T 5",
       fills: ["#d00000","#d00000","#d00000","#d00000","#ffff00","#ffff00","#ffff00","#ffff00","#d00000","#d00000","#d00000","#d00000","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#2040d0","#ffff00","#ffff00","#2040d0","#11aa00","#ee8800","#ee8800"],
-      algs: ["y2 F R U R' U' R U' R' U' R U R' F'", "y' R U R' U' R U' R' F' U' F R U R'", "y R U R' U2 R U R' U R' F R F'", "y R2 F' R U' R' F2 R F R' F' R2"]
+      algs: ["y2 F R U R' U' R U' R' U' R U R' F'"],
+      progress: "GREEN"
     },
     {
       name: "T 6",
       fills: ["#d00000","#d00000","#d00000","#d00000","#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#2040d0","#ffff00","#ffff00","#11aa00","#2040d0","#ee8800","#d00000"],
-      algs: ["R' U R U2 R2 F R F' R", "U2 y z R U R' U' R' F R2 U' R' U' R U R' F'", "y2 R U' R' U2 L2 F' L' U L'", "y2 R' F R U2 R2 F R U' R"]
+      algs: ["R' U R U2 R2 F R F' R"],
+      progress: "GREEN"
     }
   ],
   "U": [
     {
       name: "U 1",
       fills: ["#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#ee8800","#ee8800","#ee8800","#ee8800","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#2040d0","#ffff00","#2040d0","#d00000","#d00000"],
-      algs: ["y' F R U R' U' F'", "y F U R U' R' F'", "R' F' U' F U R", "y' R' U' F R' F' R U R"]
+      algs: ["y' F R U R' U' F'"],
+      progress: "GREEN"
     },
     {
       name: "U 2",
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#11aa00","#11aa00","#11aa00","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#d00000","#ee8800","#ee8800","#ffff00","#d00000","#2040d0","#11aa00"],
-      algs: ["R' U' R2 U R' U2 R U2 R' U R'", "y' R2 F2 R U R' F R2 U2 R' U' R", "R' F U' R U' R' U2 F2 R", "y2 R2 F2 R U R' F U' R U R2"]
+      algs: ["R' U' R2 U R' U2 R U2 R' U R'"],
+      progress: "YELLOW"
     },
     {
       name: "U 3",
       fills: ["#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#2040d0","#2040d0","#2040d0","#2040d0","#ffff00","#ffff00","#ffff00","#ffff00","#ffff00","#11aa00","#ee8800","#d00000","#ffff00","#11aa00","#d00000","#ee8800"],
-      algs: ["y2 F R U R' U2 F' R U' R' F", "R' F R U' R' U' R U R' F' R U R' U' R' F R F' R", "y' R U2 R U' R' F R' F2 U' F", "y' z' U2 R' U' R2 U' R' U' R U' R' U' x2"]
+      algs: ["y2 F R U R' U2 F' R U' R' F"],
+      progress: "YELLOW"
     },
     {
       name: "U 4",
@@ -453,7 +492,7 @@ const CLL_DATA = {
 // SVG GENERATION
 // ============================================================
 
-function createCubeSVG(fills) {
+function createCubeSVG(fills, rotate = 0) {
   const size = 100;
   const cellSize = 24;
   const sideWidth = 12;
@@ -483,6 +522,7 @@ function createCubeSVG(fills) {
   const rightB = fills[23];
 
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`;
+  if (rotate) svg += `<g transform="rotate(${rotate}, ${cx}, ${cy})">`;
 
   // Helper function for rounded rect
   const rect = (x, y, w, h, fill, r = cornerR) =>
@@ -511,6 +551,7 @@ function createCubeSVG(fills) {
   svg += rect(topX + 2*cellSize + 2*gap, topY, sideWidth, cellSize, rightT);
   svg += rect(topX + 2*cellSize + 2*gap, topY + cellSize + gap, sideWidth, cellSize, rightB);
 
+  if (rotate) svg += `</g>`;
   svg += `</svg>`;
   return svg;
 }
@@ -544,11 +585,11 @@ groups.forEach((group, i) => {
 
   CLL_DATA[group].forEach(caseData => {
     const card = document.createElement('div');
-    card.className = 'case-card';
+    card.className = 'case-card' + (caseData.progress ? ` progress-${caseData.progress.toLowerCase()}` : '');
 
     const diagramDiv = document.createElement('div');
     diagramDiv.className = 'cube-diagram';
-    diagramDiv.innerHTML = createCubeSVG(caseData.fills);
+    diagramDiv.innerHTML = createCubeSVG(caseData.fills, caseData.rotate);
 
     const nameDiv = document.createElement('div');
     nameDiv.className = 'case-name';
