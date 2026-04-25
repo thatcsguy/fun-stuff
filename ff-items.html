@@ -1,0 +1,1034 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>FFXIV Prices V2</title>
+
+        <script
+            src="https://code.jquery.com/jquery-3.7.1.slim.min.js"
+            integrity="sha256-kmHvs0B+OpCW5GVHUNjv9rOmY0IvSIRcf7zGUDTDQM8="
+            crossorigin="anonymous"
+        ></script>
+
+        <script
+            src="https://cdnjs.cloudflare.com/ajax/libs/jquery.tablesorter/2.31.3/js/jquery.tablesorter.min.js"
+            integrity="sha512-qzgd5cYSZcosqpzpn7zF2ZId8f/8CHmFKZ8j7mU4OUXTNRd5g+ZHBPsgKEwoqxCtdQvExE5LprwwPAgoicguNg=="
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"
+        ></script>
+
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            html,
+            body {
+                height: 100%;
+                font-family:
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    "Helvetica Neue", Arial, sans-serif;
+                background-color: #1a1a1a;
+                color: #e0e0e0;
+            }
+
+            .app-container {
+                display: flex;
+                height: 100vh;
+                overflow: hidden;
+            }
+
+            /* Left Navigation */
+            .sidebar {
+                width: 250px;
+                background-color: #242424;
+                border-right: 1px solid #333;
+                overflow-y: auto;
+                flex-shrink: 0;
+            }
+
+            .sidebar-header {
+                padding: 20px;
+                background-color: #2a2a2a;
+                border-bottom: 1px solid #333;
+            }
+
+            .sidebar-header h1 {
+                font-size: 20px;
+                font-weight: 600;
+                color: #fff;
+                margin-bottom: 5px;
+            }
+
+            .sidebar-header .subtitle {
+                font-size: 12px;
+                color: #888;
+                margin-bottom: 8px;
+            }
+
+            .sidebar-header .sheet-link {
+                font-size: 11px;
+                color: #5f9ea0;
+                text-decoration: none;
+                transition: color 0.2s ease;
+            }
+
+            .sidebar-header .sheet-link:hover {
+                color: #7fbfc1;
+                text-decoration: underline;
+            }
+
+            .nav-items {
+                padding: 10px 0;
+            }
+
+            .nav-item {
+                padding: 12px 20px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                border-left: 3px solid transparent;
+                font-size: 14px;
+            }
+
+            .nav-item:hover {
+                background-color: #2a2a2a;
+                border-left-color: #5f9ea0;
+            }
+
+            .nav-item.active {
+                background-color: #2a2a2a;
+                border-left-color: #5f9ea0;
+                color: #5f9ea0;
+            }
+
+            /* Main Content Area */
+            .main-content {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            .content-header {
+                padding: 20px 30px;
+                background-color: #242424;
+                border-bottom: 1px solid #333;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .content-header h2 {
+                font-size: 24px;
+                font-weight: 600;
+                color: #fff;
+            }
+
+            .server-toggle {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                background-color: #2a2a2a;
+                padding: 8px 16px;
+                border-radius: 6px;
+                border: 1px solid #333;
+            }
+
+            .server-toggle label {
+                font-size: 14px;
+                color: #888;
+                cursor: pointer;
+                transition: color 0.2s ease;
+            }
+
+            .toggle-switch {
+                position: relative;
+                width: 50px;
+                height: 24px;
+                background-color: #444;
+                border-radius: 12px;
+                cursor: pointer;
+                transition: background-color 0.3s ease;
+            }
+
+            .toggle-switch.active {
+                background-color: #5f9ea0;
+            }
+
+            .toggle-slider {
+                position: absolute;
+                top: 2px;
+                left: 2px;
+                width: 20px;
+                height: 20px;
+                background-color: #fff;
+                border-radius: 50%;
+                transition: transform 0.3s ease;
+            }
+
+            .toggle-switch.active .toggle-slider {
+                transform: translateX(26px);
+            }
+
+            .server-toggle label.active {
+                color: #5f9ea0;
+                font-weight: 600;
+            }
+
+            .content-body {
+                flex: 1;
+                overflow-y: auto;
+                padding: 30px;
+            }
+
+            /* Table Styles */
+            .table-container {
+                background-color: #242424;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            th,
+            td {
+                padding: 12px 16px;
+                text-align: left;
+                border-bottom: 1px solid #333;
+            }
+
+            th {
+                background-color: #2a2a2a;
+                color: #5f9ea0;
+                font-weight: 600;
+                font-size: 13px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                position: sticky;
+                top: 0;
+                z-index: 10;
+            }
+
+            td {
+                color: #e0e0e0;
+                font-size: 14px;
+            }
+
+            tbody tr {
+                cursor: pointer;
+                transition: background-color 0.15s ease;
+            }
+
+            tbody tr:hover {
+                background-color: #2a2a2a;
+            }
+
+            tbody tr:last-child td {
+                border-bottom: none;
+            }
+
+            .line {
+                border-right: 2px solid #444;
+            }
+
+            /* Center align numeric columns */
+            td:not(:first-child),
+            th:not(:first-child) {
+                text-align: center;
+            }
+
+            /* Modal Styles */
+            .modal {
+                display: none;
+                position: fixed;
+                z-index: 1000;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.8);
+                backdrop-filter: blur(4px);
+            }
+
+            .modal-content {
+                background-color: #242424;
+                margin: 5vh auto;
+                padding: 30px;
+                border-radius: 12px;
+                width: 80%;
+                max-width: 1000px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            }
+
+            .close {
+                color: #888;
+                float: right;
+                font-size: 32px;
+                font-weight: bold;
+                line-height: 1;
+                cursor: pointer;
+                transition: color 0.2s ease;
+            }
+
+            .close:hover,
+            .close:focus {
+                color: #fff;
+            }
+
+            /* Loading State */
+            .loading {
+                text-align: center;
+                padding: 40px;
+                color: #888;
+                font-size: 16px;
+            }
+
+            .loading::after {
+                content: "...";
+                animation: dots 1.5s steps(4, end) infinite;
+            }
+
+            @keyframes dots {
+                0%,
+                20% {
+                    content: ".";
+                }
+                40% {
+                    content: "..";
+                }
+                60%,
+                100% {
+                    content: "...";
+                }
+            }
+
+            /* Empty State */
+            .empty-state {
+                text-align: center;
+                padding: 60px 20px;
+                color: #666;
+            }
+
+            .empty-state h3 {
+                font-size: 20px;
+                margin-bottom: 10px;
+                color: #888;
+            }
+
+            .empty-state p {
+                font-size: 14px;
+            }
+
+            /* Scrollbar Styling */
+            ::-webkit-scrollbar {
+                width: 10px;
+                height: 10px;
+            }
+
+            ::-webkit-scrollbar-track {
+                background: #1a1a1a;
+            }
+
+            ::-webkit-scrollbar-thumb {
+                background: #444;
+                border-radius: 5px;
+            }
+
+            ::-webkit-scrollbar-thumb:hover {
+                background: #555;
+            }
+
+            /* Responsive Design */
+            @media (max-width: 768px) {
+                .sidebar {
+                    width: 200px;
+                }
+
+                .content-body {
+                    padding: 20px;
+                }
+
+                .modal-content {
+                    width: 95%;
+                    margin: 2vh auto;
+                    padding: 20px;
+                }
+
+                th,
+                td {
+                    padding: 8px 12px;
+                    font-size: 12px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app-container">
+            <!-- Left Sidebar Navigation -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h1>FFXIV Prices</h1>
+                    <div class="subtitle">Market Board Analysis</div>
+                    <a
+                        href="https://docs.google.com/spreadsheets/d/1zhzrXFGqkLyosMZIsSyx3rJGw77-IceVkv1dOhXAtCY/edit?usp=sharing"
+                        target="_blank"
+                        class="sheet-link"
+                        >Edit Item Configuration →</a
+                    >
+                </div>
+                <div class="nav-items" id="nav-items">
+                    <!-- Navigation items will be inserted here -->
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="main-content">
+                <div class="content-header">
+                    <h2 id="content-title">Select a category</h2>
+                    <div class="server-toggle">
+                        <label id="label-world" class="active">Gilgamesh</label>
+                        <div class="toggle-switch" id="server-toggle-switch">
+                            <div class="toggle-slider"></div>
+                        </div>
+                        <label id="label-dc">Aether</label>
+                    </div>
+                </div>
+                <div class="content-body">
+                    <div id="results">
+                        <div class="empty-state">
+                            <h3>Welcome to FFXIV Prices V2</h3>
+                            <p>
+                                Select a category from the left sidebar to view
+                                market data
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for Graph -->
+        <div id="myModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <canvas id="myChart"></canvas>
+            </div>
+        </div>
+
+        <script>
+            const dc = "Aether";
+            const world = "Gilgamesh";
+
+            const longWindowSeconds = 7 * 24 * 60 * 60;
+            const shortWindowSeconds = 24 * 60 * 60;
+
+            // Track current view mode (default to world/Gilgamesh)
+            let currentView = "world"; // "world" or "dc"
+
+            // Google Sheet configuration
+            const SHEET_CSV_URL_DIRECT =
+                "https://docs.google.com/spreadsheets/d/e/2PACX-1vQVnysAz00eunOxQRZlwHcuPjoQdI6HjYJzmHnpTte5NMgarwGSVX4edM13fQBxH2MDpoeXcBxkkjng/pub?gid=0&single=true&output=csv";
+
+            // Use CORS proxy to bypass CORS restrictions when opening file locally
+            const CORS_PROXY = "https://corsproxy.io/?";
+            const SHEET_CSV_URL =
+                CORS_PROXY + encodeURIComponent(SHEET_CSV_URL_DIRECT);
+
+            let itemGroups = [];
+
+            // Parse CSV data into itemGroups structure
+            function parseCSVToItemGroups(csvText) {
+                const lines = csvText.trim().split("\n");
+                const groups = {};
+
+                // Skip header row
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    // Parse CSV line (handle quoted values)
+                    const columns = [];
+                    let currentColumn = "";
+                    let inQuotes = false;
+
+                    for (let j = 0; j < line.length; j++) {
+                        const char = line[j];
+                        if (char === '"') {
+                            inQuotes = !inQuotes;
+                        } else if (char === "," && !inQuotes) {
+                            columns.push(currentColumn);
+                            currentColumn = "";
+                        } else {
+                            currentColumn += char;
+                        }
+                    }
+                    columns.push(currentColumn); // Add last column
+
+                    if (columns.length >= 4) {
+                        const groupName = columns[0].trim();
+                        const itemId = parseInt(columns[1].trim());
+                        const itemName = columns[2].trim();
+                        const itemCost = parseFloat(columns[3].trim());
+
+                        if (!groups[groupName]) {
+                            groups[groupName] = [];
+                        }
+
+                        groups[groupName].push({
+                            id: itemId,
+                            name: itemName,
+                            cost: itemCost,
+                        });
+                    }
+                }
+
+                // Convert to array format
+                const result = [];
+                for (const groupName in groups) {
+                    result.push({
+                        group: groupName,
+                        items: groups[groupName],
+                    });
+                }
+
+                return result;
+            }
+
+            // Load item groups from Google Sheet
+            async function loadItemGroupsFromSheet() {
+                try {
+                    // Add timestamp to bust both Google's and browser cache
+                    const cacheBuster = `&_=${Date.now()}`;
+                    const urlWithCacheBuster = SHEET_CSV_URL + cacheBuster;
+
+                    const response = await fetch(urlWithCacheBuster, {
+                        mode: "cors",
+                        cache: "no-store", // Changed from "no-cache" to "no-store" for more aggressive cache prevention
+                        headers: {
+                            "Cache-Control":
+                                "no-cache, no-store, must-revalidate",
+                            Pragma: "no-cache",
+                            Expires: "0",
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(
+                            `HTTP error! status: ${response.status}`,
+                        );
+                    }
+
+                    const csvText = await response.text();
+                    itemGroups = parseCSVToItemGroups(csvText);
+                    buildNavigation();
+                } catch (error) {
+                    console.error(
+                        "Error loading item groups from sheet:",
+                        error,
+                    );
+                    document.getElementById("nav-items").innerHTML =
+                        '<div style="padding: 20px; color: #ff6b6b;">Failed to load item configuration from Google Sheet.<br><br>Error: ' +
+                        error.message +
+                        "<br><br>Check browser console for details.</div>";
+                }
+            }
+
+            let longData = {};
+            let shortData = {};
+            let longWorldData = {};
+            let shortWorldData = {};
+
+            let graphData = {};
+            let currentChart = null;
+
+            // Map of id to name (will be populated after loading sheet)
+            let itemInfo = {};
+
+            // Build navigation from loaded item groups
+            function buildNavigation() {
+                // Clear existing navigation
+                const navItems = document.getElementById("nav-items");
+                navItems.innerHTML = "";
+
+                // Rebuild itemInfo map
+                itemInfo = {};
+                itemGroups.forEach(function (group) {
+                    group.items.forEach(function (item) {
+                        itemInfo[item.id] = item;
+                    });
+                });
+
+                // Build navigation items
+                itemGroups.forEach(function (group, index) {
+                    const navItem = document.createElement("div");
+                    navItem.className = "nav-item";
+                    navItem.textContent = group.group;
+                    navItem.addEventListener("click", function () {
+                        // Update active state
+                        document
+                            .querySelectorAll(".nav-item")
+                            .forEach((item) => item.classList.remove("active"));
+                        navItem.classList.add("active");
+
+                        // Update header
+                        document.getElementById("content-title").textContent =
+                            group.group;
+
+                        // Fetch data
+                        fetchJsonData(group.group);
+                    });
+                    navItems.appendChild(navItem);
+                });
+            }
+
+            // Setup server toggle functionality
+            const toggleSwitch = document.getElementById(
+                "server-toggle-switch",
+            );
+            const labelWorld = document.getElementById("label-world");
+            const labelDC = document.getElementById("label-dc");
+
+            function updateToggle() {
+                if (currentView === "dc") {
+                    toggleSwitch.classList.add("active");
+                    labelDC.classList.add("active");
+                    labelWorld.classList.remove("active");
+                } else {
+                    toggleSwitch.classList.remove("active");
+                    labelWorld.classList.add("active");
+                    labelDC.classList.remove("active");
+                }
+            }
+
+            toggleSwitch.addEventListener("click", function () {
+                currentView = currentView === "world" ? "dc" : "world";
+                updateToggle();
+
+                // Re-fetch data for current category if one is selected
+                const activeNav = document.querySelector(".nav-item.active");
+                if (activeNav) {
+                    fetchJsonData(activeNav.textContent);
+                }
+            });
+
+            labelWorld.addEventListener("click", function () {
+                if (currentView !== "world") {
+                    currentView = "world";
+                    updateToggle();
+                    const activeNav =
+                        document.querySelector(".nav-item.active");
+                    if (activeNav) {
+                        fetchJsonData(activeNav.textContent);
+                    }
+                }
+            });
+
+            labelDC.addEventListener("click", function () {
+                if (currentView !== "dc") {
+                    currentView = "dc";
+                    updateToggle();
+                    const activeNav =
+                        document.querySelector(".nav-item.active");
+                    if (activeNav) {
+                        fetchJsonData(activeNav.textContent);
+                    }
+                }
+            });
+
+            function showGraph(id) {
+                var modal = document.getElementById("myModal");
+                var span = document.getElementsByClassName("close")[0];
+
+                let quant = [];
+                let price = [];
+                for (const day in graphData) {
+                    quant.push(graphData[day][id].quantity);
+                    price.push(graphData[day][id].medianPrice);
+                }
+                quant.reverse();
+                price.reverse();
+
+                const ctx = document.getElementById("myChart");
+
+                // Destroy previous chart if exists
+                if (currentChart) {
+                    currentChart.destroy();
+                }
+
+                currentChart = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: Object.keys(graphData).reverse(),
+                        datasets: [
+                            {
+                                label: "Price",
+                                data: price,
+                                borderWidth: 2,
+                                borderColor: "#5f9ea0",
+                                backgroundColor: "rgba(95, 158, 160, 0.1)",
+                                yAxisID: "y",
+                                tension: 0.3,
+                            },
+                            {
+                                label: "Quantity",
+                                data: quant,
+                                borderWidth: 2,
+                                borderColor: "#e0e0e0",
+                                backgroundColor: "rgba(224, 224, 224, 0.1)",
+                                yAxisID: "y1",
+                                tension: 0.3,
+                            },
+                        ],
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        scales: {
+                            y: {
+                                type: "linear",
+                                display: true,
+                                position: "left",
+                                title: {
+                                    display: true,
+                                    text: "Price",
+                                    color: "#e0e0e0",
+                                },
+                                ticks: {
+                                    color: "#888",
+                                },
+                                grid: {
+                                    color: "#333",
+                                },
+                                beginAtZero: true,
+                            },
+                            y1: {
+                                type: "linear",
+                                display: true,
+                                position: "right",
+                                grid: {
+                                    drawOnChartArea: false,
+                                    color: "#333",
+                                },
+                                title: {
+                                    display: true,
+                                    text: "Quantity",
+                                    color: "#e0e0e0",
+                                },
+                                ticks: {
+                                    color: "#888",
+                                },
+                                beginAtZero: true,
+                            },
+                            x: {
+                                type: "linear",
+                                display: true,
+                                position: "bottom",
+                                title: {
+                                    display: true,
+                                    text:
+                                        longWindowSeconds <= 24 * 60 * 60
+                                            ? "Hours Ago"
+                                            : "Days Ago",
+                                    color: "#e0e0e0",
+                                },
+                                ticks: {
+                                    color: "#888",
+                                },
+                                grid: {
+                                    color: "#333",
+                                },
+                                reverse: true,
+                            },
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: itemInfo[id].name + " (" + dc + ")",
+                                color: "#fff",
+                                font: {
+                                    size: 16,
+                                },
+                            },
+                            legend: {
+                                labels: {
+                                    color: "#e0e0e0",
+                                },
+                            },
+                        },
+                    },
+                });
+
+                modal.style.display = "block";
+
+                span.onclick = function () {
+                    modal.style.display = "none";
+                    if (currentChart) {
+                        currentChart.destroy();
+                        currentChart = null;
+                    }
+                };
+
+                window.onclick = function (event) {
+                    if (event.target == modal) {
+                        modal.style.display = "none";
+                        if (currentChart) {
+                            currentChart.destroy();
+                            currentChart = null;
+                        }
+                    }
+                };
+            }
+
+            function findMedianPrice(entries) {
+                entries.sort((a, b) => a.pricePerUnit - b.pricePerUnit);
+                let totalQuant = 0;
+                entries.forEach(function (entry) {
+                    totalQuant += entry.quantity;
+                });
+                let median = totalQuant / 2;
+
+                let count = 0;
+                for (let i = 0; i < entries.length; i++) {
+                    count += entries[i].quantity;
+                    if (count >= median) {
+                        return entries[i].pricePerUnit;
+                    }
+                }
+            }
+
+            function fetchJsonData(group) {
+                longData = {};
+                shortData = {};
+                graphData = {};
+                longWorldData = {};
+                shortWorldData = {};
+
+                // Show loading state
+                document.getElementById("results").innerHTML =
+                    '<div class="loading">Loading market data</div>';
+
+                let shortWindowCutoff = Date.now() - shortWindowSeconds * 1000;
+
+                let itemGroup;
+                for (let g of itemGroups) {
+                    if (g.group == group) {
+                        itemGroup = g;
+                        break;
+                    }
+                }
+
+                let groupStr = "";
+                itemGroup.items.forEach(function (item) {
+                    groupStr += item.id + ",";
+                });
+
+                fetch(
+                    "https://universalis.app/api/v2/history/" +
+                        dc +
+                        "/" +
+                        groupStr +
+                        "?entriesToReturn=10000&entriesWithin=" +
+                        longWindowSeconds +
+                        "&minSalePrice=0&maxSalePrice=50000000",
+                )
+                    .then((response) => {
+                        if (!response.ok) {
+                            throw new Error("Network response was not ok");
+                        }
+                        return response.json();
+                    })
+                    .then((data) => {
+                        let results = [];
+
+                        data.itemIDs.forEach(function (id) {
+                            longData[id] = { entries: [] };
+                            shortData[id] = { entries: [] };
+                            longWorldData[id] = { entries: [] };
+                            shortWorldData[id] = { entries: [] };
+
+                            let segmentLength = 24 * 60 * 60 * 1000;
+                            if (longWindowSeconds <= 24 * 60 * 60) {
+                                segmentLength = 60 * 60 * 1000;
+                            }
+                            let now = Date.now();
+
+                            data.items[id].entries.forEach(function (entry) {
+                                longData[id].entries.push(entry);
+
+                                if (
+                                    entry.timestamp * 1000 >
+                                    shortWindowCutoff
+                                ) {
+                                    shortData[id].entries.push(entry);
+                                }
+
+                                if (entry.worldName == world) {
+                                    longWorldData[id].entries.push(entry);
+                                    if (
+                                        entry.timestamp * 1000 >
+                                        shortWindowCutoff
+                                    ) {
+                                        shortWorldData[id].entries.push(entry);
+                                    }
+                                }
+
+                                let d = entry.timestamp * 1000;
+                                let segmentsPast = Math.floor(
+                                    (now - d) / segmentLength,
+                                );
+                                if (!graphData[segmentsPast]) {
+                                    graphData[segmentsPast] = {};
+                                }
+                                if (!graphData[segmentsPast][id]) {
+                                    graphData[segmentsPast][id] = {
+                                        entries: [],
+                                    };
+                                }
+                                graphData[segmentsPast][id].entries.push(entry);
+                            });
+
+                            process(longData[id]);
+                            process(shortData[id]);
+                            process(longWorldData[id]);
+                            process(shortWorldData[id]);
+
+                            for (let segmentsPast in graphData) {
+                                if (!graphData[segmentsPast][id]) {
+                                    graphData[segmentsPast][id] = {
+                                        entries: [],
+                                    };
+                                }
+                                process(graphData[segmentsPast][id]);
+                            }
+                        });
+
+                        let shortSuffix =
+                            " (" + shortWindowSeconds / (60 * 60) + "h)";
+                        let longSuffix =
+                            " (" + longWindowSeconds / (60 * 60 * 24) + "d)";
+
+                        let table =
+                            '<div class="table-container"><table id="resultsTable"><thead>';
+
+                        table += "<tr>";
+                        table += '<th class="line" colspan="2"></th>';
+
+                        if (currentView === "dc") {
+                            table += '<th colspan="6">' + dc + "</th>";
+                        } else {
+                            table += '<th colspan="6">' + world + "</th>";
+                        }
+
+                        table += "</tr>";
+
+                        table += "<tr>";
+                        table += "<th>Item</th>";
+                        table += '<th class="line">Cost</th>';
+
+                        table += "<th>Sold" + longSuffix + "</th>";
+                        table += "<th>Buyers" + longSuffix + "</th>";
+                        table += "<th>Per" + longSuffix + "</th>";
+                        table += "<th>Sold" + shortSuffix + "</th>";
+                        table += "<th>Buyers" + shortSuffix + "</th>";
+                        table += "<th>Per" + shortSuffix + "</th>";
+
+                        table += "</tr></thead><tbody>";
+                        data.itemIDs.forEach(function (id) {
+                            table +=
+                                '<tr onclick="javascript: showGraph(' +
+                                id +
+                                ')">';
+
+                            table += "<td>" + itemInfo[id].name + "</td>";
+                            table +=
+                                '<td class="line">' +
+                                (itemInfo[id].cost < 1
+                                    ? "1/" + Math.round(1 / itemInfo[id].cost)
+                                    : itemInfo[id].cost) +
+                                "</td>";
+
+                            // Choose data based on current view
+                            let viewLongData =
+                                currentView === "dc"
+                                    ? longData[id]
+                                    : longWorldData[id];
+                            let viewShortData =
+                                currentView === "dc"
+                                    ? shortData[id]
+                                    : shortWorldData[id];
+
+                            table += "<td>" + viewLongData.quantity + "</td>";
+                            table += "<td>" + viewLongData.buyerCount + "</td>";
+                            table +=
+                                "<td>" +
+                                Math.round(
+                                    (100 * viewLongData.medianPrice) /
+                                        itemInfo[id].cost,
+                                ) /
+                                    100 +
+                                "</td>";
+                            table += "<td>" + viewShortData.quantity + "</td>";
+                            table +=
+                                "<td>" + viewShortData.buyerCount + "</td>";
+                            table +=
+                                "<td>" +
+                                Math.round(
+                                    (100 * viewShortData.medianPrice) /
+                                        itemInfo[id].cost,
+                                ) /
+                                    100 +
+                                "</td>";
+
+                            table += "</tr>";
+                        });
+                        table += "</tbody></table></div>";
+
+                        document.getElementById("results").innerHTML = table;
+
+                        $(function () {
+                            $("#resultsTable").tablesorter({
+                                sortList: [[5, 1]], // Sort by column index 5 (Sold short suffix), descending (1)
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        console.error("Error fetching JSON:", error);
+                        document.getElementById("results").innerHTML =
+                            '<div class="empty-state"><h3>Error loading data</h3><p>' +
+                            error.message +
+                            "</p></div>";
+                    });
+            }
+
+            function process(data) {
+                let quantity = 0;
+                let sumPrice = 0;
+                let buyers = {};
+
+                data.entries.forEach(function (entry) {
+                    sumPrice += entry.pricePerUnit * entry.quantity;
+                    quantity += entry.quantity;
+                    if (buyers[entry.buyerName] != 1) {
+                        buyers[entry.buyerName] = 1;
+                    }
+                });
+
+                data.quantity = quantity;
+                data.medianPrice = findMedianPrice(data.entries) || 0;
+                data.buyerCount = Object.keys(buyers).length;
+            }
+
+            // Initialize: Load item groups from Google Sheet on page load
+            loadItemGroupsFromSheet();
+        </script>
+    </body>
+</html>
