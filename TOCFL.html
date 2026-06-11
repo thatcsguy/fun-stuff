@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>TOCFL 1A Traditional Chinese Flashcards</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --card: #f8fafc;
+      --card-2: #eef2ff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #f59e0b;
+      --accent-dark: #b45309;
+      --white: #fff;
+      --shadow: 0 24px 80px rgba(0,0,0,.35);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background: radial-gradient(circle at top, #1e293b, var(--bg));
+      color: var(--white);
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      padding: env(safe-area-inset-top) 14px env(safe-area-inset-bottom);
+      overflow: hidden;
+    }
+    .app {
+      width: min(100%, 520px);
+      min-height: 100svh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 14px;
+      padding: 14px 0;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 2px 2px 0;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .title { min-width: 0; }
+    h1 { font-size: 1rem; line-height: 1.2; margin: 0; font-weight: 750; letter-spacing: .01em; }
+    .meta { color: #cbd5e1; font-size: .78rem; margin-top: 3px; }
+    button {
+      border: 0;
+      border-radius: 999px;
+      font: inherit;
+      color: var(--white);
+      background: rgba(255,255,255,.12);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    button:active { transform: scale(.98); }
+    .toggle {
+      padding: 10px 13px;
+      font-size: .82rem;
+      font-weight: 700;
+      white-space: nowrap;
+      background: rgba(245, 158, 11, .22);
+    }
+    .font-toggle {
+      background: rgba(255,255,255,.18);
+      position: fixed;
+      left: calc(12px + env(safe-area-inset-left));
+      top: calc(12px + env(safe-area-inset-top));
+      z-index: 20;
+      box-shadow: 0 10px 30px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.18);
+    }
+    header { padding-top: 52px; }
+    main {
+      position: relative;
+      display: grid;
+      place-items: center;
+      min-height: 0;
+    }
+    .card-wrap {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr) 48px;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav {
+      width: 48px;
+      height: 92px;
+      font-size: 2rem;
+      line-height: 1;
+      display: grid;
+      place-items: center;
+      color: #e2e8f0;
+      user-select: none;
+    }
+    .flashcard {
+      width: 100%;
+      min-height: min(66svh, 520px);
+      border-radius: 30px;
+      background: linear-gradient(150deg, var(--card), var(--card-2));
+      color: var(--text);
+      box-shadow: var(--shadow);
+      display: grid;
+      place-items: center;
+      padding: 30px 22px;
+      text-align: center;
+      user-select: none;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .flashcard::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 80% 10%, rgba(245,158,11,.18), transparent 34%);
+      pointer-events: none;
+    }
+    .content { position: relative; z-index: 1; width: 100%; }
+    .label {
+      color: var(--muted);
+      font-size: .8rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      margin-bottom: 22px;
+    }
+    .zh {
+      font-size: clamp(3.1rem, 17vw, 6.8rem);
+      line-height: 1.1;
+      font-weight: 800;
+      letter-spacing: .02em;
+      overflow-wrap: anywhere;
+    }
+    body.zh-font-serif .zh { font-family: "Noto Serif TC", "Songti TC", "STSong", "PMingLiU", serif; }
+    body.zh-font-sans .zh { font-family: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Heiti TC", sans-serif; }
+    body.zh-font-kai .zh { font-family: "Kaiti TC", "DFKai-SB", "BiauKai", "KaiTi", serif; font-weight: 700; }
+    body.zh-font-ming .zh { font-family: "PMingLiU", "MingLiU", "Songti TC", "Noto Serif TC", serif; font-weight: 700; }
+    .en {
+      font-size: clamp(2rem, 8vw, 3.4rem);
+      line-height: 1.13;
+      font-weight: 800;
+      text-wrap: balance;
+    }
+    .pinyin {
+      margin-top: 22px;
+      color: var(--accent-dark);
+      font-size: clamp(1.35rem, 5.5vw, 2.2rem);
+      font-weight: 800;
+      line-height: 1.25;
+    }
+    .hint {
+      margin-top: 26px;
+      color: var(--muted);
+      font-size: .84rem;
+      font-weight: 650;
+    }
+    footer {
+      display: grid;
+      gap: 10px;
+      padding: 0 4px 6px;
+    }
+    .progress {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: #cbd5e1;
+      font-size: .86rem;
+      font-weight: 650;
+    }
+    .bar {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.14);
+      overflow: hidden;
+    }
+    .fill { height: 100%; width: 0%; background: var(--accent); border-radius: inherit; transition: width .18s ease; }
+    .small-actions { display: flex; justify-content: center; gap: 8px; }
+    .small-actions button { padding: 9px 13px; font-size: .82rem; font-weight: 700; }
+    @media (max-width: 380px) {
+      .card-wrap { grid-template-columns: 40px minmax(0, 1fr) 40px; gap: 5px; }
+      .nav { width: 40px; height: 82px; font-size: 1.7rem; }
+      .flashcard { border-radius: 24px; padding-inline: 16px; }
+      .toggle { padding: 9px 10px; font-size: .76rem; }
+      .header-actions { gap: 6px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="title">
+        <h1>TOCFL 1A Flashcards</h1>
+        <div class="meta">Traditional Chinese · shuffled on load · font button top-left</div>
+      </div>
+      <div class="header-actions">
+        <button id="fontToggle" class="toggle font-toggle" type="button" aria-label="Change Chinese font">Font: Serif</button>
+        <button id="toggleDefault" class="toggle" type="button" aria-label="Change starting side">Start: 中文</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="card-wrap" aria-live="polite">
+        <button id="prev" class="nav" type="button" aria-label="Previous card">‹</button>
+        <section id="card" class="flashcard" role="button" tabindex="0" aria-label="Flashcard. Tap to flip.">
+          <div id="content" class="content"></div>
+        </section>
+        <button id="next" class="nav" type="button" aria-label="Next card">›</button>
+      </div>
+    </main>
+
+    <footer>
+      <div class="progress">
+        <span id="count">1 / 160</span>
+        <span id="sideLabel">Front</span>
+      </div>
+      <div class="bar" aria-hidden="true"><div id="fill" class="fill"></div></div>
+      <div class="small-actions">
+        <button id="footerFontToggle" type="button">Font: Serif</button>
+        <button id="reshuffle" type="button">Reshuffle</button>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    const ORIGINAL_CARDS = [
+  {
+    "zh": "我",
+    "pinyin": "wǒ",
+    "en": "I; me; my"
+  },
+  {
+    "zh": "你 / 妳",
+    "pinyin": "nǐ",
+    "en": "you"
+  },
+  {
+    "zh": "他 / 她",
+    "pinyin": "tā",
+    "en": "he; she; him; her"
+  },
+  {
+    "zh": "我們",
+    "pinyin": "wǒmen",
+    "en": "we; us; our"
+  },
+  {
+    "zh": "你們 / 妳們",
+    "pinyin": "nǐmen",
+    "en": "you, plural"
+  },
+  {
+    "zh": "他們 / 她們",
+    "pinyin": "tāmen",
+    "en": "they; them"
+  },
+  {
+    "zh": "您",
+    "pinyin": "nín",
+    "en": "you, polite"
+  },
+  {
+    "zh": "誰",
+    "pinyin": "shéi",
+    "en": "who"
+  },
+  {
+    "zh": "姓名",
+    "pinyin": "xìngmíng",
+    "en": "full name"
+  },
+  {
+    "zh": "人",
+    "pinyin": "rén",
+    "en": "person; people"
+  },
+  {
+    "zh": "國",
+    "pinyin": "guó",
+    "en": "country; nation"
+  },
+  {
+    "zh": "中國",
+    "pinyin": "Zhōngguó",
+    "en": "China"
+  },
+  {
+    "zh": "美國",
+    "pinyin": "Měiguó",
+    "en": "United States"
+  },
+  {
+    "zh": "日本",
+    "pinyin": "Rìběn",
+    "en": "Japan"
+  },
+  {
+    "zh": "台灣 / 臺灣",
+    "pinyin": "Táiwān",
+    "en": "Taiwan"
+  },
+  {
+    "zh": "名字",
+    "pinyin": "míngzi",
+    "en": "name"
+  },
+  {
+    "zh": "家",
+    "pinyin": "jiā",
+    "en": "home; family"
+  },
+  {
+    "zh": "電話",
+    "pinyin": "diànhuà",
+    "en": "telephone; phone call"
+  },
+  {
+    "zh": "時間",
+    "pinyin": "shíjiān",
+    "en": "time"
+  },
+  {
+    "zh": "小時",
+    "pinyin": "xiǎoshí",
+    "en": "hour"
+  },
+  {
+    "zh": "現在",
+    "pinyin": "xiànzài",
+    "en": "now; at present"
+  },
+  {
+    "zh": "今年",
+    "pinyin": "jīnnián",
+    "en": "this year"
+  },
+  {
+    "zh": "今天",
+    "pinyin": "jīntiān",
+    "en": "today"
+  },
+  {
+    "zh": "明天",
+    "pinyin": "míngtiān",
+    "en": "tomorrow"
+  },
+  {
+    "zh": "昨天",
+    "pinyin": "zuótiān",
+    "en": "yesterday"
+  },
+  {
+    "zh": "早上",
+    "pinyin": "zǎoshàng",
+    "en": "early morning"
+  },
+  {
+    "zh": "上午",
+    "pinyin": "shàngwǔ",
+    "en": "morning"
+  },
+  {
+    "zh": "中午",
+    "pinyin": "zhōngwǔ",
+    "en": "noon"
+  },
+  {
+    "zh": "下午",
+    "pinyin": "xiàwǔ",
+    "en": "afternoon"
+  },
+  {
+    "zh": "晚上",
+    "pinyin": "wǎnshàng",
+    "en": "evening; night"
+  },
+  {
+    "zh": "一",
+    "pinyin": "yī",
+    "en": "one"
+  },
+  {
+    "zh": "二",
+    "pinyin": "èr",
+    "en": "two"
+  },
+  {
+    "zh": "三",
+    "pinyin": "sān",
+    "en": "three"
+  },
+  {
+    "zh": "四",
+    "pinyin": "sì",
+    "en": "four"
+  },
+  {
+    "zh": "五",
+    "pinyin": "wǔ",
+    "en": "five"
+  },
+  {
+    "zh": "六",
+    "pinyin": "liù",
+    "en": "six"
+  },
+  {
+    "zh": "七",
+    "pinyin": "qī",
+    "en": "seven"
+  },
+  {
+    "zh": "八",
+    "pinyin": "bā",
+    "en": "eight"
+  },
+  {
+    "zh": "九",
+    "pinyin": "jiǔ",
+    "en": "nine"
+  },
+  {
+    "zh": "十",
+    "pinyin": "shí",
+    "en": "ten"
+  },
+  {
+    "zh": "兩",
+    "pinyin": "liǎng",
+    "en": "two; both"
+  },
+  {
+    "zh": "時候",
+    "pinyin": "shíhòu",
+    "en": "time; moment"
+  },
+  {
+    "zh": "百",
+    "pinyin": "bǎi",
+    "en": "hundred"
+  },
+  {
+    "zh": "半",
+    "pinyin": "bàn",
+    "en": "half"
+  },
+  {
+    "zh": "千",
+    "pinyin": "qiān",
+    "en": "thousand"
+  },
+  {
+    "zh": "爸爸 / 爸",
+    "pinyin": "bàba / bà",
+    "en": "father; dad"
+  },
+  {
+    "zh": "媽媽 / 媽",
+    "pinyin": "māma / mā",
+    "en": "mother; mom"
+  },
+  {
+    "zh": "哥哥 / 哥",
+    "pinyin": "gēge / gē",
+    "en": "older brother"
+  },
+  {
+    "zh": "弟弟 / 弟",
+    "pinyin": "dìdi / dì",
+    "en": "younger brother"
+  },
+  {
+    "zh": "姊姊 / 姐姐 / 姊 / 姐",
+    "pinyin": "jiějie / jiě",
+    "en": "older sister"
+  },
+  {
+    "zh": "妹妹 / 妹",
+    "pinyin": "mèimei / mèi",
+    "en": "younger sister"
+  },
+  {
+    "zh": "小孩 / 小孩子",
+    "pinyin": "xiǎohái / xiǎoháizi",
+    "en": "child"
+  },
+  {
+    "zh": "的",
+    "pinyin": "de",
+    "en": "possessive or attributive particle"
+  },
+  {
+    "zh": "第",
+    "pinyin": "dì",
+    "en": "ordinal prefix"
+  },
+  {
+    "zh": "分",
+    "pinyin": "fēn",
+    "en": "minute; cent; point; to divide"
+  },
+  {
+    "zh": "點",
+    "pinyin": "diǎn",
+    "en": "o'clock; point; dot"
+  },
+  {
+    "zh": "個",
+    "pinyin": "ge",
+    "en": "general classifier"
+  },
+  {
+    "zh": "歲",
+    "pinyin": "suì",
+    "en": "years old; year of age"
+  },
+  {
+    "zh": "年",
+    "pinyin": "nián",
+    "en": "year"
+  },
+  {
+    "zh": "住",
+    "pinyin": "zhù",
+    "en": "to live; to stay"
+  },
+  {
+    "zh": "來",
+    "pinyin": "lái",
+    "en": "to come"
+  },
+  {
+    "zh": "是",
+    "pinyin": "shì",
+    "en": "to be; correct"
+  },
+  {
+    "zh": "姓",
+    "pinyin": "xìng",
+    "en": "surname; to be surnamed"
+  },
+  {
+    "zh": "覺得",
+    "pinyin": "juéde",
+    "en": "to think; to feel"
+  },
+  {
+    "zh": "喜歡",
+    "pinyin": "xǐhuān",
+    "en": "to like"
+  },
+  {
+    "zh": "打電話",
+    "pinyin": "dǎ diànhuà",
+    "en": "to make a phone call"
+  },
+  {
+    "zh": "漂亮",
+    "pinyin": "piàoliàng",
+    "en": "pretty; beautiful"
+  },
+  {
+    "zh": "高",
+    "pinyin": "gāo",
+    "en": "tall; high"
+  },
+  {
+    "zh": "老",
+    "pinyin": "lǎo",
+    "en": "old; experienced"
+  },
+  {
+    "zh": "好",
+    "pinyin": "hǎo",
+    "en": "good; well; okay"
+  },
+  {
+    "zh": "很",
+    "pinyin": "hěn",
+    "en": "very; quite"
+  },
+  {
+    "zh": "真",
+    "pinyin": "zhēn",
+    "en": "really; true"
+  },
+  {
+    "zh": "電腦",
+    "pinyin": "diànnǎo",
+    "en": "computer"
+  },
+  {
+    "zh": "老師",
+    "pinyin": "lǎoshī",
+    "en": "teacher"
+  },
+  {
+    "zh": "買",
+    "pinyin": "mǎi",
+    "en": "to buy"
+  },
+  {
+    "zh": "忙",
+    "pinyin": "máng",
+    "en": "busy"
+  },
+  {
+    "zh": "學生",
+    "pinyin": "xuéshēng",
+    "en": "student"
+  },
+  {
+    "zh": "大學",
+    "pinyin": "dàxué",
+    "en": "university; college"
+  },
+  {
+    "zh": "學校",
+    "pinyin": "xuéxiào",
+    "en": "school"
+  },
+  {
+    "zh": "中文",
+    "pinyin": "Zhōngwén",
+    "en": "Chinese language"
+  },
+  {
+    "zh": "同學",
+    "pinyin": "tóngxué",
+    "en": "classmate; fellow student"
+  },
+  {
+    "zh": "字",
+    "pinyin": "zì",
+    "en": "character; word"
+  },
+  {
+    "zh": "筆",
+    "pinyin": "bǐ",
+    "en": "pen; pencil; writing brush"
+  },
+  {
+    "zh": "學",
+    "pinyin": "xué",
+    "en": "to learn; to study"
+  },
+  {
+    "zh": "問",
+    "pinyin": "wèn",
+    "en": "to ask"
+  },
+  {
+    "zh": "說",
+    "pinyin": "shuō",
+    "en": "to speak; to say"
+  },
+  {
+    "zh": "寫",
+    "pinyin": "xiě",
+    "en": "to write"
+  },
+  {
+    "zh": "聽",
+    "pinyin": "tīng",
+    "en": "to listen; to hear"
+  },
+  {
+    "zh": "對",
+    "pinyin": "duì",
+    "en": "right; correct; toward"
+  },
+  {
+    "zh": "能",
+    "pinyin": "néng",
+    "en": "can; to be able to"
+  },
+  {
+    "zh": "可以",
+    "pinyin": "kěyǐ",
+    "en": "can; may"
+  },
+  {
+    "zh": "上課",
+    "pinyin": "shàngkè",
+    "en": "to attend class; to teach class"
+  },
+  {
+    "zh": "知道",
+    "pinyin": "zhīdào",
+    "en": "to know"
+  },
+  {
+    "zh": "電視 / 電視機",
+    "pinyin": "diànshì / diànshìjī",
+    "en": "television; TV"
+  },
+  {
+    "zh": "水",
+    "pinyin": "shuǐ",
+    "en": "water"
+  },
+  {
+    "zh": "久",
+    "pinyin": "jiǔ",
+    "en": "a long time"
+  },
+  {
+    "zh": "早",
+    "pinyin": "zǎo",
+    "en": "early; morning"
+  },
+  {
+    "zh": "再",
+    "pinyin": "zài",
+    "en": "again; then"
+  },
+  {
+    "zh": "書",
+    "pinyin": "shū",
+    "en": "book"
+  },
+  {
+    "zh": "電影",
+    "pinyin": "diànyǐng",
+    "en": "movie; film"
+  },
+  {
+    "zh": "以前",
+    "pinyin": "yǐqián",
+    "en": "before; previously"
+  },
+  {
+    "zh": "以後",
+    "pinyin": "yǐhòu",
+    "en": "after; later"
+  },
+  {
+    "zh": "走",
+    "pinyin": "zǒu",
+    "en": "to walk; to go"
+  },
+  {
+    "zh": "等",
+    "pinyin": "děng",
+    "en": "to wait; etc."
+  },
+  {
+    "zh": "看",
+    "pinyin": "kàn",
+    "en": "to see; to look; to read; to watch"
+  },
+  {
+    "zh": "就",
+    "pinyin": "jiù",
+    "en": "then; just; immediately"
+  },
+  {
+    "zh": "什麼 / 甚麼",
+    "pinyin": "shénme",
+    "en": "what; something"
+  },
+  {
+    "zh": "朋友",
+    "pinyin": "péngyǒu",
+    "en": "friend"
+  },
+  {
+    "zh": "東西",
+    "pinyin": "dōngxi",
+    "en": "thing; stuff"
+  },
+  {
+    "zh": "吧",
+    "pinyin": "ba",
+    "en": "suggestion or confirmation particle"
+  },
+  {
+    "zh": "呢",
+    "pinyin": "ne",
+    "en": "question or continuation particle"
+  },
+  {
+    "zh": "嗎",
+    "pinyin": "ma",
+    "en": "yes-no question particle"
+  },
+  {
+    "zh": "找",
+    "pinyin": "zhǎo",
+    "en": "to look for; to find"
+  },
+  {
+    "zh": "做",
+    "pinyin": "zuò",
+    "en": "to do; to make"
+  },
+  {
+    "zh": "再見",
+    "pinyin": "zàijiàn",
+    "en": "goodbye; see you again"
+  },
+  {
+    "zh": "怎麼樣",
+    "pinyin": "zěnmeyàng",
+    "en": "how; how about"
+  },
+  {
+    "zh": "叫",
+    "pinyin": "jiào",
+    "en": "to be called; to call"
+  },
+  {
+    "zh": "謝謝",
+    "pinyin": "xièxie",
+    "en": "thanks; thank you"
+  },
+  {
+    "zh": "對不起",
+    "pinyin": "duìbùqǐ",
+    "en": "sorry; excuse me"
+  },
+  {
+    "zh": "請問",
+    "pinyin": "qǐngwèn",
+    "en": "excuse me, may I ask"
+  },
+  {
+    "zh": "這",
+    "pinyin": "zhè",
+    "en": "this; these"
+  },
+  {
+    "zh": "那",
+    "pinyin": "nà",
+    "en": "that; those"
+  },
+  {
+    "zh": "公共汽車 / 公車",
+    "pinyin": "gōnggòngqìchē / gōngchē",
+    "en": "bus"
+  },
+  {
+    "zh": "車子 / 車",
+    "pinyin": "chēzi / chē",
+    "en": "car; vehicle"
+  },
+  {
+    "zh": "到",
+    "pinyin": "dào",
+    "en": "to arrive; to reach"
+  },
+  {
+    "zh": "去",
+    "pinyin": "qù",
+    "en": "to go"
+  },
+  {
+    "zh": "回",
+    "pinyin": "huí",
+    "en": "to return; to go back"
+  },
+  {
+    "zh": "坐",
+    "pinyin": "zuò",
+    "en": "to sit; to take transport"
+  },
+  {
+    "zh": "這裡 / 這裏 / 這兒",
+    "pinyin": "zhèlǐ / zhèr",
+    "en": "here"
+  },
+  {
+    "zh": "那裡 / 那裏 / 那兒",
+    "pinyin": "nàlǐ / nàr",
+    "en": "there"
+  },
+  {
+    "zh": "哪裡 / 哪裏 / 哪兒",
+    "pinyin": "nǎlǐ / nǎr",
+    "en": "where"
+  },
+  {
+    "zh": "開車",
+    "pinyin": "kāichē",
+    "en": "to drive a car"
+  },
+  {
+    "zh": "錢",
+    "pinyin": "qián",
+    "en": "money"
+  },
+  {
+    "zh": "多少",
+    "pinyin": "duōshǎo",
+    "en": "how much; how many"
+  },
+  {
+    "zh": "給",
+    "pinyin": "gěi",
+    "en": "to give; for; to"
+  },
+  {
+    "zh": "貴",
+    "pinyin": "guì",
+    "en": "expensive; noble"
+  },
+  {
+    "zh": "便宜",
+    "pinyin": "piányí",
+    "en": "cheap; inexpensive"
+  },
+  {
+    "zh": "大",
+    "pinyin": "dà",
+    "en": "big; large"
+  },
+  {
+    "zh": "小",
+    "pinyin": "xiǎo",
+    "en": "small; little"
+  },
+  {
+    "zh": "難",
+    "pinyin": "nán",
+    "en": "difficult"
+  },
+  {
+    "zh": "容易",
+    "pinyin": "róngyì",
+    "en": "easy"
+  },
+  {
+    "zh": "有",
+    "pinyin": "yǒu",
+    "en": "to have; there is"
+  },
+  {
+    "zh": "想",
+    "pinyin": "xiǎng",
+    "en": "to think; to want; to miss"
+  },
+  {
+    "zh": "幾",
+    "pinyin": "jǐ",
+    "en": "how many; several"
+  },
+  {
+    "zh": "塊",
+    "pinyin": "kuài",
+    "en": "piece; classifier for money"
+  },
+  {
+    "zh": "位",
+    "pinyin": "wèi",
+    "en": "honorific classifier for people"
+  },
+  {
+    "zh": "飯",
+    "pinyin": "fàn",
+    "en": "rice; meal"
+  },
+  {
+    "zh": "吃",
+    "pinyin": "chī",
+    "en": "to eat"
+  },
+  {
+    "zh": "請",
+    "pinyin": "qǐng",
+    "en": "please; to invite; to request"
+  },
+  {
+    "zh": "也",
+    "pinyin": "yě",
+    "en": "also"
+  },
+  {
+    "zh": "不",
+    "pinyin": "bù",
+    "en": "no; not"
+  },
+  {
+    "zh": "沒",
+    "pinyin": "méi",
+    "en": "not have; not"
+  },
+  {
+    "zh": "都",
+    "pinyin": "dōu",
+    "en": "all; both"
+  },
+  {
+    "zh": "只",
+    "pinyin": "zhǐ",
+    "en": "only; just"
+  },
+  {
+    "zh": "可是",
+    "pinyin": "kěshì",
+    "en": "but; however"
+  },
+  {
+    "zh": "還是",
+    "pinyin": "háishì",
+    "en": "or; still"
+  },
+  {
+    "zh": "了",
+    "pinyin": "le",
+    "en": "completed-action or change particle"
+  },
+  {
+    "zh": "得",
+    "pinyin": "de",
+    "en": "structural particle after a verb"
+  },
+  {
+    "zh": "過",
+    "pinyin": "guò",
+    "en": "experienced-action particle; to pass"
+  },
+  {
+    "zh": "沒有",
+    "pinyin": "méiyǒu",
+    "en": "not have; there is not"
+  }
+];
+
+    let cards = [];
+    let index = 0;
+    let flipped = false;
+    let defaultSide = localStorage.getItem('tocfl-default-side') || 'zh';
+    const zhFonts = [
+      { id: 'serif', label: 'Serif' },
+      { id: 'sans', label: 'Sans' },
+      { id: 'kai', label: 'Kai' },
+      { id: 'ming', label: 'Ming' }
+    ];
+    let zhFontIndex = Math.max(0, zhFonts.findIndex(f => f.id === (localStorage.getItem('tocfl-zh-font') || 'serif')));
+
+    const content = document.getElementById('content');
+    const count = document.getElementById('count');
+    const fill = document.getElementById('fill');
+    const sideLabel = document.getElementById('sideLabel');
+    const toggleDefault = document.getElementById('toggleDefault');
+    const fontToggle = document.getElementById('fontToggle');
+    const footerFontToggle = document.getElementById('footerFontToggle');
+    const cardEl = document.getElementById('card');
+
+    function shuffle(array) {
+      const a = [...array];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function escapeHTML(value) {
+      return String(value).replace(/[&<>'"]/g, c => ({
+        '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;'
+      }[c]));
+    }
+
+    function applyChineseFont() {
+      const font = zhFonts[zhFontIndex];
+      document.body.classList.remove(...zhFonts.map(f => `zh-font-${f.id}`));
+      document.body.classList.add(`zh-font-${font.id}`);
+      fontToggle.textContent = `Font: ${font.label}`;
+      if (footerFontToggle) footerFontToggle.textContent = `Font: ${font.label}`;
+      localStorage.setItem('tocfl-zh-font', font.id);
+    }
+
+    function render() {
+      const c = cards[index];
+      const showingDefault = !flipped;
+      const showZh = defaultSide === 'zh' ? showingDefault : !showingDefault;
+
+      toggleDefault.textContent = defaultSide === 'zh' ? 'Start: 中文' : 'Start: English';
+      sideLabel.textContent = showingDefault ? 'Front' : 'Back';
+      count.textContent = `${index + 1} / ${cards.length}`;
+      fill.style.width = `${((index + 1) / cards.length) * 100}%`;
+
+      if (showZh) {
+        content.innerHTML = `
+          <div class="label">Traditional Chinese</div>
+          <div class="zh">${escapeHTML(c.zh)}</div>
+          ${flipped || defaultSide === 'en' ? `<div class="pinyin">${escapeHTML(c.pinyin)}</div>` : ''}
+          <div class="hint">Tap card to flip</div>
+        `;
+      } else {
+        content.innerHTML = `
+          <div class="label">English</div>
+          <div class="en">${escapeHTML(c.en)}</div>
+          ${flipped && defaultSide === 'zh' ? `<div class="pinyin">${escapeHTML(c.pinyin)}</div>` : ''}
+          <div class="hint">Tap card to flip</div>
+        `;
+      }
+    }
+
+    function showCard(newIndex) {
+      index = (newIndex + cards.length) % cards.length;
+      flipped = false;
+      render();
+    }
+
+    function flip() {
+      flipped = !flipped;
+      render();
+    }
+
+    function reshuffle() {
+      cards = shuffle(ORIGINAL_CARDS);
+      showCard(0);
+    }
+
+    document.getElementById('prev').addEventListener('click', e => { e.stopPropagation(); showCard(index - 1); });
+    document.getElementById('next').addEventListener('click', e => { e.stopPropagation(); showCard(index + 1); });
+    document.getElementById('reshuffle').addEventListener('click', reshuffle);
+    cardEl.addEventListener('click', flip);
+    cardEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); flip(); }
+      if (e.key === 'ArrowRight') showCard(index + 1);
+      if (e.key === 'ArrowLeft') showCard(index - 1);
+    });
+    toggleDefault.addEventListener('click', () => {
+      defaultSide = defaultSide === 'zh' ? 'en' : 'zh';
+      localStorage.setItem('tocfl-default-side', defaultSide);
+      flipped = false;
+      render();
+    });
+    function cycleChineseFont() {
+      zhFontIndex = (zhFontIndex + 1) % zhFonts.length;
+      applyChineseFont();
+    }
+    fontToggle.addEventListener('click', cycleChineseFont);
+    if (footerFontToggle) footerFontToggle.addEventListener('click', cycleChineseFont);
+
+    let touchStartX = null;
+    cardEl.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].clientX; }, {passive: true});
+    cardEl.addEventListener('touchend', e => {
+      if (touchStartX === null) return;
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      touchStartX = null;
+      if (Math.abs(dx) > 70) {
+        dx < 0 ? showCard(index + 1) : showCard(index - 1);
+      }
+    }, {passive: true});
+
+    applyChineseFont();
+    reshuffle();
+  </script>
+</body>
+</html>
