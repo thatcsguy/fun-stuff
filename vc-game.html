@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Interstellar Venture Round</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS
+   ============================================================ */
+:root{
+  --ink:#eaf0ff;
+  --ink-dim:#a7b2cf;
+  --ink-faint:#6f7b9c;
+  --void:#04050c;
+  --void-2:#080a16;
+  --panel:rgba(18,22,42,.55);
+  --panel-2:rgba(12,15,30,.72);
+  --line:rgba(150,175,255,.14);
+  --line-hot:rgba(150,175,255,.32);
+
+  --c1:#ffc860;  /* Helion      */
+  --c2:#c08bff;  /* Prior       */
+  --c3:#57e6b5;  /* Familiar    */
+  --c4:#6fd8ff;  /* Surface     */
+  --c5:#ff6ba8;  /* Windfall    */
+  --c6:#7f96ff;  /* Pact        */
+  --good:#4fe39a;
+  --bad:#ff5f7a;
+
+  --serif:'Instrument Serif',Georgia,serif;
+  --sans:'Space Grotesk',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+
+  --hud-h:74px;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--void); color:var(--ink);
+  font-family:var(--sans); font-weight:300; line-height:1.65;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+::selection{background:rgba(255,200,96,.28)}
+
+/* ============================================================
+   COSMOS — fixed parallax backdrop
+   ============================================================ */
+#cosmos{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+  background:
+    radial-gradient(1200px 800px at 78% -8%, rgba(64,44,140,.55), transparent 62%),
+    radial-gradient(1000px 700px at 8% 12%, rgba(12,66,120,.45), transparent 60%),
+    radial-gradient(1400px 900px at 50% 108%, rgba(96,26,86,.40), transparent 62%),
+    linear-gradient(180deg,#05060f 0%,#070818 42%,#04050c 100%);
+}
+.neb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.5;mix-blend-mode:screen;will-change:transform}
+.n1{width:52vw;height:52vw;left:-12vw;top:6vh;background:radial-gradient(circle at 40% 40%,rgba(120,80,255,.55),transparent 66%);animation:drift1 34s ease-in-out infinite}
+.n2{width:44vw;height:44vw;right:-10vw;top:28vh;background:radial-gradient(circle at 60% 40%,rgba(255,120,180,.42),transparent 66%);animation:drift2 42s ease-in-out infinite}
+.n3{width:60vw;height:44vw;left:16vw;top:120vh;background:radial-gradient(circle at 50% 50%,rgba(0,190,220,.34),transparent 68%);animation:drift1 50s ease-in-out infinite reverse}
+.n4{width:50vw;height:50vw;right:-6vw;top:210vh;background:radial-gradient(circle at 50% 50%,rgba(255,180,80,.26),transparent 66%);animation:drift2 46s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate3d(0,0,0) scale(1)}50%{transform:translate3d(6vw,-5vh,0) scale(1.14)}}
+@keyframes drift2{0%,100%{transform:translate3d(0,0,0) scale(1.08)}50%{transform:translate3d(-7vw,6vh,0) scale(.94)}}
+
+.stars{position:absolute;left:0;top:0;width:100%;height:100%;will-change:transform}
+.stars i{position:absolute;border-radius:50%;background:#fff}
+.twinkle{animation:tw 4s ease-in-out infinite}
+@keyframes tw{0%,100%{opacity:.15}50%{opacity:1}}
+
+#grid{position:absolute;left:50%;bottom:-30vh;width:260vw;height:90vh;transform:translateX(-50%) perspective(320px) rotateX(64deg);
+  background-image:linear-gradient(rgba(120,160,255,.16) 1px,transparent 1px),linear-gradient(90deg,rgba(120,160,255,.16) 1px,transparent 1px);
+  background-size:64px 64px;mask-image:linear-gradient(to top,#000 0%,transparent 78%);
+  -webkit-mask-image:linear-gradient(to top,#000 0%,transparent 78%);opacity:.55}
+#grain{position:absolute;inset:-50%;opacity:.028;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>")}
+.shooter{position:absolute;height:1px;width:130px;background:linear-gradient(90deg,transparent,#fff);opacity:0;border-radius:2px}
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+#page{position:relative;z-index:2}
+.wrap{width:min(1080px,92vw);margin:0 auto}
+.narrow{width:min(760px,92vw);margin:0 auto}
+
+/* scroll progress */
+#prog{position:fixed;top:0;left:0;height:2px;width:0;z-index:60;
+  background:linear-gradient(90deg,var(--c1),var(--c5),var(--c4));box-shadow:0 0 14px rgba(255,140,200,.7)}
+
+/* ============================================================
+   HERO
+   ============================================================ */
+#hero{min-height:100svh;display:grid;place-items:center;text-align:center;position:relative;padding:8vh 0 12vh}
+#hero .inner{will-change:transform}
+.kicker{font-family:var(--mono);font-size:11px;letter-spacing:.42em;text-transform:uppercase;color:var(--ink-faint)}
+.kicker b{color:var(--c1);font-weight:500}
+h1.title{
+  font-family:var(--serif);font-weight:400;line-height:.92;margin:.18em 0 .1em;
+  font-size:clamp(48px,10.5vw,140px);letter-spacing:-.02em;
+  background:linear-gradient(178deg,#ffffff 6%,#dfe6ff 38%,#8fa4e8 78%,#5d6ba8 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 0 44px rgba(140,170,255,.32));
+}
+h1.title em{font-style:italic;display:block}
+.sub{font-size:clamp(15px,2vw,20px);color:var(--ink-dim);max-width:46ch;margin:1.1em auto 0}
+.sub b{color:var(--ink);font-weight:500}
+.orb{width:clamp(140px,26vw,230px);aspect-ratio:1;border-radius:50%;margin:0 auto 6vh;position:relative;
+  background:radial-gradient(circle at 34% 30%,#fff7e0,#ffb84d 22%,#d0541f 52%,#4b1046 78%,#12081f 100%);
+  box-shadow:0 0 90px rgba(255,150,70,.42),0 0 200px rgba(200,60,180,.28),inset -18px -18px 60px rgba(0,0,0,.6);
+  animation:bob 9s ease-in-out infinite}
+.orb::after{content:'';position:absolute;inset:-16%;border-radius:50%;border:1px solid rgba(255,200,120,.22);
+  transform:rotateX(76deg);box-shadow:0 0 30px rgba(255,180,90,.22)}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
+.scrollcue{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;
+  letter-spacing:.34em;color:var(--ink-faint);text-transform:uppercase}
+.scrollcue span{display:block;width:1px;height:34px;margin:10px auto 0;background:linear-gradient(#8fa4e8,transparent);animation:cue 2.2s ease-in-out infinite}
+@keyframes cue{0%,100%{opacity:.2;transform:scaleY(.5)}50%{opacity:1;transform:scaleY(1)}}
+
+/* ============================================================
+   SECTION FURNITURE
+   ============================================================ */
+section{padding:clamp(64px,10vh,130px) 0;position:relative}
+.eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.4em;text-transform:uppercase;color:var(--ink-faint);
+  display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.eyebrow::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--line-hot),transparent)}
+h2{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5.2vw,58px);line-height:1.02;letter-spacing:-.015em;margin:0 0 .35em}
+h3{font-family:var(--sans);font-weight:500;letter-spacing:.01em;margin:0 0 .5em}
+p{margin:0 0 1em}
+.lead{font-size:clamp(16px,1.6vw,19px);color:var(--ink-dim)}
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .9s cubic-bezier(.16,1,.3,1),transform .9s cubic-bezier(.16,1,.3,1)}
+.reveal.in{opacity:1;transform:none}
+
+/* ============================================================
+   RULES
+   ============================================================ */
+.rules{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(228px,1fr));margin:34px 0 30px}
+.rule{position:relative;padding:26px 22px 24px;border:1px solid var(--line);border-radius:16px;background:var(--panel);
+  backdrop-filter:blur(12px);overflow:hidden}
+.rule::before{content:'';position:absolute;inset:0;background:radial-gradient(320px 160px at 50% -30%,rgba(255,200,96,.16),transparent 70%);pointer-events:none}
+.rule .num{font-family:var(--mono);font-size:11px;color:var(--c1);letter-spacing:.3em}
+.rule h3{font-size:20px;margin:.5em 0 .3em;font-weight:600}
+.rule p{font-size:14.5px;color:var(--ink-dim);margin:0}
+.note{border-left:2px solid var(--c1);padding:6px 0 6px 20px;color:var(--ink-dim);font-size:15.5px}
+.note b{color:var(--ink);font-weight:500}
+.grantbox{display:flex;gap:24px;align-items:center;padding:26px 28px;border-radius:18px;margin-top:20px;
+  border:1px solid rgba(255,200,96,.34);background:linear-gradient(120deg,rgba(255,200,96,.11),rgba(255,200,96,.02));
+  box-shadow:0 0 60px -30px var(--c1)}
+.grantbox .gnum{font-family:var(--mono);font-weight:700;font-size:clamp(36px,6vw,58px);color:var(--c1);line-height:1;
+  text-shadow:0 0 40px rgba(255,200,96,.5);flex:none}
+@media(max-width:560px){.grantbox{flex-direction:column;align-items:flex-start;gap:12px}}
+
+/* ============================================================
+   STARTUP CARDS
+   ============================================================ */
+.card{--ac:var(--c1);position:relative;border:1px solid var(--line);border-radius:22px;background:var(--panel-2);
+  backdrop-filter:blur(16px);padding:clamp(26px,4vw,46px);margin:0 0 34px;overflow:hidden;
+  box-shadow:0 30px 90px -50px #000, inset 0 1px 0 rgba(255,255,255,.05)}
+.card::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--ac),transparent);opacity:.7}
+.card::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background:radial-gradient(520px 260px at var(--mx,20%) -18%,color-mix(in srgb,var(--ac) 22%,transparent),transparent 70%)}
+.card.funded{border-color:color-mix(in srgb,var(--ac) 42%,transparent);
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--ac) 18%,transparent),0 34px 100px -46px color-mix(in srgb,var(--ac) 55%,transparent)}
+.card>*{position:relative;z-index:1}
+.chead{display:flex;gap:20px;align-items:flex-start;margin-bottom:6px}
+.glyph{flex:none;width:54px;height:54px;border-radius:14px;display:grid;place-items:center;font-family:var(--serif);
+  font-size:26px;color:var(--ac);border:1px solid color-mix(in srgb,var(--ac) 38%,transparent);
+  background:color-mix(in srgb,var(--ac) 10%,transparent);box-shadow:0 0 30px -6px color-mix(in srgb,var(--ac) 60%,transparent)}
+.cname{font-family:var(--serif);font-size:clamp(26px,3.6vw,40px);line-height:1.05;margin:0;letter-spacing:-.01em}
+.tag{font-style:italic;color:var(--ac);opacity:.9;font-size:14.5px;margin-top:6px;font-family:var(--serif);font-size:17px}
+.body{color:var(--ink-dim);font-size:15.5px;max-width:64ch}
+.body b,.body strong{color:var(--ink);font-weight:500}
+.hook{color:var(--ink);font-weight:500}
+.hook em{color:var(--ac);font-style:normal}
+
+/* payout tables */
+.tbl{width:100%;border-collapse:collapse;font-size:14.5px;margin:6px 0 4px}
+.tbl caption{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.3em;text-transform:uppercase;
+  color:var(--ink-faint);padding-bottom:10px}
+.tbl td{padding:9px 10px;border-bottom:1px solid rgba(150,175,255,.09);color:var(--ink-dim)}
+.tbl tr:last-child td{border-bottom:0}
+.tbl td:last-child{text-align:right;font-family:var(--mono);font-weight:500;color:var(--ink);white-space:nowrap}
+.tbl td:last-child b{color:var(--ac);font-weight:700;font-size:15px}
+.tbl tr:hover td{background:rgba(150,175,255,.045)}
+.two{display:grid;gap:clamp(20px,3vw,42px);grid-template-columns:1.05fr .95fr;align-items:start}
+@media(max-width:820px){.two{grid-template-columns:1fr}}
+/* right-hand rules panel — self-sufficient, no flavor */
+.rulebox{border:1px solid color-mix(in srgb,var(--ac) 28%,transparent);border-radius:16px;padding:20px 22px 18px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--ac) 8%,transparent),rgba(255,255,255,.014));position:sticky;top:calc(var(--hud-h) + 16px)}
+@media(max-width:820px){.rulebox{position:static}}
+.rbh{font-family:var(--mono);font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:var(--ac);
+  display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.rbh::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,color-mix(in srgb,var(--ac) 45%,transparent),transparent)}
+.rbsub{font-family:var(--mono);font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-faint);
+  margin:20px 0 8px}
+ul.rb{list-style:none;padding:0;margin:10px 0 0;font-size:14.5px;color:var(--ink-dim)}
+ul.rb li{padding:7px 0 7px 18px;position:relative;line-height:1.55}
+ul.rb li::before{content:'';position:absolute;left:0;top:16px;width:7px;height:1px;background:var(--ac);opacity:.65}
+ul.rb b{color:var(--ink);font-weight:500}
+.mx{font-family:var(--mono);font-weight:700;color:var(--ac)}
+.cap{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ac);border:1px solid color-mix(in srgb,var(--ac) 34%,transparent);
+  background:color-mix(in srgb,var(--ac) 8%,transparent);padding:5px 11px;border-radius:100px;margin:4px 6px 4px 0}
+ul.bul{margin:0 0 1em;padding-left:18px;color:var(--ink-dim);font-size:15.5px}
+ul.bul li{margin-bottom:.45em}
+
+/* ============================================================
+   ALLOCATOR
+   ============================================================ */
+.alloc{margin-top:28px;padding:22px;border-radius:16px;border:1px solid var(--line);
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01))}
+.alloc-top{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.alloc-lab{font-family:var(--mono);font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--ink-faint)}
+.amount{font-family:var(--mono);font-weight:700;font-size:clamp(30px,5vw,46px);line-height:1;letter-spacing:-.02em;
+  color:var(--ac);text-shadow:0 0 34px color-mix(in srgb,var(--ac) 45%,transparent);transition:color .25s}
+.amount.zero{color:var(--ink-faint);text-shadow:none}
+.amount small{font-size:13px;font-weight:400;letter-spacing:.2em;color:var(--ink-faint);margin-left:8px;text-shadow:none}
+
+.slider{-webkit-appearance:none;appearance:none;width:100%;height:34px;background:transparent;margin:16px 0 4px;cursor:pointer}
+.slider::-webkit-slider-runnable-track{height:6px;border-radius:100px;
+  background:linear-gradient(90deg,var(--ac) 0 var(--pct,0%),rgba(150,175,255,.14) var(--pct,0%) 100%)}
+.slider::-moz-range-track{height:6px;border-radius:100px;background:rgba(150,175,255,.14)}
+.slider::-moz-range-progress{height:6px;border-radius:100px;background:var(--ac)}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;margin-top:-8px;
+  background:#fff;border:4px solid var(--ac);box-shadow:0 0 22px color-mix(in srgb,var(--ac) 85%,transparent);transition:transform .15s}
+.slider::-moz-range-thumb{width:22px;height:22px;border:4px solid var(--ac);border-radius:50%;background:#fff;
+  box-shadow:0 0 22px color-mix(in srgb,var(--ac) 85%,transparent)}
+.slider:active::-webkit-slider-thumb{transform:scale(1.18)}
+.slider:focus-visible{outline:2px solid var(--ac);outline-offset:6px;border-radius:10px}
+.ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--ink-faint);letter-spacing:.08em}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.chip{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;padding:7px 13px;border-radius:100px;cursor:pointer;
+  border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--ink-dim);transition:.18s;white-space:nowrap}
+.chip:hover{border-color:var(--ac);color:var(--ink);background:color-mix(in srgb,var(--ac) 12%,transparent)}
+.chip:active{transform:translateY(1px)}
+.chip.step{width:34px;text-align:center;padding:7px 0;font-size:14px}
+
+/* conditional sub-inputs */
+.sub-input{margin-top:20px;border-top:1px dashed rgba(150,175,255,.18);padding-top:20px;
+  max-height:0;opacity:0;overflow:hidden;border-top-color:transparent;padding-top:0;margin-top:0;
+  transition:max-height .5s cubic-bezier(.16,1,.3,1),opacity .4s,padding-top .4s,margin-top .4s}
+.sub-input.on{max-height:760px;opacity:1;padding-top:20px;margin-top:20px;border-top-color:rgba(150,175,255,.18)}
+.req{font-family:var(--mono);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--bad);
+  border:1px solid rgba(255,95,122,.4);padding:3px 8px;border-radius:100px;margin-left:8px;vertical-align:2px}
+.req.ok{color:var(--good);border-color:rgba(79,227,154,.4)}
+
+/* rung ladder */
+.ladder{display:flex;flex-direction:column-reverse;gap:6px;margin-top:14px}
+.rung{display:grid;grid-template-columns:34px 1fr auto auto;align-items:center;gap:14px;padding:12px 16px;border-radius:12px;
+  border:1px solid var(--line);background:rgba(255,255,255,.02);cursor:pointer;transition:.2s;position:relative;overflow:hidden}
+.rung:hover{border-color:color-mix(in srgb,var(--c4) 50%,transparent);transform:translateX(4px)}
+.rung .rn{font-family:var(--mono);font-size:12px;color:var(--ink-faint)}
+.rung .rl{font-size:14.5px;color:var(--ink-dim)}
+.rung .rp{font-family:var(--mono);font-size:13px;color:var(--ink)}
+.rung.sel{background:linear-gradient(90deg,color-mix(in srgb,var(--c4) 22%,transparent),transparent);
+  border-color:var(--c4);box-shadow:0 0 34px -10px var(--c4)}
+.rung.sel .rl{color:#fff}.rung.sel .rn{color:var(--c4)}
+.rung.sel .rp{color:var(--c4);font-weight:700}
+.rung .ro{font-family:var(--mono);font-size:9px;letter-spacing:.22em;color:var(--c4);opacity:0;
+  white-space:nowrap;transition:opacity .25s;text-align:right}
+.rung.sel .ro{opacity:.9}
+@media(max-width:820px){.rung{grid-template-columns:34px 1fr auto}.rung .ro{display:none}}
+
+/* pact toggle */
+.pact{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media(max-width:560px){.pact{grid-template-columns:1fr}}
+.pcard{padding:20px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.02);cursor:pointer;transition:.22s;text-align:center}
+.pcard:hover{transform:translateY(-3px)}
+.pcard .pn{font-family:var(--mono);font-size:16px;letter-spacing:.24em;font-weight:700}
+.pcard .pd{font-size:13px;color:var(--ink-faint);margin-top:8px;line-height:1.5}
+.pcard[data-v="R"] .pn{color:#8fd6ff}
+.pcard[data-v="I"] .pn{color:#ffb36b}
+.pcard.sel[data-v="R"]{border-color:#8fd6ff;background:rgba(143,214,255,.1);box-shadow:0 0 40px -14px #8fd6ff}
+.pcard.sel[data-v="I"]{border-color:#ffb36b;background:rgba(255,179,107,.1);box-shadow:0 0 40px -14px #ffb36b}
+
+/* ============================================================
+   HUD
+   ============================================================ */
+#hud{position:fixed;left:0;right:0;top:0;height:var(--hud-h);z-index:50;display:flex;align-items:center;
+  transform:translateY(-102%);transition:transform .5s cubic-bezier(.16,1,.3,1);
+  background:linear-gradient(180deg,rgba(6,8,18,.93),rgba(6,8,18,.66));backdrop-filter:blur(20px) saturate(140%);
+  border-bottom:1px solid var(--line)}
+#hud.on{transform:none}
+#hud .wrap{display:flex;align-items:center;gap:clamp(12px,3vw,34px);width:min(1180px,95vw)}
+.hud-block{display:flex;flex-direction:column;line-height:1.05}
+.hud-lab{font-family:var(--mono);font-size:9px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-faint)}
+.hud-val{font-family:var(--mono);font-size:24px;font-weight:700;letter-spacing:-.01em;transition:color .3s}
+.hud-val.ok{color:var(--good);text-shadow:0 0 24px rgba(79,227,154,.45)}
+.hud-val.over{color:var(--bad);text-shadow:0 0 24px rgba(255,95,122,.5)}
+#hudbar{flex:1;height:12px;border-radius:100px;background:rgba(150,175,255,.10);display:flex;overflow:hidden;
+  border:1px solid var(--line);min-width:60px}
+#hudbar div{height:100%;transition:width .45s cubic-bezier(.16,1,.3,1)}
+#hudbar div.gap{background:repeating-linear-gradient(45deg,rgba(150,175,255,.10) 0 6px,transparent 6px 12px)}
+.pill{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;padding:7px 14px;border-radius:100px;
+  border:1px solid var(--line);color:var(--ink-faint);white-space:nowrap;transition:.3s}
+.pill.ok{color:var(--good);border-color:rgba(79,227,154,.45);background:rgba(79,227,154,.09);
+  box-shadow:0 0 26px -8px var(--good)}
+.pill.bad{color:var(--bad);border-color:rgba(255,95,122,.4);background:rgba(255,95,122,.08)}
+.hud-jump{font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-faint);
+  text-decoration:none;border:1px solid var(--line);padding:7px 14px;border-radius:100px;transition:.2s;white-space:nowrap}
+.hud-jump:hover{color:var(--ink);border-color:var(--line-hot)}
+@media(max-width:820px){.hud-jump,.hud-block.opt{display:none}}
+
+/* ============================================================
+   COLD READ
+   ============================================================ */
+.cold{border:1px solid var(--line);border-radius:22px;padding:clamp(26px,4vw,44px);background:var(--panel-2);
+  backdrop-filter:blur(16px);position:relative;overflow:hidden;--ac:#9fb4ff}
+.cold::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(600px 300px at 80% -20%,rgba(159,180,255,.16),transparent 70%)}
+.cold>*{position:relative;z-index:1}
+.bigread{font-family:var(--mono);font-size:clamp(46px,10vw,88px);font-weight:700;letter-spacing:-.04em;line-height:1;
+  color:#cfd9ff;text-shadow:0 0 50px rgba(159,180,255,.4);text-align:center;margin:8px 0}
+.bigread span{font-size:.42em;color:var(--ink-faint);margin-left:4px;text-shadow:none}
+.gauge{position:relative;height:44px;margin:10px 0 4px}
+.gauge .marks{position:absolute;inset:auto 0 0 0;display:flex;justify-content:space-between;font-family:var(--mono);
+  font-size:10px;color:var(--ink-faint)}
+
+/* ============================================================
+   SUBMIT
+   ============================================================ */
+#submit{padding-bottom:clamp(80px,14vh,160px)}
+.checks{display:grid;gap:9px;margin:26px 0}
+.chk{display:flex;align-items:flex-start;gap:12px;font-size:14.5px;color:var(--ink-faint);
+  font-family:var(--mono);font-size:13px;letter-spacing:.01em;transition:.3s}
+.chk .mk{flex:none;width:19px;height:19px;border-radius:50%;border:1px solid currentColor;display:grid;place-items:center;
+  font-size:11px;margin-top:1px}
+.chk.pass{color:var(--good)}
+.chk.fail{color:var(--bad)}
+.chk.fail .mk{background:rgba(255,95,122,.12)}
+.chk.pass .mk{background:rgba(79,227,154,.12)}
+
+.field{margin:20px 0}
+.field label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.3em;text-transform:uppercase;
+  color:var(--ink-faint);margin-bottom:9px}
+.field input{width:100%;background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:12px;
+  padding:15px 18px;color:var(--ink);font-family:var(--sans);font-size:17px;transition:.2s}
+.field input:focus{outline:none;border-color:var(--c1);background:rgba(255,255,255,.06);
+  box-shadow:0 0 0 4px rgba(255,200,96,.10)}
+.field input::placeholder{color:var(--ink-faint);opacity:.6}
+input[type=number]{-moz-appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+#codebox{margin-top:34px;border-radius:22px;overflow:hidden;position:relative;
+  transition:opacity .6s,transform .6s cubic-bezier(.16,1,.3,1),filter .6s}
+#codebox.locked{opacity:.42;filter:grayscale(.85) blur(1.5px);pointer-events:none;transform:scale(.985)}
+.codeinner{border:1px solid rgba(79,227,154,.35);border-radius:22px;padding:clamp(24px,4vw,38px);
+  background:linear-gradient(150deg,rgba(12,40,30,.7),rgba(10,14,28,.85));position:relative;overflow:hidden}
+#codebox:not(.locked) .codeinner{box-shadow:0 0 70px -26px var(--good),inset 0 1px 0 rgba(255,255,255,.06)}
+.codeinner::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(500px 260px at 50% -40%,rgba(79,227,154,.2),transparent 72%)}
+.codeinner>*{position:relative}
+.thecode{font-family:var(--mono);font-size:clamp(15px,3.1vw,26px);font-weight:700;letter-spacing:.06em;word-break:break-all;
+  color:#c9ffe6;text-shadow:0 0 30px rgba(79,227,154,.5);background:rgba(0,0,0,.34);border:1px solid rgba(79,227,154,.22);
+  border-radius:14px;padding:20px 22px;margin:18px 0;line-height:1.5;user-select:all}
+.btn{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;letter-spacing:.22em;
+  text-transform:uppercase;padding:15px 30px;border-radius:100px;border:1px solid var(--good);cursor:pointer;
+  background:rgba(79,227,154,.13);color:#c9ffe6;transition:.2s;font-weight:500}
+.btn:hover{background:rgba(79,227,154,.24);box-shadow:0 0 34px -8px var(--good);transform:translateY(-2px)}
+.btn:active{transform:translateY(0)}
+.btn.copied{background:var(--good);color:#04140c;border-color:var(--good)}
+.fineprint{font-size:13px;color:var(--ink-faint);margin-top:14px}
+
+/* summary board */
+.board{display:grid;gap:10px;margin:26px 0 6px}
+.brow{display:grid;grid-template-columns:1fr 78px 46px;align-items:center;gap:14px;font-size:14px}
+.brow .bn{color:var(--ink-dim);display:flex;align-items:center;gap:10px;min-width:0}
+.brow .bn i{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 12px currentColor}
+.brow .bn s{text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .bv{font-family:var(--mono);text-align:right;color:var(--ink)}
+.brow .bp{font-family:var(--mono);font-size:11px;text-align:right;color:var(--ink-faint)}
+.brow.off{opacity:.34}
+.grant{margin-top:18px;padding:16px 20px;border-radius:14px;border:1px dashed var(--line);font-size:14px;color:var(--ink-faint);
+  display:flex;justify-content:space-between;align-items:center;gap:14px;transition:.35s;font-family:var(--mono);font-size:12.5px;
+  letter-spacing:.08em}
+.grant.on{border-style:solid;border-color:rgba(255,200,96,.5);background:rgba(255,200,96,.08);color:var(--c1);
+  box-shadow:0 0 40px -16px var(--c1)}
+
+footer{padding:60px 0 80px;text-align:center;font-family:var(--mono);font-size:10.5px;letter-spacing:.28em;
+  text-transform:uppercase;color:#3d4661}
+
+/* decoder (organizer) */
+#dec{display:none;position:fixed;inset:auto 16px 16px auto;z-index:70;width:min(440px,92vw);padding:18px;
+  border-radius:16px;border:1px solid var(--line);background:rgba(8,10,22,.96);backdrop-filter:blur(14px);font-family:var(--mono);font-size:12px}
+#dec textarea{width:100%;height:60px;background:#000;color:#9fe;border:1px solid var(--line);border-radius:8px;padding:8px;font-family:var(--mono);font-size:12px}
+#dec pre{white-space:pre-wrap;color:var(--ink-dim);margin:10px 0 0;font-size:11.5px}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition-duration:.01ms!important}
+  html{scroll-behavior:auto}
+  .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<div id="prog"></div>
+
+<div id="cosmos">
+  <div class="neb n1"></div><div class="neb n2"></div><div class="neb n3"></div><div class="neb n4"></div>
+  <div class="stars" id="s1"></div>
+  <div class="stars" id="s2"></div>
+  <div class="stars" id="s3"></div>
+  <div id="grid"></div>
+  <div class="shooter" id="sh1"></div>
+  <div id="grain"></div>
+</div>
+
+<!-- ================= HUD ================= -->
+<div id="hud">
+  <div class="wrap">
+    <div class="hud-block">
+      <span class="hud-lab">Unallocated</span>
+      <span class="hud-val" id="hudRemain">1,000</span>
+    </div>
+    <div id="hudbar"></div>
+    <div class="hud-block opt" style="text-align:right">
+      <span class="hud-lab">Positions</span>
+      <span class="hud-val" id="hudPos" style="font-size:20px">0</span>
+    </div>
+    <span class="pill" id="hudPill">Incomplete</span>
+    <a class="hud-jump" href="#submit">Submit ↓</a>
+  </div>
+</div>
+
+<div id="page">
+
+<!-- ================= HERO ================= -->
+<header id="hero">
+  <div class="inner">
+    <div class="orb"></div>
+    <div class="kicker">Fiscal Cycle <b>7714</b> &nbsp;·&nbsp; Sealed Bids &nbsp;·&nbsp; One Round Only</div>
+    <h1 class="title">Interstellar<em>Venture Round</em></h1>
+    <p class="sub">You have <b>1,000 credits</b>. Six startups want them.<br>Whoever's fund is worth the most at the end wins.</p>
+  </div>
+  <div class="scrollcue">Begin<span></span></div>
+</header>
+
+<!-- ================= RULES ================= -->
+<section id="rules">
+  <div class="narrow">
+    <div class="eyebrow reveal">Section 00 — Terms of Participation</div>
+    <h2 class="reveal">How to play</h2>
+    <p class="lead reveal">You're a venture capitalist. You have <b style="color:var(--ink)">1,000 credits</b>. Spread them across the six startups below however you like.</p>
+
+    <div class="rules">
+      <div class="rule reveal"><div class="num">RULE 01</div><h3>Spend all 1,000</h3><p>No holding back. Your allocations must total exactly one thousand credits.</p></div>
+      <div class="rule reveal"><div class="num">RULE 02</div><h3>Nothing, or 100+</h3><p>Any investment is either zero or at least 100 credits. No 50-credit dabbling.</p></div>
+      <div class="rule reveal"><div class="num">RULE 03</div><h3>Round to tens</h3><p>Every allocation is a multiple of 10. The sliders will keep you honest.</p></div>
+    </div>
+
+    <p class="lead reveal">That's it. You can put everything in one startup or split it six ways.</p>
+
+    <div class="reveal" style="margin-top:38px">
+      <div class="eyebrow">Two things to know before you read the pitches</div>
+      <p class="note">Every startup pays out differently, and <b><i>every single one of them depends on what everybody else does.</i></b> You're not solving a math problem — you're guessing what everyone else in the round is about to do.</p>
+      <p class="note" style="margin-top:18px">Every startup pays a <b>multiplier</b> on what you put in, and it's the same multiplier for everyone holding it — nobody gets a better deal for going in bigger. A ×1.9 on a 300-credit position returns 570.</p>
+      <p class="note" style="margin-top:18px">And <b>nobody is hiding anything from you.</b> Every rule below is the complete rule. Each pitch has the flavor on the left and the full ruleset on the right — if you only want to play, read the right-hand panels.</p>
+    </div>
+
+    <div class="reveal" style="margin-top:52px">
+      <div class="eyebrow">One extra way to score — before you read the pitches</div>
+      <h2 style="font-size:clamp(26px,4.2vw,44px)">The Diversification Grant</h2>
+      <div class="grantbox">
+        <div class="gnum">+300</div>
+        <div>
+          <p style="margin:0 0 .5em;color:var(--ink);font-size:17px">Invest at least 100 credits in <b>four or more</b> startups and you get a flat bonus of <b>300 credits</b>.</p>
+          <p style="margin:0;color:var(--ink-dim);font-size:14.5px">Not a multiplier — a flat 300 added to your final fund. No catch. Several of these startups pay most of their investors nothing. Consider this hazard pay.</p>
+        </div>
+      </div>
+      <p class="lead" style="margin-top:18px;font-size:15.5px">Worth knowing now, because it shapes everything below: four positions of 250 each clears it, and so does 100 / 100 / 100 / 700. The tracker in the bar at the top of your screen counts your qualifying positions as you go.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= THE SIX ================= -->
+<section id="startups" style="padding-top:0">
+  <div class="wrap">
+
+  <!-- ①  HELION -->
+  <article class="card reveal" style="--ac:var(--c1)" data-card="0">
+    <div class="chead"><div class="glyph">Ⅰ</div><div>
+      <h3 class="cname">The Helion Standard</h3>
+      <div class="tag">“Backed by the full faith and credit of everyone else who showed up.”</div>
+    </div></div>
+    <div class="two">
+      <div>
+        <p class="body">The Helion is a currency. The Helion Terminal is the only object we manufacture: a brushed slab for your desk that displays your balance and nothing else. We have been asked to add a graph. We have declined.</p>
+        <p class="body">We are aware of the lineage. There have been, by the Exchange's own count, some eleven thousand prior attempts at a currency of this kind, and eleven thousand occasions on which a founder stood roughly where we are standing and explained that this one was different. We have read their filings. They were not serious people. <b>This</b> is the one that becomes real money, and we would ask you to note that the argument is stronger now than it has ever been, which is precisely what makes it credible.</p>
+        <p class="body hook">The more of this round's money that flows into the Helion, the more every holder earns. <em>You want a crowd here.</em></p>
+        <p class="body">Two failures concern us. Held by nearly everyone, the Helion is merely money, and money is not supposed to appreciate; our economists call that ceiling “winning.” Held by almost no one, it is a keepsake. Keepsakes are worth something. Not this much.</p>
+      </div>
+      <div>
+        <div class="rulebox">
+          <div class="rbh">The rules</div>
+          <ul class="rb">
+            <li>Your payout depends on <b>Helion's share of all the money in the round</b> — every credit everybody invests, everywhere.</li>
+            <li>The more Helion attracts, the higher the multiplier. <b>You want a crowd.</b></li>
+          </ul>
+          <div class="rbsub">Multiplier by Helion's share</div>
+          <table class="tbl"><tbody>
+            <tr><td>Below 7%</td><td><b class="mx">×0.35</b></td></tr>
+            <tr><td>7% up to 13%</td><td><b class="mx">×0.7</b></td></tr>
+            <tr><td>13% up to 21%</td><td><b class="mx">×1.2</b></td></tr>
+            <tr><td>21% up to 29%</td><td><b class="mx">×1.8</b></td></tr>
+            <tr><td>29% up to 35%</td><td><b class="mx">×2.35</b></td></tr>
+            <tr><td>35% and above</td><td><b class="mx">×2.5</b> <span style="color:var(--ink-faint)">max</span></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="alloc" data-alloc="0"></div>
+  </article>
+
+  <!-- ②  SCARCITY -->
+  <article class="card reveal" style="--ac:var(--c2)" data-card="1">
+    <div class="chead"><div class="glyph">Ⅱ</div><div>
+      <h3 class="cname">The Prior</h3>
+      <div class="tag">“The forecast is correct. It is correct for a limited number of people.”</div>
+    </div></div>
+    <div class="two">
+      <div>
+        <p class="body">Once a cycle we publish one forecast. It arrives as a single sheet, sealed, and in the lower corner it is numbered — <i>three of three</i>, or <i>nine of nine</i>. The forecast is the smaller half of what you are buying. The number is the rest of it.</p>
+        <p class="body">We are a research house, and our research is sound, and it degrades the instant it is acted upon. A forecast read by three desks describes the coming quarter. The same forecast read by fifteen describes fifteen desks reacting to a forecast, which is a different event, and one we did not predict, and one that would not have occurred had we kept our findings to ourselves.</p>
+        <p class="body hook">Our accuracy falls as our readership rises. <em>You want to be one of the only people holding this.</em></p>
+        <p class="body">We would prefer not to sell it at all. We are aware of how that reads in a prospectus. There is a ceiling on what you may commit, because a large enough position stops being a subscription and becomes a movement in the market we are describing, and we will not be made to forecast ourselves.</p>
+      </div>
+      <div>
+        <div class="rulebox">
+          <div class="rbh">The rules</div>
+          <ul class="rb">
+            <li>Your payout depends on <b>how many players invest</b> — not how much money. A reader is a reader.</li>
+            <li>Measured as a share of everyone who submitted. The fewer investors, the higher the multiplier.</li>
+            <li><b>Maximum stake: 250 credits.</b></li>
+          </ul>
+          <div class="rbsub">Multiplier by share of players subscribing</div>
+          <table class="tbl"><tbody>
+            <tr><td>15% and below</td><td><b class="mx">×3.0</b></td></tr>
+            <tr><td>Above 15%, up to 30%</td><td><b class="mx">×2.2</b></td></tr>
+            <tr><td>Above 30%, up to 45%</td><td><b class="mx">×1.5</b></td></tr>
+            <tr><td>Above 45%, up to 60%</td><td><b class="mx">×1.0</b></td></tr>
+            <tr><td>Above 60%, up to 75%</td><td><b class="mx">×0.6</b></td></tr>
+            <tr><td>Above 75%</td><td><b class="mx">×0.3</b></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="alloc" data-alloc="1"></div>
+  </article>
+
+  <!-- ③  FAMILIAR FACES -->
+  <article class="card reveal" style="--ac:var(--c3)" data-card="2">
+    <div class="chead"><div class="glyph">Ⅲ</div><div>
+      <h3 class="cname">Familiar Faces</h3>
+      <div class="tag">“Why train a new employee when you can simply grow another one?”</div>
+    </div></div>
+    <div class="two">
+      <div>
+        <p class="body">Meet your new hire. You've met them before — that's rather the point! We grow people to order: for firms that would rather not run onboarding, for performers with more bookings than hours, and for parents who have simply run out of evenings.</p>
+        <p class="body">Everything we do is entirely legal, in the delightful sense that nobody has got round to writing the law yet. That holds right up until we become the best-known name in the round. Come first in funding and you get hearings, protest lines outside the growth facility, and a televised afternoon with the Galactic Ethics Council, who will want to hear from the clones directly. The clones have a great deal to say.</p>
+        <p class="body hook">Nothing gets banned — the orders simply stop. <em>We would much rather be the second most interesting thing here.</em></p>
+        <p class="body">And the ones already grown? Still under contract. Somebody keeps paying them, and that somebody is us.</p>
+      </div>
+      <div>
+        <div class="rulebox">
+          <div class="rbh">The rules</div>
+          <ul class="rb">
+            <li>Two outcomes only, decided by <b>the funding leaderboard</b>.</li>
+            <li>No percentages here — a straight comparison of the six funding totals.</li>
+          </ul>
+          <div class="rbsub">Multiplier</div>
+          <table class="tbl"><tbody>
+            <tr><td>All other positions</td><td><b class="mx">×1.9</b></td></tr>
+            <tr><td>Familiar Faces gets the most funding<br><span style="color:var(--ink-faint);font-size:13px">ties count</span></td><td><b class="mx">×0.4</b></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="alloc" data-alloc="2"></div>
+  </article>
+
+  <!-- ④  SURFACE TENSION -->
+  <article class="card reveal" style="--ac:var(--c4)" data-card="3">
+    <div class="chead"><div class="glyph">Ⅳ</div><div>
+      <h3 class="cname">Surface Tension</h3>
+      <div class="tag">“Step four is when we announce it. Step five is when we build it.”</div>
+    </div></div>
+    <div class="two">
+      <div>
+        <p class="body">Watch this. That's a hull. That's fourteen thousand tonnes of nothing we never have to launch again. What we make is a bubble — a real one, an iridescent skin around a breathable volume, drifting between planets for a fraction of the price. They are beautiful. Several of them work.</p>
+        <p class="body">The valuation doesn't climb on vehicles. It climbs on the roadmap, and the roadmap is the best part: test flight, route license, passenger service, the magazine cover, the ribbon-cutting in orbit. Every one of those is an announcement, and every announcement is a step up.</p>
+        <p class="body hook"><em>You name your exit rung in advance</em> — reach it and you're paid at that valuation.</p>
+        <p class="body">Here's the thing nobody says from a stage: <b>funding is what kills us.</b> Money buys announcements faster than engineering can catch up, and a skin only holds so many promises. More credits, earlier pop. Yours included.</p>
+      </div>
+      <div>
+        <div class="rulebox">
+          <div class="rbh">The rules</div>
+          <ul class="rb">
+            <li><b>You pick a rung, 1 to 6, when you invest.</b> Each rung has its own multiplier.</li>
+            <li>Surface Tension's <b>share of all the money in the round</b> decides which rung it pops at.</li>
+            <li>Rung <b>strictly below</b> the pop rung → you got out in time, paid at your rung's multiplier.</li>
+            <li>Rung <b>equal to or above</b> the pop rung → you were still inside, <b class="mx">×0.5</b>. The rung that pops is the rung you don't survive.</li>
+            <li>Fewer than 4 investors → it never climbs, everyone refunded at <b class="mx">×1.0</b>. 4 investors is enough.</li>
+          </ul>
+          <div class="rbsub">Multiplier by rung</div>
+          <table class="tbl"><tbody>
+            <tr><td>1 · The prototype floats</td><td><b class="mx">×1.0</b></td></tr>
+            <tr><td>2 · First crewed test flight</td><td><b class="mx">×1.3</b></td></tr>
+            <tr><td>3 · Route license granted</td><td><b class="mx">×1.7</b></td></tr>
+            <tr><td>4 · Passenger service announced</td><td><b class="mx">×2.2</b></td></tr>
+            <tr><td>5 · Commercial passenger service</td><td><b class="mx">×2.8</b></td></tr>
+            <tr><td>6 · The interplanetary network</td><td><b class="mx">×3.5</b></td></tr>
+          </tbody></table>
+          <div class="rbsub">Where it pops, by share of all money</div>
+          <table class="tbl"><tbody>
+            <tr><td>Below 8%</td><td><b>never pops</b></td></tr>
+            <tr><td>8% up to 12.5%</td><td>pops at rung <b>6</b></td></tr>
+            <tr><td>12.5% up to 17.5%</td><td>pops at rung <b>5</b></td></tr>
+            <tr><td>17.5% up to 22.5%</td><td>pops at rung <b>4</b></td></tr>
+            <tr><td>22.5% up to 27.5%</td><td>pops at rung <b>3</b></td></tr>
+            <tr><td>27.5% and above</td><td>pops at rung <b>2</b></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="alloc" data-alloc="3"></div>
+    <div class="sub-input" id="stSub">
+      <div class="alloc-lab">Name your exit rung <span class="req" id="stReq">Required</span></div>
+      <p class="body" style="font-size:14px;margin:10px 0 0">Each rung pays more than the last, and the gaps widen as you climb. Pick the announcement you step off at.</p>
+      <div class="ladder" id="ladder"></div>
+    </div>
+  </article>
+
+  <!-- ⑤  WINDFALL -->
+  <article class="card reveal" style="--ac:var(--c5)" data-card="4">
+    <div class="chead"><div class="glyph">Ⅴ</div><div>
+      <h3 class="cname">Windfall Securities</h3>
+      <div class="tag">“Rates are published. We would like that noted.”</div>
+    </div></div>
+    <div class="two">
+      <div>
+        <p class="body">Windfall Securities is a game studio. It is registered as a securities firm because that is the paperwork the Founder understood, and counsel has stopped raising it. The product is <b>STARLIGHT SEMINARY: Endless Encore</b>, a live-service title in pre-launch, with a rarity table, a seasonal calendar, and eleven planned years of content.</p>
+        <p class="body">Counsel is obliged to disclose the following and has been unable to establish that it is immaterial. The Founder maintains an account, in continuous good standing for eleven years, in HEARTBLOOM ACADEMY: Eternal Encore, a title in operation for four centuries and presently running its Anniversary event. He has described his own product as “that, but the part where you stop is removed.”</p>
+        <p class="body hook">Every credit is another entry. <em>Nobody's odds are good.</em></p>
+        <p class="body">This round is itself structured as a draw. Five Investors will be paid and the rest receive nothing. The Founder selected this arrangement over a conventional allocation on the grounds that a conventional allocation is not exciting, and has asked whether the results can be revealed one at a time.</p>
+      </div>
+      <div>
+        <div class="rulebox">
+          <div class="rbh">The rules</div>
+          <ul class="rb">
+            <li><b>This one is a lottery, not a multiplier.</b> Five winners take everything; everyone else gets nothing back.</li>
+            <li>Every credit you invest is <b>one entry</b> — more credits, better odds, same prize.</li>
+            <li>Every credit invested goes into the pot, and Windfall <b>tops the pot up by 15%</b>.</li>
+            <li><b>Five Investors are drawn</b>, one at a time. Each draw is weighted by credits invested.</li>
+            <li><b>One person can't win twice</b> — a winner is removed before the next draw.</li>
+            <li>Everyone else gets nothing. That's <b class="mx">×0</b>.</li>
+            <li>Fewer than 5 investors → the draw is cancelled, everyone refunded at <b class="mx">×1.0</b>. Exactly 5 investors → all five are drawn; it's just a redistribution.</li>
+            <li><b>Maximum stake: 150 credits.</b></li>
+          </ul>
+          <div class="rbsub">How the pot splits</div>
+          <table class="tbl"><tbody>
+            <tr><td>1st draw</td><td><b class="mx">35%</b> of pot</td></tr>
+            <tr><td>2nd draw</td><td><b class="mx">25%</b> of pot</td></tr>
+            <tr><td>3rd draw</td><td><b class="mx">17%</b> of pot</td></tr>
+            <tr><td>4th draw</td><td><b class="mx">13%</b> of pot</td></tr>
+            <tr><td>5th draw</td><td><b class="mx">10%</b> of pot</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="alloc" data-alloc="4"></div>
+  </article>
+
+  <!-- ⑥  THE PACT -->
+  <article class="card reveal" style="--ac:var(--c6)" data-card="5">
+    <div class="chead"><div class="glyph">Ⅵ</div><div>
+      <h3 class="cname">The Pact</h3>
+      <div class="tag">“Self-reported figures. Reviewed quarterly, by us.”</div>
+    </div></div>
+    <div class="two">
+      <div>
+        <p class="body">Minutes of the Pact. Attendance: six partners, six systems. Verification of any partner's figures requires a round trip of eleven to nineteen months, against a reporting period of three. A confirmed number is therefore always a number about a quarter that has already closed. Audit function: none. There was one. It rated its own performance excellent and was dissolved, and the finding could not be checked in time to matter.</p>
+        <p class="body">Noted for the record: honest figures keep the total defensible, and a defensible total pays everyone. Inflated figures make one partner outstanding — a stronger quarter than their peers, drawn from the same total. This works beautifully so long as most partners decline to do it.</p>
+        <p class="body hook">You declare <em>REPORT or INFLATE</em> when you invest, and nobody sees it until the end.</p>
+        <p class="body">Should the total become indefensible, an investor will ask where it came from. The partners required to explain their methodology will be, specifically, the ones whose figures were most impressive. This item was raised and not discussed further.</p>
+      </div>
+      <div>
+        <div class="rulebox">
+          <div class="rbh">The rules</div>
+          <ul class="rb">
+            <li><b>Declare REPORT or INFLATE when you invest.</b> Nobody sees any declaration until the end.</li>
+            <li><b>Only the number of people on each side matters</b> — one person, one vote, no matter how much they invested.</li>
+            <li><b>At least half</b> the Pact's investors chose REPORT → <b>the numbers hold</b>.</li>
+            <li>Otherwise — <b>more than half</b> chose INFLATE → <b>the review happens</b>.</li>
+            <li>Counted among <b>Pact investors only</b>, not everyone in the round.</li>
+            <li>Fewer than 4 investors → never forms, everyone refunded at <b class="mx">×1.0</b>. 4 investors is enough.</li>
+          </ul>
+          <div class="rbsub">The numbers hold</div>
+          <table class="tbl"><tbody>
+            <tr><td>You chose REPORT</td><td><b class="mx">×1.5</b></td></tr>
+            <tr><td>You chose INFLATE</td><td><b class="mx">×1.9</b></td></tr>
+          </tbody></table>
+          <div class="rbsub">The review happens</div>
+          <table class="tbl"><tbody>
+            <tr><td>You chose REPORT</td><td><b class="mx">×0.85</b></td></tr>
+            <tr><td>You chose INFLATE</td><td><b class="mx">×0.25</b></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+    <div class="alloc" data-alloc="5"></div>
+    <div class="sub-input" id="pactSub">
+      <div class="alloc-lab">File your declaration <span class="req" id="pactReq">Required</span></div>
+      <div class="pact">
+        <div class="pcard" data-v="R"><div class="pn">REPORT</div><div class="pd">Hold the line. 150 if the numbers hold, 85 if they don't.</div></div>
+        <div class="pcard" data-v="I"><div class="pn">INFLATE</div><div class="pd">A stronger quarter than your peers. 190 if it holds, 25 if it doesn't.</div></div>
+      </div>
+    </div>
+  </article>
+
+  </div>
+</section>
+
+<!-- ================= COLD READ ================= -->
+<section id="coldread">
+  <div class="narrow">
+    <div class="eyebrow reveal">Section 07 — The Tiebreaker</div>
+    <h2 class="reveal">The Cold Read</h2>
+    <p class="lead reveal" style="font-style:italic;color:var(--ink-faint)">Free, and worth no credits at all.</p>
+    <p class="lead reveal">Highest final fund total wins. To break ties, everyone answers one more question:</p>
+    <p class="reveal" style="font-family:var(--serif);font-size:clamp(21px,3.4vw,31px);line-height:1.3;color:#fff;margin:26px 0">
+      What percentage of all the money in the round will the <i>least-funded</i> startup end up with?</p>
+    <p class="lead reveal">You don't have to say which startup it'll be. Just the number. Somebody finishes last. With six startups and 1,000 credits each, an even split would be about 16.7% apiece — so the question is really how badly the room's least favorite gets left out. It could be a respectable 12%. It could be nothing at all, if every single person skips it.</p>
+    <p class="lead reveal"><b style="color:var(--ink)">Closest guess wins the tie.</b> Over or under doesn't matter, only distance.</p>
+
+    <div class="cold reveal" style="margin-top:38px">
+      <div class="alloc-lab" style="text-align:center">Your Cold Read</div>
+      <div class="bigread" id="crBig">17.0<span>%</span></div>
+      <input class="slider" id="crSlider" type="range" min="0" max="17" step="0.1" value="17" style="--ac:#9fb4ff">
+      <div class="ticks"><span>0%</span><span>4.25%</span><span>8.5%</span><span>12.75%</span><span>17%</span></div>
+      <div class="chips" style="justify-content:center;margin-top:18px" id="crChips"></div>
+      <p class="fineprint" style="text-align:center;margin-top:16px">Guess to one decimal place if you like. It makes ties less likely, which is the entire point of this exercise.<br>The range runs 0% to 17% — a six-way even split is 16.7%, so nothing can finish last with more than that.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= SUBMIT ================= -->
+<section id="submit">
+  <div class="narrow">
+    <div class="eyebrow reveal">Section 08 — Transmission</div>
+    <h2 class="reveal">File your prospectus</h2>
+    <p class="lead reveal">Everything checks out below, you get a transmission code. Paste that code into the collection form — it carries your whole position, sealed.</p>
+
+    <div class="reveal">
+      <div class="eyebrow" style="margin-top:36px">Portfolio</div>
+      <div class="board" id="board"></div>
+      <div class="brow" style="border-top:1px solid var(--line);padding-top:12px;margin-top:4px">
+        <div class="bn" style="color:var(--ink)"><s>Total committed</s></div>
+        <div class="bv" id="bTotal" style="font-weight:700">0</div><div class="bp"></div>
+      </div>
+      <div class="grant" id="grantRow"><span>Diversification Grant</span><span id="grantTxt">0 / 4 positions</span></div>
+    </div>
+
+    <div class="reveal">
+      <div class="eyebrow" style="margin-top:40px">Compliance</div>
+      <div class="checks" id="checks"></div>
+    </div>
+
+    <div id="codebox" class="locked reveal">
+      <div class="codeinner">
+        <div class="alloc-lab" id="codeLab" style="color:var(--good)">◆ Transmission code — cleared for filing</div>
+        <div class="thecode" id="theCode">————————————</div>
+        <button class="btn" id="copyBtn">Copy code</button>
+        <p class="fineprint">Paste this into the collection form exactly as shown. It encodes your six allocations, your rung, your declaration and your Cold Read — nobody reading over your shoulder learns a thing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>Interstellar Venture Round · Fiscal Cycle 7714 · All figures self-reported</footer>
+</div>
+
+<div id="dec">
+  <div style="color:var(--c1);letter-spacing:.2em;margin-bottom:8px">ORGANIZER DECODER</div>
+  <textarea id="decIn" placeholder="paste code(s), one per line"></textarea>
+  <pre id="decOut"></pre>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   DATA
+   ============================================================ */
+const FIRMS = [
+  {k:'HEL', name:'The Helion Standard', short:'Helion',        c:'--c1', max:1000},
+  {k:'PRI', name:'The Prior',           short:'The Prior',     c:'--c2', max:250},
+  {k:'FAM', name:'Familiar Faces',      short:'Familiar Faces',c:'--c3', max:1000},
+  {k:'SUR', name:'Surface Tension',     short:'Surface Tension',c:'--c4',max:1000},
+  {k:'WIN', name:'Windfall Securities', short:'Windfall',      c:'--c5', max:150},
+  {k:'PAC', name:'The Pact',            short:'The Pact',      c:'--c6', max:1000},
+];
+const RUNGS = [
+  {n:1, label:'The prototype floats',                    mult:'×1.0'},
+  {n:2, label:'First crewed test flight',                mult:'×1.3'},
+  {n:3, label:'Route license granted',                   mult:'×1.7'},
+  {n:4, label:'Passenger service announced',             mult:'×2.2'},
+  {n:5, label:'Commercial passenger service',            mult:'×2.8'},
+  {n:6, label:'The interplanetary network',              mult:'×3.5'},
+];
+const BUDGET = 1000;
+
+const S = { alloc:[0,0,0,0,0,0], rung:0, pact:0, cold:17.0 };
+let READY = false;   // update() is a no-op until every control + the board exist
+
+const $  = (s,r=document)=>r.querySelector(s);
+const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const fmt = n => n.toLocaleString('en-US');
+
+/* ============================================================
+   STARFIELD + PARALLAX
+   ============================================================ */
+(function cosmos(){
+  const mk=(el,count,minS,maxS,minO,maxO)=>{
+    const f=document.createDocumentFragment();
+    for(let i=0;i<count;i++){
+      const s=document.createElement('i');
+      const sz=minS+Math.random()*(maxS-minS);
+      s.style.cssText=`left:${Math.random()*100}%;top:${Math.random()*100}%;width:${sz}px;height:${sz}px;`+
+        `opacity:${minO+Math.random()*(maxO-minO)};`+
+        (sz>1.6?`box-shadow:0 0 ${sz*3}px rgba(190,215,255,.85);`:'');
+      if(Math.random()<0.18){s.classList.add('twinkle');s.style.animationDelay=(Math.random()*4)+'s';s.style.animationDuration=(3+Math.random()*4)+'s';}
+      f.appendChild(s);
+    }
+    el.appendChild(f);
+  };
+  const w=window.innerWidth;
+  mk($('#s1'), w<700?90:170, .6,1.2,.18,.5);
+  mk($('#s2'), w<700?55:100, 1,1.9,.35,.8);
+  mk($('#s3'), w<700?22:42,  1.6,3,.5,1);
+
+  const l1=$('#s1'),l2=$('#s2'),l3=$('#s3'),grid=$('#grid'),hero=$('#hero .inner');
+  const n=[$('.n1'),$('.n2'),$('.n3'),$('.n4')];
+  let y=0,ticking=false;
+  const draw=()=>{
+    l1.style.transform=`translate3d(0,${y*-0.035}px,0)`;
+    l2.style.transform=`translate3d(0,${y*-0.09}px,0)`;
+    l3.style.transform=`translate3d(0,${y*-0.19}px,0)`;
+    grid.style.transform=`translateX(-50%) perspective(320px) rotateX(64deg) translateY(${y*-0.05}px)`;
+    n.forEach((e,i)=>{ if(e) e.style.marginTop = (y*-(0.06+i*0.035))+'px'; });
+    if(hero && y<window.innerHeight){
+      hero.style.transform=`translateY(${y*0.28}px)`;
+      hero.style.opacity=String(clamp(1-y/(window.innerHeight*0.72),0,1));
+    }
+    const h=document.documentElement.scrollHeight-window.innerHeight;
+    $('#prog').style.width=(h>0? (y/h*100):0)+'%';
+    ticking=false;
+  };
+  addEventListener('scroll',()=>{y=scrollY; if(!ticking){ticking=true;requestAnimationFrame(draw);} },{passive:true});
+  draw();
+
+  // hero mouse parallax
+  if(matchMedia('(pointer:fine)').matches){
+    addEventListener('mousemove',e=>{
+      const dx=(e.clientX/innerWidth-.5), dy=(e.clientY/innerHeight-.5);
+      l3.style.marginLeft=(dx*22)+'px'; l3.style.marginTop=(dy*14)+'px';
+      l2.style.marginLeft=(dx*11)+'px'; l2.style.marginTop=(dy*7)+'px';
+    },{passive:true});
+  }
+
+  // shooting stars
+  const sh=$('#sh1');
+  const shoot=()=>{
+    const top=Math.random()*55+3, left=Math.random()*45;
+    sh.style.top=top+'vh'; sh.style.left=left+'vw';
+    sh.animate([
+      {opacity:0,transform:'translate3d(0,0,0) rotate(24deg)'},
+      {opacity:.9,offset:.25},
+      {opacity:0,transform:'translate3d(46vw,20vh,0) rotate(24deg)'}
+    ],{duration:1250,easing:'cubic-bezier(.2,.6,.3,1)'});
+    setTimeout(shoot, 7000+Math.random()*13000);
+  };
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches) setTimeout(shoot,3500);
+})();
+
+/* reveal on scroll */
+(function reveals(){
+  const io=new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+  },{threshold:.08,rootMargin:'0px 0px -8% 0px'});
+  $$('.reveal').forEach((el,i)=>{ el.style.transitionDelay=(Math.min(i,4)*55)+'ms'; io.observe(el); });
+})();
+
+/* card pointer glow */
+$$('.card').forEach(c=>{
+  c.addEventListener('pointermove',e=>{
+    const r=c.getBoundingClientRect();
+    c.style.setProperty('--mx', ((e.clientX-r.left)/r.width*100)+'%');
+  },{passive:true});
+});
+
+/* ============================================================
+   ALLOCATORS
+   ============================================================ */
+function buildAllocator(host, idx){
+  const f=FIRMS[idx];
+  host.innerHTML=`
+    <div class="alloc-top">
+      <span class="alloc-lab">Your position — ${f.short}</span>
+      <span class="alloc-lab" id="hint${idx}"></span>
+    </div>
+    <div class="amount zero" id="amt${idx}">0<small>CR</small></div>
+    <input class="slider" id="sl${idx}" type="range" min="0" max="${f.max}" step="10" value="0"
+           aria-label="Credits invested in ${f.name}">
+    <div class="ticks">${[0,.25,.5,.75,1].map(p=>`<span>${Math.round(f.max*p/10)*10}</span>`).join('')}</div>
+    <div class="chips">
+      <button class="chip step" data-d="-10" aria-label="minus 10">−</button>
+      <button class="chip step" data-d="10" aria-label="plus 10">+</button>
+      <button class="chip" data-set="0">Clear</button>
+      <button class="chip" data-set="100">100</button>
+      ${f.max>=200?'<button class="chip" data-set="200">200</button>':''}
+      <button class="chip" data-set="${f.max===1000?'max':f.max}">${f.max===1000?'Max out':'Cap · '+f.max}</button>
+      <button class="chip" data-set="rest">Rest of my fund</button>
+    </div>`;
+
+  const sl=$('#sl'+idx,host), amt=$('#amt'+idx,host), hint=$('#hint'+idx,host);
+
+  function snap(v){ // 0 or 100+, multiples of 10
+    v=Math.round(v/10)*10;
+    if(v>0 && v<100) v = (v>=50?100:0);
+    return clamp(v,0,f.max);
+  }
+  function set(v,fromSlider){
+    v=snap(v);
+    S.alloc[idx]=v;
+    sl.value=v;
+    sl.style.setProperty('--pct',(v/f.max*100)+'%');
+    amt.innerHTML=fmt(v)+'<small>CR</small>';
+    amt.classList.toggle('zero',v===0);
+    host.closest('.card').classList.toggle('funded',v>0);
+    update();
+  }
+  // the hint reads the whole fund, so it has to be repainted whenever ANY card moves
+  host._hint=()=>{
+    const left=BUDGET-S.alloc.reduce((a,b)=>a+b,0);
+    hint.textContent = S.alloc[idx]>0
+      ? (left===0?'fully committed':(left>0? fmt(left)+' still unallocated' : fmt(-left)+' OVER budget'))
+      : '';
+    hint.style.color = left<0 ? 'var(--bad)' : '';
+  };
+  host._set=set;
+  sl.addEventListener('input',()=>set(+sl.value,true));
+  host.addEventListener('click',e=>{
+    const b=e.target.closest('.chip'); if(!b) return;
+    if(b.dataset.d){
+      const d=+b.dataset.d, cur=S.alloc[idx];
+      // the 1–99 dead zone: stepping off 100 leaves the position, stepping off 0 enters at 100
+      if(d<0 && cur<=100) return set(0);
+      if(d>0 && cur===0)  return set(100);
+      return set(cur+d);
+    }
+    const t=b.dataset.set;
+    if(t==='rest'){ const other=S.alloc.reduce((a,v,i)=>a+(i===idx?0:v),0); set(BUDGET-other); }
+    else if(t==='max') set(f.max);
+    else set(+t);
+  });
+  set(0);
+}
+$$('[data-alloc]').forEach(h=>buildAllocator(h, +h.dataset.alloc));
+
+/* rung ladder */
+(function(){
+  const L=$('#ladder');
+  L.innerHTML=RUNGS.map(r=>`
+    <div class="rung" data-r="${r.n}" role="button" tabindex="0">
+      <span class="rn">R${r.n}</span>
+      <span class="rl">${r.label}</span>
+      <span class="ro">▸ YOU GET OUT HERE</span>
+      <span class="rp">${r.mult}</span>
+    </div>`).join('');
+  const pick=n=>{ S.rung=n; $$('.rung',L).forEach(el=>el.classList.toggle('sel',+el.dataset.r===n)); update(); };
+  L.addEventListener('click',e=>{const r=e.target.closest('.rung'); if(r) pick(+r.dataset.r);});
+  L.addEventListener('keydown',e=>{const r=e.target.closest('.rung'); if(r&&(e.key==='Enter'||e.key===' ')){e.preventDefault();pick(+r.dataset.r);} });
+})();
+
+/* pact declaration */
+$$('.pcard').forEach(p=>p.addEventListener('click',()=>{
+  S.pact = p.dataset.v==='R'?1:2;
+  $$('.pcard').forEach(x=>x.classList.toggle('sel',x===p));
+  update();
+}));
+
+/* cold read */
+(function(){
+  const sl=$('#crSlider'), big=$('#crBig');
+  const chips=$('#crChips');
+  chips.innerHTML=[0,2.5,5,7.5,10,12.5,17].map(v=>`<button class="chip" data-c="${v}">${v}%</button>`).join('');
+  const set=v=>{ v=clamp(Math.round(v*10)/10,0,17); S.cold=v; sl.value=v;
+    sl.style.setProperty('--pct',(v/17*100)+'%');
+    big.innerHTML=v.toFixed(1)+'<span>%</span>'; update(); };
+  sl.addEventListener('input',()=>set(+sl.value));
+  chips.addEventListener('click',e=>{const b=e.target.closest('.chip'); if(b) set(+b.dataset.c);});
+  set(17);
+})();
+
+/* ============================================================
+   ENCODER — 7 bytes -> 12 char Crockford base32
+   layout: a0..a4 (7 bits each, value in tens 0..100) | rung 3 | pact 2 | cold 8  = 48 bits
+           + 1 checksum byte, whole thing masked with a fixed keystream
+   ============================================================ */
+const B32='0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const KEY=[0x5b,0xa7,0x1e,0xc3,0x69,0xd4,0x82];
+
+function bytesFromState(){
+  let bits='';
+  const push=(v,w)=>{ bits += v.toString(2).padStart(w,'0'); };
+  for(let i=0;i<5;i++) push(S.alloc[i]/10, 7);   // 6th is implied (sum = 100 tens)
+  push(S.rung,3);
+  push(S.pact,2);
+  push(Math.round(S.cold*10),8);
+  const b=[];
+  for(let i=0;i<48;i+=8) b.push(parseInt(bits.slice(i,i+8),2));
+  let sum=0x5a; for(const x of b) sum=(sum*31+x)&0xff;
+  b.push(sum);
+  return b.map((x,i)=>x^KEY[i]);
+}
+function encode(){
+  const b=bytesFromState();
+  let bits=b.map(x=>x.toString(2).padStart(8,'0')).join('');   // 56 bits
+  let out='';
+  for(let i=0;i<56;i+=5) out+=B32[parseInt(bits.slice(i,i+5).padEnd(5,'0'),2)];
+  return 'IVR-'+out.slice(0,6)+'-'+out.slice(6);
+}
+function decode(code){
+  const raw=String(code).toUpperCase().replace(/[^0-9A-Z]/g,'').replace(/^IVR/,'')
+            .replace(/O/g,'0').replace(/[IL]/g,'1').replace(/U/g,'V');
+  if(raw.length!==12) return null;
+  let bits='';
+  for(const ch of raw){ const v=B32.indexOf(ch); if(v<0) return null; bits+=v.toString(2).padStart(5,'0'); }
+  const b=[]; for(let i=0;i<56;i+=8) b.push(parseInt(bits.slice(i,i+8),2));
+  const d=b.map((x,i)=>x^KEY[i]);
+  let sum=0x5a; for(let i=0;i<6;i++) sum=(sum*31+d[i])&0xff;
+  if(sum!==d[6]) return null;
+  let bs=d.slice(0,6).map(x=>x.toString(2).padStart(8,'0')).join('');
+  const take=(o,w)=>parseInt(bs.slice(o,o+w),2);
+  const a=[]; for(let i=0;i<5;i++) a.push(take(i*7,7)*10);
+  a.push(1000-a.reduce((x,y)=>x+y,0));
+  return {alloc:a, rung:take(35,3), pact:take(38,2), cold:take(40,8)/10};
+}
+
+/* ============================================================
+   VALIDATION + RENDER
+   ============================================================ */
+function validate(){
+  const A=S.alloc, total=A.reduce((a,b)=>a+b,0);
+  const positions=A.filter(v=>v>0).length;
+  const bad=[];
+  A.forEach((v,i)=>{ if(v>0&&v<100) bad.push(FIRMS[i].short); });
+  const overCap=[]; A.forEach((v,i)=>{ if(v>FIRMS[i].max) overCap.push(FIRMS[i].short); });
+  return {
+    total, positions,
+    sum:    total===BUDGET,
+    minimum:bad.length===0, badList:bad,
+    tens:   A.every(v=>v%10===0),
+    caps:   overCap.length===0, capList:overCap,
+    rung:   A[3]===0 || S.rung>0,
+    pact:   A[5]===0 || S.pact>0,
+    cold:   S.cold>=0 && S.cold<=17,
+  };
+}
+
+const boardEl=$('#board');
+boardEl.innerHTML=FIRMS.map((f,i)=>`
+  <div class="brow off" id="brow${i}">
+    <div class="bn"><i style="background:var(${f.c});color:var(${f.c})"></i><s>${f.short}</s><em id="bex${i}" style="font-style:normal;color:var(--ink-faint);font-size:11.5px;font-family:var(--mono)"></em></div>
+    <div class="bv" id="bv${i}">0</div><div class="bp" id="bp${i}"></div>
+  </div>`).join('');
+
+function update(){
+  if(!READY) return;   // controls still initialising — the final update() below paints everything
+  // a closed position carries no rung and files no declaration — clear them so the
+  // code can never encode a choice the player has walked away from
+  if(S.alloc[3]===0 && S.rung){ S.rung=0; $$('.rung').forEach(el=>el.classList.remove('sel')); }
+  if(S.alloc[5]===0 && S.pact){ S.pact=0; $$('.pcard').forEach(el=>el.classList.remove('sel')); }
+
+  const v=validate(), A=S.alloc, remaining=BUDGET-v.total;
+
+  $$('[data-alloc]').forEach(h=>h._hint&&h._hint());
+
+  /* HUD */
+  const hr=$('#hudRemain');
+  hr.textContent = remaining<0 ? '−'+fmt(-remaining) : fmt(remaining);
+  hr.className='hud-val'+(remaining===0?' ok':(remaining<0?' over':''));
+  $('#hudPos').textContent=String(A.filter(x=>x>=100).length);
+  const bar=$('#hudbar');
+  if(!bar.children.length){
+    FIRMS.forEach(f=>{const d=document.createElement('div');d.style.background=`var(${f.c})`;bar.appendChild(d);});
+    const g=document.createElement('div'); g.className='gap'; bar.appendChild(g);
+  }
+  const denom=Math.max(BUDGET,v.total);
+  FIRMS.forEach((f,i)=>{ bar.children[i].style.width=(A[i]/denom*100)+'%'; });
+  bar.children[6].style.width=(Math.max(0,remaining)/denom*100)+'%';
+
+  const allOk = v.sum&&v.minimum&&v.tens&&v.caps&&v.rung&&v.pact&&v.cold;
+  const pill=$('#hudPill');
+  pill.className='pill'+(allOk?' ok':(v.total>BUDGET?' bad':''));
+  pill.textContent = allOk?'Ready to file':(v.total>BUDGET?'Over budget':'Incomplete');
+
+  /* conditional sub-inputs */
+  $('#stSub').classList.toggle('on',A[3]>0);
+  $('#pactSub').classList.toggle('on',A[5]>0);
+  $('#stReq').textContent = S.rung? 'Rung '+S.rung : 'Required';
+  $('#stReq').classList.toggle('ok', S.rung>0);
+  $('#pactReq').textContent = S.pact? (S.pact===1?'Filed · Report':'Filed · Inflate') : 'Required';
+  $('#pactReq').classList.toggle('ok', S.pact>0);
+
+  /* board */
+  FIRMS.forEach((f,i)=>{
+    $('#bv'+i).textContent=fmt(A[i]);
+    $('#bp'+i).textContent=A[i]?Math.round(A[i]/Math.max(1,v.total)*100)+'%':'';
+    $('#brow'+i).classList.toggle('off',A[i]===0);
+    let ex='';
+    if(i===3&&A[3]>0) ex = S.rung? '· rung '+S.rung : '· rung?';
+    if(i===5&&A[5]>0) ex = S.pact? (S.pact===1?'· report':'· inflate') : '· declare?';
+    $('#bex'+i).textContent=ex;
+  });
+  $('#bTotal').textContent=fmt(v.total);
+  $('#bTotal').style.color = v.sum?'var(--good)':(v.total>BUDGET?'var(--bad)':'var(--ink)');
+  const gp=A.filter(x=>x>=100).length;
+  $('#grantRow').classList.toggle('on',gp>=4);
+  $('#grantTxt').textContent = gp>=4? '◆ LOCKED IN  +300' : gp+' / 4 positions';
+
+  /* checks */
+  const list=[
+    [v.sum,  v.sum?'Allocations total exactly 1,000':(v.total<BUDGET?`Allocations total ${fmt(v.total)} — ${fmt(remaining)} still unallocated`:`Allocations total ${fmt(v.total)} — ${fmt(-remaining)} over budget`)],
+    [v.minimum,v.minimum?'Every position is 0 or 100+':`Below the 100 minimum: ${v.badList.join(', ')}`],
+    [v.tens,   'Every allocation is a multiple of 10'],
+    [v.caps,   v.caps?'Stake caps respected (The Prior 250 · Windfall 150)':`Over cap: ${v.capList.join(', ')}`],
+    [v.rung,   A[3]===0?'Surface Tension rung — not required (no position)':(S.rung?`Surface Tension rung ${S.rung} — ${RUNGS[S.rung-1].label}`:'Name your Surface Tension exit rung')],
+    [v.pact,   A[5]===0?'Pact declaration — not required (no position)':(S.pact?`Pact declaration filed — ${S.pact===1?'REPORT':'INFLATE'}`:'File your Pact declaration')],
+    [v.cold,   `Cold Read locked at ${S.cold.toFixed(1)}%`],
+  ];
+  $('#checks').innerHTML=list.map(([ok,txt])=>
+    `<div class="chk ${ok?'pass':'fail'}"><span class="mk">${ok?'✓':'!'}</span><span>${txt}</span></div>`).join('');
+
+  /* code */
+  const box=$('#codebox');
+  const wasLocked=box.classList.contains('locked');
+  box.classList.toggle('locked',!allOk);
+  if(allOk){
+    const code=encode();
+    $('#theCode').textContent = code;
+    if(wasLocked && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+      box.animate([{transform:'scale(.985)',opacity:.5},{transform:'scale(1.012)',opacity:1,offset:.6},{transform:'scale(1)',opacity:1}],
+                  {duration:620,easing:'cubic-bezier(.16,1,.3,1)'});
+    }
+  } else {
+    $('#theCode').textContent='LOCKED — resolve the items above';
+  }
+}
+
+/* copy */
+$('#copyBtn').addEventListener('click',async ()=>{
+  const txt=$('#theCode').textContent;
+  try{ await navigator.clipboard.writeText(txt); }
+  catch(_){ const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t); t.select();
+            try{document.execCommand('copy');}catch(e){} t.remove(); }
+  const b=$('#copyBtn'); b.classList.add('copied'); b.textContent='Copied ✓';
+  setTimeout(()=>{b.classList.remove('copied'); b.textContent='Copy code';},1900);
+});
+
+/* HUD visibility */
+(function(){
+  const hud=$('#hud');
+  const io=new IntersectionObserver(es=>{ hud.classList.toggle('on', !es[0].isIntersecting); },{threshold:.15});
+  io.observe($('#hero'));
+})();
+
+/* organizer decoder — open with #decode */
+(function(){
+  const d=$('#dec');
+  const sync=()=>{ d.style.display = location.hash==='#decode' ? 'block' : 'none'; };
+  addEventListener('hashchange',sync); sync();
+  $('#decIn').addEventListener('input',e=>{
+    $('#decOut').textContent=e.target.value.split('\n').filter(l=>l.trim()).map((line,n)=>{
+      const m=line.match(/IVR[-\s]?[0-9A-Za-z-]+/);
+      const r=m?decode(m[0]):null;
+      if(!r) return line.trim()+'  →  ✖ invalid';
+      // anything before the code is passed through, so a pasted "Name, IVR-..." row still labels itself
+      const who=line.split(/·|,|IVR/)[0].trim()||('row '+(n+1));
+      return `${who}\n  ${FIRMS.map((f,i)=>f.k+' '+r.alloc[i]).join('  ')}\n  rung ${r.rung||'-'}  pact ${['-','REPORT','INFLATE'][r.pact]}  cold ${r.cold.toFixed(1)}%  sum ${r.alloc.reduce((a,b)=>a+b,0)}`;
+    }).join('\n\n');
+  });
+})();
+
+READY = true;
+update();
+</script>
+</body>
+</html>
