@@ -1,0 +1,1039 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f8f6">
+  <title>Sentence Studio · Traditional Chinese</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: #f7f8f6;
+      --ink: #1e2825;
+      --muted: #61706a;
+      --line: #d5ddd8;
+      --teal: #176960;
+      --teal-soft: #e8f3ee;
+      --red: #a94f3c;
+    }
+
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: "Avenir Next", Avenir, "Segoe UI", Arial, sans-serif;
+    }
+    button { font: inherit; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+    button:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+
+    .app { width: min(100% - 32px, 900px); margin: 0 auto; padding: clamp(26px, 5vw, 54px) 0 48px; }
+    .prompt { margin-bottom: 32px; }
+    .prompt h1 { margin: 0; font-size: clamp(24px, 3.5vw, 32px); font-weight: 650; line-height: 1.35; letter-spacing: -.025em; }
+    .section-heading { margin: 0 0 14px; }
+    .section-heading h2 { margin: 0; color: var(--muted); font-size: 13px; font-weight: 700; }
+    .slots, .bank { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 9px; }
+    .slots { min-height: 90px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: #f1f4f1; }
+    .slot { min-width: 84px; min-height: 70px; display: flex; align-items: stretch; justify-content: center; border: 1.5px dashed #b8c9c3; border-radius: 8px; }
+    .slot.empty { align-items: center; color: #8a9c98; font-size: 13px; font-weight: 700; }
+    .slot.filled { border-color: transparent; }
+    .slot-number { user-select: none; }
+    .sentence-end { align-self: center; margin-left: -3px; font-family: "Noto Serif TC", "Songti TC", serif; font-size: 32px; font-weight: 700; }
+    .status { min-height: 22px; margin: 9px 1px 0; color: var(--muted); font-size: 13px; font-weight: 650; line-height: 1.5; }
+    .status.success { color: var(--teal); }
+    .status.try-again { color: var(--red); }
+
+    .divider { height: 1px; margin: 18px 0 22px; background: var(--line); }
+    .bank { min-height: 90px; padding: 3px 0 13px; }
+    .tile {
+      min-width: 84px; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; padding: 8px 14px; border: 1px solid #b8c7bf; border-radius: 8px;
+      background: #fff; color: var(--ink); cursor: pointer;
+    }
+    .tile:hover { border-color: var(--teal); }
+    .tile:active { background: #f1f6f2; }
+    .slot .tile { width: 100%; height: 100%; border-color: var(--teal); background: var(--teal-soft); }
+    .hanzi { font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Segoe UI", sans-serif; font-size: 30px; font-weight: 700; line-height: 1.25; white-space: nowrap; }
+    .pinyin { color: var(--teal); font-size: 12px; font-weight: 700; line-height: 1.25; }
+    .gloss { color: var(--muted); font-size: 12px; line-height: 1.25; }
+    .tile.hinted { min-height: 96px; }
+
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding-top: 10px; }
+    .tool-group { display: flex; flex-wrap: wrap; gap: 9px; }
+    .action { min-height: 46px; padding: 10px 17px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); font-size: 14px; font-weight: 700; cursor: pointer; }
+    .action:hover { border-color: var(--teal); }
+    .action.hint-active { border-color: var(--teal); background: var(--teal-soft); }
+    .action.answer { color: var(--teal); }
+    .action.next { margin-left: auto; border-color: var(--teal); background: var(--teal); color: white; white-space: nowrap; }
+    .action.next:hover { background: #0c5752; }
+    [hidden] { display: none !important; }
+    @media (max-width: 600px) {
+      .app { width: min(100% - 24px, 900px); padding: 24px 0 40px; }
+      .prompt { margin-bottom: 25px; }
+      .slots { padding: 10px; }
+      .slot, .tile { min-width: 72px; min-height: 66px; }
+      .tile { padding: 8px 10px; }
+      .hanzi { font-size: 28px; }
+      .action { min-height: 48px; padding: 10px 13px; }
+    }
+    @media (max-width: 390px) {
+      .tool-group { gap: 7px; }
+      .action { font-size: 13px; padding: 10px 11px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="prompt" aria-label="English sentence"><h1 id="english-sentence"></h1></section>
+
+    <section class="workspace" aria-label="Sentence builder">
+      <div class="section-heading"><h2>Your sentence</h2></div>
+      <div id="slots" class="slots" aria-label="Sentence slots"></div>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <div class="divider"></div>
+      <div class="section-heading"><h2>Phrase cards</h2></div>
+      <div id="bank" class="bank" aria-label="Available phrase cards"></div>
+      <div class="toolbar">
+        <div class="tool-group">
+          <button id="hint-button" class="action" type="button" aria-pressed="false">Show hints</button>
+          <button id="answer-button" class="action answer" type="button">Show answer</button>
+        </div>
+        <button id="next-button" class="action next" type="button" hidden>Next sentence <span aria-hidden="true">→</span></button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    // Cards are listed in their target order. Movable cards contain no punctuation.
+    const sentences = [
+      {
+        english: "If it rains tomorrow, we'll stay at home.",
+        ending: "。", pattern: "如果…就…", note: "The condition comes first; 就 introduces what happens if that condition is met.",
+        cards: [
+          ["如果", "rúguǒ", "if"], ["明天", "míngtiān", "tomorrow"], ["下雨", "xiàyǔ", "rains"],
+          ["我們", "wǒmen", "we"], ["就", "jiù", "then"], ["待在", "dāi zài", "stay at"], ["家裡", "jiālǐ", "home"]
+        ]
+      },
+      {
+        english: "Although she's busy, she cooks dinner every day.",
+        ending: "。", pattern: "雖然…但是…", note: "雖然 introduces the contrast; 但是 starts the main point.",
+        cards: [
+          ["雖然", "suīrán", "although"], ["她", "tā", "she"], ["很忙", "hěn máng", "is busy"],
+          ["但是", "dànshì", "but"], ["她", "tā", "she"], ["每天", "měitiān", "every day"],
+          ["都會", "dōu huì", "always / will"], ["做晚餐", "zuò wǎncān", "make dinner"]
+        ]
+      },
+      {
+        english: "I put the book on the table.",
+        ending: "。", pattern: "把 + object + verb", note: "把 brings the affected object before the action and its result or destination.",
+        cards: [
+          ["我", "wǒ", "I"], ["把", "bǎ", "object marker"], ["書", "shū", "book"],
+          ["放在", "fàng zài", "put at"], ["桌上", "zhuō shàng", "on the table"]
+        ]
+      },
+      {
+        english: "The window was blown open by the wind.",
+        ending: "。", pattern: "被 + agent + verb", note: "被 places the affected thing first, followed by who or what caused the action.",
+        cards: [
+          ["窗戶", "chuānghù", "window"], ["被", "bèi", "by / passive"], ["風", "fēng", "wind"],
+          ["吹開了", "chuī kāi le", "blew open"]
+        ]
+      },
+      {
+        english: "As soon as I got home, I called my mother.",
+        ending: "。", pattern: "一…就…", note: "一…就… links an event with what happened immediately afterward.",
+        cards: [
+          ["我", "wǒ", "I"], ["一", "yí", "as soon as"], ["到家", "dào jiā", "got home"],
+          ["就", "jiù", "then"], ["打電話給", "dǎ diànhuà gěi", "called"], ["媽媽", "māma", "mother"]
+        ]
+      },
+      {
+        english: "Do you know when the movie starts?",
+        ending: "？", pattern: "Embedded question", note: "The question phrase 什麼時候 stays before the verb inside the larger question.",
+        cards: [
+          ["你", "nǐ", "you"], ["知道", "zhīdào", "know"], ["電影", "diànyǐng", "movie"],
+          ["什麼時候", "shénme shíhòu", "when"], ["開始", "kāishǐ", "starts"], ["嗎", "ma", "question particle"]
+        ]
+      },
+      {
+        english: "The colder the weather gets, the more I want hot tea.",
+        ending: "。", pattern: "越…越…", note: "Two 越 phrases show that one change increases along with another.",
+        cards: [
+          ["天氣", "tiānqì", "weather"], ["越冷", "yuè lěng", "the colder"], ["我", "wǒ", "I"],
+          ["就", "jiù", "then"], ["越想", "yuè xiǎng", "the more I want"], ["喝熱茶", "hē rè chá", "drink hot tea"]
+        ]
+      },
+      {
+        english: "Please wash your hands before eating.",
+        ending: "。", pattern: "先…再…", note: "先 marks the first action; 再 marks the action that follows.",
+        cards: [
+          ["請", "qǐng", "please"], ["先", "xiān", "first"], ["洗手", "xǐshǒu", "wash hands"],
+          ["再", "zài", "then"], ["吃飯", "chīfàn", "eat"]
+        ]
+      },
+      {
+        english: "Even my younger brother knows the answer.",
+        ending: "。", pattern: "連…都…", note: "連 singles out a surprising example; 都 goes before the verb.",
+        cards: [
+          ["連", "lián", "even"], ["我弟弟", "wǒ dìdi", "my younger brother"], ["都", "dōu", "even / also"],
+          ["知道", "zhīdào", "knows"], ["答案", "dá'àn", "answer"]
+        ]
+      },
+      {
+        english: "It was yesterday at the station that I met her.",
+        ending: "。", pattern: "是…的", note: "是…的 frames a completed event and highlights details such as when or where it happened.",
+        cards: [
+          ["我", "wǒ", "I"], ["是", "shì", "emphasis marker"], ["昨天", "zuótiān", "yesterday"],
+          ["在車站", "zài chēzhàn", "at the station"], ["遇到", "yùdào", "met"],
+          ["她", "tā", "her"], ["的", "de", "emphasis particle"]
+        ]
+      },
+      {
+        english: "Besides English, he also speaks Japanese.",
+        ending: "。", pattern: "除了…以外，還…", note: "除了…以外 introduces what is already included; 還 adds another thing.",
+        cards: [
+          ["除了", "chúle", "besides"], ["英文", "Yīngwén", "English"], ["以外", "yǐwài", "apart from"],
+          ["他", "tā", "he"], ["還會", "hái huì", "also can"], ["說", "shuō", "speak"], ["日文", "Rìwén", "Japanese"]
+        ]
+      },
+      {
+        english: "Since you already know, I won't explain it again.",
+        ending: "。", pattern: "既然…就…", note: "既然 gives an accepted fact; 就 introduces the decision based on it.",
+        cards: [
+          ["既然", "jìrán", "since"], ["你", "nǐ", "you"], ["已經", "yǐjīng", "already"],
+          ["知道了", "zhīdào le", "know"], ["我", "wǒ", "I"], ["就", "jiù", "then"],
+          ["不再", "bú zài", "not anymore"], ["解釋了", "jiěshì le", "explain"]
+        ]
+      },
+      {
+        english: "Only after finishing the work can we rest.",
+        ending: "。", pattern: "只有…才…", note: "只有 states the necessary condition; 才 marks the result that becomes possible.",
+        cards: [
+          ["只有", "zhǐyǒu", "only if"], ["把", "bǎ", "object marker"], ["工作", "gōngzuò", "work"],
+          ["做完", "zuò wán", "finish"], ["我們", "wǒmen", "we"], ["才能", "cái néng", "only then can"],
+          ["休息", "xiūxí", "rest"]
+        ]
+      },
+      {
+        english: "She can not only sing but also dance.",
+        ending: "。", pattern: "不但…而且…", note: "不但 introduces the first ability; 而且 adds a second one.",
+        cards: [
+          ["她", "tā", "she"], ["不但", "búdàn", "not only"], ["會唱歌", "huì chànggē", "can sing"],
+          ["而且", "érqiě", "but also"], ["會跳舞", "huì tiàowǔ", "can dance"]
+        ]
+      },
+      {
+        english: "It wasn't that I forgot; I just didn't have time.",
+        ending: "。", pattern: "不是…而是…", note: "不是 rejects one explanation; 而是 gives the real one.",
+        cards: [
+          ["我", "wǒ", "I"], ["不是", "bú shì", "it isn't that"], ["忘記了", "wàngjì le", "forgot"],
+          ["而是", "érshì", "but rather"], ["沒有時間", "méiyǒu shíjiān", "had no time"]
+        ]
+      },
+      {
+        english: "This bag is as heavy as that one.",
+        ending: "。", pattern: "跟…一樣…", note: "跟 introduces the comparison; 一樣 comes before the shared quality.",
+        cards: [
+          ["這個", "zhège", "this"], ["袋子", "dàizi", "bag"], ["跟", "gēn", "with / as"],
+          ["那個", "nàge", "that one"], ["一樣", "yíyàng", "equally"], ["重", "zhòng", "heavy"]
+        ]
+      },
+      {
+        english: "He didn't leave until the rain stopped.",
+        ending: "。", pattern: "直到…才…", note: "直到 names the point in time; 才 shows that the action waited until then.",
+        cards: [
+          ["他", "tā", "he"], ["直到", "zhídào", "until"], ["雨停了", "yǔ tíng le", "the rain stopped"],
+          ["才", "cái", "only then"], ["離開", "líkāi", "left"]
+        ]
+      },
+      {
+        english: "In order to catch the train, we left early.",
+        ending: "。", pattern: "為了…", note: "為了 puts the purpose before the action taken to achieve it.",
+        cards: [
+          ["為了", "wèile", "in order to"], ["趕上", "gǎnshàng", "catch"], ["火車", "huǒchē", "train"],
+          ["我們", "wǒmen", "we"], ["提早", "tízǎo", "early"], ["出門", "chūmén", "left home"]
+        ]
+      },
+      {
+        english: "As long as you ask for help, someone will help you.",
+        ending: "。", pattern: "只要…就…", note: "只要 sets a sufficient condition; 就 introduces the expected result.",
+        cards: [
+          ["只要", "zhǐyào", "as long as"], ["你", "nǐ", "you"], ["開口求助", "kāikǒu qiúzhù", "ask for help"],
+          ["就會", "jiù huì", "then will"], ["有人", "yǒu rén", "someone"], ["幫你", "bāng nǐ", "help you"]
+        ]
+      },
+      {
+        english: "Even if it's expensive, I still want to try it.",
+        ending: "。", pattern: "即使…還是…", note: "即使 introduces a possible obstacle; 還是 shows that the decision remains the same.",
+        cards: [
+          ["即使", "jíshǐ", "even if"], ["很貴", "hěn guì", "expensive"], ["我", "wǒ", "I"],
+          ["還是", "háishì", "still"], ["想", "xiǎng", "want to"], ["試試看", "shìshi kàn", "give it a try"]
+        ]
+      }
+    ];
+
+    const C = (hanzi, pinyin, gloss) => [hanzi, pinyin, gloss];
+    const I = C("我", "wǒ", "I");
+    const YOU = C("你", "nǐ", "you");
+    const WE = C("我們", "wǒmen", "we");
+    const add = (english, cards, ending = "。") => sentences.push({ english, cards, ending });
+    const expand = (lines, build) => lines.forEach((line) => build(...line.split("|")));
+
+    // Everyday routines, errands, and plans.
+    expand([
+      "buy groceries|買菜|mǎi cài",
+      "do laundry|洗衣服|xǐ yīfú",
+      "pay the electricity bill|繳電費|jiǎo diànfèi",
+      "call the dentist|打電話給牙醫|dǎ diànhuà gěi yáyī",
+      "pick up the package|去拿包裹|qù ná bāoguǒ",
+      "charge my phone|幫手機充電|bāng shǒujī chōngdiàn",
+      "clean the kitchen|打掃廚房|dǎsǎo chúfáng",
+      "reply to that email|回覆那封郵件|huífù nà fēng yóujiàn",
+      "book a table|訂位|dìngwèi",
+      "buy cat food|買貓飼料|mǎi māo sìliào",
+      "print the documents|列印文件|lièyìn wénjiàn",
+      "take out the trash|倒垃圾|dào lèsè"
+    ], (en, zh, py) => add("I need to " + en + " today.", [I, C("今天", "jīntiān", "today"), C("得", "děi", "need to"), C(zh, py, en)]));
+
+    expand([
+      "go hiking|去爬山|qù páshān",
+      "watch a movie|看電影|kàn diànyǐng",
+      "visit my grandparents|去看爺爺奶奶|qù kàn yéye nǎinai",
+      "try that new restaurant|去吃那家新餐廳|qù chī nà jiā xīn cāntīng",
+      "sleep in|睡晚一點|shuì wǎn yìdiǎn",
+      "go to the beach|去海邊|qù hǎibiān",
+      "meet some friends|跟朋友見面|gēn péngyǒu jiànmiàn",
+      "read at a cafe|去咖啡店看書|qù kāfēidiàn kàn shū",
+      "cook something new|試做一道新菜|shì zuò yí dào xīn cài",
+      "walk around the night market|逛夜市|guàng yèshì",
+      "take a short day trip|去附近走走|qù fùjìn zǒuzou",
+      "stay home and rest|待在家休息|dāi zài jiā xiūxí"
+    ], (en, zh, py) => add("I want to " + en + " this weekend.", [I, C("這個週末", "zhège zhōumò", "this weekend"), C("想", "xiǎng", "want to"), C(zh, py, en)]));
+
+    expand([
+      "my umbrella|雨傘|yǔsǎn",
+      "my keys|鑰匙|yàoshi",
+      "my wallet|錢包|qiánbāo",
+      "my phone|手機|shǒujī",
+      "my charger|充電器|chōngdiànqì",
+      "my water bottle|水壺|shuǐhú",
+      "my jacket|外套|wàitào",
+      "my ID|身分證|shēnfènzhèng",
+      "my lunch|午餐|wǔcān",
+      "my glasses|眼鏡|yǎnjìng",
+      "my notebook|筆記本|bǐjìběn",
+      "my transit card|悠遊卡|Yōuyóukǎ"
+    ], (en, zh, py) => add("I forgot to bring " + en + ".", [I, C("忘了", "wàng le", "forgot to"), C("帶", "dài", "bring"), C(zh, py, en)]));
+
+    expand([
+      "keys|鑰匙|yàoshi|at home|家裡|jiālǐ",
+      "wallet|錢包|qiánbāo|at the office|辦公室|bàngōngshì",
+      "umbrella|雨傘|yǔsǎn|on the bus|公車上|gōngchē shàng",
+      "phone|手機|shǒujī|in the car|車上|chē shàng",
+      "book|書|shū|at school|學校|xuéxiào",
+      "coat|外套|wàitào|at the restaurant|餐廳|cāntīng",
+      "bag|包包|bāobāo|at my friend's place|朋友家|péngyǒu jiā",
+      "glasses|眼鏡|yǎnjìng|in the bedroom|臥室|wòshì",
+      "lunch|午餐|wǔcān|in the fridge|冰箱裡|bīngxiāng lǐ",
+      "ticket|車票|chēpiào|on the desk|桌上|zhuō shàng",
+      "charger|充電器|chōngdiànqì|at the hotel|飯店|fàndiàn",
+      "notebook|筆記本|bǐjìběn|in the meeting room|會議室|huìyìshì"
+    ], (enItem, zhItem, pyItem, enPlace, zhPlace, pyPlace) => add("I left my " + enItem + " " + enPlace + ".", [I, C("把", "bǎ", "object marker"), C(zhItem, pyItem, enItem), C("忘在", "wàng zài", "left at"), C(zhPlace, pyPlace, enPlace), C("了", "le", "completed action")]));
+
+    expand([
+      "My mom|我媽|wǒ mā|cooking dinner|煮晚餐|zhǔ wǎncān",
+      "My dad|我爸|wǒ bà|washing the dishes|洗碗|xǐ wǎn",
+      "My sister|我妹妹|wǒ mèimei|doing homework|寫作業|xiě zuòyè",
+      "My brother|我弟弟|wǒ dìdi|playing basketball|打籃球|dǎ lánqiú",
+      "My roommate|我室友|wǒ shìyǒu|taking a shower|洗澡|xǐzǎo",
+      "My friend|我朋友|wǒ péngyǒu|waiting outside|外面等|wàimiàn děng",
+      "My coworker|我同事|wǒ tóngshì|making coffee|泡咖啡|pào kāfēi",
+      "The teacher|老師|lǎoshī|talking to a parent|跟家長說話|gēn jiāzhǎng shuōhuà",
+      "My neighbor|我鄰居|wǒ línjū|walking the dog|遛狗|liù gǒu",
+      "My wife|我太太|wǒ tàitai|putting the baby to sleep|哄寶寶睡覺|hǒng bǎobao shuìjiào",
+      "My husband|我先生|wǒ xiānsheng|fixing his bike|修腳踏車|xiū jiǎotàchē",
+      "The cashier|店員|diànyuán|helping a customer|幫客人結帳|bāng kèrén jiézhàng"
+    ], (enPerson, zhPerson, pyPerson, enAction, zhAction, pyAction) => add(enPerson + " is " + enAction + " right now.", [C(zhPerson, pyPerson, enPerson), C("現在", "xiànzài", "right now"), C("正在", "zhèngzài", "in the middle of"), C(zhAction, pyAction, enAction)]));
+
+    expand([
+      "drink water|喝水|hē shuǐ",
+      "check my messages|看訊息|kàn xùnxí",
+      "take a shower|洗澡|xǐzǎo",
+      "walk the dog|遛狗|liù gǒu",
+      "make coffee|泡咖啡|pào kāfēi",
+      "stretch|拉筋|lā jīn",
+      "open the windows|開窗戶|kāi chuānghù",
+      "feed the cat|餵貓|wèi māo",
+      "make my bed|整理床鋪|zhěnglǐ chuángpù",
+      "read the news|看新聞|kàn xīnwén",
+      "water the plants|澆花|jiāo huā",
+      "pack my bag|整理包包|zhěnglǐ bāobāo"
+    ], (en, zh, py) => add("I usually " + en + " before breakfast.", [I, C("通常", "tōngcháng", "usually"), C("早餐前", "zǎocān qián", "before breakfast"), C("會", "huì", "tend to"), C(zh, py, en)]));
+
+    expand([
+      "bought groceries|買了菜|mǎi le cài",
+      "washed the car|洗了車|xǐ le chē",
+      "cleaned the bathroom|打掃了浴室|dǎsǎo le yùshì",
+      "called my aunt|打電話給阿姨|dǎ diànhuà gěi āyí",
+      "sent the email|寄了郵件|jì le yóujiàn",
+      "cooked dinner|煮了晚餐|zhǔ le wǎncān",
+      "saw the doctor|看了醫生|kàn le yīshēng",
+      "went to the bank|去了銀行|qù le yínháng",
+      "picked up a package|拿了包裹|ná le bāoguǒ",
+      "paid the bill|付了帳單|fù le zhàngdān",
+      "met a friend|跟朋友見了面|gēn péngyǒu jiàn le miàn",
+      "watched the game|看了比賽|kàn le bǐsài"
+    ], (en, zh, py) => add("Yesterday I " + en + ".", [I, C("昨天", "zuótiān", "yesterday"), C(zh, py, en)]));
+
+    expand([
+      "eaten breakfast|吃早餐|chī zǎocān",
+      "finished my work|做完工作|zuò wán gōngzuò",
+      "seen that movie|看過那部電影|kàn guò nà bù diànyǐng",
+      "replied to her|回覆她|huífù tā",
+      "paid rent|繳房租|jiǎo fángzū",
+      "called home|打電話回家|dǎ diànhuà huí jiā",
+      "booked the tickets|訂票|dìng piào",
+      "washed the dishes|洗碗|xǐ wǎn",
+      "sent the file|寄出檔案|jì chū dǎng'àn",
+      "decided|決定|juédìng",
+      "taken my medicine|吃藥|chī yào",
+      "found my keys|找到鑰匙|zhǎodào yàoshi"
+    ], (en, zh, py) => add("I haven't " + en + " yet.", [I, C("還沒", "hái méi", "not yet"), C(zh, py, en)]));
+
+    expand([
+      "eaten|吃過|chī guò",
+      "finished lunch|吃完午餐|chī wán wǔcān",
+      "sent the email|寄出郵件|jì chū yóujiàn",
+      "paid rent|繳房租|jiǎo fángzū",
+      "booked a table|訂位|dìngwèi",
+      "told him|告訴他|gàosù tā",
+      "cleaned the kitchen|打掃廚房|dǎsǎo chúfáng",
+      "checked the schedule|看過時間表|kàn guò shíjiānbiǎo",
+      "called my mom|打電話給媽媽|dǎ diànhuà gěi māma",
+      "bought the tickets|買票|mǎi piào",
+      "read the message|看過訊息|kàn guò xùnxí",
+      "made an appointment|預約好|yùyuē hǎo"
+    ], (en, zh, py) => add("I've already " + en + ".", [I, C("已經", "yǐjīng", "already"), C(zh, py, en), C("了", "le", "completed action")]));
+
+    expand([
+      "call you|打電話給你|dǎ diànhuà gěi nǐ",
+      "reply to the message|回訊息|huí xùnxí",
+      "take out the trash|倒垃圾|dào lèsè",
+      "wash the dishes|洗碗|xǐ wǎn",
+      "send you the address|傳地址給你|chuán dìzhǐ gěi nǐ",
+      "check my email|看郵件|kàn yóujiàn",
+      "pick up the package|去拿包裹|qù ná bāoguǒ",
+      "buy some milk|買牛奶|mǎi niúnǎi",
+      "feed the cat|餵貓|wèi māo",
+      "book a taxi|叫計程車|jiào jìchéngchē",
+      "finish the report|寫完報告|xiě wán bàogào",
+      "charge my phone|幫手機充電|bāng shǒujī chōngdiàn"
+    ], (en, zh, py) => add("I'll " + en + " later.", [I, C("晚點", "wǎndiǎn", "later"), C("會", "huì", "will"), C(zh, py, en)]));
+
+    // Requests, shopping, and everyday cause and sequence.
+    expand([
+      "carry this box|搬這個箱子|bān zhège xiāngzi",
+      "check the address|核對地址|héduì dìzhǐ",
+      "open this jar|打開這個罐子|dǎkāi zhège guànzi",
+      "find my phone|找手機|zhǎo shǒujī",
+      "move the table|搬桌子|bān zhuōzi",
+      "take a photo|拍張照片|pāi zhāng zhàopiàn",
+      "print this page|列印這一頁|lièyìn zhè yí yè",
+      "call a taxi|叫計程車|jiào jìchéngchē",
+      "translate this message|翻譯這則訊息|fānyì zhè zé xùnxí",
+      "hold the door|扶著門|fú zhe mén",
+      "wipe the table|擦桌子|cā zhuōzi",
+      "look after the cat|照顧貓|zhàogù māo"
+    ], (en, zh, py) => add("Could you help me " + en + "?", [YOU, C("可以", "kěyǐ", "could"), C("幫我", "bāng wǒ", "help me"), C(zh, py, en), C("嗎", "ma", "question particle")], "？"));
+
+    expand([
+      "batteries|電池|diànchí",
+      "stamps|郵票|yóupiào",
+      "train tickets|火車票|huǒchēpiào",
+      "an umbrella|雨傘|yǔsǎn",
+      "fresh bread|新鮮麵包|xīnxiān miànbāo",
+      "a transit card|悠遊卡|Yōuyóukǎ",
+      "toothpaste|牙膏|yágāo",
+      "flowers|花|huā",
+      "a notebook|筆記本|bǐjìběn",
+      "cold medicine|感冒藥|gǎnmào yào",
+      "a phone case|手機殼|shǒujī ké",
+      "bottled water|瓶裝水|píngzhuāng shuǐ"
+    ], (en, zh, py) => add("Where can I buy " + en + "?", [C("哪裡", "nǎlǐ", "where"), C("可以", "kěyǐ", "can"), C("買到", "mǎidào", "buy"), C(zh, py, en)], "？"));
+
+    expand([
+      "cup of coffee|這杯|zhè bēi|咖啡|kāfēi",
+      "bottle of water|這瓶|zhè píng|水|shuǐ",
+      "sandwich|這個|zhège|三明治|sānmíngzhì",
+      "notebook|這本|zhè běn|筆記本|bǐjìběn",
+      "coat|這件|zhè jiàn|外套|wàitào",
+      "shirt|這件|zhè jiàn|襯衫|chènshān",
+      "bag|這個|zhège|包包|bāobāo",
+      "ticket|這張|zhè zhāng|票|piào",
+      "plant|這盆|zhè pén|植物|zhíwù",
+      "piece of cake|這塊|zhè kuài|蛋糕|dàngāo",
+      "umbrella|這把|zhè bǎ|雨傘|yǔsǎn",
+      "pair of shoes|這雙|zhè shuāng|鞋|xié"
+    ], (en, zhMeasure, pyMeasure, zhItem, pyItem) => add("How much is this " + en + "?", [C(zhMeasure, pyMeasure, "this"), C(zhItem, pyItem, en), C("多少錢", "duōshǎo qián", "how much")], "？"));
+
+    expand([
+      "coffee|咖啡|kāfēi|tea|茶|chá",
+      "rice|飯|fàn|noodles|麵|miàn",
+      "hot water|熱水|rè shuǐ|cold water|冰水|bīng shuǐ",
+      "soup|湯|tāng|salad|沙拉|shālā",
+      "this one|這個|zhège|that one|那個|nàge",
+      "a train ticket|火車票|huǒchēpiào|a bus ticket|公車票|gōngchēpiào",
+      "orange juice|柳橙汁|liǔchéngzhī|apple juice|蘋果汁|píngguǒzhī",
+      "chicken|雞肉|jīròu|fish|魚|yú",
+      "a small size|小杯|xiǎo bēi|a large size|大杯|dà bēi",
+      "bread|麵包|miànbāo|a pastry|點心|diǎnxīn",
+      "a window seat|靠窗的位置|kào chuāng de wèizhi|an aisle seat|走道的位置|zǒudào de wèizhi",
+      "a paper bag|紙袋|zhǐdài|a reusable bag|環保袋|huánbǎodài"
+    ], (enA, zhA, pyA, enB, zhB, pyB) => add("Do you want " + enA + " or " + enB + "?", [YOU, C("想要", "xiǎngyào", "want"), C(zhA, pyA, enA), C("還是", "háishì", "or"), C(zhB, pyB, enB)], "？"));
+
+    expand([
+      "grocery store|超市|chāoshì",
+      "pharmacy|藥局|yàojú",
+      "post office|郵局|yóujú",
+      "library|圖書館|túshūguǎn",
+      "coffee shop|咖啡店|kāfēidiàn",
+      "bank|銀行|yínháng",
+      "bakery|麵包店|miànbāodiàn",
+      "clinic|診所|zhěnsuǒ",
+      "laundromat|自助洗衣店|zìzhù xǐyīdiàn",
+      "restaurant|餐廳|cāntīng",
+      "bookstore|書店|shūdiàn",
+      "gym|健身房|jiànshēnfáng"
+    ], (en, zh, py) => add("Is the " + en + " still open?", [C(zh, py, en), C("現在", "xiànzài", "now"), C("還", "hái", "still"), C("開著", "kāi zhe", "open"), C("嗎", "ma", "question particle")], "？"));
+
+    expand([
+      "Because it was raining, I brought an umbrella.|下雨|xiàyǔ|帶了雨傘|dài le yǔsǎn",
+      "Because traffic was bad, I was late.|塞車|sāichē|遲到了|chídào le",
+      "Because I was tired, I went to bed early.|我很累|wǒ hěn lèi|早點睡了|zǎodiǎn shuì le",
+      "Because the bus didn't come, I took a taxi.|公車沒來|gōngchē méi lái|搭了計程車|dā le jìchéngchē",
+      "Because the store was closed, I went home.|店關了|diàn guān le|回家了|huí jiā le",
+      "Because I had a meeting, I missed lunch.|我要開會|wǒ yào kāihuì|沒吃午餐|méi chī wǔcān",
+      "Because my phone died, I couldn't call you.|手機沒電|shǒujī méi diàn|沒辦法打給你|méi bànfǎ dǎ gěi nǐ",
+      "Because it was hot, I bought a cold drink.|天氣很熱|tiānqì hěn rè|買了冷飲|mǎi le lěngyǐn",
+      "Because I forgot my wallet, I borrowed some money.|我忘了帶錢包|wǒ wàng le dài qiánbāo|借了點錢|jiè le diǎn qián",
+      "Because the train was delayed, I changed my plans.|火車誤點|huǒchē wùdiǎn|改了計畫|gǎi le jìhuà",
+      "Because I wasn't feeling well, I stayed home.|我不太舒服|wǒ bú tài shūfú|待在家裡|dāi zài jiālǐ",
+      "Because the line was too long, I came back later.|排隊的人太多|páiduì de rén tài duō|晚點再來|wǎndiǎn zài lái"
+    ], (en, zhReason, pyReason, zhResult, pyResult) => {
+      const [, reason, result] = /^Because (.+), I (.+)\.$/.exec(en);
+      add(en, [C("因為", "yīnwèi", "because"), C(zhReason, pyReason, reason), C("所以", "suǒyǐ", "so"), I, C(zhResult, pyResult, result)]);
+    });
+
+    expand([
+      "If it rains, we'll stay inside.|下雨|xiàyǔ|待在室內|dāi zài shìnèi",
+      "If the bus is late, we'll take a taxi.|公車晚到|gōngchē wǎn dào|搭計程車|dā jìchéngchē",
+      "If you have time, we'll eat together.|你有空|nǐ yǒu kòng|一起吃飯|yìqǐ chīfàn",
+      "If the store is open, we'll buy some milk.|店還開著|diàn hái kāi zhe|買牛奶|mǎi niúnǎi",
+      "If it's too crowded, we'll come back later.|人太多|rén tài duō|晚點再來|wǎndiǎn zài lái",
+      "If the weather is nice, we'll go for a walk.|天氣好|tiānqì hǎo|出去走走|chūqù zǒuzou",
+      "If the tickets are sold out, we'll watch it online.|票賣完了|piào mài wán le|在網路上看|zài wǎnglù shàng kàn",
+      "If dinner isn't ready, we'll order takeout.|晚餐還沒好|wǎncān hái méi hǎo|叫外送|jiào wàisòng",
+      "If the road is blocked, we'll take another route.|路不通|lù bù tōng|走別條路|zǒu bié tiáo lù",
+      "If you're tired, we'll stop for a while.|你累了|nǐ lèi le|休息一下|xiūxí yíxià",
+      "If the restaurant is full, we'll go next door.|餐廳客滿|cāntīng kèmǎn|去隔壁|qù gébì",
+      "If we leave early, we'll avoid traffic.|我們早點出門|wǒmen zǎodiǎn chūmén|能避開塞車|néng bìkāi sāichē"
+    ], (en, zhCondition, pyCondition, zhResult, pyResult) => {
+      const [, condition, result] = /^If (.+), we'll (.+)\.$/.exec(en);
+      add(en, [C("如果", "rúguǒ", "if"), C(zhCondition, pyCondition, condition), WE, C("就", "jiù", "then"), C(zhResult, pyResult, result)]);
+    });
+
+    expand([
+      "Although it's raining, I still need to go out.|下雨|xiàyǔ|得出門|děi chūmén",
+      "Although I'm tired, I still want to cook.|我很累|wǒ hěn lèi|想煮飯|xiǎng zhǔfàn",
+      "Although it's expensive, I still want to buy it.|很貴|hěn guì|想買|xiǎng mǎi",
+      "Although it's late, I still need to finish this.|很晚了|hěn wǎn le|得做完這件事|děi zuò wán zhè jiàn shì",
+      "Although the bus is slow, I still take it.|公車很慢|gōngchē hěn màn|搭公車|dā gōngchē",
+      "Although the room is small, I still like it.|房間很小|fángjiān hěn xiǎo|喜歡這個房間|xǐhuān zhège fángjiān",
+      "Although I'm busy, I still call my parents.|我很忙|wǒ hěn máng|打電話給爸媽|dǎ diànhuà gěi bàmā",
+      "Although it's cold, I still walk to work.|天氣很冷|tiānqì hěn lěng|走路上班|zǒulù shàngbān",
+      "Although I don't know him well, I still trust him.|我不太認識他|wǒ bú tài rènshi tā|相信他|xiāngxìn tā",
+      "Although the food is spicy, I still like it.|菜很辣|cài hěn là|喜歡這道菜|xǐhuān zhè dào cài",
+      "Although it takes time, I still want to learn.|需要花時間|xūyào huā shíjiān|想學|xiǎng xué",
+      "Although I was nervous, I still spoke up.|我很緊張|wǒ hěn jǐnzhāng|開口說了|kāikǒu shuō le"
+    ], (en, zhProblem, pyProblem, zhAction, pyAction) => {
+      const [, problem, action] = /^Although (.+), I still (.+)\.$/.exec(en);
+      add(en, [C("雖然", "suīrán", "although"), C(zhProblem, pyProblem, problem), I, C("還是", "háishì", "still"), C(zhAction, pyAction, action)]);
+    });
+
+    expand([
+      "wash your hands|洗手|xǐshǒu|eat|吃飯|chīfàn",
+      "check the address|核對地址|héduì dìzhǐ|mail the package|寄包裹|jì bāoguǒ",
+      "buy the ingredients|買食材|mǎi shícái|cook dinner|煮晚餐|zhǔ wǎncān",
+      "park the car|停車|tíng chē|go inside|進去|jìnqù",
+      "read the instructions|看說明|kàn shuōmíng|turn it on|打開電源|dǎkāi diànyuán",
+      "save the file|存檔|cún dǎng|close the laptop|關電腦|guān diànnǎo",
+      "call ahead|打電話|dǎ diànhuà|leave the house|出門|chūmén",
+      "take a number|抽號碼牌|chōu hàomǎpái|wait your turn|等叫號|děng jiàohào",
+      "boil the water|把水煮開|bǎ shuǐ zhǔ kāi|make tea|泡茶|pào chá",
+      "finish your homework|做完作業|zuò wán zuòyè|watch TV|看電視|kàn diànshì",
+      "put on your shoes|穿鞋|chuān xié|go outside|出去|chūqù",
+      "wash the vegetables|洗菜|xǐ cài|cut them|切菜|qiē cài"
+    ], (enFirst, zhFirst, pyFirst, enSecond, zhSecond, pySecond) => add("First " + enFirst + ", then " + enSecond + ".", [C("先", "xiān", "first"), C(zhFirst, pyFirst, enFirst), C("再", "zài", "then"), C(zhSecond, pySecond, enSecond)]));
+
+    expand([
+      "get home|到家|dào jiā|call you|打電話給你|dǎ diànhuà gěi nǐ",
+      "finish work|下班|xiàbān|go to the store|去超市|qù chāoshì",
+      "eat dinner|吃完晚餐|chī wán wǎncān|wash the dishes|洗碗|xǐ wǎn",
+      "take a shower|洗完澡|xǐ wán zǎo|go to bed|睡覺|shuìjiào",
+      "get paid|領到薪水|lǐngdào xīnshuǐ|pay the rent|繳房租|jiǎo fángzū",
+      "pick up the kids|接到孩子|jiēdào háizi|make dinner|煮晚餐|zhǔ wǎncān",
+      "finish the meeting|開完會|kāi wán huì|send you the notes|把筆記傳給你|bǎ bǐjì chuán gěi nǐ",
+      "buy groceries|買完菜|mǎi wán cài|go home|回家|huí jiā",
+      "park the car|停好車|tíng hǎo chē|come upstairs|上樓|shàng lóu",
+      "finish this chapter|看完這一章|kàn wán zhè yì zhāng|take a break|休息一下|xiūxí yíxià",
+      "drop off the package|寄出包裹|jì chū bāoguǒ|text you|傳訊息給你|chuán xùnxí gěi nǐ",
+      "check the schedule|看完時間表|kàn wán shíjiānbiǎo|book the tickets|訂票|dìng piào"
+    ], (enEvent, zhEvent, pyEvent, enAction, zhAction, pyAction) => add("After I " + enEvent + ", I'll " + enAction + ".", [I, C(zhEvent, pyEvent, enEvent), C("以後", "yǐhòu", "after"), C("會", "huì", "will"), C(zhAction, pyAction, enAction)]));
+
+    // Ordering, changes, and interactions with other people.
+    expand([
+      "leave|出門|chūmén|turn off the lights|關燈|guān dēng",
+      "eat|吃飯|chīfàn|wash your hands|洗手|xǐshǒu",
+      "go to bed|睡覺|shuìjiào|set an alarm|設鬧鐘|shè nàozhōng",
+      "drive|開車|kāi chē|check the tires|檢查輪胎|jiǎnchá lúntāi",
+      "submit the report|交報告|jiāo bàogào|check the numbers|核對數字|héduì shùzì",
+      "buy the tickets|買票|mǎi piào|check the date|確認日期|quèrèn rìqí",
+      "go to the store|去超市|qù chāoshì|make a shopping list|寫購物清單|xiě gòuwù qīngdān",
+      "take the medicine|吃藥|chī yào|read the label|看標籤|kàn biāoqiān",
+      "travel|出遠門|chū yuǎnmén|lock the door|鎖門|suǒ mén",
+      "send the message|傳訊息|chuán xùnxí|check the recipient|確認收件人|quèrèn shōujiànrén",
+      "start the meeting|開會|kāihuì|silence your phone|把手機調成靜音|bǎ shǒujī tiáo chéng jìngyīn",
+      "heat the food|加熱食物|jiārè shíwù|remove the lid|拿掉蓋子|nádiào gàizi"
+    ], (enEvent, zhEvent, pyEvent, enAction, zhAction, pyAction) => add("Before you " + enEvent + ", please " + enAction + ".", [C(zhEvent, pyEvent, enEvent), C("之前", "zhīqián", "before"), C("請", "qǐng", "please"), C(zhAction, pyAction, enAction)]));
+
+    expand([
+      "keys|鑰匙|yàoshi|on the table|桌上|zhuō shàng",
+      "milk|牛奶|niúnǎi|in the fridge|冰箱裡|bīngxiāng lǐ",
+      "coat|外套|wàitào|in the closet|衣櫃裡|yīguì lǐ",
+      "book|書|shū|on the shelf|書架上|shūjià shàng",
+      "shoes|鞋子|xiézi|by the door|門口|ménkǒu",
+      "ticket|票|piào|in my bag|包包裡|bāobāo lǐ",
+      "leftovers|剩菜|shèngcài|in the fridge|冰箱裡|bīngxiāng lǐ",
+      "towel|毛巾|máojīn|in the bathroom|浴室裡|yùshì lǐ",
+      "charger|充電器|chōngdiànqì|in the drawer|抽屜裡|chōuti lǐ",
+      "documents|文件|wénjiàn|on the desk|書桌上|shūzhuō shàng",
+      "cup|杯子|bēizi|in the sink|水槽裡|shuǐcáo lǐ",
+      "groceries|買的東西|mǎi de dōngxi|in the kitchen|廚房裡|chúfáng lǐ"
+    ], (enItem, zhItem, pyItem, enPlace, zhPlace, pyPlace) => add("I put the " + enItem + " " + enPlace + ".", [I, C("把", "bǎ", "object marker"), C(zhItem, pyItem, enItem), C("放在", "fàng zài", "put at"), C(zhPlace, pyPlace, enPlace)]));
+
+    expand([
+      "My phone was damaged by water.|我的手機|wǒ de shǒujī|水|shuǐ|弄壞了|nònghuài le",
+      "My shirt was stained by coffee.|我的襯衫|wǒ de chènshān|咖啡|kāfēi|弄髒了|nòngzāng le",
+      "The door was locked by my roommate.|門|mén|我室友|wǒ shìyǒu|鎖上了|suǒ shàng le",
+      "The cake was eaten by the dog.|蛋糕|dàngāo|狗|gǒu|吃掉了|chīdiào le",
+      "My bag was taken by someone else.|我的包包|wǒ de bāobāo|別人|biérén|拿錯了|ná cuò le",
+      "The meeting was canceled by my boss.|會議|huìyì|老闆|lǎobǎn|取消了|qǔxiāo le",
+      "The computer was fixed by a technician.|電腦|diànnǎo|技術人員|jìshù rényuán|修好了|xiū hǎo le",
+      "The window was broken by a ball.|窗戶|chuānghù|球|qiú|打破了|dǎpò le",
+      "My umbrella was blown away by the wind.|我的雨傘|wǒ de yǔsǎn|風|fēng|吹走了|chuī zǒu le",
+      "The laundry was soaked by the rain.|衣服|yīfú|雨|yǔ|淋濕了|línshī le",
+      "The note was thrown away by the cleaner.|紙條|zhǐtiáo|清潔人員|qīngjié rényuán|丟掉了|diūdiào le",
+      "The bike was moved by the security guard.|腳踏車|jiǎotàchē|警衛|jǐngwèi|移走了|yí zǒu le"
+    ], (en, zhItem, pyItem, zhAgent, pyAgent, zhAction, pyAction) => {
+      const [, thing, action, agent] = /^(.+) was (.+) by (.+)\.$/.exec(en);
+      add(en, [C(zhItem, pyItem, thing), C("被", "bèi", "by"), C(zhAgent, pyAgent, agent), C(zhAction, pyAction, action)]);
+    });
+
+    expand([
+      "This route is faster than that one.|這條路|zhè tiáo lù|那條路|nà tiáo lù|快|kuài",
+      "This coffee is hotter than mine.|這杯咖啡|zhè bēi kāfēi|我的|wǒ de|熱|rè",
+      "Our apartment is smaller than theirs.|我們的公寓|wǒmen de gōngyù|他們的|tāmen de|小|xiǎo",
+      "Today is colder than yesterday.|今天|jīntiān|昨天|zuótiān|冷|lěng",
+      "This bag is lighter than yours.|這個包包|zhège bāobāo|你的|nǐ de|輕|qīng",
+      "The train is faster than the bus.|火車|huǒchē|公車|gōngchē|快|kuài",
+      "My brother is taller than I am.|我弟弟|wǒ dìdi|我|wǒ|高|gāo",
+      "This restaurant is cheaper than that one.|這家餐廳|zhè jiā cāntīng|那家|nà jiā|便宜|piányí",
+      "The new chair is more comfortable than the old one.|新椅子|xīn yǐzi|舊椅子|jiù yǐzi|舒服|shūfú",
+      "This street is quieter than the main road.|這條街|zhè tiáo jiē|大馬路|dà mǎlù|安靜|ānjìng",
+      "The morning bus has fewer people than the evening bus.|早上的公車|zǎoshang de gōngchē|晚上的|wǎnshang de|人少|rén shǎo",
+      "This phone is newer than mine.|這支手機|zhè zhī shǒujī|我的|wǒ de|新|xīn"
+    ], (en, zhA, pyA, zhB, pyB, zhQuality, pyQuality) => {
+      const [, first, quality, second] = /^(.+) is (.+) than (.+)\.$/.exec(en)
+        || ["", "The morning bus", "fewer people", "the evening bus"];
+      add(en, [C(zhA, pyA, first), C("比", "bǐ", "compared with"), C(zhB, pyB, second), C(zhQuality, pyQuality, quality)]);
+    });
+
+    expand([
+      "My bag is as heavy as yours.|我的包包|wǒ de bāobāo|你的|nǐ de|重|zhòng",
+      "This road is as long as that one.|這條路|zhè tiáo lù|那條路|nà tiáo lù|長|cháng",
+      "Our room is as big as theirs.|我們的房間|wǒmen de fángjiān|他們的|tāmen de|大|dà",
+      "Today is as hot as yesterday.|今天|jīntiān|昨天|zuótiān|熱|rè",
+      "Her coffee is as sweet as mine.|她的咖啡|tā de kāfēi|我的|wǒ de|甜|tián",
+      "This chair is as comfortable as that one.|這張椅子|zhè zhāng yǐzi|那張|nà zhāng|舒服|shūfú",
+      "Your phone is as new as mine.|你的手機|nǐ de shǒujī|我的|wǒ de|新|xīn",
+      "My commute is as long as yours.|我的通勤時間|wǒ de tōngqín shíjiān|你的|nǐ de|長|cháng",
+      "This movie is as funny as the last one.|這部電影|zhè bù diànyǐng|上一部|shàng yí bù|好笑|hǎoxiào",
+      "My sister is as busy as I am.|我妹妹|wǒ mèimei|我|wǒ|忙|máng",
+      "This shirt is as expensive as that one.|這件襯衫|zhè jiàn chènshān|那件|nà jiàn|貴|guì",
+      "This soup is as spicy as that one.|這碗湯|zhè wǎn tāng|那碗|nà wǎn|辣|là"
+    ], (en, zhA, pyA, zhB, pyB, zhQuality, pyQuality) => {
+      const [, first, quality, second] = /^(.+) is as (.+) as (.+)\.$/.exec(en);
+      add(en, [C(zhA, pyA, first), C("跟", "gēn", "with"), C(zhB, pyB, second), C("一樣", "yíyàng", "as"), C(zhQuality, pyQuality, quality)]);
+    });
+
+    expand([
+      "My sister speaks not only English but also Japanese.|我妹妹|wǒ mèimei|會說英文|huì shuō Yīngwén|會說日文|huì shuō Rìwén|my sister|can speak English|can speak Japanese",
+      "My dad not only cooks but also bakes.|我爸|wǒ bà|會煮飯|huì zhǔfàn|會烤點心|huì kǎo diǎnxīn|my dad|can cook|can bake",
+      "This shop sells not only coffee but also bread.|這家店|zhè jiā diàn|賣咖啡|mài kāfēi|賣麵包|mài miànbāo|this shop|sells coffee|sells bread",
+      "She works not only on weekdays but also on weekends.|她|tā|平日上班|píngrì shàngbān|週末也上班|zhōumò yě shàngbān|she|works on weekdays|also works on weekends",
+      "He not only forgot his keys but also lost his wallet.|他|tā|忘了帶鑰匙|wàng le dài yàoshi|弄丟了錢包|nòngdiū le qiánbāo|he|forgot his keys|lost his wallet",
+      "I not only cleaned the room but also washed the dishes.|我|wǒ|打掃了房間|dǎsǎo le fángjiān|洗了碗|xǐ le wǎn|I|cleaned the room|washed the dishes",
+      "This place is not only quiet but also clean.|這裡|zhèlǐ|安靜|ānjìng|乾淨|gānjìng|this place|quiet|clean",
+      "My friend can not only drive but also ride a bike.|我朋友|wǒ péngyǒu|會開車|huì kāi chē|會騎腳踏車|huì qí jiǎotàchē|my friend|can drive|can ride a bike",
+      "She not only called me but also sent me a message.|她|tā|打電話給我|dǎ diànhuà gěi wǒ|傳訊息給我|chuán xùnxí gěi wǒ|she|called me|sent me a message",
+      "The restaurant is not only cheap but also serves good food.|這家餐廳|zhè jiā cāntīng|便宜|piányí|好吃|hǎochī|this restaurant|cheap|has tasty food",
+      "We not only bought groceries but also cooked dinner.|我們|wǒmen|買了菜|mǎi le cài|煮了晚餐|zhǔ le wǎncān|we|bought groceries|cooked dinner",
+      "He not only arrived early but also helped set up.|他|tā|早到了|zǎo dào le|幫忙布置|bāngmáng bùzhì|he|arrived early|helped set up"
+    ], (en, zhSubject, pySubject, zhA, pyA, zhB, pyB, enSubject, enA, enB) => add(en, [C(zhSubject, pySubject, enSubject), C("不但", "búdàn", "not only"), C(zhA, pyA, enA), C("而且", "érqiě", "but also"), C(zhB, pyB, enB)]));
+
+    expand([
+      "coffee|咖啡|kāfēi|bread|麵包|miànbāo",
+      "milk|牛奶|niúnǎi|eggs|雞蛋|jīdàn",
+      "rice|米|mǐ|noodles|麵|miàn",
+      "apples|蘋果|píngguǒ|oranges|橘子|júzi",
+      "a shirt|襯衫|chènshān|a jacket|外套|wàitào",
+      "a notebook|筆記本|bǐjìběn|pens|筆|bǐ",
+      "a ticket|車票|chēpiào|a drink|飲料|yǐnliào",
+      "vegetables|青菜|qīngcài|tofu|豆腐|dòufu",
+      "a book|書|shū|a magazine|雜誌|zázhì",
+      "soap|肥皂|féizào|shampoo|洗髮精|xǐfǎjīng",
+      "cat food|貓飼料|māo sìliào|cat litter|貓砂|māoshā",
+      "flowers|花|huā|a card|卡片|kǎpiàn"
+    ], (enA, zhA, pyA, enB, zhB, pyB) => add("Besides " + enA + ", I also bought " + enB + ".", [C("除了", "chúle", "besides"), C(zhA, pyA, enA), C("以外", "yǐwài", "apart from"), I, C("還", "hái", "also"), C("買了", "mǎi le", "bought"), C(zhB, pyB, enB)]));
+
+    expand([
+      "my mom|媽媽|māma|dinner|晚餐的事|wǎncān de shì",
+      "my dad|爸爸|bàba|the car|車子的事|chēzi de shì",
+      "my friend|朋友|péngyǒu|weekend plans|週末的計畫|zhōumò de jìhuà",
+      "my coworker|同事|tóngshì|the meeting time|開會的時間|kāihuì de shíjiān",
+      "the store|店家|diànjiā|the delivery|送貨的事|sònghuò de shì",
+      "the clinic|診所|zhěnsuǒ|my appointment|預約的事|yùyuē de shì",
+      "the school|學校|xuéxiào|the class schedule|課表|kèbiǎo",
+      "the hotel|飯店|fàndiàn|check-in time|入住時間|rùzhù shíjiān",
+      "the restaurant|餐廳|cāntīng|our reservation|訂位的事|dìngwèi de shì",
+      "the bank|銀行|yínháng|the fees|手續費|shǒuxùfèi",
+      "my landlord|房東|fángdōng|the rent|房租|fángzū",
+      "my sister|妹妹|mèimei|birthday plans|生日安排|shēngrì ānpái"
+    ], (enPerson, zhPerson, pyPerson, enTopic, zhTopic, pyTopic) => add("I called " + enPerson + " to ask about " + enTopic + ".", [I, C("打電話給", "dǎ diànhuà gěi", "called"), C(zhPerson, pyPerson, enPerson), C("問", "wèn", "to ask about"), C(zhTopic, pyTopic, enTopic)]));
+
+    expand([
+      "my brother|我弟弟|wǒ dìdi|pick me up|來接我|lái jiē wǒ",
+      "my mom|我媽|wǒ mā|buy some milk|買牛奶|mǎi niúnǎi",
+      "my coworker|我同事|wǒ tóngshì|send me the file|把檔案傳給我|bǎ dǎng'àn chuán gěi wǒ",
+      "my friend|我朋友|wǒ péngyǒu|watch my cat|照顧我的貓|zhàogù wǒ de māo",
+      "my roommate|我室友|wǒ shìyǒu|water the plants|幫植物澆水|bāng zhíwù jiāo shuǐ",
+      "my dad|我爸|wǒ bà|check the car|檢查車子|jiǎnchá chēzi",
+      "my sister|我妹妹|wǒ mèimei|call me later|晚點打給我|wǎndiǎn dǎ gěi wǒ",
+      "my partner|我伴侶|wǒ bànlǚ|buy the tickets|買票|mǎi piào",
+      "the teacher|老師|lǎoshī|explain it again|再解釋一次|zài jiěshì yí cì",
+      "my neighbor|我鄰居|wǒ línjū|accept a package for me|幫我收包裹|bāng wǒ shōu bāoguǒ",
+      "the cashier|店員|diànyuán|check the price|確認價格|quèrèn jiàgé",
+      "the driver|司機|sījī|stop here|停在這裡|tíng zài zhèlǐ"
+    ], (enPerson, zhPerson, pyPerson, enTask, zhTask, pyTask) => add("I asked " + enPerson + " to " + enTask + ".", [I, C("請", "qǐng", "asked"), C(zhPerson, pyPerson, enPerson), C(zhTask, pyTask, enTask)]));
+
+    expand([
+      "the supermarket|超市|chāoshì|my mom|我媽|wǒ mā",
+      "the park|公園|gōngyuán|my dad|我爸|wǒ bà",
+      "the library|圖書館|túshūguǎn|my sister|我妹妹|wǒ mèimei",
+      "the clinic|診所|zhěnsuǒ|my husband|我先生|wǒ xiānsheng",
+      "the market|市場|shìchǎng|my grandma|我奶奶|wǒ nǎinai",
+      "the station|車站|chēzhàn|my friend|我朋友|wǒ péngyǒu",
+      "the beach|海邊|hǎibiān|my cousin|我表哥|wǒ biǎogē",
+      "the bookstore|書店|shūdiàn|my roommate|我室友|wǒ shìyǒu",
+      "the night market|夜市|yèshì|my brother|我弟弟|wǒ dìdi",
+      "the gym|健身房|jiànshēnfáng|my coworker|我同事|wǒ tóngshì",
+      "the museum|博物館|bówùguǎn|my aunt|我阿姨|wǒ āyí",
+      "the bakery|麵包店|miànbāodiàn|my daughter|我女兒|wǒ nǚ'ér"
+    ], (enPlace, zhPlace, pyPlace, enPerson, zhPerson, pyPerson) => add("I went to " + enPlace + " with " + enPerson + ".", [I, C("跟", "gēn", "with"), C(zhPerson, pyPerson, enPerson), C("一起", "yìqǐ", "together"), C("去了", "qù le", "went to"), C(zhPlace, pyPlace, enPlace)]));
+
+    // Time, reported information, questions, and common choices.
+    expand([
+      "My mom|我媽|wǒ mā|me|我|wǒ|a key|一把鑰匙|yì bǎ yàoshi",
+      "My dad|我爸|wǒ bà|my brother|我弟弟|wǒ dìdi|his old bike|他的舊腳踏車|tā de jiù jiǎotàchē",
+      "My coworker|我同事|wǒ tóngshì|me|我|wǒ|the file|檔案|dǎng'àn",
+      "My friend|我朋友|wǒ péngyǒu|me|我|wǒ|a book|一本書|yì běn shū",
+      "The teacher|老師|lǎoshī|us|我們|wǒmen|homework|作業|zuòyè",
+      "My neighbor|我鄰居|wǒ línjū|us|我們|wǒmen|some oranges|一些橘子|yìxiē júzi",
+      "My grandma|我奶奶|wǒ nǎinai|me|我|wǒ|a red envelope|一個紅包|yí ge hóngbāo",
+      "My boss|老闆|lǎobǎn|me|我|wǒ|a new task|一個新任務|yí ge xīn rènwù",
+      "The doctor|醫生|yīshēng|me|我|wǒ|some medicine|一些藥|yìxiē yào",
+      "The cashier|店員|diànyuán|me|我|wǒ|a receipt|一張收據|yì zhāng shōujù",
+      "The server|服務生|fúwùshēng|us|我們|wǒmen|the menu|菜單|càidān",
+      "My sister|我妹妹|wǒ mèimei|my mom|我媽|wǒ mā|flowers|花|huā"
+    ], (enGiver, zhGiver, pyGiver, enRecipient, zhRecipient, pyRecipient, enItem, zhItem, pyItem) => add(enGiver + " gave " + enRecipient + " " + enItem + ".", [C(zhGiver, pyGiver, enGiver), C("給了", "gěi le", "gave"), C(zhRecipient, pyRecipient, enRecipient), C(zhItem, pyItem, enItem)]));
+
+    expand([
+      "wash the dishes|洗碗|xǐ wǎn|twenty minutes|二十分鐘|èrshí fēnzhōng",
+      "cook dinner|煮晚餐|zhǔ wǎncān|forty-five minutes|四十五分鐘|sìshíwǔ fēnzhōng",
+      "get to work|去上班|qù shàngbān|forty minutes|四十分鐘|sìshí fēnzhōng",
+      "find my keys|才找到鑰匙|cái zhǎodào yàoshi|ten minutes|十分鐘|shí fēnzhōng",
+      "clean the kitchen|打掃廚房|dǎsǎo chúfáng|an hour|一個小時|yí ge xiǎoshí",
+      "fold the laundry|摺衣服|zhé yīfú|fifteen minutes|十五分鐘|shíwǔ fēnzhōng",
+      "write the email|寫郵件|xiě yóujiàn|ten minutes|十分鐘|shí fēnzhōng",
+      "fix the bike|修腳踏車|xiū jiǎotàchē|two hours|兩個小時|liǎng ge xiǎoshí",
+      "buy groceries|買菜|mǎi cài|half an hour|半個小時|bàn ge xiǎoshí",
+      "walk to the station|走到車站|zǒu dào chēzhàn|twelve minutes|十二分鐘|shí'èr fēnzhōng",
+      "book the tickets|訂票|dìng piào|five minutes|五分鐘|wǔ fēnzhōng",
+      "do the laundry|洗衣服|xǐ yīfú|two hours|兩個小時|liǎng ge xiǎoshí"
+    ], (enTask, zhTask, pyTask, enTime, zhTime, pyTime) => add("It took me " + enTime + " to " + enTask + ".", [I, C("花了", "huā le", "spent"), C(zhTime, pyTime, enTime), C(zhTask, pyTask, enTask)]));
+
+    expand([
+      "woke up|醒來|xǐnglái|checked my phone|看手機|kàn shǒujī",
+      "finished work|下班|xiàbān|went home|回家|huí jiā",
+      "heard the news|聽到消息|tīngdào xiāoxi|called my mom|打電話給媽媽|dǎ diànhuà gěi māma",
+      "saw that it was raining|看到下雨|kàndào xiàyǔ|opened my umbrella|撐開雨傘|chēngkāi yǔsǎn",
+      "got on the bus|上公車|shàng gōngchē|found a seat|找到位子|zhǎodào wèizi",
+      "arrived at the station|到車站|dào chēzhàn|bought a ticket|買票|mǎi piào",
+      "got home|到家|dào jiā|took off my shoes|脫鞋|tuō xié",
+      "saw her message|看到她的訊息|kàndào tā de xùnxí|replied|回覆|huífù",
+      "finished lunch|吃完午餐|chī wán wǔcān|went back to work|回去工作|huíqù gōngzuò",
+      "heard the alarm|聽到鬧鐘|tīngdào nàozhōng|got up|起床|qǐchuáng",
+      "saw the price|看到價格|kàndào jiàgé|changed my mind|改變主意|gǎibiàn zhǔyì",
+      "sat down|坐下|zuòxià|opened my laptop|打開電腦|dǎkāi diànnǎo"
+    ], (enEvent, zhEvent, pyEvent, enAction, zhAction, pyAction) => add("As soon as I " + enEvent + ", I " + enAction + ".", [I, C("一", "yí", "as soon as"), C(zhEvent, pyEvent, enEvent), C("就", "jiù", "then"), C(zhAction, pyAction, enAction)]));
+
+    expand([
+      "The weather|天氣|tiānqì|colder|冷|lěng",
+      "The day|白天|báitiān|longer|長|cháng",
+      "The rent|房租|fángzū|higher|貴|guì",
+      "My child|我的孩子|wǒ de háizi|taller|高|gāo",
+      "The traffic|路況|lùkuàng|worse|差|chà",
+      "The room|房間|fángjiān|warmer|暖和|nuǎnhuo",
+      "My phone|我的手機|wǒ de shǒujī|slower|慢|màn",
+      "The line|隊伍|duìwǔ|longer|長|cháng",
+      "The coffee|咖啡|kāfēi|colder|冷|lěng",
+      "The garden|花園|huāyuán|greener|綠|lǜ",
+      "The neighborhood|這一帶|zhè yí dài|busier|熱鬧|rènao",
+      "The cost of living|物價|wùjià|higher|高|gāo"
+    ], (enThing, zhThing, pyThing, enQuality, zhQuality, pyQuality) => add(enThing + " is getting " + enQuality + ".", [C(zhThing, pyThing, enThing), C("越來越", "yuè lái yuè", "more and more"), C(zhQuality, pyQuality, enQuality), C("了", "le", "change of state")]));
+
+    expand([
+      "this is too expensive|這個|zhège|太貴了|tài guì le|this|is too expensive",
+      "this restaurant is good|這家餐廳|zhè jiā cāntīng|不錯|búcuò|this restaurant|is good",
+      "the bus will be late|公車|gōngchē|會晚到|huì wǎn dào|the bus|will be late",
+      "the room is too cold|房間|fángjiān|太冷了|tài lěng le|the room|is too cold",
+      "this size fits|這個尺寸|zhège chǐcùn|剛好|gānghǎo|this size|fits",
+      "we should leave early|我們|wǒmen|應該早點走|yīnggāi zǎodiǎn zǒu|we|should leave early",
+      "the food needs more salt|這道菜|zhè dào cài|需要再加點鹽|xūyào zài jiā diǎn yán|the food|needs more salt",
+      "he looks tired|他|tā|看起來很累|kàn qǐlái hěn lèi|he|looks tired",
+      "this road is faster|這條路|zhè tiáo lù|比較快|bǐjiào kuài|this road|is faster",
+      "this movie is worth watching|這部電影|zhè bù diànyǐng|值得看|zhídé kàn|this movie|is worth watching",
+      "it will rain soon|等一下|děng yíxià|會下雨|huì xiàyǔ|soon|will rain",
+      "the meeting won't take long|會議|huìyì|不會太久|bú huì tài jiǔ|the meeting|won't take long"
+    ], (enClause, zhSubject, pySubject, zhPredicate, pyPredicate, enSubject, enPredicate) => add("I think " + enClause + ".", [I, C("覺得", "juéde", "think"), C(zhSubject, pySubject, enSubject), C(zhPredicate, pyPredicate, enPredicate)]));
+
+    expand([
+      "the new cafe has opened|新咖啡店|xīn kāfēidiàn|開了|kāi le|the new cafe|has opened",
+      "our train is delayed|我們的火車|wǒmen de huǒchē|誤點了|wùdiǎn le|our train|is delayed",
+      "she got a new job|她|tā|找到新工作了|zhǎodào xīn gōngzuò le|she|got a new job",
+      "school is closed tomorrow|學校|xuéxiào|明天放假|míngtiān fàngjià|school|is closed tomorrow",
+      "our neighbor is moving|鄰居|línjū|要搬家了|yào bānjiā le|our neighbor|is moving",
+      "that restaurant is good|那家餐廳|nà jiā cāntīng|很好吃|hěn hǎochī|that restaurant|has good food",
+      "the price went up|價格|jiàgé|漲了|zhǎng le|the price|went up",
+      "the meeting moved to Friday|會議|huìyì|改到星期五了|gǎi dào xīngqīwǔ le|the meeting|moved to Friday",
+      "he is sick|他|tā|生病了|shēngbìng le|he|is sick",
+      "the weather will improve tomorrow|明天的天氣|míngtiān de tiānqì|會變好|huì biàn hǎo|the weather tomorrow|will improve",
+      "the store is closing early today|店|diàn|今天提早關門|jīntiān tízǎo guānmén|the store|is closing early today",
+      "the bus route changed|公車路線|gōngchē lùxiàn|改了|gǎi le|the bus route|changed"
+    ], (enClause, zhSubject, pySubject, zhPredicate, pyPredicate, enSubject, enPredicate) => add("I heard " + enClause + ".", [I, C("聽說", "tīngshuō", "heard that"), C(zhSubject, pySubject, enSubject), C(zhPredicate, pyPredicate, enPredicate)]));
+
+    const questionCards = (encoded) => encoded.split(";").map((part) => C(...part.split("~")));
+    expand([
+      "where the restroom is|洗手間~xǐshǒujiān~restroom;在哪裡~zài nǎlǐ~where it is",
+      "what time the train leaves|火車~huǒchē~train;幾點~jǐ diǎn~what time;出發~chūfā~leaves",
+      "when the store closes|店~diàn~store;幾點~jǐ diǎn~what time;關門~guānmén~closes",
+      "whether she is coming|她~tā~she;會不會~huì bú huì~whether;來~lái~come",
+      "how much the ticket costs|票~piào~ticket;多少錢~duōshǎo qián~how much",
+      "who took my umbrella|誰~shéi~who;拿走~ná zǒu~took;我的雨傘~wǒ de yǔsǎn~my umbrella",
+      "where he went|他~tā~he;去了~qù le~went;哪裡~nǎlǐ~where",
+      "why the bus is late|公車~gōngchē~bus;為什麼~wèishénme~why;晚到~wǎn dào~late",
+      "which floor the clinic is on|診所~zhěnsuǒ~clinic;在~zài~is on;幾樓~jǐ lóu~which floor",
+      "where the package is|包裹~bāoguǒ~package;在哪裡~zài nǎlǐ~where it is",
+      "when the meeting starts|會議~huìyì~meeting;什麼時候~shénme shíhòu~when;開始~kāishǐ~starts",
+      "how to use this machine|這台機器~zhè tái jīqì~this machine;怎麼~zěnme~how to;用~yòng~use"
+    ], (enQuestion, encoded) => add("I don't know " + enQuestion + ".", [I, C("不知道", "bù zhīdào", "don't know"), ...questionCards(encoded)]));
+
+    expand([
+      "order takeout|叫外送|jiào wàisòng|cook at home|自己煮|zìjǐ zhǔ",
+      "take a taxi|搭計程車|dā jìchéngchē|walk|走路|zǒulù",
+      "go out tonight|今晚出門|jīnwǎn chūmén|stay home|待在家|dāi zài jiā",
+      "drink coffee|喝咖啡|hē kāfēi|have tea|喝茶|hē chá",
+      "wait in line|排隊|páiduì|come back later|晚點再來|wǎndiǎn zài lái",
+      "argue|吵架|chǎojià|talk calmly|好好談|hǎohǎo tán",
+      "buy a new phone|買新手機|mǎi xīn shǒujī|repair this one|修這支|xiū zhè zhī",
+      "watch TV|看電視|kàn diànshì|read|看書|kàn shū",
+      "eat out|外食|wài shí|make dinner|煮晚餐|zhǔ wǎncān",
+      "drive|開車|kāi chē|take the train|搭火車|dā huǒchē",
+      "buy it now|現在買|xiànzài mǎi|wait for a sale|等特價|děng tèjià",
+      "rush|趕時間|gǎn shíjiān|leave a little earlier|早點出門|zǎodiǎn chūmén"
+    ], (enA, zhA, pyA, enB, zhB, pyB) => add("I don't want to " + enA + "; I'd rather " + enB + ".", [I, C("不想", "bù xiǎng", "don't want to"), C(zhA, pyA, enA), C("比較想", "bǐjiào xiǎng", "would rather"), C(zhB, pyB, enB)]));
+
+    expand([
+      "you call me|你打給我|nǐ dǎ gěi wǒ|pick you up|去接你|qù jiē nǐ",
+      "the bus is on time|公車準時|gōngchē zhǔnshí|make the meeting|趕上會議|gǎnshàng huìyì",
+      "the weather is nice|天氣好|tiānqì hǎo|walk to work|走路上班|zǒulù shàngbān",
+      "you send the address|你傳地址給我|nǐ chuán dìzhǐ gěi wǒ|find the place|找到那個地方|zhǎodào nàge dìfāng",
+      "the meeting ends early|會議提早結束|huìyì tízǎo jiéshù|come over|過去|guòqù",
+      "we leave now|我們現在出門|wǒmen xiànzài chūmén|catch the train|趕上火車|gǎnshàng huǒchē",
+      "my phone still has power|手機還有電|shǒujī hái yǒu diàn|call you|打給你|dǎ gěi nǐ",
+      "you explain it once more|你再解釋一次|nǐ zài jiěshì yí cì|understand|聽懂|tīngdǒng",
+      "I have time tonight|我今晚有空|wǒ jīnwǎn yǒu kòng|finish it|做完|zuò wán",
+      "the price drops|價格降低|jiàgé jiàngdī|buy it|買下來|mǎi xiàlái",
+      "you wait five minutes|你等五分鐘|nǐ děng wǔ fēnzhōng|get there|趕到|gǎn dào",
+      "the cafe has seats|咖啡店有位子|kāfēidiàn yǒu wèizi|sit down|坐下|zuòxià"
+    ], (enCondition, zhCondition, pyCondition, enResult, zhResult, pyResult) => add("As long as " + enCondition + ", I can " + enResult + ".", [C("只要", "zhǐyào", "as long as"), C(zhCondition, pyCondition, enCondition), I, C("就能", "jiù néng", "then can"), C(zhResult, pyResult, enResult)]));
+
+    expand([
+      "it rains|下雨|xiàyǔ|go out|出門|chūmén",
+      "it's late|很晚了|hěn wǎn le|finish this|把這件事做完|bǎ zhè jiàn shì zuò wán",
+      "it's expensive|很貴|hěn guì|buy it|買|mǎi",
+      "it's crowded|人很多|rén hěn duō|wait|等|děng",
+      "I'm tired|我很累|wǒ hěn lèi|cook dinner|煮晚餐|zhǔ wǎncān",
+      "it's cold|天氣很冷|tiānqì hěn lěng|walk to work|走路上班|zǒulù shàngbān",
+      "I don't know the way|我不認識路|wǒ bú rènshi lù|give it a try|試試看|shìshi kàn",
+      "no one else goes|別人都不去|biérén dōu bú qù|go|去|qù",
+      "the bus is slow|公車很慢|gōngchē hěn màn|take it|搭公車|dā gōngchē",
+      "the food is spicy|菜很辣|cài hěn là|eat it|吃這道菜|chī zhè dào cài",
+      "I'm busy|我很忙|wǒ hěn máng|call my mom|打電話給媽媽|dǎ diànhuà gěi māma",
+      "the train is delayed|火車誤點|huǒchē wùdiǎn|wait|等|děng"
+    ], (enCondition, zhCondition, pyCondition, enResult, zhResult, pyResult) => add("Even if " + enCondition + ", I'll still " + enResult + ".", [C("就算", "jiùsuàn", "even if"), C(zhCondition, pyCondition, enCondition), I, C("也", "yě", "still"), C(zhResult, pyResult, enResult)]));
+
+    const $ = (id) => document.getElementById(id);
+    const ui = {
+      english: $("english-sentence"), slots: $("slots"), bank: $("bank"), status: $("status"),
+      hint: $("hint-button"), answer: $("answer-button"), next: $("next-button")
+    };
+    let deck = [];
+    let deckPosition = 0;
+    let currentIndex = -1;
+    let placed = [];
+    let bankOrder = [];
+    let hintsVisible = false;
+    let wasCorrect = false;
+
+    function shuffle(values) {
+      const result = [...values];
+      for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+      }
+      return result;
+    }
+
+    function refillDeck() {
+      const previous = currentIndex;
+      deck = shuffle(sentences.map((_, index) => index));
+      if (deck.length > 1 && deck[0] === previous) [deck[0], deck[1]] = [deck[1], deck[0]];
+      deckPosition = 0;
+    }
+
+    function loadSentence() {
+      if (deckPosition >= deck.length) refillDeck();
+      currentIndex = deck[deckPosition++];
+      const count = sentences[currentIndex].cards.length;
+      placed = Array(count).fill(null);
+      bankOrder = shuffle(Array.from({ length: count }, (_, index) => index));
+      // Keep the initial row from accidentally revealing the complete answer.
+      if (count > 1 && bankOrder.every((id, position) => id === position)) [bankOrder[0], bankOrder[1]] = [bankOrder[1], bankOrder[0]];
+      hintsVisible = false;
+      wasCorrect = false;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      render();
+    }
+
+    function makeTile(id, location) {
+      const [hanzi, pinyin, gloss] = sentences[currentIndex].cards[id];
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `tile${hintsVisible ? " hinted" : ""}`;
+      button.setAttribute("aria-label", `${location === "slot" ? "Return" : "Place"} ${hanzi}${hintsVisible ? `, ${pinyin}, ${gloss}` : ""}`);
+      const characters = document.createElement("span");
+      characters.className = "hanzi";
+      characters.textContent = hanzi;
+      button.append(characters);
+      if (hintsVisible) {
+        const romanization = document.createElement("span");
+        romanization.className = "pinyin";
+        romanization.textContent = pinyin;
+        const translation = document.createElement("span");
+        translation.className = "gloss";
+        translation.textContent = gloss;
+        button.append(romanization, translation);
+      }
+      if (location === "slot") {
+        button.addEventListener("click", () => {
+          const slotIndex = placed.indexOf(id);
+          if (slotIndex === -1) return;
+          placed[slotIndex] = null;
+          bankOrder.push(id);
+          render();
+        });
+      } else {
+        button.addEventListener("click", () => {
+          const slotIndex = placed.indexOf(null);
+          if (slotIndex === -1) return;
+          placed[slotIndex] = id;
+          bankOrder = bankOrder.filter((cardId) => cardId !== id);
+          render();
+        });
+      }
+      return button;
+    }
+
+    function render() {
+      const sentence = sentences[currentIndex];
+      const complete = placed.every((id) => id !== null);
+      const correct = complete && placed.every((id, index) => id === index);
+      if (correct && !wasCorrect) hintsVisible = true;
+      wasCorrect = correct;
+      ui.english.textContent = sentence.english;
+      ui.slots.replaceChildren();
+      placed.forEach((id, index) => {
+        const slot = document.createElement("div");
+        slot.className = `slot ${id === null ? "empty" : "filled"}`;
+        if (id === null) {
+          const number = document.createElement("span");
+          number.className = "slot-number";
+          number.textContent = String(index + 1);
+          slot.append(number);
+        } else {
+          slot.append(makeTile(id, "slot"));
+        }
+        ui.slots.append(slot);
+      });
+      const ending = document.createElement("span");
+      ending.className = "sentence-end";
+      ending.textContent = sentence.ending;
+      ui.slots.append(ending);
+      ui.bank.replaceChildren(...bankOrder.map((id) => makeTile(id, "bank")));
+      ui.hint.textContent = hintsVisible ? "Hide hints" : "Show hints";
+      ui.hint.classList.toggle("hint-active", hintsVisible);
+      ui.hint.setAttribute("aria-pressed", String(hintsVisible));
+      ui.status.className = `status${correct ? " success" : complete ? " try-again" : ""}`;
+      ui.status.textContent = correct ? "Correct" : complete ? "Try again" : "";
+      ui.next.hidden = !correct;
+    }
+
+    ui.hint.addEventListener("click", () => { hintsVisible = !hintsVisible; render(); });
+    ui.answer.addEventListener("click", () => {
+      placed = sentences[currentIndex].cards.map((_, index) => index);
+      bankOrder = [];
+      render();
+    });
+    ui.next.addEventListener("click", loadSentence);
+
+    refillDeck();
+    loadSentence();
+  </script>
+</body>
+</html>
