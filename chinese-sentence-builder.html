@@ -3,18 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#f7f8f6">
+  <meta name="theme-color" content="#0f1719">
   <title>Sentence Studio · Traditional Chinese</title>
   <style>
     :root {
-      color-scheme: light;
-      --page: #f7f8f6;
-      --ink: #1e2825;
-      --muted: #61706a;
-      --line: #d5ddd8;
-      --teal: #176960;
-      --teal-soft: #e8f3ee;
-      --red: #a94f3c;
+      color-scheme: dark;
+      --page: #0f1719;
+      --ink: #edf5f1;
+      --muted: #a9bbb3;
+      --line: #354842;
+      --teal: #8fd7bd;
+      --teal-soft: #1b3931;
+      --red: #ffad9d;
+      --slot-bg: #172225;
+      --tile-bg: #202e2d;
+      --tile-active: #294039;
     }
 
     * { box-sizing: border-box; }
@@ -36,9 +39,9 @@
     .section-heading { margin: 0 0 14px; }
     .section-heading h2 { margin: 0; color: var(--muted); font-size: 13px; font-weight: 700; }
     .slots, .bank { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 9px; }
-    .slots { min-height: 90px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: #f1f4f1; }
-    .slot { min-width: 84px; min-height: 70px; display: flex; align-items: stretch; justify-content: center; border: 1.5px dashed #b8c9c3; border-radius: 8px; }
-    .slot.empty { align-items: center; color: #8a9c98; font-size: 13px; font-weight: 700; }
+    .slots { min-height: 90px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--slot-bg); }
+    .slot { min-width: 84px; min-height: 70px; display: flex; align-items: stretch; justify-content: center; border: 1.5px dashed #597268; border-radius: 8px; }
+    .slot.empty { align-items: center; color: #91a99e; font-size: 13px; font-weight: 700; }
     .slot.filled { border-color: transparent; }
     .slot-number { user-select: none; }
     .sentence-end { align-self: center; margin-left: -3px; font-family: "Noto Serif TC", "Songti TC", serif; font-size: 32px; font-weight: 700; }
@@ -50,11 +53,11 @@
     .bank { min-height: 90px; padding: 3px 0 13px; }
     .tile {
       min-width: 84px; min-height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 3px; padding: 8px 14px; border: 1px solid #b8c7bf; border-radius: 8px;
-      background: #fff; color: var(--ink); cursor: pointer;
+      gap: 3px; padding: 8px 14px; border: 1px solid #597268; border-radius: 8px;
+      background: var(--tile-bg); color: var(--ink); cursor: pointer;
     }
     .tile:hover { border-color: var(--teal); }
-    .tile:active { background: #f1f6f2; }
+    .tile:active { background: var(--tile-active); }
     .slot .tile { width: 100%; height: 100%; border-color: var(--teal); background: var(--teal-soft); }
     .hanzi { font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Segoe UI", sans-serif; font-size: 30px; font-weight: 700; line-height: 1.25; white-space: nowrap; }
     .pinyin { color: var(--teal); font-size: 12px; font-weight: 700; line-height: 1.25; }
@@ -63,12 +66,12 @@
 
     .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding-top: 10px; }
     .tool-group { display: flex; flex-wrap: wrap; gap: 9px; }
-    .action { min-height: 46px; padding: 10px 17px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); font-size: 14px; font-weight: 700; cursor: pointer; }
+    .action { min-height: 46px; padding: 10px 17px; border: 1px solid var(--line); border-radius: 8px; background: var(--tile-bg); color: var(--ink); font-size: 14px; font-weight: 700; cursor: pointer; }
     .action:hover { border-color: var(--teal); }
     .action.hint-active { border-color: var(--teal); background: var(--teal-soft); }
     .action.answer { color: var(--teal); }
-    .action.next { margin-left: auto; border-color: var(--teal); background: var(--teal); color: white; white-space: nowrap; }
-    .action.next:hover { background: #0c5752; }
+    .action.next { margin-left: auto; border-color: var(--teal); background: var(--teal); color: #10231d; white-space: nowrap; }
+    .action.next:hover { background: #aae8d1; }
     [hidden] { display: none !important; }
     @media (max-width: 600px) {
       .app { width: min(100% - 24px, 900px); padding: 24px 0 40px; }
