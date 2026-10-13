@@ -34,6 +34,9 @@
     button:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
 
     .app { width: min(100% - 32px, 900px); margin: 0 auto; padding: clamp(26px, 5vw, 54px) 0 48px; }
+    .home-link { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 18px; color: var(--teal); font-size: 14px; text-decoration: none; }
+    .home-link:hover { text-decoration: underline; }
+    .home-link:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
     .prompt { margin-bottom: 32px; }
     .prompt h1 { margin: 0; font-size: clamp(24px, 3.5vw, 32px); font-weight: 650; line-height: 1.35; letter-spacing: -.025em; }
     .section-heading { margin: 0 0 14px; }
@@ -90,6 +93,7 @@
 </head>
 <body>
   <main class="app">
+    <a class="home-link" href="index.html">← Chinese practice</a>
     <section class="prompt" aria-label="English sentence"><h1 id="english-sentence"></h1></section>
 
     <section class="workspace" aria-label="Sentence builder">
