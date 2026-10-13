@@ -13,18 +13,12 @@
 <body>
   <main class="study-shell shell">
     <header class="site-header">
-      <a class="brand" href="index.html"><span class="brand-mark" lang="zh-Hant" aria-hidden="true">中</span> Chinese practice</a>
-      <a class="back-link" href="index.html">← All practices</a>
+      <a class="back-link" href="index.html">← Practices</a>
+      <h1 class="page-title">Flashcards</h1>
     </header>
 
-    <div class="study-intro">
-      <p class="eyebrow">RECALL &amp; TRANSLATE</p>
-      <h1>Sentence flashcards</h1>
-      <p class="study-description">Take your time. Say it to yourself, then tap for the answer.</p>
-    </div>
-
     <fieldset class="mode-picker">
-      <legend>Practice direction</legend>
+      <legend class="sr-only">Practice direction</legend>
       <div class="mode-options">
         <button class="mode-button" type="button" data-mode="zh-en" aria-pressed="false">Chinese <span class="mode-to">→ English</span></button>
         <button class="mode-button" type="button" data-mode="en-zh" aria-pressed="false">English <span class="mode-to">→ Chinese</span></button>
@@ -39,13 +33,13 @@
 
     <button id="flashcard" class="flashcard" type="button" aria-expanded="false" aria-controls="answer-face" aria-label="Sentence flashcard. Tap to reveal the answer.">
       <span class="flashcard-top"><span id="card-direction" class="card-direction"></span><span id="sentence-number"></span></span>
-      <span id="prompt-face" class="prompt-face"><span id="prompt-text" class="prompt-text"></span><span id="prompt-note" class="prompt-note"></span></span>
+      <span id="prompt-face" class="prompt-face"><span id="prompt-text" class="prompt-text"></span></span>
       <span id="answer-face" class="answer-face" hidden>
         <span class="solution-field"><span class="field-label">CHARACTERS</span><span id="solution-chinese" class="solution-chinese" lang="zh-Hant"></span></span>
         <span class="solution-field"><span class="field-label">PINYIN</span><span id="solution-pinyin" class="solution-pinyin" lang="zh-Latn"></span></span>
         <span class="solution-field"><span class="field-label">ENGLISH</span><span id="solution-english" class="solution-english" lang="en"></span></span>
       </span>
-      <span id="card-hint" class="card-hint">Tap anywhere on the card to reveal</span>
+      <span id="card-hint" class="card-hint">Tap to reveal</span>
     </button>
 
     <div class="study-controls">
@@ -54,7 +48,6 @@
       <button id="next-button" class="nav-button" type="button" aria-label="Next card">→</button>
     </div>
     <progress id="study-progress" class="study-progress" value="0" max="600" aria-label="Position in this shuffled round"></progress>
-    <footer class="study-footer"><span id="deck-summary">GPT Sentence Practice · 300 sentences</span><span class="keyboard-note">Space: reveal / next · ← →: navigate</span></footer>
     <p id="announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
     <noscript><p>Please enable JavaScript to practice these flashcards.</p></noscript>
   </main>

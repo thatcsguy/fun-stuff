@@ -57,17 +57,15 @@ function render() {
   document.getElementById("sentence-number").textContent = `SENTENCE ${String(card.number).padStart(3, "0")}`;
   promptText.textContent = isChinese ? card.zh : card.en;
   promptText.lang = isChinese ? "zh-Hant" : "en";
-  document.getElementById("prompt-note").textContent = isChinese ? "How would you say this in English?" : "How would you say this in Chinese?";
   document.getElementById("solution-chinese").textContent = card.zh;
   document.getElementById("solution-pinyin").textContent = card.pinyin;
   document.getElementById("solution-english").textContent = card.en;
   promptFace.hidden = revealed;
   answerFace.hidden = !revealed;
-  document.getElementById("card-hint").textContent = revealed ? "Tap the card to see the prompt again" : "Tap anywhere on the card to reveal";
+  document.getElementById("card-hint").textContent = revealed ? "Tap to see prompt" : "Tap to reveal";
   primaryButton.textContent = revealed ? "Next card →" : "Reveal answer";
   previousButton.disabled = position === 0;
   document.getElementById("card-count").textContent = `${position + 1} / ${queue.length} prompts · Round ${round}`;
-  document.getElementById("deck-summary").textContent = `${SENTENCE_DECK.title} · ${SENTENCE_DECK.cards.length} sentences`;
   progress.max = queue.length;
   progress.value = position + 1;
   modeButtons.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.mode === mode)));
