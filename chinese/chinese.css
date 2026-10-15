@@ -36,12 +36,13 @@ button:disabled { cursor: default; opacity: .35; }
 .featured .practice-icon { border-color: #d6d8c6; }
 .featured:hover { border-color: #d7e9ae; }
 
-/* Sentence practice */
+/* Flashcards */
 .page-title { margin: 0; font-size: 20px; font-weight: 650; }
 .back-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-size: 13px; text-decoration: none; }
 .back-link:hover { color: var(--ink); }
 .mode-picker { margin: 16px 0 0; padding: 0; border: 0; }
 .mode-options { display: grid; grid-template-columns: 1fr 1fr .7fr; gap: 6px; padding: 5px; border: 1px solid var(--line); border-radius: 14px; background: #15231e; }
+.mode-options.two-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .mode-button { min-height: 48px; padding: 8px 10px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 650; }
 .mode-button[aria-pressed="true"] { border-color: var(--mint); background: var(--mint); color: var(--paper-ink); }
 .mode-button:hover:not([aria-pressed="true"]) { background: var(--panel); color: var(--ink); }
@@ -56,12 +57,14 @@ button:disabled { cursor: default; opacity: .35; }
 .prompt-face { display: flex; flex: 1; flex-direction: column; justify-content: center; padding: 32px 0; }
 .prompt-text { display: block; font-size: clamp(25px, 4vw, 35px); font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
 .prompt-text[lang="zh-Hant"], .solution-chinese { font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", "Segoe UI", sans-serif; font-weight: 550; }
+.vocab-page .prompt-text[lang="zh-Hant"] { font-size: clamp(38px, 7vw, 56px); }
 .answer-face { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: 18px; padding: 26px 0; }
 .solution-field, .field-label { display: block; }
 .field-label { margin-bottom: 7px; color: #65715d; font-size: 10px; font-weight: 700; letter-spacing: .1em; }
 .solution-chinese { display: block; font-size: clamp(26px, 4vw, 33px); line-height: 1.5; overflow-wrap: anywhere; }
 .solution-pinyin { display: block; color: #547143; font-size: 17px; line-height: 1.6; overflow-wrap: anywhere; }
-.solution-english { display: block; font-size: 18px; line-height: 1.6; overflow-wrap: anywhere; }
+.solution-english { display: block; font-size: 18px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-line; }
+.vocab-page .solution-english { font-size: 16px; }
 .card-hint { display: block; padding-top: 17px; border-top: 1px solid #d9dccb; color: #65715d; font-size: 12px; text-align: center; }
 .study-controls { display: grid; grid-template-columns: 54px 1fr 54px; gap: 12px; margin-top: 16px; }
 .nav-button, .primary-button { min-height: 52px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); }

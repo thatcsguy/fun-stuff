@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101d1a">
+  <meta name="description" content="Practice previously studied vocabulary from your Taiwan Anki deck in either direction.">
+  <title>Vocab · Chinese practice</title>
+  <link rel="stylesheet" href="chinese.css">
+  <script src="vocab-deck.js" defer></script>
+  <script src="flashcards.js" defer></script>
+</head>
+<body>
+  <main class="study-shell shell vocab-page">
+    <header class="site-header">
+      <a class="back-link" href="index.html">← Practices</a>
+      <h1 class="page-title">Vocab</h1>
+    </header>
+
+    <fieldset class="mode-picker">
+      <legend class="sr-only">Practice direction</legend>
+      <div class="mode-options two-modes">
+        <button class="mode-button" type="button" data-mode="zh-en" aria-pressed="true">Chinese <span class="mode-to">→ English</span></button>
+        <button class="mode-button" type="button" data-mode="en-zh" aria-pressed="false">English <span class="mode-to">→ Chinese</span></button>
+      </div>
+    </fieldset>
+
+    <div class="session-meta">
+      <p id="card-count">Loading words…</p>
+      <button id="shuffle-button" class="text-button" type="button"><span aria-hidden="true">⤨</span> Reshuffle</button>
+    </div>
+
+    <button id="flashcard" class="flashcard" type="button" aria-expanded="false" aria-controls="answer-face" aria-label="Vocabulary flashcard. Tap to reveal the answer.">
+      <span class="flashcard-top"><span id="card-direction" class="card-direction"></span><span id="card-number"></span></span>
+      <span id="prompt-face" class="prompt-face"><span id="prompt-text" class="prompt-text"></span></span>
+      <span id="answer-face" class="answer-face" hidden>
+        <span class="solution-field"><span class="field-label">CHARACTERS</span><span id="solution-chinese" class="solution-chinese" lang="zh-Hant"></span></span>
+        <span class="solution-field"><span class="field-label">PINYIN</span><span id="solution-pinyin" class="solution-pinyin" lang="zh-Latn"></span></span>
+        <span class="solution-field"><span class="field-label">ENGLISH</span><span id="solution-english" class="solution-english" lang="en"></span></span>
+      </span>
+      <span id="card-hint" class="card-hint">Tap to reveal</span>
+    </button>
+
+    <div class="study-controls">
+      <button id="previous-button" class="nav-button" type="button" aria-label="Previous card" disabled>←</button>
+      <button id="primary-button" class="primary-button" type="button">Reveal answer</button>
+      <button id="next-button" class="nav-button" type="button" aria-label="Next card">→</button>
+    </div>
+    <progress id="study-progress" class="study-progress" value="0" max="573" aria-label="Position in this shuffled round"></progress>
+    <p id="announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+    <noscript><p>Please enable JavaScript to practice these flashcards.</p></noscript>
+  </main>
+</body>
+</html>

@@ -5,8 +5,9 @@ const MODE_LABELS = {
   "en-zh": "English → Chinese",
   mixed: "Mixed"
 };
-const PREFERENCE_KEY = "chinese-sentence-flashcards-mode";
+const PREFERENCE_KEY = `chinese-${FLASHCARD_DECK.id}-flashcards-mode`;
 const modeButtons = Array.from(document.querySelectorAll("[data-mode]"));
+const availableModes = new Set(modeButtons.map(button => button.dataset.mode));
 const flashcard = document.getElementById("flashcard");
 const promptFace = document.getElementById("prompt-face");
 const promptText = document.getElementById("prompt-text");
@@ -15,7 +16,7 @@ const primaryButton = document.getElementById("primary-button");
 const previousButton = document.getElementById("previous-button");
 const announcement = document.getElementById("announcement");
 const progress = document.getElementById("study-progress");
-let mode = "mixed";
+let mode = FLASHCARD_DECK.defaultMode;
 let queue = [];
 let position = 0;
 let round = 1;
@@ -24,7 +25,7 @@ let revealed = false;
 // Storage can be unavailable for local files or in private browsing.
 try {
   const savedMode = localStorage.getItem(PREFERENCE_KEY);
-  if (Object.hasOwn(MODE_LABELS, savedMode)) mode = savedMode;
+  if (availableModes.has(savedMode)) mode = savedMode;
 } catch {}
 
 function shuffle(items) {
@@ -38,7 +39,7 @@ function shuffle(items) {
 function startRound(lastPrompt = null) {
   // A mixed round includes both translations of every original Anki card.
   const directions = mode === "mixed" ? ["zh-en", "en-zh"] : [mode];
-  queue = shuffle(SENTENCE_DECK.cards.flatMap(card => directions.map(direction => ({ card, direction }))));
+  queue = shuffle(FLASHCARD_DECK.cards.flatMap(card => directions.map(direction => ({ card, direction }))));
   if (lastPrompt && queue.length > 1 && queue[0].card.id === lastPrompt.card.id && queue[0].direction === lastPrompt.direction) {
     [queue[0], queue[1]] = [queue[1], queue[0]];
   }
@@ -50,12 +51,13 @@ function startRound(lastPrompt = null) {
 function render() {
   const { card, direction } = queue[position];
   const isChinese = direction === "zh-en";
+  const prompt = isChinese ? card.zh : (card.promptEn ?? card.en);
   flashcard.dataset.cardId = card.id;
   flashcard.dataset.direction = direction;
   flashcard.setAttribute("aria-expanded", String(revealed));
   document.getElementById("card-direction").textContent = MODE_LABELS[direction].toUpperCase();
-  document.getElementById("sentence-number").textContent = `SENTENCE ${String(card.number).padStart(3, "0")}`;
-  promptText.textContent = isChinese ? card.zh : card.en;
+  document.getElementById("card-number").textContent = `${FLASHCARD_DECK.unit.toUpperCase()} ${String(card.number).padStart(3, "0")}`;
+  promptText.textContent = prompt;
   promptText.lang = isChinese ? "zh-Hant" : "en";
   document.getElementById("solution-chinese").textContent = card.zh;
   document.getElementById("solution-pinyin").textContent = card.pinyin;
@@ -71,7 +73,7 @@ function render() {
   modeButtons.forEach(button => button.setAttribute("aria-pressed", String(button.dataset.mode === mode)));
   flashcard.setAttribute("aria-label", revealed
     ? `Answer. Characters: ${card.zh} Pinyin: ${card.pinyin} English: ${card.en} Tap to see the prompt again.`
-    : `${isChinese ? "Chinese" : "English"} prompt: ${isChinese ? card.zh : card.en} Tap to reveal the answer.`);
+    : `${isChinese ? "Chinese" : "English"} prompt: ${prompt} Tap to reveal the answer.`);
 }
 
 function toggleAnswer() {

@@ -1,5 +1,8 @@
 // Imported from GPT Sentence Practice.apkg. Every sentence is available in both directions.
-const SENTENCE_DECK = {
+const FLASHCARD_DECK = {
+  "id": "sentence",
+  "unit": "sentence",
+  "defaultMode": "mixed",
   "title": "GPT Sentence Practice",
   "source": "GPT Sentence Practice.apkg",
   "cards": [

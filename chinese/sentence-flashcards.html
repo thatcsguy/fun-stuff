@@ -8,7 +8,7 @@
   <title>Sentence flashcards · Chinese practice</title>
   <link rel="stylesheet" href="chinese.css">
   <script src="sentence-deck.js" defer></script>
-  <script src="sentence-flashcards.js" defer></script>
+  <script src="flashcards.js" defer></script>
 </head>
 <body>
   <main class="study-shell shell">
@@ -32,7 +32,7 @@
     </div>
 
     <button id="flashcard" class="flashcard" type="button" aria-expanded="false" aria-controls="answer-face" aria-label="Sentence flashcard. Tap to reveal the answer.">
-      <span class="flashcard-top"><span id="card-direction" class="card-direction"></span><span id="sentence-number"></span></span>
+      <span class="flashcard-top"><span id="card-direction" class="card-direction"></span><span id="card-number"></span></span>
       <span id="prompt-face" class="prompt-face"><span id="prompt-text" class="prompt-text"></span></span>
       <span id="answer-face" class="answer-face" hidden>
         <span class="solution-field"><span class="field-label">CHARACTERS</span><span id="solution-chinese" class="solution-chinese" lang="zh-Hant"></span></span>
