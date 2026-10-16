@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#14161c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Five pass-and-play games for one phone. Works offline.">
+<title>One Phone</title>
+<style>
+:root{--bg:#14161c;--card:#1f232c;--card2:#2a2f3a;--text:#f2f3f5;--muted:#9aa1ad;--accent:#ffb84d;--good:#4cd37b;--bad:#ff5c6c;--blue:#4da3ff;--orange:#ff8a3d}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overscroll-behavior:none}
+body{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#app{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;max-width:560px;margin:0 auto;padding:max(12px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom))}
+h1{font-size:30px;margin:8px 0 4px}h2{font-size:24px;margin:6px 0 10px}
+p{line-height:1.45;margin:8px 0}
+.muted{color:var(--muted)}.small{font-size:14px}.center{text-align:center}
+.grow{flex:1;display:flex;flex-direction:column;justify-content:center}
+.btn{display:block;width:100%;border:0;border-radius:14px;padding:16px;margin:8px 0;font-size:19px;font-weight:700;background:var(--accent);color:#1a1300;cursor:pointer;font-family:inherit}
+.btn.sec{background:var(--card2);color:var(--text)}
+.btn.good{background:var(--good);color:#04210f}.btn.bad{background:var(--bad);color:#2a0006}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.5}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.top{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px}
+.back{background:none;border:0;color:var(--muted);font-size:16px;padding:10px 4px;font-family:inherit;cursor:pointer}
+.card{background:var(--card);border-radius:16px;padding:16px;margin:8px 0}
+.gamecard{display:flex;align-items:center;gap:14px;width:100%;text-align:left;border:0;color:var(--text);font-family:inherit;cursor:pointer}
+.gamecard .ic{font-size:34px;width:48px;text-align:center}
+.gamecard b{font-size:19px;display:block}.gamecard span{color:var(--muted);font-size:14px}
+.players{display:flex;flex-direction:column;gap:8px}
+.players input{width:100%;font-size:17px;padding:12px;border-radius:10px;border:1px solid #3a404d;background:#11131a;color:var(--text);font-family:inherit;-webkit-user-select:text;user-select:text}
+.pl{display:flex;gap:8px}.pl button{width:48px;border:0;border-radius:10px;background:var(--card2);color:var(--text);font-size:20px}
+.big{font-size:44px;font-weight:800;line-height:1.1}
+.huge{font-size:72px;font-weight:800;line-height:1}
+.score{display:flex;justify-content:space-between;padding:10px 4px;border-bottom:1px solid #2c313c;font-size:18px}
+.score:last-child{border-bottom:0}
+.tag{display:inline-block;padding:4px 10px;border-radius:99px;background:var(--card2);font-size:14px;color:var(--muted)}
+/* Spectrum */
+.spec-labels{display:flex;justify-content:space-between;gap:10px;font-weight:700;font-size:18px;margin:6px 0}
+.spec-labels span:last-child{text-align:right}
+.dial{position:relative;height:84px;border-radius:14px;background:linear-gradient(90deg,#3b4bd8,#7a3fd0 50%,#e0484f);margin:10px 0;touch-action:none;overflow:hidden}
+.band{position:absolute;top:0;bottom:0}
+.b2{background:rgba(255,255,255,.28)}.b3{background:rgba(255,255,255,.5)}.b4{background:rgba(255,220,80,.95)}
+.needle{position:absolute;top:-4px;bottom:-4px;width:6px;margin-left:-3px;border-radius:3px;background:#fff;box-shadow:0 0 0 2px #000}
+.needle i{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-style:normal;font-size:12px;font-weight:800;background:#000;color:#fff;border-radius:99px;padding:2px 6px;white-space:nowrap}
+/* Duel */
+.duel{position:fixed;inset:0;display:flex;flex-direction:column;z-index:5;background:#000}
+.half{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;font-size:28px;font-weight:800;text-align:center;padding:10px;touch-action:none;transition:background .1s}
+.half.p1{transform:rotate(180deg)}
+.mid{height:52px;display:flex;align-items:center;justify-content:center;gap:12px;background:#000}
+.mid button{border:0;border-radius:10px;padding:8px 14px;background:#333;color:#fff;font-size:15px;font-family:inherit}
+/* Forehead */
+.fh{position:fixed;inset:0;z-index:5;display:flex;background:#1d2a5c}
+.fh .zone{flex:1;display:flex;align-items:flex-end;justify-content:center;padding-bottom:30px;font-size:20px;font-weight:700;color:rgba(255,255,255,.7)}
+.fh .word{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;pointer-events:none;text-align:center;padding:20px}
+.fh .word b{font-size:52px;line-height:1.05;word-break:break-word}
+.fh .clock{position:absolute;top:max(16px,env(safe-area-inset-top));left:0;right:0;text-align:center;font-size:30px;font-weight:800;pointer-events:none}
+.flash-good{background:#167a3c!important}.flash-bad{background:#7a1622!important}
+/* Gauntlet */
+.stepper{display:flex;align-items:center;justify-content:center;gap:18px;margin:10px 0}
+.stepper button{width:64px;height:64px;border-radius:50%;border:0;background:var(--card2);color:var(--text);font-size:32px;font-weight:700}
+.tapzone{flex:1;min-height:300px;border-radius:20px;background:var(--blue);display:flex;align-items:center;justify-content:center;flex-direction:column;touch-action:none;color:#fff}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.keypad button{padding:16px 0;font-size:24px;font-weight:700;border:0;border-radius:12px;background:var(--card2);color:var(--text);font-family:inherit}
+.entry{font-size:36px;font-weight:800;letter-spacing:4px;min-height:48px;text-align:center;font-variant-numeric:tabular-nums;word-break:break-all}
+.cover{position:relative;border-radius:16px;background:var(--card);padding:20px;text-align:center}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<noscript><p style="padding:20px">This page needs JavaScript.</p></noscript>
+<script>
+(function () {
+'use strict';
+var app = document.getElementById('app');
+var timers = [];
+function later(fn, ms) { var t = setTimeout(fn, ms); timers.push(t); return t; }
+function every(fn, ms) { var t = setInterval(fn, ms); timers.push(t); return t; }
+function clearTimers() { timers.forEach(function (t) { clearTimeout(t); clearInterval(t); }); timers = []; }
+function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function rnd(n) { return Math.floor(Math.random() * n); }
+function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+function store(k, v) { try { if (v === undefined) return JSON.parse(localStorage.getItem('onephone.' + k)); localStorage.setItem('onephone.' + k, JSON.stringify(v)); } catch (e) { return null; } }
+
+/* Each deck is shuffled once and then dealt without repeats until it runs out. */
+var decks = {};
+function deal(name, list) {
+  var d = decks[name];
+  if (!d || !d.length) d = decks[name] = shuffle(list);
+  return d.pop();
+}
+
+function render(html) { clearTimers(); app.innerHTML = html; window.scrollTo(0, 0); }
+function on(sel, ev, fn) { var els = app.querySelectorAll(sel); for (var i = 0; i < els.length; i++) els[i].addEventListener(ev, fn); }
+function tap(sel, fn) { on(sel, 'click', fn); }
+function top(title) { return '<div class="top"><button class="back" data-home>&larr; Games</button><span class="tag">' + esc(title) + '</span></div>'; }
+function bindHome(confirmMsg) {
+  tap('[data-home]', function () { if (!confirmMsg || confirm(confirmMsg)) home(); });
+}
+
+/* ---------- Players ---------- */
+var players = store('players');
+if (!Array.isArray(players) || players.length < 2) players = ['Player 1', 'Player 2', 'Player 3'];
+function savePlayers() { store('players', players); }
+function playerNames() { return players.map(function (p, i) { return (p || '').trim() || ('Player ' + (i + 1)); }); }
+
+/* ---------- Hub ---------- */
+var GAMES = [
+  { id: 'spectrum', ic: '🎯', name: 'On the Spectrum', blurb: 'Give a clue, guess where it lands. 2+ players.', run: function () { spectrumStart(); } },
+  { id: 'duel', ic: '⚡', name: 'Quick Draw', blurb: 'Two thumbs, one phone, fastest tap wins. 2 players.', run: function () { duelStart(); } },
+  { id: 'spy', ic: '🕵️', name: 'Odd One Out', blurb: 'Everyone knows the place except the spy. 3+ players.', run: function () { spyStart(); } },
+  { id: 'forehead', ic: '🙆', name: 'Forehead', blurb: 'Phone on your head, friends give clues. 2+ players.', run: function () { fhStart(); } },
+  { id: 'gauntlet', ic: '📈', name: 'Over/Under', blurb: 'Call your shot, then prove it. 1+ players.', run: function () { gStart(); } }
+];
+
+function home() {
+  var h = '<h1>One Phone</h1><p class="muted">Five games for one phone, no wifi needed.</p>';
+  GAMES.forEach(function (g) {
+    h += '<button class="card gamecard" data-game="' + g.id + '"><span class="ic">' + g.ic + '</span><span><b>' + esc(g.name) + '</b><span>' + esc(g.blurb) + '</span></span></button>';
+  });
+  h += '<div class="card"><b>Players</b><p class="muted small">Used for turns and scores.</p><div class="players">';
+  players.forEach(function (p, i) {
+    h += '<div class="pl"><input data-p="' + i + '" value="' + esc(p) + '" maxlength="14" autocomplete="off" placeholder="Player ' + (i + 1) + '">' +
+      (players.length > 2 ? '<button data-rm="' + i + '" aria-label="Remove">&times;</button>' : '') + '</div>';
+  });
+  h += '</div>' + (players.length < 8 ? '<button class="btn sec" data-add>+ Add player</button>' : '') + '</div>';
+  h += '<p class="muted small center">Open this page once with internet and it keeps working offline.</p>';
+  render(h);
+  on('[data-p]', 'input', function (e) { players[+e.target.getAttribute('data-p')] = e.target.value; savePlayers(); });
+  tap('[data-rm]', function (e) { players.splice(+e.currentTarget.getAttribute('data-rm'), 1); savePlayers(); home(); });
+  tap('[data-add]', function () { players.push(''); savePlayers(); home(); });
+  tap('[data-game]', function (e) {
+    var id = e.currentTarget.getAttribute('data-game');
+    GAMES.forEach(function (g) { if (g.id === id) g.run(); });
+  });
+}
+
+/* ---------- 1. On the Spectrum ---------- */
+var SPECTRA = [
+  ['Cold', 'Hot'], ['Overrated', 'Underrated'], ['Useless', 'Useful'], ['Smells bad', 'Smells good'], ['Kid thing', 'Adult thing'],
+  ['Villain', 'Hero'], ['Boring hobby', 'Exciting hobby'], ['Easy to spell', 'Hard to spell'], ['Mainstream', 'Niche'],
+  ['Bad investment', 'Good investment'], ['Unforgivable', 'Totally fine'], ['Feels illegal but isn’t', 'Is illegal but feels fine'],
+  ['Worst airplane activity', 'Best airplane activity'], ['Dies first in a zombie movie', 'Survives the zombie movie'],
+  ['Normal pet', 'Weird pet'], ['Fancy', 'Trashy'], ['Sad song', 'Happy song'], ['Round', 'Pointy'], ['Past its prime', 'At its peak'],
+  ['Soft', 'Hard'], ['Cheap', 'Expensive'], ['Quiet', 'Loud'], ['Healthy food', 'Junk food'], ['Breakfast food', 'Dinner food'],
+  ['Forgettable movie', 'Unforgettable movie'], ['Bad superpower', 'Great superpower'], ['Low effort', 'High effort'],
+  ['Introvert activity', 'Extrovert activity'], ['Dangerous', 'Safe'], ['Old-fashioned', 'Futuristic'], ['Overpriced', 'Bargain'],
+  ['Calm', 'Chaotic'], ['Underwear', 'Formal wear'], ['Tastes bad', 'Tastes good'], ['Bad gift', 'Great gift'],
+  ['Wet', 'Dry'], ['Small', 'Huge'], ['Rare', 'Common'], ['Guilty pleasure', 'Proud pleasure'], ['Mild', 'Spicy'],
+  ['Easy job', 'Hard job'], ['Bad smell in a car', 'Good smell in a car'], ['Sleepy', 'Energizing'], ['Ugly', 'Beautiful'],
+  ['Fun for 5 minutes', 'Fun for 5 hours'], ['Worst first date', 'Best first date'], ['Nature', 'Technology'],
+  ['Requires luck', 'Requires skill'], ['Hated chore', 'Tolerable chore'], ['Tiny inconvenience', 'Ruins your whole day'],
+  ['Normal thing to say to a stranger', 'Weird thing to say to a stranger'], ['Lazy', 'Ambitious'], ['Sour', 'Sweet'],
+  ['Cat person thing', 'Dog person thing'], ['Basic', 'Hipster'], ['Better as a book', 'Better as a movie'],
+  ['Short-lived trend', 'Timeless classic'], ['Underdressed', 'Overdressed'], ['Bad name for a baby', 'Good name for a baby'],
+  ['Morning person thing', 'Night owl thing'], ['Unhelpful advice', 'Helpful advice'], ['Fragile', 'Indestructible'],
+  ['Square', 'Cool'], ['Flimsy excuse', 'Airtight excuse'], ['Mean', 'Nice'], ['Relaxing vacation', 'Exhausting vacation'],
+  ['Normal fear', 'Irrational fear'], ['Bad pizza topping', 'Good pizza topping'], ['Easy to draw', 'Hard to draw'],
+  ['Famous', 'Obscure'], ['Smooth', 'Rough'], ['Worst way to travel', 'Best way to travel'], ['Romantic', 'Unromantic'],
+  ['Messy food', 'Clean food'], ['Bad sport to watch', 'Good sport to watch'], ['Annoying sound', 'Pleasant sound'],
+  ['Ordinary', 'Extraordinary'], ['Weak', 'Strong'], ['Short', 'Long'], ['Light', 'Heavy'], ['Simple', 'Complicated'],
+  ['Dull color', 'Bright color'], ['Bad habit', 'Good habit'], ['Scary', 'Cute'], ['Slow', 'Fast'], ['Ancient', 'Brand new'],
+  ['Hard to pronounce', 'Easy to pronounce'], ['Most overrated city', 'Most underrated city'], ['Worst airport snack', 'Best airport snack'],
+  ['Normal thing to bring on a plane', 'Weird thing to bring on a plane'], ['Bad at parties', 'Great at parties'],
+  ['Needs a manual', 'Totally intuitive'], ['Ethical', 'Unethical'], ['Funny', 'Serious'], ['Clean', 'Dirty'],
+  ['Thing you do once a year', 'Thing you do every day'], ['Easy to give up', 'Impossible to give up']
+];
+
+var sp;
+function spectrumStart() {
+  var names = playerNames();
+  sp = { names: names, scores: names.map(function () { return 0; }), giver: 0, round: 0 };
+  spRound();
+}
+function spScores() {
+  var h = '<div class="card">';
+  sp.names.forEach(function (n, i) { h += '<div class="score"><span>' + esc(n) + '</span><b>' + sp.scores[i] + '</b></div>'; });
+  return h + '</div>';
+}
+function spRound() {
+  sp.round++;
+  sp.options = [deal('spec', SPECTRA), deal('spec', SPECTRA)];
+  sp.target = 8 + rnd(85);
+  sp.guesses = [];
+  sp.guessers = [];
+  for (var k = 1; k < sp.names.length; k++) sp.guessers.push((sp.giver + k) % sp.names.length);
+  var g = esc(sp.names[sp.giver]);
+  render(top('On the Spectrum') + '<div class="grow center"><p class="muted">Round ' + sp.round + '</p><p class="big">' + g + '</p>' +
+    '<p>You are the clue giver. Take the phone and don’t let anyone else see the screen.</p>' +
+    '<button class="btn" data-go>I’m ' + g + ', show me</button>' +
+    '<details class="muted small" style="margin-top:14px;text-align:left"><summary>How to play</summary><p>The clue giver sees a spectrum and a secret target. They say one clue out loud that sits at that spot (for Cold↔Hot near the right: “soup”). Each guesser then privately drags a needle. Guessers score 4, 3 or 2 by how close they are. The clue giver gets the average of the guessers’ scores.</p></details>' +
+    '</div>' + spScores());
+  bindHome('Leave this game? Scores will be lost.');
+  tap('[data-go]', spPick);
+}
+function spPick() {
+  var h = top('On the Spectrum') + '<h2>Pick a spectrum</h2>';
+  sp.options.forEach(function (o, i) {
+    h += '<button class="card gamecard" data-opt="' + i + '"><span><b>' + esc(o[0]) + ' ↔ ' + esc(o[1]) + '</b></span></button>';
+  });
+  render(h);
+  bindHome('Leave this game? Scores will be lost.');
+  tap('[data-opt]', function (e) { sp.spec = sp.options[+e.currentTarget.getAttribute('data-opt')]; spShowTarget(); });
+}
+function bandsHtml(t) {
+  // Points bands around the target: 4 within 3, 3 within 9, 2 within 15.
+  function b(cls, w) { var l = Math.max(0, t - w), r = Math.min(100, t + w); return '<div class="band ' + cls + '" style="left:' + l + '%;width:' + (r - l) + '%"></div>'; }
+  return b('b2', 15) + b('b3', 9) + b('b4', 3);
+}
+function spPoints(guess) { var d = Math.abs(guess - sp.target); return d <= 3 ? 4 : d <= 9 ? 3 : d <= 15 ? 2 : 0; }
+function labels() { return '<div class="spec-labels"><span>← ' + esc(sp.spec[0]) + '</span><span>' + esc(sp.spec[1]) + ' →</span></div>'; }
+function spShowTarget() {
+  render(top('On the Spectrum') + '<h2>Your secret target</h2>' + labels() + '<div class="dial">' + bandsHtml(sp.target) + '</div>' +
+    '<p>Think of a clue that sits right on the yellow stripe. Say it out loud once the phone is passed.</p>' +
+    '<div class="grow"></div><button class="btn" data-hide>Hide it and pass</button>');
+  bindHome('Leave this game? Scores will be lost.');
+  tap('[data-hide]', function () { spGuessIntro(0); });
+}
+function spGuessIntro(gi) {
+  var n = esc(sp.names[sp.guessers[gi]]);
+  render(top('On the Spectrum') + '<div class="grow center"><p class="muted">Pass the phone to</p><p class="big">' + n + '</p>' +
+    (gi === 0 ? '<p>Clue giver: say your clue out loud now.</p>' : '<p>Guess on your own. No peeking at the other guess.</p>') +
+    '<button class="btn" data-go>I’m ' + n + ', let me guess</button></div>');
+  bindHome('Leave this game? Scores will be lost.');
+  tap('[data-go]', function () { spGuess(gi); });
+}
+function spGuess(gi) {
+  var pos = 50;
+  render(top('On the Spectrum') + '<h2>' + esc(sp.names[sp.guessers[gi]]) + ', where is it?</h2>' + labels() +
+    '<div class="dial" id="dial"><div class="needle" id="needle" style="left:50%"></div></div>' +
+    '<p class="muted center">Drag or tap the bar to move the needle.</p><div class="grow"></div><button class="btn" data-lock>Lock it in</button>');
+  bindHome('Leave this game? Scores will be lost.');
+  var dial = document.getElementById('dial'), needle = document.getElementById('needle');
+  function move(e) {
+    var r = dial.getBoundingClientRect();
+    pos = Math.max(0, Math.min(100, Math.round((e.clientX - r.left) / r.width * 100)));
+    needle.style.left = pos + '%';
+  }
+  var down = false;
+  dial.addEventListener('pointerdown', function (e) { down = true; try { dial.setPointerCapture(e.pointerId); } catch (x) {} move(e); });
+  dial.addEventListener('pointermove', function (e) { if (down) move(e); });
+  dial.addEventListener('pointerup', function () { down = false; });
+  dial.addEventListener('pointercancel', function () { down = false; });
+  tap('[data-lock]', function () {
+    sp.guesses[gi] = pos;
+    if (gi + 1 < sp.guessers.length) spGuessIntro(gi + 1); else spReveal();
+  });
+}
+function spReveal() {
+  var h = top('On the Spectrum') + '<h2>Reveal!</h2>' + labels() + '<div class="dial">' + bandsHtml(sp.target);
+  var total = 0, lines = '';
+  sp.guessers.forEach(function (p, gi) {
+    var pts = spPoints(sp.guesses[gi]);
+    total += pts;
+    sp.scores[p] += pts;
+    h += '<div class="needle" style="left:' + sp.guesses[gi] + '%"><i>' + esc(sp.names[p].slice(0, 10)) + '</i></div>';
+    lines += '<p>' + esc(sp.names[p]) + ': <b>+' + pts + '</b></p>';
+  });
+  var gp = Math.round(total / sp.guessers.length * 10) / 10;
+  sp.scores[sp.giver] = Math.round((sp.scores[sp.giver] + gp) * 10) / 10;
+  lines += '<p>' + esc(sp.names[sp.giver]) + ' (clue giver): <b>+' + gp + '</b></p>';
+  h += '</div>' + lines + spScores() + '<button class="btn" data-next>Next round</button>';
+  render(h);
+  bindHome('Leave this game? Scores will be lost.');
+  tap('[data-next]', function () { sp.giver = (sp.giver + 1) % sp.names.length; spRound(); });
+}
+
+/* ---------- 2. Quick Draw (reaction duel) ---------- */
+var du;
+function duelStart() {
+  var names = playerNames();
+  du = { names: [names[0], names[1]], score: [0, 0], state: 'idle', target: 5 };
+  render('<div class="duel"><div class="half p1" id="h0"></div><div class="mid"><button data-home>&larr; Games</button><button data-reset>Reset</button></div><div class="half p2" id="h1"></div></div>');
+  bindHome();
+  tap('[data-reset]', function () { duelStart(); });
+  du.h = [document.getElementById('h0'), document.getElementById('h1')];
+  du.h.forEach(function (el, i) { el.addEventListener('pointerdown', function (e) { e.preventDefault(); duelTap(i); }); });
+  duelIdle('Lay the phone flat between you. ' + esc(du.names[0]) + ' takes the far side.<br><br>Wait for GREEN, then tap your half first. Too early and the point goes to the other player.<br><br>First to ' + du.target + '. Both tap to start.');
+}
+function duelPaint(bg, txt0, txt1) {
+  du.h[0].style.background = bg; du.h[1].style.background = bg;
+  du.h[0].innerHTML = txt0; du.h[1].innerHTML = txt1 === undefined ? txt0 : txt1;
+}
+function duelHead(i) { return '<div style="font-size:18px;opacity:.8">' + esc(du.names[i]) + ' &middot; ' + du.score[i] + '</div>'; }
+function duelIdle(msg) {
+  du.state = 'idle'; du.ready = [false, false];
+  duelPaint('#1d2230', duelHead(0) + '<div style="font-size:18px;font-weight:600;margin-top:12px">' + msg + '</div>', duelHead(1) + '<div style="font-size:18px;font-weight:600;margin-top:12px">' + msg + '</div>');
+}
+function duelArm() {
+  du.state = 'wait';
+  duelPaint('#7a1622', duelHead(0) + '<div>Wait for green…</div>', duelHead(1) + '<div>Wait for green…</div>');
+  du.t = later(function () { du.state = 'go'; du.goAt = performance.now(); duelPaint('#16a34a', '<div class="huge">TAP!</div>'); }, 1500 + rnd(3500));
+}
+function duelTap(i) {
+  if (du.state === 'idle') {
+    if (du.ready[i]) return;
+    du.ready[i] = true;
+    du.h[i].innerHTML = duelHead(i) + '<div>Ready!</div>';
+    if (du.ready[0] && du.ready[1]) { du.state = 'pause'; later(duelArm, 600); }
+    return;
+  }
+  if (du.state === 'wait') {
+    clearTimeout(du.t);
+    var o = 1 - i;
+    du.score[o]++;
+    buzz(200);
+    duelResult(o, esc(du.names[i]) + ' jumped the gun!');
+  } else if (du.state === 'go') {
+    du.score[i]++;
+    buzz(60);
+    duelResult(i, Math.round(performance.now() - du.goAt) + ' ms');
+  }
+}
+function duelResult(w, why) {
+  du.state = 'pause';
+  var done = du.score[w] >= du.target;
+  var win = '<div class="big">' + (done ? 'YOU WIN THE MATCH!' : 'Point!') + '</div><div style="font-size:18px">' + why + '</div>';
+  var lose = '<div class="big">' + (done ? 'Match lost' : 'Too slow') + '</div><div style="font-size:18px">' + why + '</div>';
+  du.h[0].innerHTML = duelHead(0) + (w === 0 ? win : lose);
+  du.h[1].innerHTML = duelHead(1) + (w === 1 ? win : lose);
+  du.h[w].style.background = '#16a34a'; du.h[1 - w].style.background = '#3a1d22';
+  later(function () {
+    if (done) { du.score = [0, 0]; duelIdle(esc(du.names[w]) + ' won the last match. Both tap for a rematch.'); }
+    else duelIdle('Both tap when ready.');
+  }, done ? 2500 : 1400);
+}
+
+/* ---------- 3. Odd One Out (spy) ---------- */
+var PLACES = ['Airplane', 'Beach', 'Hospital', 'Movie theater', 'Submarine', 'Space station', 'Casino', 'Zoo', 'Library', 'Wedding',
+  'Pirate ship', 'Ski resort', 'Supermarket', 'Circus', 'Haunted house', 'Bank', 'School', 'Restaurant kitchen', 'Police station',
+  'Dentist office', 'Hotel', 'Train', 'Museum', 'Gym', 'Night club', 'Farm', 'Football stadium', 'Spa', 'Airport security line',
+  'Cruise ship', 'Camping trip', 'Amusement park', 'Car wash', 'Concert', 'Volcano', 'Desert island', 'Office party', 'Hair salon',
+  'Bowling alley', 'Laundromat', 'Aquarium', 'Castle', 'Recording studio', 'Taxi', 'Escape room', 'Fire station', 'Post office',
+  'Waterpark', 'Jungle', 'Ice rink', 'Bakery', 'Courtroom', 'Gas station', 'Movie set', 'Night market', 'Hot spring', 'Karaoke room',
+  'Temple', 'Arctic research base', 'Construction site'];
+var spy;
+function spyStart() {
+  var names = playerNames();
+  if (names.length < 3) {
+    render(top('Odd One Out') + '<div class="grow center"><p class="big">Needs 3+ players</p><p>Add another player on the home screen.</p><button class="btn" data-home>Back to games</button></div>');
+    bindHome(); return;
+  }
+  spy = { names: names, place: deal('places', PLACES), spy: rnd(names.length) };
+  render(top('Odd One Out') + '<h2>How it works</h2><p>The phone goes around. Everyone sees the same secret place except one player, who is the <b>spy</b> and sees nothing.</p>' +
+    '<p>Then take turns asking each other questions about the place (“Would you wear shorts here?”). Answer so friends know you know, without giving it away to the spy.</p>' +
+    '<p>Anyone can call a vote. If the group finds the spy, the spy gets one guess at the place to steal the win.</p><div class="grow"></div><button class="btn" data-go>Deal roles</button>');
+  bindHome();
+  tap('[data-go]', function () { spyPass(0); });
+}
+function spyPass(i) {
+  var n = esc(spy.names[i]);
+  render(top('Odd One Out') + '<div class="grow center"><p class="muted">Pass the phone to</p><p class="big">' + n + '</p><button class="btn" data-see>I’m ' + n + ', show me</button></div>');
+  bindHome('Leave this game?');
+  tap('[data-see]', function () {
+    var isSpy = i === spy.spy;
+    render(top('Odd One Out') + '<div class="grow center"><div class="cover">' +
+      (isSpy ? '<p class="huge">🕵️</p><p class="big">You are the SPY</p><p>Blend in and figure out the place.</p>'
+        : '<p class="muted">The place is</p><p class="big">' + esc(spy.place) + '</p><p>Find the spy.</p>') +
+      '</div><button class="btn" data-hide style="margin-top:20px">Hide and pass</button></div>');
+    bindHome('Leave this game?');
+    tap('[data-hide]', function () { if (i + 1 < spy.names.length) spyPass(i + 1); else spyPlay(); });
+  });
+}
+function spyPlay() {
+  var first = rnd(spy.names.length), left = 180;
+  render(top('Odd One Out') + '<div class="grow center"><p class="muted">Everyone has seen their role.</p><p><b>' + esc(spy.names[first]) + '</b> asks the first question.</p>' +
+    '<p class="huge" id="clock">3:00</p><p class="muted small">When time runs out, everyone points at who they think the spy is.</p></div>' +
+    '<button class="btn" data-reveal>Reveal the spy</button><button class="btn sec" data-again>New round</button>');
+  bindHome('Leave this game?');
+  var clock = document.getElementById('clock');
+  every(function () {
+    left = Math.max(0, left - 1);
+    clock.textContent = Math.floor(left / 60) + ':' + ('0' + left % 60).slice(-2);
+    if (left === 0) { clock.textContent = 'VOTE!'; clock.style.color = 'var(--bad)'; buzz(400); clearTimers(); }
+  }, 1000);
+  tap('[data-reveal]', function () {
+    render(top('Odd One Out') + '<div class="grow center"><p class="muted">The spy was</p><p class="big">' + esc(spy.names[spy.spy]) + '</p><p class="muted">The place was</p><p class="big">' + esc(spy.place) + '</p></div><button class="btn" data-again>New round</button>');
+    bindHome();
+    tap('[data-again]', spyStart);
+  });
+  tap('[data-again]', function () { if (confirm('Start a new round?')) spyStart(); });
+}
+
+/* ---------- 4. Forehead (heads-up style) ---------- */
+var WORDS = {
+  'Animals': ['Penguin', 'Giraffe', 'Kangaroo', 'Octopus', 'Sloth', 'Flamingo', 'Hedgehog', 'Shark', 'Panda', 'Chameleon', 'Squirrel', 'Peacock', 'Camel', 'Bat', 'Jellyfish', 'Koala', 'Woodpecker', 'Skunk', 'Lobster', 'Hamster', 'Crocodile', 'Owl', 'Zebra', 'Goldfish', 'Turtle', 'Gorilla', 'Mosquito', 'Seal', 'Llama', 'Raccoon'],
+  'Food': ['Spaghetti', 'Sushi', 'Pancakes', 'Popcorn', 'Taco', 'Dumplings', 'Bubble tea', 'Hot dog', 'Watermelon', 'Birthday cake', 'Fried chicken', 'Ice cream', 'Burrito', 'Pickle', 'Croissant', 'Ramen', 'Cereal', 'Pizza', 'Corn on the cob', 'Fortune cookie', 'Lobster roll', 'Nachos', 'Avocado toast', 'Cotton candy', 'Mango', 'Pretzel', 'Steak', 'French fries', 'Donut', 'Lollipop'],
+  'Actions': ['Brushing teeth', 'Skydiving', 'Juggling', 'Ice skating', 'Taking a selfie', 'Sneezing', 'Bowling', 'Surfing', 'Knitting', 'Sleepwalking', 'Doing yoga', 'Fishing', 'Parallel parking', 'Playing violin', 'Changing a diaper', 'Rock climbing', 'Blowing bubbles', 'Walking a dog', 'Typing', 'Flossing', 'Hula hooping', 'Milking a cow', 'Paddling a canoe', 'Hailing a taxi', 'Building a snowman', 'Jump rope', 'Archery', 'Painting a wall', 'Boxing', 'Riding a horse'],
+  'Things': ['Umbrella', 'Toothbrush', 'Telescope', 'Lawn mower', 'Passport', 'Headphones', 'Fire extinguisher', 'Hammock', 'Trampoline', 'Suitcase', 'Microwave', 'Lighthouse', 'Rubber duck', 'Parachute', 'Remote control', 'Escalator', 'Snow globe', 'Vending machine', 'Seatbelt', 'Toaster', 'Backpack', 'Calculator', 'Candle', 'Hot air balloon', 'Treadmill', 'Lipstick', 'Stapler', 'Mirror', 'Wheelchair', 'Traffic light'],
+  'Jobs & people': ['Astronaut', 'Dentist', 'Pilot', 'Magician', 'Lifeguard', 'Chef', 'Firefighter', 'Librarian', 'Mime', 'Cowboy', 'Plumber', 'Ninja', 'Pirate', 'Zookeeper', 'Barista', 'Referee', 'Flight attendant', 'Detective', 'Mermaid', 'Vampire', 'Superhero', 'Clown', 'Ballerina', 'Wizard', 'Teacher', 'Surgeon', 'Mail carrier', 'DJ', 'Scientist', 'Robot'],
+  'Places': ['Eiffel Tower', 'Disneyland', 'Grand Canyon', 'Antarctica', 'Las Vegas', 'Great Wall of China', 'Statue of Liberty', 'Hollywood', 'Pyramids', 'Mount Everest', 'Hawaii', 'Niagara Falls', 'Times Square', 'Taipei 101', 'Tokyo', 'The moon', 'Amazon rainforest', 'Venice', 'Sahara Desert', 'North Pole', 'London', 'Paris', 'Australia', 'Brazil', 'Egypt', 'Iceland', 'Mexico', 'New York', 'Rome', 'Alaska']
+};
+var fh;
+function fhStart() {
+  var cats = Object.keys(WORDS);
+  var h = top('Forehead') + '<h2>Forehead</h2><p>One player holds the phone on their forehead, screen facing out. Everyone else gives clues (talk, act, hum) without saying the word.</p>' +
+    '<p>Holder: tap with your <b>right hand</b> when you get it, your <b>left hand</b> to pass (the screen says which side is which, so your friends can check). 60 seconds a turn. Take turns and compare scores.</p><p class="muted small">Pick a category:</p>';
+  h += '<button class="btn" data-cat="__mix">Mix of everything</button>';
+  cats.forEach(function (c) { h += '<button class="btn sec" data-cat="' + esc(c) + '">' + esc(c) + '</button>'; });
+  render(h);
+  bindHome();
+  tap('[data-cat]', function (e) {
+    var c = e.currentTarget.getAttribute('data-cat');
+    var list = c === '__mix' ? cats.reduce(function (a, k) { return a.concat(WORDS[k]); }, []) : WORDS[c];
+    fh = { cat: c, list: list, results: [] };
+    fhCountdown();
+  });
+}
+function fhCountdown() {
+  var n = 3;
+  render('<div class="fh"><div class="word"><p style="font-size:22px">Put the phone on your forehead</p><b id="cd">3</b></div></div>');
+  every(function () {
+    n--;
+    if (n > 0) document.getElementById('cd').textContent = n;
+    else fhPlay();
+  }, 1000);
+}
+function fhPlay() {
+  var left = 60, word = '';
+  var deckName = 'fh_' + fh.cat;
+  render('<div class="fh" id="fh"><div class="zone" data-z="got">GOT IT</div><div class="zone" data-z="pass" style="border-left:2px solid rgba(255,255,255,.15)">PASS</div>' +
+    '<div class="clock" id="clk">60</div><div class="word"><b id="w"></b></div></div>');
+  var fhEl = document.getElementById('fh'), wEl = document.getElementById('w'), clk = document.getElementById('clk');
+  function next() { word = deal(deckName, fh.list); wEl.textContent = word; }
+  next();
+  var lock = false;
+  on('[data-z]', 'pointerdown', function (e) {
+    e.preventDefault();
+    if (lock || left <= 0) return;
+    lock = true;
+    var got = e.currentTarget.getAttribute('data-z') === 'got';
+    fh.results.push([word, got]);
+    buzz(got ? 50 : 150);
+    fhEl.classList.add(got ? 'flash-good' : 'flash-bad');
+    wEl.textContent = got ? 'Correct!' : 'Pass';
+    later(function () { fhEl.classList.remove('flash-good', 'flash-bad'); lock = false; if (left > 0) next(); }, 450);
+  });
+  every(function () {
+    left--;
+    clk.textContent = left;
+    if (left <= 0) { buzz(500); fhDone(); }
+  }, 1000);
+}
+function fhDone() {
+  var got = fh.results.filter(function (r) { return r[1]; }).length;
+  var h = top('Forehead') + '<div class="center"><p class="muted">Time’s up!</p><p class="huge">' + got + '</p><p>correct</p></div><div class="card">';
+  if (!fh.results.length) h += '<p class="muted">No words tapped.</p>';
+  fh.results.forEach(function (r) { h += '<div class="score"><span>' + esc(r[0]) + '</span><b style="color:' + (r[1] ? 'var(--good)' : 'var(--bad)') + '">' + (r[1] ? '✓' : '✗') + '</b></div>'; });
+  h += '</div><button class="btn" data-again>Next player, same category</button><button class="btn sec" data-cats>Change category</button>';
+  render(h);
+  bindHome();
+  tap('[data-again]', function () { fh.results = []; fhCountdown(); });
+  tap('[data-cats]', fhStart);
+  // The holder may still be tapping when time runs out; ignore stray taps for a moment.
+  var bs = app.querySelectorAll('.btn, [data-home]');
+  for (var i = 0; i < bs.length; i++) bs[i].disabled = true;
+  later(function () { for (var i = 0; i < bs.length; i++) bs[i].disabled = false; }, 1200);
+}
+
+/* ---------- 5. Over/Under (call your shot) ---------- */
+var CHALLENGES = [
+  { id: 'taps', name: 'Tap Frenzy', need: function (L) { return 'at least ' + (30 + 5 * L) + ' taps in 10 seconds'; } },
+  { id: 'clock', name: 'Blind Stopwatch', need: function (L) { return 'stop a hidden timer within ' + ((11 - L) * 0.05).toFixed(2) + 's of 5.00s'; } },
+  { id: 'digits', name: 'Digit Recall', need: function (L) { return 'remember a ' + (L + 2) + '-digit number'; } },
+  { id: 'math', name: 'Quick Sums', need: function (L) { return 'solve ' + (3 + L) + ' sums in 20 seconds (one miss ends it)'; } }
+];
+var gu;
+function gStart() {
+  var names = playerNames();
+  gu = { names: names, scores: names.map(function () { return 0; }), turn: 0, round: 1, rounds: 3 };
+  render(top('Over/Under') + '<h2>Over/Under</h2><p>On your turn you get a random challenge. Before playing, <b>call your level</b> from 1 to 10. Higher levels are harder.</p>' +
+    '<p>Make it and score the level in points. Miss it and score nothing. Everyone else can heckle.</p>' +
+    '<p class="muted">' + gu.rounds + ' rounds each. Highest total wins.</p><div class="grow"></div><button class="btn" data-go>Start</button>');
+  bindHome();
+  tap('[data-go]', gTurn);
+}
+function gBoard() {
+  var h = '<div class="card">';
+  gu.names.forEach(function (n, i) { h += '<div class="score"><span>' + (i === gu.turn ? '▶ ' : '') + esc(n) + '</span><b>' + gu.scores[i] + '</b></div>'; });
+  return h + '</div>';
+}
+function gTurn() {
+  var ch = gu.ch = deal('chal', CHALLENGES);
+  var L = 5;
+  function draw() {
+    render(top('Over/Under') + '<p class="muted center">Round ' + gu.round + ' of ' + gu.rounds + '</p><p class="center"><b style="font-size:22px">' + esc(gu.names[gu.turn]) + '</b>, your challenge:</p>' +
+      '<h2 class="center">' + ch.name + '</h2><p class="center muted">Call your level</p>' +
+      '<div class="stepper"><button data-m>&minus;</button><span class="huge" style="min-width:90px;text-align:center">' + L + '</span><button data-p>+</button></div>' +
+      '<p class="center">You need to <b>' + ch.need(L) + '</b>.</p><button class="btn" data-go>Lock in level ' + L + '</button>' + gBoard());
+    bindHome('Leave this game? Scores will be lost.');
+    tap('[data-m]', function () { if (L > 1) { L--; draw(); } });
+    tap('[data-p]', function () { if (L < 10) { L++; draw(); } });
+    tap('[data-go]', function () { gu.L = L; gReady(); });
+  }
+  draw();
+}
+function gReady() {
+  render(top('Over/Under') + '<div class="grow center"><h2>' + gu.ch.name + '</h2><p>Level ' + gu.L + ': ' + gu.ch.need(gu.L) + '.</p><button class="btn" data-go>Go!</button></div>');
+  bindHome('Leave this game? Scores will be lost.');
+  tap('[data-go]', function () { ({ taps: gTaps, clock: gClock, digits: gDigits, math: gMath })[gu.ch.id](); });
+}
+function gResult(made, detail) {
+  if (made) gu.scores[gu.turn] += gu.L;
+  buzz(made ? 80 : 300);
+  var last = gu.turn === gu.names.length - 1 && gu.round === gu.rounds;
+  render(top('Over/Under') + '<div class="grow center"><p class="big" style="color:' + (made ? 'var(--good)' : 'var(--bad)') + '">' + (made ? 'Made it! +' + gu.L : 'Missed!') + '</p><p>' + detail + '</p></div>' +
+    gBoard() + '<button class="btn" data-next>' + (last ? 'Final scores' : 'Next turn') + '</button>');
+  bindHome('Leave this game? Scores will be lost.');
+  tap('[data-next]', function () {
+    if (last) return gFinal();
+    gu.turn++;
+    if (gu.turn >= gu.names.length) { gu.turn = 0; gu.round++; }
+    gPass();
+  });
+}
+function gPass() {
+  var n = esc(gu.names[gu.turn]);
+  render(top('Over/Under') + '<div class="grow center"><p class="muted">Pass the phone to</p><p class="big">' + n + '</p><button class="btn" data-go>I’m ' + n + '</button></div>');
+  bindHome('Leave this game? Scores will be lost.');
+  tap('[data-go]', gTurn);
+}
+function gFinal() {
+  var best = Math.max.apply(null, gu.scores);
+  var winners = gu.names.filter(function (n, i) { return gu.scores[i] === best; });
+  gu.turn = -1;
+  render(top('Over/Under') + '<div class="center"><p class="muted">Winner</p><p class="big">' + winners.map(esc).join(' & ') + '</p></div>' + gBoard() + '<button class="btn" data-again>Play again</button>');
+  bindHome();
+  tap('[data-again]', gStart);
+}
+function gTaps() {
+  var need = 30 + 5 * gu.L, n = 0, started = false, left = 10;
+  render('<p class="center"><b id="tl">Tap the box to start the clock</b></p><div class="tapzone" id="tz"><span class="huge" id="tc">0</span><span>need ' + need + '</span></div>');
+  var tz = document.getElementById('tz'), tc = document.getElementById('tc'), tl = document.getElementById('tl'), over = false;
+  tz.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    if (over) return;
+    if (!started) {
+      started = true;
+      tl.textContent = '10';
+      every(function () {
+        left--; tl.textContent = left;
+        if (left <= 0) { over = true; clearTimers(); later(function () { gResult(n >= need, n + ' taps (needed ' + need + ').'); }, 500); }
+      }, 1000);
+    }
+    n++; tc.textContent = n;
+  });
+}
+function gClock() {
+  var tol = (11 - gu.L) * 0.05, t0 = 0, running = false;
+  render('<div class="grow center"><p>Tap START. The timer hides after 1 second. Tap STOP at exactly <b>5.00s</b>.</p><p class="huge" id="sv">0.00</p></div><button class="btn" id="sb" style="padding:34px;font-size:26px">START</button>');
+  var sv = document.getElementById('sv'), sb = document.getElementById('sb');
+  sb.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    if (!running) {
+      running = true; t0 = performance.now(); sb.textContent = 'STOP';
+      every(function () { var s = (performance.now() - t0) / 1000; sv.textContent = s < 1 ? s.toFixed(2) : '?.??'; }, 30);
+    } else {
+      clearTimers();
+      var s = (performance.now() - t0) / 1000, off = Math.abs(s - 5);
+      sb.disabled = true;
+      sv.textContent = s.toFixed(2);
+      later(function () { gResult(off <= tol + 1e-9, 'You stopped at ' + s.toFixed(2) + 's, off by ' + off.toFixed(2) + 's (allowed ' + tol.toFixed(2) + 's).'); }, 900);
+    }
+  });
+}
+function gDigits() {
+  var len = gu.L + 2, num = String(1 + rnd(9));
+  while (num.length < len) num += rnd(10);
+  var show = 1000 + 400 * len;
+  render('<div class="grow center"><p class="muted">Memorize!</p><p class="entry" style="font-size:44px">' + num + '</p></div>');
+  later(function () {
+    var entry = '';
+    var keys = '';
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'].forEach(function (k) { keys += '<button data-k="' + k + '">' + (k === 'del' ? '⌫' : k === 'ok' ? '✓' : k) + '</button>'; });
+    render('<div class="grow center"><p class="muted">Type the number</p><div class="entry" id="en"></div></div><div class="keypad">' + keys + '</div>');
+    var en = document.getElementById('en');
+    on('[data-k]', 'click', function (e) {
+      var k = e.currentTarget.getAttribute('data-k');
+      if (k === 'del') entry = entry.slice(0, -1);
+      else if (k === 'ok') return gResult(entry === num, 'It was <b>' + num + '</b>. You typed <b>' + (esc(entry) || 'nothing') + '</b>.');
+      else if (entry.length < 14) entry += k;
+      en.textContent = entry;
+    });
+  }, show);
+}
+function gMath() {
+  var need = 3 + gu.L, solved = 0, left = 20, ans = 0, entry = '', over = false;
+  var keys = '';
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'].forEach(function (k) { keys += '<button data-k="' + k + '">' + (k === 'del' ? '⌫' : k === 'ok' ? '✓' : k) + '</button>'; });
+  render('<div class="top"><b id="ml">20</b><span>' + '<span id="ms">0</span> / ' + need + '</span></div><div class="grow center"><p class="big" id="mq"></p><div class="entry" id="en"></div></div><div class="keypad">' + keys + '</div>');
+  var mq = document.getElementById('mq'), en = document.getElementById('en'), ms = document.getElementById('ms'), ml = document.getElementById('ml');
+  function q() {
+    var a, b, op = rnd(3);
+    if (op === 0) { a = 2 + rnd(48); b = 2 + rnd(48); ans = a + b; mq.textContent = a + ' + ' + b; }
+    else if (op === 1) { a = 10 + rnd(60); b = 1 + rnd(a - 1); ans = a - b; mq.textContent = a + ' − ' + b; }
+    else { a = 2 + rnd(9); b = 2 + rnd(9); ans = a * b; mq.textContent = a + ' × ' + b; }
+    entry = ''; en.textContent = '';
+  }
+  function end(made, why) { if (over) return; over = true; clearTimers(); later(function () { gResult(made, why); }, 600); }
+  q();
+  every(function () { left--; ml.textContent = left; if (left <= 0) end(solved >= need, 'Time! ' + solved + ' solved (needed ' + need + ').'); }, 1000);
+  on('[data-k]', 'click', function (e) {
+    if (over) return;
+    var k = e.currentTarget.getAttribute('data-k');
+    if (k === 'del') { entry = entry.slice(0, -1); en.textContent = entry; return; }
+    if (k !== 'ok') { if (entry.length < 4) entry += k; en.textContent = entry; if (+entry === ans) { solved++; ms.textContent = solved; if (solved >= need) end(true, 'All ' + need + ' sums solved with ' + left + 's left.'); else q(); } return; }
+    if (entry === '') return;
+    if (+entry !== ans) { mq.textContent = 'Answer was ' + ans; end(false, 'Wrong answer after ' + solved + ' solved (needed ' + need + ').'); }
+  });
+}
+
+home();
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+})();
+</script>
+</body>
+</html>
