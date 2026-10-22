@@ -88,10 +88,13 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 
 /* ---------- player panel (bottom centre) ---------- */
 #playerpanel{position:absolute;left:50%;bottom:calc(14px + var(--sab));transform:translateX(-50%);width:max(30vw,230px);max-width:440px}
-#statuses{display:flex;gap:5px;justify-content:center;min-height:30px;margin-bottom:4px;flex-wrap:wrap}
-.st{position:relative;width:28px;height:28px;border-radius:6px;border:1px solid currentColor;background:rgba(6,10,18,.78);display:flex;align-items:center;justify-content:center;
-  font-family:var(--num);font-weight:700;font-size:11px;letter-spacing:.02em;box-shadow:0 0 8px currentColor inset}
-.st b{position:absolute;right:-4px;bottom:-6px;font-size:14px;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}
+#statuses{display:flex;gap:10px;justify-content:center;min-height:34px;margin-bottom:9px;flex-wrap:wrap}
+.st{position:relative;width:32px;height:32px;border-radius:6px;border:1px solid currentColor;background:rgba(6,10,18,.78);display:flex;align-items:center;justify-content:center;
+  font-family:var(--num);font-weight:700;font-size:12px;letter-spacing:.02em;box-shadow:0 0 8px currentColor inset}
+/* stack count: a small pill on the bottom-right corner, outside the label (the timer sits above the badge) */
+.st b{position:absolute;right:-9px;bottom:-8px;min-width:16px;height:16px;padding:0 3px;border-radius:8px;border:1px solid currentColor;background:rgba(6,10,18,.94);
+  font-size:12px;line-height:14px;text-align:center;color:#fff;text-shadow:none}
+.st b:empty{display:none}
 .st s{position:absolute;left:0;right:0;top:-15px;text-align:center;text-decoration:none;font-size:14px;color:#fff;text-shadow:0 0 3px #000}
 #hpbar{position:relative;height:12px;border:1px solid rgba(160,240,255,.5);background:rgba(4,8,12,.75);overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.6),0 0 12px rgba(80,220,255,.12)}
 #hp-chip,#hp-fill,#hp-shield{position:absolute;left:0;top:0;bottom:0;width:100%;transform-origin:0 50%}
@@ -175,8 +178,9 @@ body.touch #hgbar{display:none}
   font-family:var(--num);font-weight:600;font-size:16px;padding:8px 14px;color:#e9f7ff;opacity:0;transition:opacity .3s}
 #hint.on{opacity:1}
 body.letterbox #hint.on{opacity:0}
-/* landscape phone: bottom-centre is where the player stands; park the hint top-left under the pause button, compact */
-body.compact:not(.portrait) #hint{bottom:auto;top:calc(62px + var(--sat));left:calc(14px + var(--sal));transform:none;max-width:min(36vw,340px);font-size:13px;line-height:1.3;padding:6px 10px;text-align:left}
+/* landscape phone: bottom-centre is where the player stands; the hint goes in a top corner under the bar block, compact.
+   Callouts (12-hud) picks the corner clear of the boss and her pips and sets left/top as its centre */
+body.compact:not(.portrait) #hint{bottom:auto;top:calc(90px + var(--sat));left:calc(180px + var(--sal));transform:translate(-50%,-50%);width:max-content;max-width:min(36vw,340px);font-size:13px;line-height:1.3;padding:6px 10px;text-align:left}
 #countdown{position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:16;pointer-events:none;font-family:var(--head);font-weight:900;font-size:84px;color:#fff;opacity:0;
   text-shadow:0 0 30px var(--cyan),0 4px 8px #000}
 #countdown.show{animation:cd .5s ease-out forwards}
@@ -188,7 +192,7 @@ body.compact:not(.portrait) #hint{bottom:auto;top:calc(62px + var(--sat));left:c
 #lb-top{top:0;transform:translateY(-100%)}
 #lb-bot{bottom:0;transform:translateY(100%)}
 body.letterbox #lb-top,body.letterbox #lb-bot{transform:translateY(0)}
-body.letterbox #abilities,body.letterbox #playerpanel,body.letterbox #topleft{opacity:0;transition:opacity .3s}
+body.letterbox #abilities,body.letterbox #playerpanel,body.letterbox #topleft,body.letterbox #bossbar{opacity:0;transition:opacity .3s}
 #skiphint{position:fixed;right:calc(18px + var(--sar));bottom:calc(3vh + var(--sab));z-index:14;font-family:var(--num);font-weight:600;font-size:14px;letter-spacing:.2em;color:rgba(255,255,255,.6);opacity:0;pointer-events:none}
 body.letterbox #skiphint.can{opacity:1}
 
@@ -200,7 +204,7 @@ body.letterbox #skiphint.can{opacity:1}
   border-radius:50%;border:1.5px solid rgba(140,235,255,.55);padding:0;pointer-events:auto;
   background:radial-gradient(circle at 50% 38%,rgba(40,70,90,.75),rgba(6,12,20,.85) 70%);
   box-shadow:0 0 0 1px rgba(0,0,0,.6),0 4px 14px rgba(0,0,0,.55),inset 0 0 12px rgba(95,242,255,.12);
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);--cd:0;--g:0;--e:0}
+  --cd:0;--g:0;--e:0}   /* no backdrop-filter: the buttons are ~85% opaque and a live blur of the redrawn canvas costs every frame on phones */
 .ab::before{content:"";position:absolute;inset:3px;border-radius:50%;
   background:conic-gradient(rgba(2,4,8,.78) calc(var(--cd) * 360deg),transparent 0);z-index:2;pointer-events:none}
 .ab svg{position:absolute;left:50%;top:50%;width:52%;height:52%;transform:translate(-50%,-50%);z-index:1;fill:none;stroke:#bff8ff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;
@@ -357,6 +361,25 @@ body.compact #bb-name{font-size:15px}
 body.compact #bossbar{top:calc(6px + var(--sat))}
 body.compact #banner .t{font-size:17px}
 body.compact #playerpanel{width:30vw;min-width:200px}
+/* touch: HUD glass over the live canvas without a per-frame backdrop blur (more opaque instead) */
+body.touch #pausebtn,body.touch #hint{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(10,16,28,.84)}
+/* portrait: the boss bar starts right of the pause button (its left end is where the last HP drains) */
+body.portrait #bossbar{left:calc(62px + var(--sal));right:calc(12px + var(--sar));width:auto;transform:none;min-width:0}
+body.portrait #cb-shards{left:calc(50% + 25px)}
+/* portrait hint: placed by Callouts (12-hud) — left/top are its centre; at most ~2 lines */
+body.portrait #hint{transform:translate(-50%,-50%);width:max-content;max-width:min(92vw,360px)}
+body.portrait #hint.narrow{max-width:min(54vw,210px);text-align:left}
+/* landscape phone: one compact top block — name (and epithet when it fits) to the LEFT of a narrower bar, a
+   slimmer cast bar right under it — so the boss's head clears the HUD (block ends ~49 px instead of ~74 px) */
+body.compact:not(.portrait) #bossbar{width:min(54vw,760px)}
+body.compact:not(.portrait) .bb-names{position:absolute;right:calc(100% + 12px);top:-2px;margin:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px;white-space:nowrap}
+body.compact:not(.portrait) #bb-name{font-size:14px;letter-spacing:.1em}
+body.compact:not(.portrait) #bb-epithet{font-size:12px;letter-spacing:.04em}
+@media (max-width:799px){ body.compact:not(.portrait) #bb-epithet{display:none} }
+body.compact:not(.portrait) #castbar{margin-top:5px;height:18px}
+body.compact:not(.portrait) #cb-name{font-size:13px}
+body.compact:not(.portrait) #cb-tag{font-size:12px}
+body.compact:not(.portrait) #cb-shards{top:calc(6px + var(--sat) + 32px)}
 </style>
 <script type="importmap">
 { "imports": {
@@ -518,7 +541,11 @@ body.compact #playerpanel{width:30vw;min-width:200px}
   }
   window.__raidFail = fail;
   window.addEventListener('error', function(ev){
-    if (!window.__raidBooted && ev && (ev.message || (ev.target && ev.target.src))) fail(ev.message || 'Failed to load ' + ev.target.src);
+    if (window.__raidBooted || !ev) return;
+    var t = ev.target;
+    // An inline module whose imports (CDN) fail fires a plain 'error' on its <script> element: fail fast.
+    if (t && t.tagName === 'SCRIPT' && t.type === 'module') fail('Failed to load the 3D engine from the CDN.');
+    else if (ev.message || (t && t.src)) fail(ev.message || 'Failed to load ' + t.src);
   }, true);
   setTimeout(function(){ if(!window.__raidBooting) fail('Module did not start (network or browser support).'); }, 20000);
 })();
@@ -615,6 +642,13 @@ const CONFIG = {
   // ---------------------------------------------------------------- camera (§7)
   camera: {
     offset: [0, 10, 14], lookBias: 0.30, lookUp: 2.0, fov: 50, fovPortrait: 62, portraitPush: 1.15,
+    // portrait: the horizontal FOV is only ~31°, so lean toward the boss far less sideways (player stays near centre),
+    // and pull back a little when the boss is far to the side so both stay framed
+    portraitLateralBias: 0.15, portraitWidePush: 0.25,
+    // short portrait (Safari with toolbars, h/w < 1.9): the thumb cluster takes more of the height → frame the player higher
+    portraitShortLookUp: 0.9,
+    // landscape phone: the boss bar + cast bar block is ~74 px of a ~390 px screen → aim lower so the boss's head clears it
+    lookUpCompact: 3.2,
     omega: 30,                 // critically damped spring ≈ 0.12 s settle
     zooms: [0.85, 1.0, 1.2], widen: 1.25, widenEase: 0.6,
     shake: { maxOffset: 0.6, maxRoll: 2, decay: 1.5, freq: 25 },
@@ -1252,6 +1286,14 @@ const Post = {
     if (this.expDur && this.expT < this.expDur) { this.expT += dt; renderer.toneMappingExposure = lerp(this.exposureFrom, this.exposureTo, smooth01(this.expT / this.expDur)); }
   },
 
+  /** compile every material in the scene for the variant the frame really uses: the RenderPass draws into the
+   *  composer's linear, un-tonemapped target, so compiling against the canvas (sRGB + ACES) would build the wrong programs */
+  compileScene() {
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(this.composer ? this.composer.readBuffer : null);
+    try { renderer.compile(scene, camera); } finally { renderer.setRenderTarget(prev); }
+  },
+
   render(dt) {
     if (!this.composer) { renderer.render(scene, camera); return; }
     const U = this.U;
@@ -1303,9 +1345,13 @@ const Quality = {
     this.setTier(m === 'auto' ? this.startTier() : m, true);
   },
   cycle() { const order = ['auto', 'low', 'medium', 'high']; this.setMode(order[(order.indexOf(this.mode) + 1) % order.length]); return this.mode; },
-  setTier(id, resetPr) {
+  /** live = an automatic change during a fight: a shadow on/off flip recompiles every lit program (a multi-second
+   *  freeze on the device that is already struggling), so it keeps the current shadow state until applyPending() */
+  setTier(id, resetPr, live) {
     const prevShadows = this.tier && this.tier.shadows;
-    this.tier = CONFIG.quality[id];
+    let t = CONFIG.quality[id];
+    if (live && prevShadows != null && t.shadows !== prevShadows) t = Object.assign({}, t, { shadows: prevShadows, shadowsPending: true });
+    this.tier = t;
     if (resetPr) this.pr = Math.min(View.dpr, this.tier.prMax);
     this.pr = clamp(this.pr, Math.min(this.tier.prMin, View.dpr), Math.min(View.dpr, this.tier.prMax));
     GLOBAL_U.uOctaves.value = this.tier.octaves;
@@ -1317,6 +1363,8 @@ const Quality = {
     applyResize();
     for (const fn of this.listeners) fn(this.tier);
   },
+  /** apply a deferred shadow flip (called on fight setup / teardown, behind a transition) */
+  applyPending() { if (this.tier && this.tier.shadowsPending) this.setTier(this.tier.id, false); },
   /** called every frame with the real frame time (ms) */
   sample(ms) {
     if (this.mode !== 'auto' || Game.paused || Game.hidden) return;
@@ -1331,14 +1379,14 @@ const Quality = {
     if (avg > CONFIG.quality.slowMs) {
       this.fastT = 0;
       if (this.pr - CONFIG.quality.prStep >= this.tier.prMin - 1e-3) { this.pr -= CONFIG.quality.prStep; this.lastChange = now; applyResize(); }
-      else if (i > 0) { this.setTier(order[i - 1], false); this.lastChange = now; }
+      else if (i > 0) { this.setTier(order[i - 1], false, Game.state !== 'title'); this.lastChange = now; }
     } else if (avg < CONFIG.quality.fastMs) {
       this.fastT += CONFIG.quality.sampleWindow;
       if (this.fastT >= CONFIG.quality.fastHold) {
         this.fastT = 0;
         const cap = Math.min(View.dpr, this.tier.prMax);
         if (this.pr + CONFIG.quality.prStep <= cap + 1e-3) { this.pr += CONFIG.quality.prStep; this.lastChange = now; applyResize(); }
-        else if (i < 2) { this.setTier(order[i + 1], false); this.lastChange = now; }
+        else if (i < 2) { this.setTier(order[i + 1], false, Game.state !== 'title'); this.lastChange = now; }
       }
     } else this.fastT = 0;
   },
@@ -1351,7 +1399,9 @@ function applyResize() {
   readViewport();
   document.body.classList.toggle('portrait', View.portrait);
   document.body.classList.toggle('compact', View.compact);
-  document.documentElement.style.setProperty('--ui-scale', View.portrait ? '0.85' : (View.h < 420 ? '0.92' : '1'));
+  // portrait: ×0.85, shrinking a little more on short screens (Safari with toolbars, 390×664) so the thumb cluster
+  // pulls toward the corner and away from the player; floor 0.75 keeps the smallest button ≥ 44 px
+  document.documentElement.style.setProperty('--ui-scale', View.portrait ? (0.85 * clamp(View.h / 844, 0.88, 1)).toFixed(3) : (View.h < 420 ? '0.92' : '1'));
   renderer.setPixelRatio(Quality.pr || 1);
   renderer.setSize(View.w, View.h, true);
   camera.aspect = View.w / View.h;
@@ -1384,6 +1434,9 @@ function worldToScreen(v, out) {
 //       the player (Player.press). Everything routes through Input.press(action).
 // =============================================================================
 const ACTIONS = ['dash', 'rend', 'shatter', 'recall', 'lance', 'ult'];
+
+/** true if any key code in `list` is held (hoisted: Input.update runs every sim step) */
+function anyKeyDown(keys, list) { for (let i = 0; i < list.length; i++) if (keys[list[i]]) return true; return false; }
 
 const Input = {
   keys: Object.create(null),
@@ -1449,6 +1502,9 @@ const Input = {
   },
 
   lastTouch: false,
+  /** ability name for hint text: 'Stasis Lance (F)' on keyboard, plain 'Stasis Lance' after a touch (no key caps on phones) */
+  KEY_NAMES: { dash: ['Phase Step', 'Space'], rend: ['Temporal Rend', 'Q'], shatter: ['Shatter', 'E'], recall: ['Recall', 'R'], lance: ['Stasis Lance', 'F'], ult: ['Zero Hour', 'T'] },
+  keyLabel(id) { const n = this.KEY_NAMES[id]; if (!n) return id; return this.lastTouch ? n[0] : n[0] + ' (' + n[1] + ')'; },
   setLastTouch(on) { if (this.lastTouch === on && this._ltInit) return; this._ltInit = true; this.lastTouch = on; document.body.classList.toggle('lasttouch', on); },
 
   onKey(e, down) {
@@ -1556,9 +1612,8 @@ const Input = {
     else if (this.joy.id !== -1) { m.x = this.joy.x; m.z = this.joy.y; }
     else {
       const k = this.keys, km = CONFIG.keys;
-      const any = (list) => { for (let i = 0; i < list.length; i++) if (k[list[i]]) return true; return false; };
-      m.x = (any(km.right) ? 1 : 0) - (any(km.left) ? 1 : 0);
-      m.z = (any(km.down) ? 1 : 0) - (any(km.up) ? 1 : 0);
+      m.x = (anyKeyDown(k, km.right) ? 1 : 0) - (anyKeyDown(k, km.left) ? 1 : 0);
+      m.z = (anyKeyDown(k, km.down) ? 1 : 0) - (anyKeyDown(k, km.up) ? 1 : 0);
     }
     let mag = Math.hypot(m.x, m.z);
     if (mag > 1) { m.x /= mag; m.z /= mag; mag = 1; }
@@ -1579,7 +1634,8 @@ const Audio = {
   volume: Save.settings.volume, muted: !!Save.settings.mute,
 
   unlock() {
-    if (this.ctx) { if (this.ctx.state === 'suspended' && !Game.hidden) this.ctx.resume().catch(() => {}); return; }
+    // any non-running state is resumable: WebKit uses a non-standard 'interrupted' state after calls / Siri / lock screen
+    if (this.ctx) { if (this.ctx.state !== 'running' && this.ctx.state !== 'closed' && !Game.hidden) this.ctx.resume().catch(() => {}); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     try { this.ctx = new AC({ latencyHint: 'interactive' }); } catch (e) { return; }
@@ -1617,7 +1673,7 @@ const Audio = {
   setVolume(v) { this.volume = v; Save.settings.volume = v; Save.save(); if (this.master && !this.muted) this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.03); },
   setMute(m) { this.muted = m; Save.settings.mute = m; Save.save(); if (this.master) this.master.gain.setTargetAtTime(m ? 0 : this.volume, this.ctx.currentTime, 0.03); },
   suspend() { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend().catch(() => {}); },
-  resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); },
+  resume() { if (this.ctx && this.ctx.state !== 'running' && this.ctx.state !== 'closed') this.ctx.resume().catch(() => {}); },
 
   // ---------------------------------------------------------------- primitives
   /** oscillator voice with an attack/exp-decay envelope */
@@ -2359,6 +2415,7 @@ const Particles = {
   },
   updateScale() {
     const pr = renderer.getPixelRatio();
+    this._fov = camera.fov;
     this.mat.uniforms.uScale.value = View.h * pr / (2 * Math.tan(camera.fov * DEG / 2));
     this.mat.uniforms.uMaxSize.value = 34 * pr;
   },
@@ -2442,6 +2499,7 @@ const Particles = {
   /** upload only the slots written this frame (one or two contiguous runs). */
   flush(timeNow) {
     this.mat.uniforms.uTime.value = timeNow;
+    if (camera.fov !== this._fov) this.updateScale();      // portrait FOV / rail FOVs change the projection after boot
     if (this.dirtyFirst < 0) return;
     const first = this.dirtyFirst, count = Math.min(this.dirtyCount, this.cap);
     for (const k in this.attrs) {
@@ -2638,7 +2696,11 @@ class RibbonTrail {
     this.mesh.frustumCulled = false; this.mesh.renderOrder = 7;
     scene.add(this.mesh);
   }
-  reset(base, tip) { const a = this.posAttr.array; for (let i = 0; i < this.n; i++) { a.set([base.x, base.y, base.z, tip.x, tip.y, tip.z], i * 6); } this.posAttr.needsUpdate = true; }
+  reset(base, tip) {   // runs every frame while the blade is idle: plain writes, no temp arrays
+    const a = this.posAttr.array;
+    for (let i = 0, o = 0; i < this.n; i++, o += 6) { a[o] = base.x; a[o + 1] = base.y; a[o + 2] = base.z; a[o + 3] = tip.x; a[o + 4] = tip.y; a[o + 5] = tip.z; }
+    this.posAttr.needsUpdate = true;
+  }
   push(base, tip) {
     const a = this.posAttr.array;
     a.copyWithin(6, 0, (this.n - 1) * 6);
@@ -2766,6 +2828,9 @@ function springStep(posV, velV, ax, target, omega, dt) {
   velV[ax] = (vel + hoo * (target - state)) * inv;
 }
 
+/** piecewise-linear sample of a rail keyframe array at eased u (hoisted: runs every rail frame) */
+function railSample(arr, dflt, e) { if (!arr || !arr.length) return dflt; if (arr.length === 1) return arr[0]; const f = e * (arr.length - 1), i = Math.min(arr.length - 2, Math.floor(f)); return lerp(arr[i], arr[i + 1], f - i); }
+
 const CamRig = {
   pos: new THREE.Vector3(0, 10, 14), vel: new THREE.Vector3(),
   look: new THREE.Vector3(0, 2, 0), lookVel: new THREE.Vector3(),
@@ -2803,13 +2868,18 @@ const CamRig = {
     let bx = px, bz = pz - 6;
     const b = Game.boss;
     if (b && b.alive !== false && b.vis) { bx = b.vis.x; bz = b.vis.z; }
-    const k = C.lookBias;
-    const lx = lerp(px, bx, k), lz = lerp(pz, bz, k);
-    const z = this.zoom * this.widen * (View.portrait ? C.portraitPush : 1);
+    const k = C.lookBias, kx = View.portrait ? C.portraitLateralBias : k;
+    const lx = lerp(px, bx, kx), lz = lerp(pz, bz, k);
+    let push = 1, lookUp = C.lookUp;
+    if (View.portrait) {
+      push = C.portraitPush * (1 + C.portraitWidePush * clamp01((Math.abs(bx - px) - 6) / 10));
+      lookUp -= C.portraitShortLookUp * clamp01((1.9 - View.h / View.w) / 0.3);
+    } else if (View.compact) lookUp = C.lookUpCompact;
+    const z = this.zoom * this.widen * push;
     // follow target sits between player and look point so the boss stays framed
     const fx = lerp(px, lx, 0.5), fz = lerp(pz, lz, 0.5);
     this.desired.set(fx + C.offset[0] * z, C.offset[1] * z, fz + C.offset[2] * z);
-    this.desiredLook.set(lx, C.lookUp, lz);
+    this.desiredLook.set(lx, lookUp, lz);
   },
 
   /** play a rail: {dur, pos:[V3|[x,y,z]...], tgt:[...], fov:[...]?, roll:[...]?, events:[{t,fn}]?, letterbox:true, skippable:true, ease:'inOut'|'linear'|'out', timeScale?, onDone?} */
@@ -2836,10 +2906,9 @@ const CamRig = {
     camera.position.copy(this._p);
     camera.up.set(0, 1, 0);
     camera.lookAt(this._t);
-    const sample = (arr, dflt) => { if (!arr || !arr.length) return dflt; if (arr.length === 1) return arr[0]; const f = e * (arr.length - 1), i = Math.min(arr.length - 2, Math.floor(f)); return lerp(arr[i], arr[i + 1], f - i); };
-    const roll = clamp(sample(def.roll, 0), -CONFIG.camera.maxDutch, CONFIG.camera.maxDutch);
+    const roll = clamp(railSample(def.roll, 0, e), -CONFIG.camera.maxDutch, CONFIG.camera.maxDutch);
     if (roll) camera.rotateZ(roll * DEG);
-    const fov = sample(def.fov, this.fovBase);
+    const fov = railSample(def.fov, this.fovBase, e);
     if (Math.abs(camera.fov - fov) > 0.01) { camera.fov = fov; camera.updateProjectionMatrix(); }
     this.pos.copy(camera.position); this.look.copy(this._t);
   },
@@ -3448,6 +3517,10 @@ const ABILITIES = {
 };
 
 // ---------------------------------------------------------------- Player
+// pose-blend helper for Player.computePose (module-level so the per-frame action overlay allocates no closure)
+let _poseP = null, _poseW = 0;
+function poseBlend(key, v) { _poseP[key] = lerp(_poseP[key], v, _poseW); }
+
 class Player {
   constructor() {
     const C = CONFIG.player;
@@ -4281,7 +4354,7 @@ class Player {
     const A = this.act;
     if (A.type) {
       const k = clamp01(A.t / A.dur), w = Math.min(1, A.t / 0.04) * (A.type === 'death' ? 1 : Math.min(1, (A.dur - A.t) / 0.1 + 0.0001));
-      const L = (key, v) => { P[key] = lerp(P[key], v, w); };
+      _poseP = P; _poseW = w; const L = poseBlend;    // hoisted helper: no closure per frame
       switch (A.type) {
         case 'slash1': { const e = easeOutCubic(k); L('armRX', -1.45); L('armRZ', -0.05); L('yawR', lerp(-1.7, 1.4, e)); L('twist', lerp(-0.55, 0.6, e)); L('elbowR', -0.15); L('bladeX', Math.PI - 0.25); L('bladeY', 0); L('bladeZ', -0.3); L('lean', 0.22); break; }
         case 'slash2': { const e = easeOutCubic(k); L('armRX', -1.35); L('armRZ', -0.1); L('yawR', lerp(1.3, -1.8, e)); L('twist', lerp(0.6, -0.65, e)); L('elbowR', -0.25); L('bladeX', Math.PI - 0.2); L('bladeY', Math.PI); L('bladeZ', 0.3); L('lean', 0.18); L('roll', -0.06); break; }
@@ -4349,6 +4422,8 @@ const PointLights = {
 /** Apply damage from the player to a target (boss, add…). info = {kind:'auto'|'skill'|'grand', source, melee}. Returns damage dealt. */
 function dealDamage(t, amount, info) {
   if (!t || !t.alive) return 0;
+  // the player has fallen: in-flight needles / lances must not kill the boss during the death beat or under the death card
+  if (t !== Game.player && (Game.dying || (Game.player && !Game.player.alive))) return 0;
   const hp = t.hitPoint || t.pos;
   if (t.invuln) { if (t.onImmuneHit) { try { t.onImmuneHit(amount, info || {}); } catch (e) { console.error(e); } } DmgNumbers.spawn(hp, 'IMMUNE', 'small'); return 0; }
   const mul = t.dmgTakenMul != null ? t.dmgTakenMul : 1;
@@ -4436,14 +4511,20 @@ const PhaseTitle = {
   },
 };
 const Hint = {
-  t: 0,
-  /** one-line hint above the player HUD. id (optional) shows once per save. */
-  show(text, dur, id) {
+  t: 0, castEnt: null, castName: '',
+  /** one-line hint above the player HUD. id (optional) shows once per save.
+   *  castEnt + castName (optional): a hint about that cast — it leaves 0.5 s after the cast ends, so it never sits over the next cast */
+  show(text, dur, id, castEnt, castName) {
     if (id && Save.seenHint(id)) return;
     const el = $('hint'); el.textContent = text; el.classList.add('on'); this.t = dur || 4;
+    this.castEnt = castEnt || null; this.castName = castName || '';
   },
-  update(dt) { if (this.t > 0) { this.t -= dt; if (this.t <= 0) $('hint').classList.remove('on'); } },
-  hide() { this.t = 0; $('hint').classList.remove('on'); },
+  update(dt) {
+    const e = this.castEnt;
+    if (e && (!e.cast || e.cast.name !== this.castName)) { this.castEnt = null; this.t = Math.min(this.t, 0.5); }
+    if (this.t > 0) { this.t -= dt; if (this.t <= 0) $('hint').classList.remove('on'); }
+  },
+  hide() { this.t = 0; this.castEnt = null; $('hint').classList.remove('on'); },
 };
 
 // ---------------------------------------------------------------- beams (pooled horizontal light blades)
@@ -4760,7 +4841,11 @@ class BossEntity {
     const got = Math.min(this.hp, amt);
     this.hp -= amt; this.flashV = Math.max(this.flashV, info && (info.kind === "skill" || info.kind === "grand") ? 1 : 0.45);
     if (this.onDamaged) this.onDamaged(amt, info);
-    if (this.hp <= 0) { this.hp = 0; this.onLethal(info); }
+    if (this.hp <= 0) {
+      const p = Game.player;
+      if (p && !p.alive) { this.hp = 1; return got; }   // any other lethal path (DoT ticks…) after the player fell: one outcome only
+      this.hp = 0; this.onLethal(info);
+    }
     return got;
   }
   /** default lethal handling: subclasses / the framework override for death cinematics */
@@ -4885,6 +4970,10 @@ class BossEntity {
 //       numbers, pips, grey-out, glows), fracture pips, off-screen arrows.
 //       DOM writes are cached: an element is only touched when its value changes.
 // =============================================================================
+// precomputed cache keys (the HUD runs every frame; 'dp' + i would build a string each time)
+const HUD_KEYS = { dp: [], dpv: [], pip: [], arw: [] };
+for (let i = 0; i < 8; i++) { HUD_KEYS.dp.push('dp' + i); HUD_KEYS.dpv.push('dpv' + i); HUD_KEYS.pip.push('pip' + i); HUD_KEYS.arw.push('arw' + i); }
+
 const HUD = {
   el: {}, cache: Object.create(null), btnState: {}, statusEls: [], arrows: [],
   bossChip: 1, bossChipDelay: 0, lastBossF: 1, hpChip: 1, hpChipDelay: 0, lastHpF: 1,
@@ -4913,7 +5002,7 @@ const HUD = {
     }
     document.querySelectorAll('#abilities .ab').forEach((b) => {
       const id = b.dataset.ab;
-      this.btnState[id] = { el: b, cdn: b.querySelector('.cdn'), pips: b.querySelector('.pips') ? Array.from(b.querySelectorAll('.pips i')) : null, cd: -1, num: '', cls: '', ready: true, g: -1, e: -1 };
+      this.btnState[id] = { el: b, cdn: b.querySelector('.cdn'), pips: b.querySelector('.pips') ? Array.from(b.querySelectorAll('.pips i')) : null, cd: -1, num: '', cls: '', ready: true, g: -1, e: -1, kcd: 'cd_' + id };
     });
     this.el.pausebtn.addEventListener('click', (e) => { e.stopPropagation(); Game.togglePause(); });
     this.el.fpsbadge.classList.toggle('on', this.fpsOn);
@@ -4946,6 +5035,8 @@ const HUD = {
   /** bind a boss: name, epithet, phase tick marks */
   bindBoss(b) {
     this.boundBoss = b;
+    // a cast bar left 'on' by the previous fight (quit mid-cast) must not flash at the start of this one
+    this.el.castbar.classList.remove('on', 'int'); this.cache.castOn = false; this.cache.cbiint = false;
     const ticks = this.el['bb-ticks']; ticks.innerHTML = '';
     if (b) {
       this.setText(this.el['bb-name'], 'bbn', b.name); this.setText(this.el['bb-epithet'], 'bbe', b.epithet || '');
@@ -5011,9 +5102,9 @@ const HUD = {
     if (showPips && worldToScreen(_v4.set(b.vis.x, b.height + 0.9, b.vis.z), this._s) && this._s.y > 40) {
       this.setClass(this.el.pips, 'pipon', 'on', true);
       const s = this._s;
-      const key = Math.round(s.x) + ',' + Math.round(s.y);
-      if (this.cache.pipPos !== key) { this.cache.pipPos = key; this.el.pips.style.transform = 'translate3d(' + Math.round(s.x) + 'px,' + Math.round(Math.max(s.y, 90)) + 'px,0) translate(-50%,-50%)'; }
-      for (let i = 0; i < 5; i++) this.setClass(this.pips[i], 'pip' + i, 'lit', i < p.fractures);
+      const px = Math.round(s.x), py = Math.round(Math.max(s.y, 90));
+      if (this.pipX !== px || this.pipY !== py) { this.pipX = px; this.pipY = py; this.el.pips.style.transform = 'translate3d(' + px + 'px,' + py + 'px,0) translate(-50%,-50%)'; }
+      for (let i = 0; i < 5; i++) this.setClass(this.pips[i], HUD_KEYS.pip[i], 'lit', i < p.fractures);
       this.setClass(this.el.pips, 'pipf', 'full', p.fractures >= 5);
       this.setClass(this.el.pips, 'pipfl', 'flick', p.fractures > 0 && p.fractureT < CONFIG.player.fractureFlicker);
     } else this.setClass(this.el.pips, 'pipon', 'on', false);
@@ -5026,13 +5117,13 @@ const HUD = {
 
   arrow(i, wp) {
     const el = this.arrows[i];
-    if (!wp) { this.setClass(el, 'arw' + i, 'on', false); return; }
+    if (!wp) { this.setClass(el, HUD_KEYS.arw[i], 'on', false); return; }
     _v8.copy(wp).project(camera);
     let x = _v8.x, y = _v8.y;
     const behind = _v8.z > 1;
     if (behind) { x = -x; y = -y; }
     const off = behind || Math.abs(x) > 0.96 || Math.abs(y) > 0.96;
-    this.setClass(el, 'arw' + i, 'on', off);
+    this.setClass(el, HUD_KEYS.arw[i], 'on', off);
     if (!off) return;
     const m = Math.max(Math.abs(x), Math.abs(y)) || 1;
     x /= m; y /= m;
@@ -5057,11 +5148,10 @@ const HUD = {
     for (let i = n; i < this.statusEls.length; i++) { const e = this.statusEls[i]; if (e.key !== '') { e.key = ''; e.el.style.display = 'none'; } }
   },
 
-  updateButtons(p, b) {
-    const A = CONFIG.abilities, act = p.canAct() || Game.state === 'transition';
-    const set = (id, cdFrac, remain, grey, glow) => {
+  /** one ability button: cooldown sweep, number, grey-out, glow, ready flash (cached; no per-frame allocation) */
+  setBtn(id, cdFrac, remain, grey, glow) {
       const s = this.btnState[id]; if (!s) return;
-      this.setVar(s.el, 'cd_' + id, '--cd', clamp01(cdFrac));
+      this.setVar(s.el, s.kcd, '--cd', clamp01(cdFrac));
       const num = remain > 0.05 && remain < 3 ? (remain < 1 ? remain.toFixed(1) : Math.ceil(remain) + '') : '';
       if (s.num !== num) { s.num = num; s.cdn.textContent = num; }
       const cls = (grey ? ' grey' : '') + (glow ? ' ' + glow : '');
@@ -5069,55 +5159,85 @@ const HUD = {
       const ready = cdFrac <= 0 && !grey;
       if (ready && !s.ready) this.flashButton(id);
       s.ready = ready;
-    };
+  },
+  updateButtons(p, b) {
+    const A = CONFIG.abilities, act = p.canAct() || Game.state === 'transition';
     const cd = p.cds, rate = p.cdRate;
     // Phase Step: pips + sweep when empty
     const dc = cd.dash;
-    set('dash', dc.charges > 0 ? 0 : dc.t / A.dash.cd, dc.charges > 0 ? 0 : dc.t / rate, !act, null);
+    this.setBtn('dash', dc.charges > 0 ? 0 : dc.t / A.dash.cd, dc.charges > 0 ? 0 : dc.t / rate, !act, null);
     const ds = this.btnState.dash;
     if (ds && ds.pips) for (let i = 0; i < ds.pips.length; i++) {
-      this.setClass(ds.pips[i], 'dp' + i, 'on', i < dc.charges);
-      const show = i < dc.max; if (this.cache['dpv' + i] !== show) { this.cache['dpv' + i] = show; ds.pips[i].style.display = show ? '' : 'none'; }
+      this.setClass(ds.pips[i], HUD_KEYS.dp[i], 'on', i < dc.charges);
+      const show = i < dc.max, kv = HUD_KEYS.dpv[i]; if (this.cache[kv] !== show) { this.cache[kv] = show; ds.pips[i].style.display = show ? '' : 'none'; }
     }
-    set('rend', cd.rend.t / A.rend.cd, cd.rend.t / rate, !act, null);
+    this.setBtn('rend', cd.rend.t / A.rend.cd, cd.rend.t / rate, !act, null);
     const canShatter = p.flux >= A.shatter.cost;
-    set('shatter', cd.shatter.t / A.shatter.cd, cd.shatter.t, !canShatter || !act, canShatter && p.fractures >= 5 ? 'glow-gold' : null);
-    set('recall', cd.recall.t / A.recall.cd, cd.recall.t / rate, !p.echo.active || !act, null);
+    this.setBtn('shatter', cd.shatter.t / A.shatter.cd, cd.shatter.t, !canShatter || !act, canShatter && p.fractures >= 5 ? 'glow-gold' : null);
+    this.setBtn('recall', cd.recall.t / A.recall.cd, cd.recall.t / rate, !p.echo.active || !act, null);
     const rs = this.btnState.recall; if (rs) this.setVar(rs.el, 'echoL', '--e', p.echo.active ? p.echo.life / p.echo.max : 0);
     const lanceCd = p.talentB === 'borrowedPlus' ? CONFIG.talents[1][0].lanceCd : A.lance.cd;
     let castInt = !!(b && b.cast && b.cast.interruptible);
     if (!castInt && b && b.lanceGlow) castInt = !!b.lanceGlow();
-    set('lance', cd.lance.t / lanceCd, cd.lance.t, !act, castInt && cd.lance.t <= 0 ? 'glow-violet' : null);
+    this.setBtn('lance', cd.lance.t / lanceCd, cd.lance.t, !act, castInt && cd.lance.t <= 0 ? 'glow-violet' : null);
     const us = this.btnState.ult; if (us) this.setVar(us.el, 'ultG', '--g', p.hourglass / 100);
-    set('ult', 0, 0, p.hourglass < 100 || !act, p.hourglass >= 100 ? 'glow-gold' : null);
+    this.setBtn('ult', 0, 0, p.hourglass < 100 || !act, p.hourglass >= 100 ? 'glow-gold' : null);
   },
 };
 
 // =============================================================================
-//  Callouts — keeps banners, stamps and phase titles off the boss and the player.
-//  Each visible callout is placed every frame: just under the boss bar (spec: upper third) when that spot is
-//  clear, otherwise beside the boss, above its head, or in the first free band below. Spots are sticky
+//  Callouts — keeps banners, stamps, phase titles (and, in portrait, the tutorial hint) off the boss, the player
+//  and the HUD. Each visible callout is placed every frame: just under the boss bar (spec: upper third) when that
+//  spot is clear, otherwise beside the boss, above its head, or in the first free band below. Spots are sticky
 //  (a callout only moves when its current spot becomes covered) so text does not jitter.
+//  Obstacles: boss body + fracture pips, player body, the ability buttons / player panel / live joystick (cached per
+//  screen size), the hint, and callouts already placed this frame. No per-frame allocation.
 // =============================================================================
 const Callouts = {
-  items: null, _barKey: '', _barBottom: 60,
+  items: null, _barBottom: 60, _bbW: -1, _bbH: -1, _bbHide: null,
   _pb: { l: 0, t: 0, r: 0, b: 0, on: false }, _pp: { l: 0, t: 0, r: 0, b: 0, on: false },
-  _s: { x: 0, y: 0, z: 0 }, _obs: [],
+  _pips: { l: 0, t: 0, r: 0, b: 0, on: false }, _joy: { l: 0, t: 0, r: 0, b: 0, on: false },
+  _ph: { l: 0, t: 0, r: 0, b: 0, on: false },               // the hint rect (static spot in landscape, solver-placed in portrait)
+  _phW: -1, _phH: -1,
+  _hud: [], _hudW: -1, _hudH: -1,                           // static HUD rects (buttons, player panel)
+  _s: { x: 0, y: 0, z: 0 }, _obs: [], _cx: new Float32Array(96), _cy: new Float32Array(96), _cn: new Uint8Array(96), _nc: 0, _panelW: -1, _panelH: -1, _panelTop: 0,
   init() {
-    const mk = (id, dur, base) => ({ id, el: $(id), until: 0, dur, base, w: 0, h: 0, x: -1, y: -1, rect: { l: 0, t: 0, r: 0, b: 0 } });
-    this.items = [mk('phasetitle', 2.6, 0.36), mk('banner', 1.2, 0.16), mk('stamp', 1.1, 0.32), mk('countdown', 0.5, 0.4)];
-    this.cd = this.items[3]; this.cdText = '';
+    const mk = (id, dur, base) => ({ id, el: $(id), until: 0, dur, base, w: 0, h: 0, x: -1, y: -1, rect: { l: 0, t: 0, r: 0, b: 0, on: false } });
+    this.hintItem = mk('hint', 0, 0.2); this.hintItem.isHint = true;
+    // the hint is placed first (banners then route around it); it is only solver-placed in portrait
+    this.items = [this.hintItem, mk('phasetitle', 2.6, 0.36), mk('banner', 1.2, 0.16), mk('stamp', 1.1, 0.32), mk('countdown', 0.5, 0.4)];
+    this.cd = this.items[4]; this.cdText = '';
     // wrap the 11-combat show() calls so we know when (and for how long) each callout is on screen
     const wrap = (obj, id, durOf) => { const f = obj.show; obj.show = function () { const r = f.apply(this, arguments); Callouts.kick(id, durOf(arguments)); return r; }; };
     wrap(Banner, 'banner', (a) => ((a[2] && a[2].dur) || 0.8) + 0.4);
     wrap(PhaseTitle, 'phasetitle', () => 2.6);
     wrap(Stamp, 'stamp', () => 1.1);
+    wrap(Hint, 'hint', () => 0);
+    resizeListeners.push(() => { this._hudW = -1; this._phW = -1; this._bbW = -1; this.hintItem.x = -1; this.hintItem.w = 0; });   // re-measure the hint (its CSS shape follows the orientation)
   },
   kick(id, dur) {
     if (!this.items) return;
-    const it = this.items.find((i) => i.id === id); if (!it) return;
+    let it = null; for (const i of this.items) if (i.id === id) it = i;
+    if (!it) return;
+    if (it.isHint) { this.measureHint(); it.x = -1; it.y = -1; this._phW = -1; this.layout(true); return; }
     it.until = Game.realTime + dur; it.w = it.el.offsetWidth; it.h = it.el.offsetHeight; it.x = -1; it.y = -1;
     this.layout(true);
+  },
+  /** the hint has two shapes in portrait: wide (≤360 px, 2 lines) and narrow (≤210 px, for the lower-left corner) */
+  measureHint() {
+    const it = this.hintItem, el = it.el, n = el.classList.contains('narrow');
+    el.classList.add('narrow'); it.wn = el.offsetWidth; it.hn = el.offsetHeight;
+    el.classList.remove('narrow'); it.w = el.offsetWidth; it.h = el.offsetHeight;
+    if (n) el.classList.add('narrow');
+  },
+  /** bottom of the top HUD block (boss bar + cast bar), cached per screen size / bar visibility */
+  barBottom() {
+    const bb = HUD.el.bossbar; const hide = !bb || bb.classList.contains('hide');
+    if (this._bbW !== View.w || this._bbH !== View.h || this._bbHide !== hide) {
+      this._bbW = View.w; this._bbH = View.h; this._bbHide = hide;
+      this._barBottom = hide ? 8 : bb.getBoundingClientRect().bottom;
+    }
+    return this._barBottom;
   },
   /** screen rect of a world-space vertical span (feet → head) with a width proportional to its projected height */
   span(x, z, y0, y1, wk, minW, out) {
@@ -5130,67 +5250,129 @@ const Callouts = {
     out.l = cx - w / 2; out.r = cx + w / 2; out.t = Math.min(hy, fy) - 6; out.b = Math.max(hy, fy) + 4; out.on = true;
     return out;
   },
+  /** ability buttons + player panel: they only move on resize, so read them once per screen size */
+  hudRects() {
+    if (this._hudW === View.w && this._hudH === View.h) return this._hud;
+    this._hudW = View.w; this._hudH = View.h;
+    const L = this._hud; L.length = 0;
+    const add = (el, pad) => { if (!el) return; const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) return; L.push({ l: r.left - pad, t: r.top - pad, r: r.right + pad, b: r.bottom + pad, on: true }); };
+    document.querySelectorAll('#abilities .ab').forEach((b) => add(b, 6));
+    add(HUD.el.playerpanel, 4);
+    return L;
+  },
+  hit(o, l, t, r, b) { return o.on !== false && l < o.r && r > o.l && t < o.b && b > o.t; },
   free(l, t, r, b) {
     if (l < 6 || r > View.w - 6 || t < 4 || b > View.h - 4) return false;
-    for (const o of this._obs) if (o.on !== false && l < o.r && r > o.l && t < o.b && b > o.t) return false;
+    for (const o of this._obs) if (this.hit(o, l, t, r, b)) return false;
     return true;
   },
+  fits(x, y, hw, hh, top0) { return y - hh >= top0 - 1 && this.free(x - hw, y - hh, x + hw, y + hh); },
+  /** clear of every other callout, the hint and the HUD (boss / player overlap allowed): the fallback's hard rule */
+  clearOfUI(it, x, y, hw, hh, top0) {
+    const l = x - hw, r = x + hw, t = y - hh, b = y + hh;
+    if (t < top0 - 1 || b > View.h - 4 || l < 6 || r > View.w - 6) return false;
+    for (const o of this.items) if (o !== it && o.rect.on && this.hit(o.rect, l, t, r, b)) return false;
+    if (!it.isHint && this._ph.on && this.hit(this._ph, l, t, r, b)) return false;
+    for (const o of this._hud) if (this.hit(o, l, t, r, b)) return false;
+    if (this._joy.on && this.hit(this._joy, l, t, r, b)) return false;
+    return true;
+  },
+  ov(o, x, y, hw, hh) { return (o && o.on !== false) ? Math.max(0, Math.min(x + hw, o.r) - Math.max(x - hw, o.l)) * Math.max(0, Math.min(y + hh, o.b) - Math.max(y - hh, o.t)) : 0; },
+  cand(x, y, narrow) { if (this._nc < this._cx.length) { this._cx[this._nc] = x; this._cy[this._nc] = y; this._cn[this._nc] = narrow ? 1 : 0; this._nc++; } },
   layout(force) {
     if (!this.items) return;
     const cdt = this.cd.el.textContent;                      // the 3-2-1-FIGHT countdown (18-game) is watched by its text
     if (cdt !== this.cdText) { this.cdText = cdt; if (cdt) this.kick('countdown', 0.5); }
-    let any = false; for (const it of this.items) if (it.until > Game.realTime) any = true;
-    if (!any) return;
-    // ---- where is the top HUD block?
-    const key = View.w + 'x' + View.h + (HUD.el.bossbar && HUD.el.bossbar.classList.contains('hide') ? 'h' : 'v');
-    if (key !== this._barKey) { this._barKey = key; const bb = HUD.el.bossbar; this._barBottom = bb && !bb.classList.contains('hide') ? bb.getBoundingClientRect().bottom : 8; }
+    const hi = this.hintItem, hintOn = hi.el.classList.contains('on');
+    const hintSolve = hintOn && (View.portrait || View.compact);   // phones: the hint is placed by the solver; desktop: fixed CSS spot
+    if (!View.portrait && !View.compact && hi.x !== -2) { hi.x = -2; hi.el.style.left = ''; hi.el.style.top = ''; hi.el.classList.remove('narrow'); }
+    let any = hintSolve; for (const it of this.items) if (!it.isHint && it.until > Game.realTime) any = true;
+    if (!any) { if (!hintOn) this._ph.on = false; return; }
     const lb = Letterbox.on ? View.h * 0.11 : 0;
-    const top0 = Math.max(this._barBottom, lb) + 8;
-    // ---- obstacles: boss body and player body
+    const top0 = Math.max(this.barBottom(), lb) + 8;
+    // ---- obstacles
     const obs = this._obs; obs.length = 0;
     const b = Game.boss, p = Game.player;
-    if (b && b.alive && b.vis && b.group && b.group.visible !== false) obs.push(this.span(b.vis.x, b.vis.z, 0, (b.height || 5) + 0.5, 0.7, 70, this._pb));
-    if (p && p.vis && p.alive !== false && Game.state !== 'title') obs.push(this.span(p.vis.x, p.vis.z, 0, 2.2, 0.8, 44, this._pp));
-    const hel = $('hint');                                     // a visible tutorial hint is an obstacle too (portrait puts it up top)
-    if (hel && hel.classList.contains('on')) { const r = hel.getBoundingClientRect(), o = this._ph || (this._ph = { l: 0, t: 0, r: 0, b: 0, on: true }); o.l = r.left; o.t = r.top; o.r = r.right; o.b = r.bottom; obs.push(o); }
+    if (b && b.alive && b.vis && b.group && b.group.visible !== false) obs.push(this.span(b.vis.x, b.vis.z, 0, (b.height || 5) + 0.5, 0.7, 70, this._pb)); else this._pb.on = false;
+    if (p && p.vis && p.alive !== false && Game.state !== 'title') obs.push(this.span(p.vis.x, p.vis.z, 0, 2.2, 0.8, 44, this._pp)); else this._pp.on = false;
+    const pr = this._pips; pr.on = !!(HUD.el.pips && HUD.el.pips.classList.contains('on') && HUD.pipX != null);
+    if (pr.on) { pr.l = HUD.pipX - 50; pr.r = HUD.pipX + 50; pr.t = HUD.pipY - 14; pr.b = HUD.pipY + 14; obs.push(pr); }
+    if (HUD.visible) { const L = this.hudRects(); for (let i = 0; i < L.length; i++) obs.push(L[i]); }
+    else { this._hud.length = 0; this._hudW = -1; }
+    const j = Input.joy, jr = this._joy; jr.on = !!j && j.id !== -1;
+    if (jr.on) { const R = CONFIG.input.joyBase / 2 + 8; jr.l = j.ox - R; jr.r = j.ox + R; jr.t = j.oy - R; jr.b = j.oy + R; obs.push(jr); }
+    // the hint on desktop: a fixed CSS spot, measured once per show / resize
+    const ph = this._ph;
+    if (hintOn && !hintSolve) {
+      if (this._phW !== View.w || this._phH !== View.h) { this._phW = View.w; this._phH = View.h; const r = hi.el.getBoundingClientRect(); ph.l = r.left; ph.t = r.top; ph.r = r.right; ph.b = r.bottom; }
+      ph.on = true; obs.push(ph);
+    } else ph.on = false;
+    for (const it of this.items) it.rect.on = false;          // placed in priority order this frame (hint first): ignore last frame's spots
     const cx = View.w / 2;
     for (const it of this.items) {
-      if (it.until <= Game.realTime) continue;
+      if (it.isHint ? !hintSolve : it.until <= Game.realTime) continue;
+      if (it.isHint && !it.w) this.measureHint();
       const W = it.w + 8, H = it.h + 6, hw = W / 2, hh = H / 2;
-      const fits = (x, y) => y - hh >= top0 - 1 && this.free(x - hw, y - hh, x + hw, y + hh);   // never over the boss/cast bars (also re-checks sticky spots when the bar reappears)
-      let x = -1, y = -1;
-      if (!force && it.x >= 0 && fits(it.x, it.y)) { x = it.x; y = it.y; }
-      else {
+      const nW = it.isHint ? (it.wn || it.w) + 8 : W, nH = it.isHint ? (it.hn || it.h) + 6 : H;
+      let x = -1, y = -1, nar = false;
+      if (!force && it.x >= 0) {                              // sticky (re-checked: the bar, boss or joystick may have moved)
+        const sw = it.narrow ? nW / 2 : hw, sh = it.narrow ? nH / 2 : hh;
+        if (this.fits(it.x, it.y, sw, sh, top0)) { x = it.x; y = it.y; nar = !!it.narrow; }
+      }
+      if (x < 0) {
         const band = top0 + hh;
-        const cands = [];
-        if (it.id === 'phasetitle' && Letterbox.on) cands.push([cx, View.h - lb - hh - 10]);       // cinematic lower third
-        if (it.id === 'stamp' || it.id === 'countdown') cands.push([cx, View.h * it.base]);
-        cands.push([cx, band]);
-        const pb = this._pb;
+        this._nc = 0;
+        const pb = this._pb, pp = this._pp;
+        if (it.isHint && !View.portrait) {                     // landscape phone: a top corner under the bar block
+          this.cand(14 + hw - 4, band); this.cand(View.w - 14 - hw + 4, band);
+        }
+        if (it.id === 'phasetitle' && Letterbox.on) this.cand(cx, View.h - lb - hh - 10);       // cinematic lower third
+        if (it.id === 'stamp' || it.id === 'countdown') this.cand(cx, View.h * it.base);
+        this.cand(cx, band);
+        if (it.isHint && pb.on && pp.on && pp.t - pb.b > H + 8) this.cand(cx, (pb.b + pp.t) * 0.5);   // between the boss's feet and the player's head
+        if (it.isHint && View.portrait) {                     // portrait: the lower-left corner above the player panel (narrow shape)
+          const pt = HUD.el.playerpanel ? this.hudPanelTop() : View.h - 90;
+          this.cand(12 + nW / 2, pt - 8 - nH / 2, true);
+        }
         if (pb.on) {
           const right = pb.r + 16 + hw, left = pb.l - 16 - hw;
-          if (View.w - pb.r > pb.l) cands.push([right, band], [left, band]); else cands.push([left, band], [right, band]);
-          cands.push([cx, pb.t - 6 - hh]);
+          if (View.w - pb.r > pb.l) { this.cand(right, band); this.cand(left, band); } else { this.cand(left, band); this.cand(right, band); }
+          this.cand(cx, pb.t - 6 - hh);
         }
-        for (let yy = band + 14; yy < View.h * 0.5; yy += 14) cands.push([cx, yy]);
-        for (const c of cands) if (fits(c[0], c[1])) { x = c[0]; y = c[1]; break; }
-        if (x < 0) {                                       // no spot clear of the boss/player (small landscape screens): at least never stack callouts on each other
-          const mine = this.items.filter((o) => o !== it && o.until > Game.realTime && o.x >= 0).map((o) => o.rect);
-          const clearOfCallouts = (cx_, cy_) => cy_ - hh >= top0 - 1 && cy_ + hh <= View.h - 4 && cx_ - hw >= 6 && cx_ + hw <= View.w - 6 && mine.every((o) => !(cx_ - hw < o.r && cx_ + hw > o.l && cy_ - hh < o.b && cy_ + hh > o.t));
-          // among spots clear of other callouts, cover as little of the boss and (much more costly) the player as possible
-          const ov = (o, cx_, cy_) => (o && o.on !== false) ? Math.max(0, Math.min(cx_ + hw, o.r) - Math.max(cx_ - hw, o.l)) * Math.max(0, Math.min(cy_ + hh, o.b) - Math.max(cy_ - hh, o.t)) : 0;
+        if (!it.isHint && ph.on) this.cand(cx, ph.b + 6 + hh);                                     // directly under the hint
+        for (let yy = band + 14; yy < View.h * 0.62; yy += 14) this.cand(cx, yy);
+        for (let k = 0; k < this._nc; k++) {
+          const n = this._cn[k] === 1;
+          if (this.fits(this._cx[k], this._cy[k], n ? nW / 2 : hw, n ? nH / 2 : hh, top0)) { x = this._cx[k]; y = this._cy[k]; nar = n; break; }
+        }
+        if (x < 0) {
+          // nothing clear of the boss/player (small screens): never on another callout, the hint or the HUD; among
+          // those spots cover as little of the boss, its pips and (much more costly) the player as possible
           let best = Infinity;
-          const tryAt = (cx_, cy_) => { if (!clearOfCallouts(cx_, cy_)) return; const sc = ov(this._pb, cx_, cy_) + 4 * ov(this._pp, cx_, cy_) + (cy_ - band) * 0.5; if (sc < best) { best = sc; x = cx_; y = cy_; } };
-          for (const c of cands) tryAt(c[0], c[1]);
-          for (let yy = band; yy < View.h * 0.8; yy += 14) tryAt(cx, yy);
-          if (x < 0) { x = cx; y = band; }
+          for (let k = 0; k < this._nc; k++) {
+            const cx_ = this._cx[k], cy_ = this._cy[k], n = this._cn[k] === 1, w2 = n ? nW / 2 : hw, h2 = n ? nH / 2 : hh;
+            if (!this.clearOfUI(it, cx_, cy_, w2, h2, top0)) continue;
+            const sc = this.ov(this._pb, cx_, cy_, w2, h2) + this.ov(this._pips, cx_, cy_, w2, h2) * 2 + 4 * this.ov(this._pp, cx_, cy_, w2, h2) + (cy_ - band) * 0.5;
+            if (sc < best) { best = sc; x = cx_; y = cy_; nar = n; }
+          }
+          if (x < 0) for (let yy = band; yy < View.h * 0.8; yy += 14) {
+            if (!this.clearOfUI(it, cx, yy, hw, hh, top0)) continue;
+            const sc = this.ov(this._pb, cx, yy, hw, hh) + 4 * this.ov(this._pp, cx, yy, hw, hh) + (yy - band) * 0.5;
+            if (sc < best) { best = sc; x = cx; y = yy; nar = false; }
+          }
+          if (x < 0) { x = cx; y = band; nar = false; }
         }
       }
+      if (it.isHint && nar !== !!it.narrow) { it.narrow = nar; it.el.classList.toggle('narrow', nar); }
       if (x !== it.x || y !== it.y) { it.x = x; it.y = y; it.el.style.left = Math.round(x) + 'px'; it.el.style.top = Math.round(y) + 'px'; }
-      const r = it.rect; r.l = x - hw; r.r = x + hw; r.t = y - hh; r.b = y + hh; r.on = true;
+      const w2 = nar ? nW / 2 : hw, h2 = nar ? nH / 2 : hh;
+      const r = it.rect; r.l = x - w2; r.r = x + w2; r.t = y - h2; r.b = y + h2; r.on = true;
       obs.push(r);
+      if (it.isHint) { ph.l = r.l; ph.r = r.r; ph.t = r.t; ph.b = r.b; ph.on = true; }
     }
   },
+  /** top of the player panel (cached with the other HUD rects) */
+  hudPanelTop() { if (this._panelW !== View.w || this._panelH !== View.h) { this._panelW = View.w; this._panelH = View.h; this._panelTop = HUD.el.playerpanel.getBoundingClientRect().top; } return this._panelTop; },
 };
 
 // ===== 13-boss-framework.js =====
@@ -5414,6 +5596,7 @@ const WorldBars = {
     return h;
   },
   update() {
+    const top = this.list.length ? Callouts.barBottom() + 4 : 0;   // never draw over the boss bar / epithet / cast bar
     for (const h of this.list) {
       const e = h.ent, pos = e.vis || e.pos;
       let show = !!(e.alive !== false && pos) && !CamRig.rail;
@@ -5421,7 +5604,7 @@ const WorldBars = {
       if (show && h.kind === 'cast') { const c = e.cast; show = !!c; if (c) { frac = c.t / c.dur; name = c.name; cls = c.interruptible ? 'int' : ''; } }
       else if (show) { frac = e.hp / e.maxHp; cls = e.shielded ? 'shield' : ''; }
       if (show && worldToScreen(_v4.set(pos.x, (h.y != null ? h.y : (e.height || 2) + 0.8), pos.z), this._s)) {
-        h.el.style.transform = 'translate3d(' + this._s.x.toFixed(0) + 'px,' + this._s.y.toFixed(0) + 'px,0)';
+        h.el.style.transform = 'translate3d(' + this._s.x.toFixed(0) + 'px,' + Math.max(top, this._s.y).toFixed(0) + 'px,0)';
         const q = Math.round(clamp01(frac) * 500);
         if (q !== h.last) { h.last = q; h.fill.style.transform = 'scaleX(' + (q / 500) + ')'; }
         if (name !== h.lastName) { h.lastName = name; h.name.textContent = name; }
@@ -7079,18 +7262,21 @@ class Pyrrha extends Boss {
   forward(out, dist) { return out.set(this.pos.x + Math.sin(this.yaw) * dist, 0, this.pos.z + Math.cos(this.yaw) * dist); }
   hammerImpact(rot, power) {
     const ix = this.pos.x + Math.sin(rot) * 3.4, iz = this.pos.z + Math.cos(rot) * 3.4;
+    // phones: the impact crescents fill most of a small frame and the bloom floods it white (mean luma ~150, 15%
+    // near-white at a Twin Hammerfall landing) → half the additive energy and hot-orange (not white-gold) crescents
+    const small = Math.min(View.w, View.h) < 600, ek = small ? 0.5 : 1;
     sfx('slam'); sfx('boom');
     BossKit.impact(ix, iz, 1.5, 0xffc070, PYR_DARK);
     CamRig.addTrauma(this.M.hammerfall.trauma * power);
-    Post.kickBloom(0.25, 0.3);
+    Post.kickBloom(0.25 * ek, 0.3);
     // molten wave rolling over the cone
     for (let k = 0; k < 7; k++) {
       const a = rot + (k - 3) / 3 * (this.M.hammerfall.angle * DEG * 0.45);
-      Particles.cone(_v1.set(ix, 0.3, iz), _v2.set(Math.sin(a), 0.12, Math.cos(a)), 0.13, 18, 0xffd090, 0xff2a04, 15, 0.6, 0.42, -6, { intensity: 2.2, drag: 2.2 });
+      Particles.cone(_v1.set(ix, 0.3, iz), _v2.set(Math.sin(a), 0.12, Math.cos(a)), 0.13, small ? 12 : 18, small ? 0xffb060 : 0xffd090, 0xff2a04, 15, 0.6, 0.42, -6, { intensity: 2.2 * (small ? 0.6 : 1), drag: 2.2 });
     }
-    Particles.burst(_v1.set(ix, 0.6, iz), 70, 0xfff0c0, PYR_EMBER, 10, 1.0, 0.18, -12, { up: 7, intensity: 2.6, drag: 1.2 });
-    for (let i = 0; i < 3; i++) SlashFX.spawn(this.pos.x, 0.25, this.pos.z, rot, 0, 4.5 + i * 3.2, i ? 0xff8a30 : 0xffd090, { dur: 0.16, hold: 0.18, intensity: 2.4 - i * 0.4, tail: 0.9, delay: i * 0.06 });
-    GroundFX.ring(ix, iz, 1, 9, 0xff7a30, 0.55, 0.5, 2.4);
+    Particles.burst(_v1.set(ix, 0.6, iz), small ? 45 : 70, small ? 0xffd090 : 0xfff0c0, PYR_EMBER, 10, 1.0, 0.18, -12, { up: 7, intensity: 2.6 * (small ? 0.6 : 1), drag: 1.2 });
+    for (let i = 0; i < 3; i++) SlashFX.spawn(this.pos.x, 0.25, this.pos.z, rot, 0, 4.5 + i * 3.2, i || small ? 0xff8a30 : 0xffd090, { dur: 0.16, hold: small ? 0.1 : 0.18, intensity: (2.4 - i * 0.4) * ek, tail: 0.9, delay: i * 0.06 });
+    GroundFX.ring(ix, iz, 1, 9, 0xff7a30, 0.55, 0.5, 2.4 * (small ? 0.6 : 1));
   }
 
   // ------------------------------------------------------------ abilities
@@ -7157,7 +7343,7 @@ class Pyrrha extends Boss {
     const I = this.M.incinerate;
     Banner.show('INCINERATE', 'Interrupt it!', { cls: 'violet' });
     this.pose('palm', 5);
-    if (!Save.seenHint('incinerateHint')) Hint.show(Input.lastTouch ? 'Violet cast bar = interruptible. Tap your STASIS LANCE now!' : 'Violet cast bar = interruptible. Throw your Stasis Lance (F) now!', 4.5);
+    if (!Save.seenHint('incinerateHint')) Hint.show(Input.lastTouch ? 'Violet cast bar = interruptible. Tap your STASIS LANCE now!' : 'Violet cast bar = interruptible. Throw your Stasis Lance (F) now!', 4.5, null, this, 'Incinerate');
     this.startCast('Incinerate', I.cast, { interruptible: true, stingF: 247,
       onComplete: () => {
         const pl = Game.player; this.pose('slam', 10); this.after(0.6, () => this.pose('idle', 4));
@@ -7709,10 +7895,10 @@ function makeCathedralFloorMaterial(R, U) {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.0 });
   mat.depthWrite = false;          // the floor is the water surface: mirrored reflections below it must show through
   mat.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, U, { uTime: GLOBAL_U.uTime, uR: { value: R } });
+    Object.assign(sh.uniforms, U, { uTime: GLOBAL_U.uTime, uR: { value: R }, uOctaves: GLOBAL_U.uOctaves });
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vFloorW;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFloorW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFloorW; uniform float uTime; uniform float uR;\n' +
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vFloorW; uniform float uTime; uniform float uR; uniform float uOctaves;\n' +
       'uniform vec3 uRipples[16]; uniform float uFlow; uniform float uFlowS; uniform float uHymn; uniform float uHymnPulse; uniform vec2 uEye; uniform vec4 uPillars[6];\n' +
       'uniform vec4 uShadow[8]; uniform vec4 uBoss; uniform vec3 uMoonDir; uniform float uMoonSize; uniform float uMoonOcc; uniform vec4 uRaySpots[3]; uniform float uGlow; uniform vec4 uWin; uniform float uWinGlow;\n' +
       GLSL_NOISE + NER_ROSE_GLSL + `
@@ -7730,6 +7916,9 @@ function makeCathedralFloorMaterial(R, U) {
       {
         vec2 fp = vFloorW.xz; float fr = length(fp);
         vec3 Vw = normalize(cameraPosition - vFloorW);
+        // quality tier (uniform branch, no recompile): this floor covers most of the screen, so Medium/Low drop the
+        // second wavelet octave, half the ripple slots, the second caustic layer and the rose-window reflection ray
+        bool fHQ = uOctaves > 3.5;
         // ---- current flow frame (P3): the pattern rotates clockwise at 2 m/s (shears into streaks)
         float fang = uFlowS / max(fr, 1.5);
         float fc = cos(-fang), fs = sin(-fang);
@@ -7769,12 +7958,19 @@ function makeCathedralFloorMaterial(R, U) {
         vec2 wq = mix(fp, fq, uFlow);
         float e = 0.12;
         vec2 o1 = uTime * vec2(0.30, 0.20), o2 = -uTime * vec2(0.25, 0.40);
-        float h0 = vnoise(wq * 1.3 + o1) + 0.5 * vnoise(wq * 3.1 + o2);
-        float hx = vnoise((wq + vec2(e, 0.0)) * 1.3 + o1) + 0.5 * vnoise((wq + vec2(e, 0.0)) * 3.1 + o2);
-        float hz = vnoise((wq + vec2(0.0, e)) * 1.3 + o1) + 0.5 * vnoise((wq + vec2(0.0, e)) * 3.1 + o2);
+        float h0 = vnoise(wq * 1.3 + o1);
+        float hx = vnoise((wq + vec2(e, 0.0)) * 1.3 + o1);
+        float hz = vnoise((wq + vec2(0.0, e)) * 1.3 + o1);
+        if (fHQ) {
+          h0 += 0.5 * vnoise(wq * 3.1 + o2);
+          hx += 0.5 * vnoise((wq + vec2(e, 0.0)) * 3.1 + o2);
+          hz += 0.5 * vnoise((wq + vec2(0.0, e)) * 3.1 + o2);
+        }
         vec2 g = vec2(hx - h0, hz - h0) / e * (0.045 + 0.04 * uFlow);
         float crest = 0.0;
+        int nRip = fHQ ? 16 : 8;
         for (int i = 0; i < 16; i++) {
+          if (i >= nRip) break;
           vec3 rp = uRipples[i]; float age = uTime - rp.z;
           if (age <= 0.0 || age > 2.4) continue;
           vec2 dv = fp - rp.xy; float dist = length(dv);
@@ -7788,8 +7984,8 @@ function makeCathedralFloorMaterial(R, U) {
         // ---- caustics: two scrolling Voronoi layers, min-combined (flow along the current in P3)
         vec2 cp = wq * 0.42 + g * 1.4;
         vec4 v1 = voronoi2(cp + vec2(uTime * 0.11, uTime * 0.07));
-        vec4 v2 = voronoi2(cp * 1.37 + vec2(-uTime * 0.08, uTime * 0.10) + 4.7);
-        float ce = min(v1.y, v2.y);
+        float ce = v1.y;
+        if (fHQ) { vec4 v2 = voronoi2(cp * 1.37 + vec2(-uTime * 0.08, uTime * 0.10) + 4.7); ce = min(ce, v2.y); }
         float caust = pow(1.0 - smoothstep(0.0, 0.13, ce), 3.0) * (0.55 + 0.45 * vnoise(fp * 0.3 + uTime * 0.05)) * (1.0 - deep * 0.8);
         // god-ray light pools + glow under Nerith
         float pool = 0.0;
@@ -7808,7 +8004,7 @@ function makeCathedralFloorMaterial(R, U) {
         // ---- reflection: analytic sky + moon + the rose window on the north wall
         vec3 Rr = reflect(-Vw, nW);
         vec3 refl = nerSkyRefl(Rr);
-        if (Rr.z < -0.01) {
+        if (fHQ && Rr.z < -0.01) {
           float tt = (uWin.z - vFloorW.z) / Rr.z;
           vec3 hit = vFloorW + Rr * tt;
           vec2 wuv = (hit.xy - uWin.xy) / uWin.w;
@@ -8849,7 +9045,7 @@ function buildCathedralArena(ctx) {
     tw: {},
     tween(name, to, dur) { if (!dur) { this[name] = to; delete this.tw[name]; return; } this.tw[name] = { from: this[name], to, t: 0, dur }; },
     /** write a ripple ring into the floor's 16-entry ring buffer */
-    ripple(x, z, delay) { const r = ripples[ripI]; ripI = (ripI + 1) % 16; r.set(x, z, Game.time + (delay || 0)); },
+    ripple(x, z, delay) { const n = GLOBAL_U.uOctaves.value > 3.5 ? 16 : 8; ripI %= n; const r = ripples[ripI]; ripI = (ripI + 1) % n; r.set(x, z, Game.time + (delay || 0)); },   // Medium/Low: the shader reads 8 slots
     /** line of ripples (lash / coil impact) */
     rippleLine(x0, z0, x1, z1, n, dt) { for (let i = 0; i < n; i++) { const k = i / Math.max(1, n - 1); this.ripple(lerp(x0, x1, k), lerp(z0, z1, k), i * (dt || 0)); } },
     /** standing pillars as line-of-sight circles */
@@ -10365,7 +10561,8 @@ function buildClockArena(ctx) {
       rim.color.setHex(AUR_RIM).lerp(_c1.setRGB(1, 0.85, 0.65), this.dawn);
       // numeral beams fade
       for (const b of numBeams) if (b.visible) { b.userData.t = (b.userData.t || 0) + dt; b.material.uniforms.uAlpha.value = Math.max(0, 1 - b.userData.t / 0.9); if (b.userData.t > 0.9) b.visible = false; }
-      for (const b of numBeams.concat([fateBeam])) if (b.visible) b.rotation.y = Math.atan2(camera.position.x - b.position.x, camera.position.z - b.position.z);
+      for (const b of numBeams) if (b.visible) b.rotation.y = Math.atan2(camera.position.x - b.position.x, camera.position.z - b.position.z);
+      if (fateBeam.visible) fateBeam.rotation.y = Math.atan2(camera.position.x - fateBeam.position.x, camera.position.z - fateBeam.position.z);
       // rewind sepia
       if (this.sepiaT > 0) { this.sepiaT -= dt; Post.sepia = Math.max(0, this.sepiaT / 0.9) * 0.75; if (this.sepiaT <= 0) Post.sepia = 0; }
     },
@@ -10661,7 +10858,7 @@ class Auren extends Boss {
       onInterrupt: () => { this.rewindEnd(); this.pose('idle', 4); } });
     this.rewindOn = true; this.pose('cast', 5);
     Banner.show('REWIND', 'Lance it, or make your past safe', { cls: 'violet', dur: 1.2 });
-    if (!this.hintRw) { this.hintRw = true; Hint.show('REWIND: the gold ghost is where you stood 5 s ago. Interrupt with Stasis Lance (F).', 4, 'aurRewind'); }
+    if (!this.hintRw) { this.hintRw = true; Hint.show('REWIND: the gold ghost is where you stood 5 s ago. Interrupt with ' + Input.keyLabel('lance') + '.', 4, 'aurRewind', this, 'Rewind'); }
     sfx('whoosh', { f: 1800, f1: 300, dur: 0.8, vol: 0.2 });
     return Rw.cast * this.windupMul + 0.3;
   }
@@ -10742,7 +10939,7 @@ class Auren extends Boss {
     this.startCast('Paradox Bell', Bl.cast, { stingF: 233, onComplete: () => this.bellToll() });
     this.pose('bell', 6); this.bell.visible = true; this.bellK = 0;
     Banner.show('PARADOX BELL', 'SPEND YOUR FRACTURES', { cls: 'violet', dur: 1.6 });
-    if (!this.hintBell) { this.hintBell = true; Hint.show('The Bell hits only if you hold 5 Fractures. Shatter (E) before it tolls.', 4, 'aurBell'); }
+    if (!this.hintBell) { this.hintBell = true; Hint.show('The Bell hits only if you hold 5 Fractures. ' + Input.keyLabel('shatter') + ' before it tolls.', 4, 'aurBell'); }
     return Bl.cast * this.windupMul + 0.2;
   }
   bellToll() {
@@ -10829,6 +11026,14 @@ class Auren extends Boss {
   }
 
   // ------------------------------------------------------------ STOPPED CLOCK (intermission)
+  /** Game.prewarmFight hook: one hidden anchor crystal so its arcane program compiles at fight start, not when
+   *  the Stopped Clock begins (the real anchors' materials share the program through the same cache key) */
+  prewarm() {
+    if (this._anchorTpl) return;
+    const cm = makeArcane({ color: 0x140a24, roughness: 0.08, metalness: 0.35, emissive: 0x5a2090, emissiveIntensity: 0.6, flatShading: true }, { rim: 1.3, rimColor: AUR_GOLD, crackColor: AUR_GOLD, crackScale: 1.4, key: 'aurAnchor', occluder: true });
+    const m = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), cm); m.visible = false; m.frustumCulled = false;
+    scene.add(m); this._anchorTpl = m;
+  }
   spawnAnchors() {
     const SC = this.M.stoppedClock, B = CONFIG.bosses[2], R = SC.anchorR;
     this.killAnchors();
@@ -10910,9 +11115,23 @@ class Auren extends Boss {
       delete a.kill; delete a.takeDamage;
       if (a.alive) { a.onDeath = null; a.kill(false); }
     }
-    for (const a of this.anchors) if (a._mats) { const ms = a._mats; a._mats = null; Timers.after(0.5, () => { for (const m of ms) m.dispose(); }); }
+    // free each crystal (materials AND its four geometries, and detach it from the pooled add) after its death fade;
+    // a teardown inside that 0.5 s drops the timer (Timers.clear), so dispose() flushes whatever is still pending
+    for (const a of this.anchors) if (a._mats) {
+      const job = { a, custom: a.custom, ms: a._mats }; a._mats = null;
+      (this._anchorFree || (this._anchorFree = [])).push(job);
+      Timers.after(0.5, () => this.freeAnchor(job));
+    }
     this.anchors = [];
     for (const t of this.tethers) t.visible = false;
+  }
+  freeAnchor(job) {
+    const L = this._anchorFree, i = L ? L.indexOf(job) : -1; if (i < 0) return; L.splice(i, 1);
+    for (const m of job.ms) m.dispose();
+    if (job.custom) {
+      job.custom.traverse((c) => { if (c.geometry) c.geometry.dispose(); });
+      if (job.a.custom === job.custom) { job.a.group.remove(job.custom); job.a.custom = null; }
+    }
   }
   startStoppedClock() {
     const SC = this.M.stoppedClock;
@@ -11016,7 +11235,7 @@ class Auren extends Boss {
       p.addStatus('entropy', Infinity, { stacks: n });
       GroundFX.ring(p.pos.x, p.pos.z, 0.4, 2.4, 0xc56bff, 0.5, 0.25, 2.4);
       sfx('fracture', { n: 0 });
-      if (n === 1) Hint.show('ENTROPY: +6% damage taken per stack. Recall (R) is the only cleanse.', 4, 'aurEntropy');
+      if (n === 1) Hint.show('ENTROPY: +6% damage taken per stack. ' + Input.keyLabel('recall') + ' is the only cleanse.', 4, 'aurEntropy');
       if (n >= 3 && n % 2 === 1) Banner.show('ENTROPY ×' + n, 'Recall to cleanse', { cls: 'violet', dur: 0.9 });
     }
   }
@@ -11223,8 +11442,9 @@ class Auren extends Boss {
     this.creditsOn = true;
     const done = () => {
       if (!this.creditsOn) return; this.creditsOn = false;
+      if (Game.paused) Game.togglePause(false);              // never leave the results card behind a pause menu
       const el = $('aur-credits'); if (el) el.remove();
-      window.removeEventListener('keydown', keySkip, true);
+      window.removeEventListener('keydown', keySkip, true); this._creditsKey = null;
       CamRig.override = null;
       if (this.killTime) Game.fightTime = this.killTime;      // the results card times the fight, not the credits
       Boss.prototype.finishVictory.call(this);
@@ -11258,10 +11478,10 @@ class Auren extends Boss {
       <div style="height:80px"></div>
       <div style="font-size:22px;letter-spacing:.3em;color:#fff3d8">THANK YOU FOR PLAYING</div>
       <div style="height:30px"></div></div>
-      <div style="position:absolute;right:16px;bottom:14px;font-size:12px;letter-spacing:.2em;opacity:.6;color:#fff;font-family:var(--head,Georgia,serif)">TAP / SPACE TO SKIP</div>`;
+      <div style="position:absolute;right:16px;bottom:14px;font-size:12px;letter-spacing:.2em;opacity:.6;color:#fff;font-family:var(--head,Georgia,serif)"><span class="tch">TAP TO SKIP</span><span class="kbd">CLICK / SPACE TO SKIP</span></div>`;
     document.body.appendChild(el);
-    el.addEventListener('pointerdown', (e) => { e.preventDefault(); done(); });
-    window.addEventListener('keydown', keySkip, true);
+    el.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); done(); });   // 'click', not 'pointerdown': removing the layer on pointerdown let the click land on the button underneath
+    window.addEventListener('keydown', keySkip, true); this._creditsKey = keySkip;
     this.credits = { el, roll: el.querySelector('.roll'), t: 0, dur: 26 };
     HUD.show(false); Letterbox.set(false);
     // a slow crane up into the new dawn
@@ -11336,14 +11556,15 @@ class Auren extends Boss {
     this.rig.add('body', 0, 0, 0, 0, Math.sin(t * 0.9) * 0.08, 0);
     this.ringPulse = Math.max(0, (this.ringPulse || 0) - dt * 2);
     const spin = this.ringSpin * (this.cast ? 1.8 : 1) * (this.finalHour ? 2.5 : 1) * (this.alive ? 1 : 0.2);
-    this.ringObjs.forEach((r, i) => {
+    for (let i = 0; i < this.ringObjs.length; i++) {
+      const r = this.ringObjs[i];
       r.spin.rotation.y += r.speed * spin * dt;
       r.gim.rotation.x = Math.sin(t * (0.21 + i * 0.07) + r.ph) * r.tiltA;
       r.gim.rotation.z = Math.cos(t * (0.17 + i * 0.05) + r.ph * 1.7) * r.tiltA * 0.8;
       r.tex.offset.x = (r.tex.offset.x + dt * 0.03 * (i % 2 ? -1 : 1) * spin) % 1;
       r.mat.emissiveIntensity = (1.4 + this.ringPulse * 2.5 + (this.cast ? 0.6 : 0) + this.overV * 1.5) * (1 - ar.dark) * this.formK;
       r.gim.scale.setScalar(Math.max(0.01, this.formK));
-    });
+    }
     this.hem.rotation.y += dt * 0.25;
     // overexposure: shell rim goes white-hot
     this.overV = damp(this.overV, this.hasStatus('overexposed') ? 1 : 0, 3, dt);
@@ -11399,7 +11620,10 @@ class Auren extends Boss {
     for (const t of this.tethers) t.material.dispose();
     const p = Game.player; if (p) { p.clearMarkRing(); p.pos.y = 0; p.prevPos.y = 0; }
     Timers.cancelTag('aurFall');
+    if (this._anchorFree) while (this._anchorFree.length) this.freeAnchor(this._anchorFree[0]);
+    if (this._anchorTpl) { scene.remove(this._anchorTpl); this._anchorTpl.geometry.dispose(); this._anchorTpl.material.dispose(); this._anchorTpl = null; }
     if (this.creditsOn) { this.creditsOn = false; const el = $('aur-credits'); if (el) el.remove(); CamRig.override = null; }
+    if (this._creditsKey) { window.removeEventListener('keydown', this._creditsKey, true); this._creditsKey = null; }   // torn down mid-roll (Retry / Raid Map): the capture listener must not outlive it
     super.dispose();
   }
   /** formK / heartK / ringSpin tweens (stepped in onUpdate; a direct set via setNow cancels) */
@@ -11703,7 +11927,7 @@ const TitleScene = {
     }
     const pathMat = makeBeamMaterial({ color: 0xffd890, intensity: 1.6, len: 12, scroll: 1.2, soft: 0.5 });
     pathMat.side = THREE.DoubleSide; disposables.push(pathMat);
-    let pathMesh = null, pathKey = '';
+    let pathMesh = null; const pathKey = new Float32Array(9).fill(1e9);   // last node positions the path was built for
 
     const arena = {
       key: 'title', group, radius: 40, sky, exposure: 1.0, bloom: 0.9,
@@ -11728,9 +11952,10 @@ const TitleScene = {
           nodes[i].pos.copy(cam.position).addScaledVector(_v1, along);
         }
         // light path: a gentle arcing tube through the three platform tops
-        const key = nodes.map((n) => n.pos.toArray().map((v) => v.toFixed(1)).join(',')).join('|');
-        if (key !== pathKey) {
-          pathKey = key;
+        let moved = false;                                   // numeric compare (this runs every frame on the map: no key strings)
+        for (let i = 0; i < 3; i++) { const q = nodes[i].pos; if (Math.abs(q.x - pathKey[i * 3]) > 0.05 || Math.abs(q.y - pathKey[i * 3 + 1]) > 0.05 || Math.abs(q.z - pathKey[i * 3 + 2]) > 0.05) moved = true; }
+        if (moved) {
+          for (let i = 0; i < 3; i++) { pathKey[i * 3] = nodes[i].pos.x; pathKey[i * 3 + 1] = nodes[i].pos.y; pathKey[i * 3 + 2] = nodes[i].pos.z; }
           if (pathMesh) { mapG.remove(pathMesh); pathMesh.geometry.dispose(); }
           const P = [];
           for (let i = 0; i < 3; i++) {
@@ -11885,7 +12110,7 @@ const MENU_CSS = `
   .mnode .mn-tal-h{margin-top:4px}
   .mnode .mn-tal{margin-top:3px}
 }
-@media (max-aspect-ratio: 21/20){ #hint{bottom:auto;top:calc(12.5vh + var(--sat, 0px));max-width:92vw;font-size:13px;line-height:1.3;padding:6px 10px} }  /* portrait: under the boss/cast bars — at 21vh it hid the boss and her telegraphs (Callouts route banners around it) */
+@media (max-aspect-ratio: 21/20){ #hint{bottom:auto;top:calc(12.5vh + var(--sat, 0px));max-width:92vw;font-size:13px;line-height:1.3;padding:6px 10px} }  /* portrait: default spot under the boss/cast bars; Callouts (12-hud) then places it clear of the boss, her pips, the player and the buttons */
 @media (max-aspect-ratio: 21/20){ #talentpick .tp-row{flex-direction:column;align-items:center} .tpc{padding:12px} .tpc .glyph{font-size:30px} }
 `;
 const RaidMap = {
@@ -11934,18 +12159,32 @@ const RaidMap = {
       }
       el.innerHTML = h;
     }
+    this.sz = null;                 // card sizes changed: re-measure on the next place()
     this.place();
+  },
+  /** read every card size once (after render / resize / orientation change), so place() is write-only */
+  measure() {
+    const land = View.w / View.h >= 1.05;
+    for (const el of this.els) el.classList.toggle('portrait', !land);
+    const sz = this.sz || (this.sz = [{ w: 0, h: 0 }, { w: 0, h: 0 }, { w: 0, h: 0 }]);
+    let ok = true;
+    for (let i = 0; i < 3; i++) { const el = this.els[i]; sz[i].w = el.offsetWidth; sz[i].h = el.offsetHeight; if (!sz[i].w) ok = false; }
+    this.szW = ok ? View.w : -1; this.szH = View.h; this.szLand = land;   // measured while hidden → measure again next time
   },
   place() {
     const A = Game.titleArena; if (!A || !A.nodeScreen) return;
-    const land = View.w / View.h >= 1.05;
+    if (!this.sz || this.szW !== View.w || this.szH !== View.h) this.measure();
+    const land = this.szLand;
     let lastBottom = 0;
     for (let i = 0; i < 3; i++) {
-      const s = A.nodeScreen(i, this._s), el = this.els[i];
-      el.classList.toggle('portrait', !land);
-      if (land) { const hw = (el.offsetWidth || 250) / 2; el.style.left = clamp(s.x, hw + 4, View.w - hw - 4) + 'px'; el.style.top = Math.max(56, Math.min(s.y + 54, View.h - (el.offsetHeight || 180) - 6)) + 'px'; }
-      else { const hh = el.offsetHeight || 160; el.style.left = Math.min(s.x + 54, View.w - el.offsetWidth - 8) + 'px'; const cy = Math.max(clamp(s.y, hh / 2 + 72, View.h - hh / 2 - 8), lastBottom + 8 + hh / 2); el.style.top = cy + 'px'; lastBottom = cy + hh / 2; }
-      el.style.opacity = s.vis ? 1 : 0;
+      const s = A.nodeScreen(i, this._s), el = this.els[i], w = this.sz[i].w || 250, h = this.sz[i].h || (land ? 180 : 160);
+      let x, y;
+      if (land) { const hw = w / 2; x = clamp(s.x, hw + 4, View.w - hw - 4); y = Math.max(56, Math.min(s.y + 54, View.h - h - 6)); }
+      else { x = Math.min(s.x + 54, View.w - w - 8); y = Math.max(clamp(s.y, h / 2 + 72, View.h - h / 2 - 8), lastBottom + 8 + h / 2); lastBottom = y + h / 2; }
+      x = Math.round(x); y = Math.round(y);
+      if (el._x !== x) { el._x = x; el.style.left = x + 'px'; }
+      if (el._y !== y) { el._y = y; el.style.top = y + 'px'; }
+      const op = s.vis ? 1 : 0; if (el._op !== op) { el._op = op; el.style.opacity = op; }
     }
   },
   update() { if (!$('map').classList.contains('hidden')) this.place(); },
@@ -12465,7 +12704,7 @@ class TrainingDummy extends BossEntity {
   ab_chime() {
     Banner.show('CHIME OF STASIS', 'Interrupt it!', { cls: 'violet' });
     this.pose('cast');
-    if (!Save.seenHint('lanceHint')) Hint.show('Violet cast bar = interruptible. Throw your Stasis Lance (F).', 4);
+    if (!Save.seenHint('lanceHint')) Hint.show('Violet cast bar = interruptible. Throw your ' + Input.keyLabel('lance') + '.', 4, null, this, 'Chime of Stasis');
     this.startCast('Chime of Stasis', 2.5, { interruptible: true,
       onComplete: () => {
         this.pose('wide'); sfx('bell', { f: 262 });
@@ -12677,11 +12916,15 @@ Object.assign(Game, {
     Letterbox.set(false);
     Hint.hide();
     this.baseScale = 1; this.inputLocked = false; this.cinematic = false; this.forceWide = 0;
+    this.dying = false;                                        // a Retry / Raid Map during the death beat drops its timer (Timers.clear) — never leave the flag stuck
+    Post.expDur = 0; Post.expT = 0;                            // a running exposure tween (rail events, Auren's dawn) must not carry into the next fight
+    Post.bloomKick = 0; Post.caKick = 0; Post.desatCur = 0;
   },
 
   /** destroy the current arena + boss */
   teardown() {
     this.resetWorld();
+    Quality.applyPending();                                    // a shadow flip deferred during the last fight recompiles here, not mid-fight
     if (this.boss && this.boss.dispose) { try { this.boss.dispose(); } catch (e) { console.error(e); } }
     if (this.arena && this.arena.dispose) { try { this.arena.dispose(); } catch (e) { console.error(e); } }
     if (this.encounter && this.encounter.dispose) { try { this.encounter.dispose(); } catch (e) { console.error(e); } }
@@ -12724,6 +12967,7 @@ Object.assign(Game, {
     CamRig.zoomTarget = CONFIG.camera.zooms[Input.zoomIdx]; CamRig.zoom = CamRig.zoomTarget;
     CamRig.snap();
     HUD.bindBoss(this.boss);
+    this.prewarmFight();
     Audio.music.play(enc.music || 'training');
     Audio.music.setPhase(0);
     if (!opts.skipIntro && enc.intro) {
@@ -12741,6 +12985,14 @@ Object.assign(Game, {
     if (enc.onStart) enc.onStart(ctx);
   },
 
+  /** compile every material of the new arena + boss now (hidden lava pools, towers, beams, ghosts, shields, anchor
+   *  templates…), behind the intro / countdown, instead of on first use in the middle of a dodge window.
+   *  renderer.compile walks invisible meshes too; lights are taken from the visible scene, as at render time. */
+  prewarmFight() {
+    if (this.boss && this.boss.prewarm) { try { this.boss.prewarm(); } catch (e) { console.warn('prewarm', e); } }
+    try { Post.compileScene(); } catch (e) { console.warn('prewarm', e); }
+  },
+
   /** "3, 2, 1, FIGHT" over 1.5 s (or instantly) */
   beginCountdown(instant) {
     if (instant) { this.setState('fight'); this.inputLocked = false; HUD.showJoyGhost(); return; }
@@ -12753,17 +13005,25 @@ Object.assign(Game, {
     Timers.after(1.125, () => { step('FIGHT', 'fight'); this.setState('fight'); this.inputLocked = false; HUD.showJoyGhost(); }, { real: true, tag: 'cd' });
   },
 
+  /** pausing is allowed in live gameplay only — not during the 1.5 s death beat or Auren's credits roll */
+  canPause() {
+    const st = this.state;
+    if (st !== 'fight' && st !== 'transition' && st !== 'intro') return false;
+    if (this.dying) return false;
+    if (this.boss && this.boss.creditsOn) return false;
+    return true;
+  },
   togglePause(force) {
     const st = this.state;
     if (force === true && st === 'paused') return;
     if (st === 'paused' || force === false) {
-      if (st !== 'paused') return;
       $('pause').classList.add('hidden'); $('settings').classList.add('hidden');
+      if (st !== 'paused') { this.paused = false; Audio.resume(); return; }   // recover a stray paused flag (state moved on under the menu)
       this.paused = false; this.setState(this.pausedFrom || 'fight');
       Audio.resume();
       return;
     }
-    if (st !== 'fight' && st !== 'transition' && st !== 'intro') return;
+    if (!this.canPause()) return;
     this.pausedFrom = st; this.paused = true; this.setState('paused');
     $('p-quality').textContent = 'QUALITY: ' + Quality.label;
     $('pause').classList.remove('hidden');
@@ -12777,7 +13037,8 @@ Object.assign(Game, {
 
   // ---------------------------------------------------------------- death (§11.4)
   onPlayerDeath(source) {
-    if (this.state === 'defeat' || this.dying) return;
+    if (this.state === 'defeat' || this.state === 'victory' || this.dying) return;
+    if (this.boss && this.boss.dying) return;                  // the boss fell first: its death beat owns the outcome (one result card only)
     this.dying = true;
     this.baseScale = 0.1; this.inputLocked = true;
     Post.setDesatHold(1);
@@ -12805,6 +13066,7 @@ Object.assign(Game, {
   // ---------------------------------------------------------------- victory (§11.5)
   onBossDefeated(boss) {
     if (this.state === 'victory') return;
+    if (this.dying || this.state === 'defeat') return;        // the player fell first: no victory over the death card (if the boss fell first, onPlayerDeath stood down)
     this.setState('victory'); this.inputLocked = true; this.baseScale = 1;
     Audio.music.stop(2); sfx('victory');
     const t = this.fightTime, S = this.stats;
@@ -13086,6 +13348,7 @@ const __raid = window.__raid = {
   get fps() { return Game.fps; },
   // ---- extras for developers / tests
   game: Game,
+  config: CONFIG,
   /** module internals for tests / console poking */
   get api() { return { THREE, Telegraphs, Hazards, Particles, ShardFX, GroundFX, SlashFX, CamRig, TimeFX, Post, Quality, Banner, Stamp, Hint, PhaseTitle, dealDamage, Audio, Adds, Projectiles, Input, HUD, scene, camera, renderer }; },
   /** training dummy: force its next ability ('cleave','hail','line','toll','sanctum','chime','quarters','pulse','tremor','severance','gaze','adds') */
@@ -13150,7 +13413,7 @@ function prewarm() {
   show(Adds.pool[0].group);
   show(SlashFX.pool.items[0].mesh); show(Beams.pool.items[0].grp); show(GroundFX.pool.items[0].mesh);
   const pl = Game.player; show(pl.echoModel.root); show(pl.echoRing); show(pl.markRing); show(pl.ghosts[0].model.root);
-  try { renderer.compile(scene, camera); } catch (e) { console.warn('prewarm', e); }
+  try { Post.compileScene(); } catch (e) { console.warn('prewarm', e); }
   for (const o of flip) o.visible = false;
   // reset projectile child visibility to a sane default (spawn() sets it anyway)
 }
