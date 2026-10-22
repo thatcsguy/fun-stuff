@@ -142,6 +142,25 @@ button{font-family:var(--serif);cursor:pointer}
 #bigCast .nm{font-size:22px;letter-spacing:.5em;color:#fff;text-shadow:0 0 18px #fff}
 #bigCast .bar{height:12px;margin-top:8px}
 #bigCastFill{background:linear-gradient(90deg,#fff,#ffe9a0)}
+/* boss 3: supernova countdown ring, last-light nova prompt */
+#snova{position:absolute;right:calc(var(--sar) + 10px);top:calc(var(--sat) + 64px);width:78px;height:78px;display:none}
+#snova.on{display:block}
+#snova .rg{position:absolute;inset:0;border-radius:50%;background:conic-gradient(#ff5a2a var(--k,100%), rgba(255,255,255,.1) 0);
+  -webkit-mask:radial-gradient(circle,transparent 57%,#000 59%);mask:radial-gradient(circle,transparent 57%,#000 59%);filter:drop-shadow(0 0 6px #ff4a1a)}
+#snova .core{position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle,rgba(255,120,60,.35),rgba(40,0,0,.6) 70%);box-shadow:inset 0 0 12px rgba(255,90,40,.6)}
+#snova .n{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:bold 21px ui-monospace,Menlo,monospace;color:#ffe2cc;text-shadow:0 0 8px #ff3a10,0 0 2px #000}
+#snova .l{position:absolute;left:-24px;right:-24px;top:100%;margin-top:5px;text-align:center;font-size:9px;letter-spacing:.32em;color:#ffb08a;text-shadow:0 0 6px #000}
+#snova.crit .rg{animation:snPulse .5s infinite alternate}
+@keyframes snPulse{to{filter:drop-shadow(0 0 16px #ff2a00) brightness(1.6)}}
+#novaPrompt{position:absolute;right:calc(var(--sar) + 18px);bottom:calc(var(--sab) + 262px * var(--s));display:none;text-align:right;
+  font-size:clamp(15px,3.6vw,24px);letter-spacing:.32em;color:#fff;text-shadow:0 0 14px #fff,0 0 30px #9cf,0 0 3px #000;animation:pulse 0.9s ease-in-out infinite}
+#novaPrompt.on{display:block}
+#novaPrompt small{display:block;font-size:10px;letter-spacing:.3em;opacity:.8;margin-top:4px}
+#credits{margin-top:6px;font-size:11px;letter-spacing:.32em;color:#cfd3ea;line-height:2.0;min-height:10px}
+#credits div{opacity:0;animation:credIn 1.2s ease-out forwards}
+#credits .h{color:#fff;letter-spacing:.5em;font-size:12px;margin-top:6px}
+@keyframes credIn{from{opacity:0;transform:translateY(10px);filter:blur(4px)}to{opacity:.9;transform:none;filter:none}}
+@media (orientation:portrait){ body.touch #snova{top:calc(var(--sat) + 58px);width:64px;height:64px} body.touch #snova .n{font-size:17px} }
 #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .5s}
 #descendText{position:absolute;left:0;right:0;top:45%;text-align:center;opacity:0;transition:opacity .5s}
 #descendText.on{opacity:1}
@@ -160,7 +179,7 @@ button{font-family:var(--serif);cursor:pointer}
 #title.out #logo{letter-spacing:1.2em;opacity:0;filter:blur(12px)}
 @keyframes hue{to{background-position:200% 0}}
 #subtitle{margin-top:10px;font-size:clamp(11px,2.4vw,17px);letter-spacing:.7em;padding-left:.7em;color:#d8d0e8;opacity:.85}
-#prompt{margin-top:7vh;font-size:clamp(14px,2.6vw,18px);letter-spacing:.35em;color:#fff;animation:pulse 2.2s ease-in-out infinite;cursor:pointer}
+#prompt{margin-top:7vh;font-size:clamp(14px,2.6vw,18px);letter-spacing:.35em;color:#fff;animation:pulse 2.2s ease-in-out infinite;cursor:pointer;text-shadow:0 0 10px #000,0 0 22px #000,0 0 4px rgba(255,255,255,.5)}
 @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
 #titleBtns{margin-top:4vh;display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
 .gbtn{pointer-events:auto;padding:10px 20px;border-radius:22px;border:1px solid rgba(255,255,255,.35);background:rgba(16,14,30,.55);
@@ -214,6 +233,8 @@ body.touch .ab .key{display:none}
 @media (orientation:portrait){
   body.touch{--s:.9}
   body.touch #playerFrame{left:50%;transform:translateX(-50%);top:calc(var(--sat) + 112px);width:min(260px,64vw)}
+  body.touch #bossFrame{left:calc(var(--sal) + 12px);transform:none;width:calc(100vw - 70px - var(--sal) - var(--sar))}
+  body.touch #castBar{width:min(320px,70vw)}
   body.touch #spectrum{right:auto;left:calc(var(--sal) + 16px);bottom:calc(var(--sab) + 26px)}
   #facet .cards{flex-direction:column;align-items:center;gap:12px}
   .card{width:80%;max-width:420px;min-height:0;padding:14px;flex-direction:row;text-align:left;clip-path:polygon(4% 0,96% 0,100% 15%,100% 85%,96% 100%,4% 100%,0 85%,0 15%)}
@@ -278,6 +299,8 @@ body.touch .ab .key{display:none}
   </div>
   <div id="joy"><div id="joyBase"></div><div id="joyKnob"></div></div>
   <div id="toast"></div>
+  <div id="snova"><div class="core"></div><div class="rg"></div><div class="n" id="snovaN">100</div><div class="l">SUPERNOVA</div></div>
+  <div id="novaPrompt">UNLEASH WHITE NOVA<small id="novaPromptK"></small></div>
   <div id="bigCast"><div class="nm" id="bigCastName">LAST LIGHT</div><div class="bar"><div class="fill" id="bigCastFill"></div><div class="sheen"></div></div></div>
 </div>
 
@@ -337,6 +360,7 @@ body.touch .ab .key{display:none}
   <h2>THE PRISM RESTORED</h2><div class="sub">ALL LIGHT RETURNS</div>
   <div class="endStats" id="victoryStats"></div>
   <div class="btnRow"><button class="gbtn big" id="btnAgain">AGAIN</button><button class="gbtn" id="btnVicTitle">TITLE</button></div>
+  <div id="credits"></div>
 </div>
 
 <div id="dbg" class="hidden"></div>
@@ -571,13 +595,16 @@ const floorU = {
   uVoid: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) },
   uSwirl: { value: 1 }, uTint: { value: new THREE.Color(0.4, 1.0, 0.6) }, uTint2: { value: new THREE.Color(0.6, 0.3, 1.0) },
   uLatPos: { value: new THREE.Vector3(0, 0, 0) },
+  // Event Horizon (boss 3): temperature ramp (outer/mid/inner), ignition radius, dawn reef blend, blackout dim
+  uRampA: { value: new THREE.Color(0.22, 0.015, 0.02) }, uRampB: { value: new THREE.Color(1.0, 0.38, 0.07) }, uRampC: { value: new THREE.Color(1.0, 0.93, 0.82) },
+  uIgnite: { value: 99 }, uDawn: { value: 0 }, uFloorDim: { value: 0 },
 };
 const floorMat = new THREE.ShaderMaterial({
   uniforms: floorU, defines: fbmDefines(), transparent: true, depthWrite: true,
   vertexShader: `varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
   fragmentShader: GLSL_LIB + /* glsl */`
-    uniform float uTime,uArena,uArenaR,uEdgeGlow,uPalFrom,uPalTo,uPalRadius,uPlayerGlow,uSwirl,uBossShadow;
-    uniform vec2 uPalCenter,uPlayerPos,uBossPos; uniform vec3 uPlayerColor,uTint,uTint2,uLatPos;
+    uniform float uTime,uArena,uArenaR,uEdgeGlow,uPalFrom,uPalTo,uPalRadius,uPlayerGlow,uSwirl,uBossShadow,uIgnite,uDawn,uFloorDim;
+    uniform vec2 uPalCenter,uPlayerPos,uBossPos; uniform vec3 uPlayerColor,uTint,uTint2,uLatPos,uRampA,uRampB,uRampC;
     uniform vec4 uWave[3]; uniform vec4 uLights[4]; uniform vec3 uLightCol[4]; uniform vec4 uRipples[8]; uniform vec4 uVoid[6];
     varying vec3 vW;
     float waterH(vec2 p){ return noise2(p*1.1+vec2(uTime*0.25,uTime*0.1))*0.5 + noise2(p*2.7-vec2(uTime*0.12,-uTime*0.2))*0.25; }
@@ -629,26 +656,44 @@ const floorMat = new THREE.ShaderMaterial({
         col += vec3(1.0,0.5,0.15)*front*1.4;
         col += vec3(0.55,0.6,0.8)*hexLine*0.035;
       } else if (uArena < 1.5) {
-        // ---------------- ORCHARD (stub floor: glowing void hexes) ----------------
-        float cell = hash12(cid);
-        float pulse = 0.5+0.5*sin(uTime*1.3 + cell*6.283 + r*0.3);
-        col = vec3(0.012,0.006,0.026) + uTint*hexLine*0.32*(0.4+0.6*pulse) + uTint2*hexSoft*0.04*pulse;
-        col += vec3(0.6,0.4,1.0)*pow(noise2(p*2.2+uTime*0.25),14.0)*1.6;
-        for(int i=0;i<4;i++){ vec4 L=uLights[i]; if(L.w<=0.0) continue; float dl=length(p-L.xz); col += uLightCol[i]*L.w*0.45*exp(-dl*dl/(6.0+L.y*2.0)); }
+        // ---------------- ORCHARD: the violet void far beneath the glass columns ----------------
+        float n = fbm(p*0.09 + vec2(uTime*0.012, -uTime*0.017));
+        float n2 = noise2(p*0.35 - uTime*0.05);
+        col = vec3(0.01,0.005,0.024) + uTint2*0.07*pow(n,2.2) + uTint*0.025*n2;
+        vec4 hx2 = hexCoords(p*0.25); float he2 = 0.5 - hexD(hx2.xy);
+        col += uTint*smoothstep(0.03,0.0,he2)*0.07*smoothstep(0.35,0.75,n);
+        col += vec3(0.75,0.6,1.0)*pow(noise2(p*1.3+uTime*0.18),18.0)*1.3;
       } else {
         // ---------------- EVENT HORIZON (accretion disk) ----------------
         float a2 = (uTime*0.15 + 3.0/(r+0.5))*uSwirl;
         float c=cos(a2), s=sin(a2); vec2 q = mat2(c,-s,s,c)*p;
         float f = fbm(q*vec2(0.42,0.42) + vec2(0.0, r*0.25));
         float f2 = fbm(q*1.1 - vec2(uTime*0.05, 0.0));
-        float t = smoothstep(17.0, 2.6, r);
-        vec3 ramp = mix(vec3(0.22,0.015,0.02), vec3(1.0,0.38,0.07), t); ramp = mix(ramp, vec3(1.0,0.93,0.82), smoothstep(0.78,1.0,t));
-        col = ramp*(pow(f,2.0)*(0.35+1.9*t) + f2*f2*0.25*t);
-        col *= smoothstep(2.35, 2.9, r);
-        col += vec3(1.0,0.7,0.4)*exp(-pow((r-2.75)*5.0,2.0))*1.8;
+        float t = smoothstep(16.5, 2.6, r);
+        vec3 ramp = mix(uRampA, uRampB, smoothstep(0.0, 0.8, t)); ramp = mix(ramp, uRampC, smoothstep(0.82, 1.0, t));
+        float lanes = pow(f, 2.4);
+        col = ramp*(lanes*(0.22 + 1.15*t) + f2*f2*0.1*t);
+        col *= smoothstep(2.45, 3.15, r);
+        col += mix(uRampB, uRampC, 0.65)*exp(-pow((r-2.9)*6.5,2.0))*1.25;
+        // ignition front (intro): the disk lights outward from the horizon
+        float ign = smoothstep(uIgnite, uIgnite-2.5, r);
+        col = col*ign + uRampC*exp(-pow((r-uIgnite)*1.4,2.0))*1.6*step(uIgnite, 30.0)*step(2.6, r);
         for(int i=0;i<6;i++){ vec4 vd=uVoid[i]; if(vd.w<=0.0) continue; float dv=length(p-vd.xy); float rr=vd.z*vd.w;
-          col = mix(col, vec3(0.0), smoothstep(rr, rr-0.25, dv)); col += vec3(1.0,0.55,0.2)*exp(-pow((dv-rr)*6.0,2.0))*2.0*vd.w; }
+          col = mix(col, vec3(0.0), smoothstep(rr, rr-0.25, dv));
+          float sw = 0.6+0.4*sin(atan(p.y-vd.y, p.x-vd.x)*5.0 - uTime*6.0 + dv*4.0);
+          col += mix(uRampB, uRampC, 0.4)*exp(-pow((dv-rr)*6.0,2.0))*2.0*vd.w + uRampB*exp(-pow((dv-rr-0.6)*2.5,2.0))*0.5*vd.w*sw; }
         col += vec3(0.6,0.65,0.9)*hexLine*0.02*t;
+        // dawn reef (finale): calm iridescent mirror
+        if (uDawn > 0.0) {
+          vec3 Nd = normalize(vec3(sin(p.x*0.6+uTime*0.5)*0.025, 1.0, cos(p.y*0.55+uTime*0.45)*0.025));
+          vec3 Rd = reflect(-V, Nd); float fd = 0.04 + 0.96*pow(1.0-max(dot(Nd,V),0.0), 5.0);
+          vec3 skyd = mix(vec3(0.16,0.09,0.24), vec3(0.03,0.06,0.16), clamp(Rd.y*1.4, 0.0, 1.0));
+          skyd += vec3(0.25,0.5,0.4)*pow(fbm(Rd.xz/(Rd.y+0.3)*0.9 + uTime*0.02), 3.0)*0.6;
+          vec3 irid = palette(r*0.05 - uTime*0.05 + dot(cid, vec2(0.05,0.031)));
+          vec3 dawn = skyd*(0.35 + fd*1.4) + irid*(0.035 + hexLine*0.32 + hexSoft*0.05) + irid*fd*0.18;
+          col = mix(col, dawn, uDawn);
+        }
+        col *= 1.0 - uFloorDim;
       }
       // rainbow hex glyph waves
       for(int i=0;i<3;i++){ vec4 w=uWave[i]; if(w.w<=0.0) continue; float d=length(p-w.xy);
@@ -1157,7 +1202,7 @@ const PJ = {
   orR: new Float32Array(PJ_N), orA: new Float32Array(PJ_N), orW: new Float32Array(PJ_N), y: new Float32Array(PJ_N), turn: new Float32Array(PJ_N),
   alive: new Uint8Array(PJ_N), hi: -1, count: 0, cursor: 0, colorDirty: false, onLand: new Array(PJ_N).fill(null),
 };
-const F_GRAZED = 1, F_REFL = 2, F_HOME = 4, F_LAT = 8, F_ORBIT = 16, F_HARMLESS = 32, F_LAND = 64, F_NOTRAIL = 128, F_SLOWED = 256;
+const F_GRAZED = 1, F_REFL = 2, F_HOME = 4, F_LAT = 8, F_ORBIT = 16, F_HARMLESS = 32, F_LAND = 64, F_NOTRAIL = 128, F_SLOWED = 256, F_NOHIT = 512;
 const pjMat = new THREE.ShaderMaterial({
   vertexShader: /* glsl */`varying vec3 vC; varying vec3 vN; varying vec3 vV;
     void main(){ vC = instanceColor; vec4 mv = modelViewMatrix*instanceMatrix*vec4(position,1.0); vV = -mv.xyz; vN = normalize(normalMatrix*normal); gl_Position = projectionMatrix*mv; }`,
@@ -1249,7 +1294,7 @@ function resolveHazard(d, band, col, dmg, canGraze, amt = 8, sx = player.x, sz =
 const settings = { quality: 'auto', reduceFx: false, volume: 0.8 };
 const debug = { god: false, timeScale: 1 };
 const game = { state: 'title', prevState: 'title', bossIdx: 0, runMode: 'full', fightTime: 0, runTime: 0, bossTimes: [null, null, null], facets: [],
-  stats: { grazes: 0, perfects: 0, deaths: 0, time: 0 }, sat: 0.15, satTarget: 0.15, tutorial: {}, defeatT: -1, arenaR: 15, gravity: 0 };
+  stats: { grazes: 0, perfects: 0, deaths: 0, time: 0 }, sat: 0.15, satTarget: 0.15, tutorial: {}, defeatT: -1, arenaR: 15, gravity: 0, arenaCut: { on: false, nx: 0, nz: 1, off: 1 } };
 game.sat = game.satTarget = SAT_TITLE;
 const director = { trauma: 0, hitstopT: 0, bloomBoost: 0, aberr: 0, timeScale: 1, cine: null, ct: 0, evI: 0, camOverride: false,
   camPos: new THREE.Vector3(), camLook: new THREE.Vector3(), fov: 0, shockT: -1, shockX: 0.5, shockY: 0.5, shockStr: 0.05 };
@@ -1523,7 +1568,7 @@ function fireLanceBeam(ang, mul) {
   const x0 = p.x + c * 0.6, z0 = p.z + s * 0.6, L = PLAYER.lanceLen, x1 = x0 + c * L, z1 = z0 + s * L;
   const tgtD = aim.tgt ? Math.max(1, Math.hypot(aim.tgt.x - x0, aim.tgt.z - z0)) : 10;
   const slope = aim.tgt ? (aim.tgt.y - 1.15) / tgtD : 0;
-  beam(x0, 1.15, z0, x1, 1.15 + slope * L, z1, PLAYER.lanceW * 0.5 * (mul < 1 ? 0.6 : 1), 0.22, 1.0, 0.1, 0.18, 0, 1.6);
+  beam(x0, 1.15, z0, x1, 1.15 + slope * L, z1, PLAYER.lanceW * 0.5 * (mul < 1 ? 0.6 : 1), 0.22, 1.0, 0.1, 0.18, 0, 1.25);
   ring(x0, 1.15, z0, 0.1, 1.4, 0.25, 0.15, 2.5, 0.4, 0.5, 1.2);
   burst(x0, 1.15, z0, 10, 2.5, 0.4, 0.5, 5, 0.25, 0.14, 1, 4);
   let hitAny = false, critAny = false;
@@ -1624,6 +1669,7 @@ function updatePlayer(dt) {
   // arena clamp
   const maxR = game.arenaR - 0.6, rr = Math.hypot(p.x, p.z);
   if (rr > maxR) { p.x *= maxR / rr; p.z *= maxR / rr; }
+  const ac = game.arenaCut; if (ac.on) { const s = p.x * ac.nx + p.z * ac.nz - (ac.off - 0.6); if (s > 0) { p.x -= ac.nx * s; p.z -= ac.nz * s; } }
   p.distWalked += Math.hypot(p.vx, p.vz) * dt;
   // timers
   if (p.dashI > 0) p.dashI -= dt; if (p.hurtI > 0) p.hurtI -= dt; if (p.invuln > 0) p.invuln -= dt; if (p.slowT > 0) p.slowT -= dt; if (p.stunT > 0) p.stunT -= dt;
@@ -1803,13 +1849,13 @@ function updateProjectiles(dt) {
         }
       }
       if (!PJ.alive[i]) continue;
-    } else if (!(fl & F_HARMLESS) && player.alive) {
+    } else if (!(fl & (F_HARMLESS | F_NOHIT)) && player.alive) {
       const dxp = x - px, dzp = z - pz;
       if (mirror.active && dxp * dxp + dzp * dzp < (PLAYER.mirR + r) * (PLAYER.mirR + r)) {
         const a = Math.atan2(dzp, dxp);
         if (Math.abs(wrapA(a - mirror.ang)) < Math.PI / 3) {
           fl |= F_REFL | F_HOME; PJ.c[i] = Bc; pjSetColor(i, Bc, 1.3); PJ.turn[i] = 6; PJ.dmg[i] = hasFacet('polished') ? 40 : PLAYER.mirDmg; PJ.life[i] = 4;
-          const sp = Math.hypot(PJ.vx[i], PJ.vz[i]) * 1.4 + 2; PJ.vx[i] = Math.cos(a) * sp; PJ.vz[i] = Math.sin(a) * sp; PJ.av[i] = 0; PJ.acc[i] = 0; fl &= ~F_ORBIT;
+          const sp = Math.hypot(PJ.vx[i], PJ.vz[i]) * 1.4 + 2; PJ.vx[i] = Math.cos(a) * sp; PJ.vz[i] = Math.sin(a) * sp; PJ.av[i] = 0; PJ.acc[i] = 0; fl &= ~F_ORBIT; PJ.onLand[i] = null;
           player.reflectN++; sfx.tink(player.reflectN); mirU.uFlash.value = 0.6;
           burst(x, 1.0, z, 6, 0.8, 1.4, 2.8, 4, 0.3, 0.12, 1, 4);
           PJ.fl[i] = fl; hi = i; writePj(arr, i); continue;
@@ -1872,7 +1918,7 @@ function hzBeam(x0, y0, z0, x1, y1, z1, w, dur, dmg, col, upd) {
   let o = null; for (let i = 0; i < HB_N; i++) if (!hzBeams[i].active) { o = hzBeams[i]; break; } if (!o) o = hzBeams[0];
   o.active = true; o.x0 = x0; o.y0 = y0; o.z0 = z0; o.x1 = x1; o.y1 = y1; o.z1 = z1; o.w = w; o.dur = dur; o.dmg = dmg; o.col = col; o.t = 0; o.tick = 0; o.grazed = false; o.slowed = false;
   o.sx = x0; o.sz = z0; o.upd = upd || null;
-  const c = PCOL[col]; o.vis = beam(x0, y0, z0, x1, y1, z1, w * 0.32, dur, c[0], c[1], c[2], 1, 0.9);
+  const c = PCOL[col]; o.vis = beam(x0, y0, z0, x1, y1, z1, w * 0.32, dur, c[0], c[1], c[2], 1, 0.62);
   return o;
 }
 function hzBeamsClear() { for (let i = 0; i < HB_N; i++) { const o = hzBeams[i]; if (o.active) { o.active = false; killBeam(o.vis); } } }
@@ -1953,7 +1999,7 @@ function bossReset(idx, phase = 0) {
   bossTarget.x = def.hit.x; bossTarget.y = def.hit.y; bossTarget.z = def.hit.z; bossTarget.r = def.hit.r; bossTarget.hy = def.hit.hy; bossTarget.alive = true;
   rng = mulberry32(1337 + idx * 101);
   clearTasks(); teleClearAll(); pjClearAll(false); hzBeamsClear();
-  game.arenaR = def.arenaR; floorU.uArenaR.value = def.arenaR; game.gravity = 0;
+  game.arenaR = def.arenaR; floorU.uArenaR.value = def.arenaR; game.gravity = 0; game.arenaCut.on = false;
   def.reset();
   if (phase > 0) { b.hp = def.phases[phase - 1].until * b.maxHp; b.phase = phase; if (def.transitionInstant) for (let p = 1; p <= phase; p++) def.transitionInstant(p); if (def.onPhase) def.onPhase(phase); }
 }
@@ -1968,12 +2014,12 @@ function updateBoss(dt) {
     b.fracIdle += dt; if (b.fracIdle > 4 && b.fracture > 0 && b.fracture < 100) b.fracture = Math.max(0, b.fracture - 2 * dt);
     b.time += dt;
     // enrage
-    b.enrageLeft -= dt;
-    if (b.enrageLeft <= 3 && !b.enrageWarned) { b.enrageWarned = true; ui.toast('ENRAGE', 3, true); sfx.riser(); }
-    if (b.enrageLeft <= 0 && b.wipeT < 0) { b.wipeT = 0; bossInterrupt(); LU.uWhite.value = 1; bloomSpike(2.5); addTrauma(1); sfx.boom(); if (!debug.god) { player.hurtI = 0; player.invuln = 0; damagePlayer(999, W); } b.enrageLeft = 9999; }
+    if (!b.lastLight) b.enrageLeft -= dt;
+    if (b.enrageLeft <= 3 && !b.enrageWarned) { b.enrageWarned = true; ui.toast(b.def.enrageName ? b.def.enrageName() : 'ENRAGE', 3, true); sfx.riser(); }
+    if (b.enrageLeft <= 0 && b.wipeT < 0) { b.wipeT = 0; bossInterrupt(); if (b.def.onEnrage) b.def.onEnrage(); LU.uWhite.value = 1; bloomSpike(2.5); addTrauma(1); sfx.boom(); if (!debug.god) { player.hurtI = 0; player.invuln = 0; damagePlayer(999, W); } b.enrageLeft = 9999; }
     if (b.wipeT >= 0) { b.wipeT += dt; LU.uWhite.value = Math.max(0, 1 - b.wipeT / 1.2); if (b.wipeT > 1.2) b.wipeT = -1; }
     // scheduler
-    if (b.vuln <= 0 && b.stagger <= 0) {
+    if (b.vuln <= 0 && b.stagger <= 0 && !b.lastLight) {
       const ph = b.def.phases[b.phase];
       b.loopT += dt;
       while (b.cursor < ph.steps.length && ph.steps[b.cursor][0] <= b.loopT) { const st = ph.steps[b.cursor++]; const fn = b.def.casts[st[1]]; if (fn) fn(st[2]); }
@@ -2459,142 +2505,1602 @@ const BOSS1 = {
   },
 };
 
+
 // ------------------------------------------------------------------
-// BOSS 2 — VEYRA, THE GLASS ORCHARD  (STUB — extension point)
-// TODO(next pass): hex-column arena, L-system crystal tree, leaves, saplings, petals, soak tower, arena drop, thorn ring.
+// BOSS 2 — VEYRA, THE GLASS ORCHARD (hex-column arena, crystal tree, saplings, petals, soak, arena drop, thorn ring)
 // ------------------------------------------------------------------
-const B2 = { group: new THREE.Group(), core: null, coreU: null, spires: [] };
+const B2PAL = {
+  grove: { edge: [0.12, 0.85, 0.78], body: [0.2, 1.0, 0.7], core: [0.55, 1.9, 1.0], fog: [0.005, 0.014, 0.024], leaf: [0.3, 1.0, 0.65], void: [0.1, 0.5, 0.5] },
+  bloom: { edge: [0.62, 0.32, 1.0], body: [0.6, 0.38, 1.0], core: [1.0, 0.6, 1.9], fog: [0.016, 0.007, 0.034], leaf: [0.75, 0.45, 1.0], void: [0.45, 0.2, 0.8] },
+  thorn: { edge: [1.0, 0.18, 0.38], body: [1.0, 0.3, 0.45], core: [1.9, 0.45, 0.6], fog: [0.03, 0.005, 0.014], leaf: [1.0, 0.38, 0.52], void: [0.8, 0.1, 0.25] },
+};
+const B2 = {
+  group: new THREE.Group(), precomp: [],
+  NT: 0, tileMesh: null, tDyn: null, tDynA: null, tx: null, tz: null, td: null, ty0: null, tPlay: null, tSeed: null, tState: null, tErupt: null, tFallAt: null, tY: null, tVY: null, tAng: null, tAx: null, tAz: null, tW: null, matDirty: false,
+  colU: null, brMesh: null, brData: [], brU: null, leafMesh: null, leafU: null,
+  veyra: null, vU: null, hair: null, hairData: [], arms: [], core: null, halo: null, haloU: null, bud: null,
+  vx: 0, vz: 0.25, hy: 3.4, yaw: 0, lift: 0, move: null, armRaise: 0, sc: 1.12,
+  saps: [], seeds: [], petals: [], bloom: { active: false, t: 0, dur: 10, fade: 0 }, soak: { active: false, x: 0, z: 0, t: 0, inT: 0, fade: 0 }, tower: null, towerU: null, seedOrb: null,
+  spikes: null, ringGlow: null, ringOn: false, ringR: 14, ringFrom: 14, ringReset: 0, ringGrazeCD: 0, ringA: 0, fracFlag: false, vulnPrev: false, kbT: 0, kbX: 0, kbZ: 0,
+  vortex: 0, vortexTo: 0, rippleT: -1, introT: -1, palT: -1, pal: 'grove', white: 0, whiteTo: 0, collapse: 0, collapseTo: 0, scatter: 0, scatterOn: false,
+  firstBloom: true, sparkAcc: 0, armT: 0, cut: { nx: 0, nz: 1, off: 1 }, brokeTree: false,
+};
+const S3 = Math.sqrt(3);
+function b2InArena(x, z, m) {
+  if (Math.hypot(x, z) > 14.4 - m) return false;
+  const ac = game.arenaCut; if (ac.on && x * ac.nx + z * ac.nz > ac.off - m) return false;
+  return true;
+}
+function b2Clamp(o) { // o: Vector2 in/out
+  const r = Math.hypot(o.x, o.y), mr = 13.2; if (r > mr) { o.x *= mr / r; o.y *= mr / r; }
+  const ac = game.arenaCut; if (ac.on) { const s = o.x * ac.nx + o.y * ac.nz - (ac.off - 1.6); if (s > 0) { o.x -= ac.nx * s; o.y -= ac.nz * s; } }
+  return o;
+}
+// crystal shader shared by Veyra, saplings, hair (instancing-aware)
+function b2CrystalMat(u) {
+  return new THREE.ShaderMaterial({
+    uniforms: u,
+    vertexShader: /* glsl */`varying vec3 vV; varying vec3 vO;
+      void main(){ vO = position; vec4 lp = vec4(position,1.0);
+        #ifdef USE_INSTANCING
+        lp = instanceMatrix*lp;
+        #endif
+        vec4 mv = modelViewMatrix*lp; vV = mv.xyz; gl_Position = projectionMatrix*mv; }`,
+    fragmentShader: GLSL_LIB + /* glsl */`
+      uniform float uTime,uFlash,uCrack,uFracture,uWhite,uDark; uniform vec3 uCol,uCore; varying vec3 vV; varying vec3 vO;
+      vec2 vor(vec2 p){ vec2 i=floor(p), f=fract(p); float d1=8.0, d2=8.0; for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){ vec2 g=vec2(x,y); vec2 o=vec2(hash12(i+g), hash12(i+g+17.0)); vec2 r=g+o-f; float d=dot(r,r); if(d<d1){d2=d1; d1=d;} else if(d<d2) d2=d; } return vec2(sqrt(d1), sqrt(d2)); }
+      void main(){
+        vec3 n = normalize(cross(dFdx(vV), dFdy(vV))); vec3 v = normalize(-vV);
+        float fr = 1.0-abs(dot(n,v));
+        float fl = 0.8+0.2*noise2(vec2(uTime*3.0, vO.y*4.0));
+        vec3 c = uCol*(0.05 + pow(fr,1.5)*1.25) + uCore*pow(1.0-fr,2.5)*0.22*fl + palette(fr*1.2 + uTime*0.06 + vO.y*0.3)*pow(fr,2.0)*0.4;
+        vec3 L = normalize((viewMatrix*vec4(0.4,0.9,0.3,0.0)).xyz);
+        c += vec3(pow(max(dot(reflect(-v,n),L),0.0), 24.0)*1.1);
+        vec2 vr = vor(vO.xy*3.0 + vO.z*1.7); float ce = smoothstep(0.07, 0.0, vr.y-vr.x);
+        c += vec3(2.2,2.4,2.6)*ce*max(uCrack, uFracture*0.35*(0.5+0.5*sin(uTime*9.0)));
+        c = mix(c, vec3(1.7,1.85,2.1)*(0.35+fr*1.3) + vec3(ce)*1.6, uWhite);
+        c *= 1.0-uDark*0.85;
+        c = mix(c, vec3(3.0), uFlash);
+        gl_FragColor = vec4(c, 1.0); }`,
+  });
+}
 function buildBoss2() {
   const g = B2.group; scene.add(g);
-  B2.coreU = { uTime: { value: 0 }, uFlash: { value: 0 }, uCol: { value: new THREE.Color(0.2, 1.0, 0.45) } };
-  const crys = new THREE.ShaderMaterial({
-    uniforms: B2.coreU,
-    vertexShader: `varying vec3 vV; varying vec3 vO; void main(){ vO=position; vec4 mv=modelViewMatrix*vec4(position,1.0); vV=mv.xyz; gl_Position=projectionMatrix*mv; }`,
-    fragmentShader: GLSL_LIB + `uniform float uTime,uFlash; uniform vec3 uCol; varying vec3 vV; varying vec3 vO;
-      void main(){ vec3 n=normalize(cross(dFdx(vV),dFdy(vV))); float fr=1.0-abs(dot(n,normalize(-vV)));
-        vec3 c = uCol*(0.15+pow(fr,1.5)*1.6) + uCol*pow(1.0-fr,3.0)*0.8 + palette(fr+uTime*0.05)*fr*0.3; c=mix(c,vec3(3.0),uFlash); gl_FragColor=vec4(c,1.0); }`,
-  });
-  B2.mat = crys;
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.9, 6, 6), crys); trunk.position.y = 3; g.add(trunk);
-  for (let i = 0; i < 9; i++) {
-    const a = i / 9 * TAU, l = 2.5 + frand() * 2.5;
-    const br = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.25, l, 6).translate(0, l / 2, 0), crys);
-    br.position.set(0, 4 + frand() * 2, 0); br.rotation.set(Math.cos(a) * 0.9, 0, Math.sin(a) * 0.9); g.add(br); B2.spires.push(br);
+  // ================= HEX COLUMNS =================
+  const cells = [];
+  for (let q = -14; q <= 14; q++) for (let r = -14; r <= 14; r++) { const x = S3 * (q + r / 2), z = 1.5 * r, d = Math.hypot(x, z); if (d < 22.5) cells.push([x, z, d]); }
+  cells.sort((a, b) => a[2] - b[2]);
+  const NT = B2.NT = cells.length;
+  const colGeo = new THREE.CylinderGeometry(0.965, 0.965, 8, 6, 1).translate(0, -4, 0);
+  const aTile = new Float32Array(NT * 4); B2.tDyn = new Float32Array(NT * 3);
+  B2.tx = new Float32Array(NT); B2.tz = new Float32Array(NT); B2.td = new Float32Array(NT); B2.ty0 = new Float32Array(NT); B2.tPlay = new Uint8Array(NT); B2.tSeed = new Float32Array(NT);
+  B2.tState = new Uint8Array(NT); B2.tErupt = new Float32Array(NT).fill(-1); B2.tFallAt = new Float32Array(NT); B2.tY = new Float32Array(NT); B2.tVY = new Float32Array(NT); B2.tAng = new Float32Array(NT);
+  B2.tAx = new Float32Array(NT); B2.tAz = new Float32Array(NT); B2.tW = new Float32Array(NT); B2.tGlow = new Float32Array(NT);
+  for (let i = 0; i < NT; i++) {
+    const [x, z, d] = cells[i]; const play = d < 15.2; const sd = frand();
+    B2.tx[i] = x; B2.tz[i] = z; B2.td[i] = d; B2.tPlay[i] = play ? 1 : 0; B2.tSeed[i] = sd;
+    B2.ty0[i] = play ? -0.09 : -0.45 - (d - 15.2) * 0.5 - frand() * 0.7;
+    aTile[i * 4] = x; aTile[i * 4 + 1] = z; aTile[i * 4 + 2] = sd; aTile[i * 4 + 3] = play ? 1 : 0;
+    const a = frand() * TAU; B2.tAx[i] = Math.cos(a); B2.tAz[i] = Math.sin(a); B2.tW[i] = (1.2 + frand() * 2.5) * (frand() < 0.5 ? -1 : 1);
   }
-  B2.core = new THREE.Mesh(new THREE.IcosahedronGeometry(1.1, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 3, 1.2) })); B2.core.position.y = 3; g.add(B2.core);
+  colGeo.setAttribute('aTile', new THREE.InstancedBufferAttribute(aTile, 4));
+  B2.tDynA = new THREE.InstancedBufferAttribute(B2.tDyn, 3).setUsage(THREE.DynamicDrawUsage); colGeo.setAttribute('aDyn', B2.tDynA);
+  B2.colU = {
+    uTime: floorU.uTime, uPlayerPos: floorU.uPlayerPos, uPlayerColor: floorU.uPlayerColor, uPlayerGlow: floorU.uPlayerGlow, uBossPos: floorU.uBossPos, uBossShadow: floorU.uBossShadow,
+    uWave: floorU.uWave, uLights: floorU.uLights, uLightCol: floorU.uLightCol, uLatPos: floorU.uLatPos,
+    uEdgeA: { value: new THREE.Color(0.2, 1, 0.5) }, uEdgeB: { value: new THREE.Color(0.2, 1, 0.5) }, uPalR: { value: 0 }, uPalC: { value: new THREE.Vector2() },
+    uRing: { value: new THREE.Vector4(0, 0, 14, 0) }, uFog: { value: new THREE.Color(0.006, 0.014, 0.024) },
+  };
+  const colMat = new THREE.ShaderMaterial({
+    uniforms: B2.colU,
+    vertexShader: /* glsl */`
+      attribute vec4 aTile; attribute vec3 aDyn;
+      varying vec3 vW; varying vec3 vL; varying vec3 vN; varying vec4 vTile; varying vec3 vDyn; varying float vTop;
+      void main(){
+        vL = position; vTile = aTile; vDyn = aDyn; vTop = normal.y > 0.5 ? 1.0 : 0.0;
+        vec4 w = modelMatrix*instanceMatrix*vec4(position,1.0); w.y += aDyn.x; vW = w.xyz;
+        vN = normalize(mat3(modelMatrix)*mat3(instanceMatrix)*normal);
+        gl_Position = projectionMatrix*viewMatrix*w; }`,
+    fragmentShader: GLSL_LIB + /* glsl */`
+      uniform float uTime,uPlayerGlow,uBossShadow,uPalR; uniform vec2 uPlayerPos,uBossPos,uPalC; uniform vec3 uPlayerColor,uEdgeA,uEdgeB,uLatPos,uFog;
+      uniform vec4 uWave[3]; uniform vec4 uLights[4]; uniform vec3 uLightCol[4]; uniform vec4 uRing;
+      varying vec3 vW; varying vec3 vL; varying vec3 vN; varying vec4 vTile; varying vec3 vDyn; varying float vTop;
+      void main(){
+        vec3 V = normalize(cameraPosition - vW);
+        vec2 c = vTile.xy; float seed = vTile.z; float play = vTile.w; float glow = vDyn.y;
+        float pd = length(c - uPalC);
+        vec3 edgeC = mix(uEdgeA, uEdgeB, smoothstep(uPalR, uPalR-3.0, pd));
+        float front = exp(-pow((pd-uPalR)*0.7,2.0))*step(0.01,uPalR)*(1.0-smoothstep(26.0,34.0,uPalR));
+        vec3 col;
+        if (vTop > 0.5) {
+          float e = 0.835 - hexD(vL.xz);
+          float line = smoothstep(0.075, 0.0, e); float soft = exp(-max(e,0.0)*7.0);
+          vec2 q = vW.xz - V.xz/max(V.y,0.25)*0.55;
+          float n1 = noise2(q*1.4 + seed*31.0);
+          vec2 gq = q*2.6 + seed*17.0; vec2 gi = floor(gq); vec2 gf = fract(gq)-0.5; float gh = hash12(gi);
+          float spark = step(0.9, gh)*smoothstep(0.16, 0.0, length(gf + (vec2(hash12(gi+3.1), hash12(gi+7.7))-0.5)*0.6))*pow(0.5+0.5*sin(uTime*(0.8+gh*2.5)+gh*40.0), 3.0);
+          float fres = pow(1.0-max(V.y,0.0), 3.0);
+          float tv = hash12(c*1.37+0.5);
+          col = vec3(0.006,0.005,0.016) + edgeC*0.022*(0.2+1.1*n1*n1)*(0.4+tv*1.2) + vec3(0.05,0.04,0.09)*fres;
+          float vein = smoothstep(0.035, 0.0, abs(noise2(q*1.6 + seed*7.0) - 0.5));
+          col += edgeC*vein*0.07*(0.4+play*0.6)*(0.5+0.5*sin(uTime*0.7 + seed*9.0));
+          float bd = length(c - uBossPos);
+          float sapw = pow(0.5+0.5*sin(bd*0.55 - uTime*2.2), 6.0)*exp(-bd*0.06);
+          float pulse = 0.5+0.5*sin(uTime*1.1 + seed*6.28 + length(c)*0.35);
+          float rim = play*smoothstep(13.4, 15.0, length(c));
+          col += edgeC*(line*(0.16+0.22*pulse*tv + sapw*0.55 + rim*0.6)*mix(0.25,1.0,play) + soft*(0.04+sapw*0.08));
+          col += mix(edgeC, vec3(1.0), 0.5)*spark*1.1;
+          col += edgeC*glow*(0.35 + line*1.6 + soft*0.4);
+          for(int i=0;i<3;i++){ vec4 w=uWave[i]; if(w.w<=0.0) continue; float d=length(c-w.xy);
+            float band = smoothstep(2.4,0.0,abs(d-w.z)); vec3 pc = palette(seed*0.6 + uTime*0.2 + d*0.03);
+            col += pc*(soft*0.9 + line*2.6 + 0.16)*band*w.w*2.4; }
+          for(int i=0;i<4;i++){ vec4 Lt=uLights[i]; if(Lt.w<=0.0) continue; float dl=length(vW.xz-Lt.xz);
+            col += uLightCol[i]*Lt.w*0.3*exp(-dl*dl/(4.0+Lt.y*2.0))*(0.45+line*1.8+spark*2.0); }
+          vec2 dpp = vW.xz-uPlayerPos; float dp2 = dot(dpp,dpp);
+          col += uPlayerColor*uPlayerGlow*exp(-dp2/9.0)*(0.6 + line*2.2);
+          if (uLatPos.z > 0.0) { float dl = length(vW.xz-uLatPos.xy); col += vec3(0.1,1.0,0.35)*smoothstep(4.8,0.0,dl)*uLatPos.z*(0.06+line*0.4); }
+          if (uRing.w > 0.0) { float rd = length(c-uRing.xy) - uRing.z; float o = smoothstep(-0.6,0.9,rd);
+            col = mix(col, col*0.55, o*uRing.w); col += vec3(1.0,0.1,0.18)*o*uRing.w*(0.03 + line*0.45*(0.6+0.4*sin(uTime*4.0+seed*6.0))); }
+          float db2 = dot(vW.xz-uBossPos, vW.xz-uBossPos);
+          col *= (1.0-0.6*exp(-dp2/0.32))*(1.0-0.5*uBossShadow*exp(-db2/4.0));
+        } else {
+          float fr = pow(1.0-abs(dot(normalize(vN), V)), 2.0);
+          float dep = clamp(-vL.y/8.0, 0.0, 1.0);
+          float vein = smoothstep(0.9, 1.0, sin(vL.y*1.7 + seed*20.0 + atan(vL.x,vL.z)*3.0));
+          col = vec3(0.006,0.005,0.016) + edgeC*(fr*0.32 + 0.035)*(1.0-dep)*(1.0-dep) + edgeC*vein*0.08*(1.0-dep);
+          col += edgeC*smoothstep(-0.14, 0.0, vL.y)*0.55;
+          col += edgeC*glow*(1.0-dep)*0.7;
+        }
+        col += edgeC*front*1.1;
+        float dist = length(cameraPosition - vW);
+        float f = 1.0 - exp(-pow(dist*0.016,2.0));
+        float hf = smoothstep(-0.6, -10.0, vW.y);
+        col = mix(col, uFog, clamp(max(f*0.8, hf*0.94), 0.0, 1.0));
+        gl_FragColor = vec4(col, 1.0); }`,
+  });
+  B2.tileMesh = new THREE.InstancedMesh(colGeo, colMat, NT);
+  B2.tileMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); B2.tileMesh.frustumCulled = false;
+  g.add(B2.tileMesh); b2TilesReset();
+
+  // ================= CRYSTAL TREE (L-system, depth 5) =================
+  const rr = mulberry32(4242); const brs = [];
+  const grow = (s, d, len, rad, depth) => {
+    const e = s.clone().addScaledVector(d, len); brs.push({ s: s.clone(), e, d: d.clone(), len, rad, depth, seed: rr() });
+    if (depth >= 5 || brs.length > 170) return;
+    const n = depth === 0 ? 3 : (rr() < 0.42 ? 3 : 2); const az0 = rr() * TAU;
+    for (let k = 0; k < n; k++) {
+      const az = az0 + k * TAU / n + (rr() - 0.5) * 0.7; const tilt = depth === 0 ? 0.85 + rr() * 0.2 : 0.4 + rr() * 0.4;
+      const h = new THREE.Vector3(Math.cos(az), 0, Math.sin(az));
+      const nd = d.clone().multiplyScalar(Math.cos(tilt)).addScaledVector(h, Math.sin(tilt)).normalize();
+      nd.y = Math.max(nd.y, depth >= 3 ? -0.35 : 0.12); nd.normalize();
+      grow(e, nd, len * (0.68 + rr() * 0.12), rad * 0.62, depth + 1);
+    }
+  };
+  grow(new THREE.Vector3(0, -0.3, -1.0), new THREE.Vector3(0, 1, -0.05).normalize(), 4.4, 0.6, 0);
+  B2.brData = brs;
+  const brGeo = new THREE.CylinderGeometry(0.62, 1, 1, 6, 3).translate(0, 0.5, 0);
+  const aBr = new Float32Array(brs.length * 3); brs.forEach((b, i) => { aBr[i * 3] = b.depth; aBr[i * 3 + 1] = b.seed; });
+  brGeo.setAttribute('aBr', new THREE.InstancedBufferAttribute(aBr, 3));
+  B2.brU = { uTime: { value: 0 }, uCol: { value: new THREE.Color(0.22, 1, 0.55) }, uFlash: { value: 0 }, uDim: { value: 0 }, uWhite: { value: 0 } };
+  B2.brMesh = new THREE.InstancedMesh(brGeo, new THREE.ShaderMaterial({
+    uniforms: B2.brU,
+    vertexShader: /* glsl */`attribute vec3 aBr; varying vec3 vV; varying float vY; varying vec3 vBr;
+      void main(){ vY = position.y; vBr = aBr; vec4 mv = modelViewMatrix*instanceMatrix*vec4(position,1.0); vV = mv.xyz; gl_Position = projectionMatrix*mv; }`,
+    fragmentShader: GLSL_LIB + /* glsl */`uniform float uTime,uFlash,uDim,uWhite; uniform vec3 uCol; varying vec3 vV; varying float vY; varying vec3 vBr;
+      void main(){ vec3 n = normalize(cross(dFdx(vV), dFdy(vV))); float fr = 1.0-abs(dot(n, normalize(-vV)));
+        float sp = fract((vBr.x + vY)*0.45 - uTime*0.38 + vBr.y*0.15); float sap = exp(-pow((sp-0.5)*9.0,2.0));
+        vec3 c = uCol*(0.035 + pow(fr,1.8)*1.05) + uCol*sap*(0.35+0.9*(1.0-fr))*(0.7+0.5*vBr.y) + palette(fr+uTime*0.05+vBr.y)*pow(fr,3.0)*0.25;
+        c *= 1.0-uDim*0.75;
+        c = mix(c, vec3(1.6,1.8,2.0)*(0.3+fr), uWhite);
+        c = mix(c, vec3(2.5), uFlash); gl_FragColor = vec4(c, 1.0); }`,
+  }), brs.length);
+  B2.brMesh.frustumCulled = false; g.add(B2.brMesh); b2TreeReset();
+
+  // ================= LEAVES (1500 shards, rest ↔ vortex in the vertex shader) =================
+  const NL = 1500; const lg = new THREE.BufferGeometry();
+  lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, 0.22, 0, 0.075, 0.02, 0, 0, -0.16, 0, -0.075, 0.02, 0]), 3)); lg.setIndex([0, 1, 2, 0, 2, 3]);
+  const aRest = new Float32Array(NL * 3), aOrb = new Float32Array(NL * 3), aSeed = new Float32Array(NL * 2);
+  const tips = brs.filter((b) => b.depth >= 4);
+  for (let i = 0; i < NL; i++) {
+    const b = tips[i % tips.length]; const u = frand();
+    const px = lerp(b.s.x, b.e.x, 0.4 + u * 0.7), py = lerp(b.s.y, b.e.y, 0.4 + u * 0.7), pz = lerp(b.s.z, b.e.z, 0.4 + u * 0.7);
+    const th = frand() * TAU, ph = Math.acos(frand() * 2 - 1), rad = 0.25 + Math.pow(frand(), 0.6) * 0.75;
+    aRest[i * 3] = px + Math.sin(ph) * Math.cos(th) * rad; aRest[i * 3 + 1] = py + Math.cos(ph) * rad * 0.6 - 0.15; aRest[i * 3 + 2] = pz + Math.sin(ph) * Math.sin(th) * rad;
+    aOrb[i * 3] = 6 + Math.pow(frand(), 0.8) * 8; aOrb[i * 3 + 1] = 0.6 + frand() * 3.2; aOrb[i * 3 + 2] = frand() * TAU;
+    aSeed[i * 2] = frand(); aSeed[i * 2 + 1] = frand();
+  }
+  lg.setAttribute('aRest', new THREE.InstancedBufferAttribute(aRest, 3)); lg.setAttribute('aOrb', new THREE.InstancedBufferAttribute(aOrb, 3)); lg.setAttribute('aSeed', new THREE.InstancedBufferAttribute(aSeed, 2));
+  B2.leafU = { uTime: { value: 0 }, uVortex: { value: 0 }, uCollapse: { value: 0 }, uScatter: { value: 0 }, uHide: { value: 0 }, uCenter: { value: new THREE.Vector3() }, uCore: { value: new THREE.Vector3(0, 3.4, 0) }, uCol: { value: new THREE.Color(0.3, 1, 0.55) } };
+  B2.leafMesh = new THREE.InstancedMesh(lg, new THREE.ShaderMaterial({
+    uniforms: B2.leafU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: /* glsl */`
+      attribute vec3 aRest; attribute vec3 aOrb; attribute vec2 aSeed;
+      uniform float uTime,uVortex,uCollapse,uScatter,uHide; uniform vec3 uCenter,uCore;
+      varying float vSp; varying float vA; varying vec2 vP;
+      void main(){
+        float s = aSeed.x;
+        float k = clamp(uVortex*1.7 - s*0.7, 0.0, 1.0); k = k*k*(3.0-2.0*k);
+        vec3 rest = aRest + vec3(sin(uTime*1.3+s*40.0), 0.6*sin(uTime*1.7+s*23.0), cos(uTime*1.1+s*31.0))*0.05;
+        float ang = aOrb.z + uTime*(0.22+0.3*aSeed.y)*(1.6-aOrb.x/13.0);
+        vec3 orb = uCenter + vec3(cos(ang)*aOrb.x, aOrb.y + sin(uTime*0.8+s*12.0)*0.35, sin(ang)*aOrb.x);
+        vec3 p = mix(rest, orb, k);
+        float ck = clamp(uCollapse*1.5 - s*0.5, 0.0, 1.0); ck = ck*ck*(3.0-2.0*ck);
+        p = mix(p, uCore + vec3(sin(s*70.0), cos(s*40.0), sin(s*33.0))*0.4*(1.0-ck), ck);
+        vec3 dir = normalize(vec3(sin(s*91.7), cos(s*57.3)*0.8+0.3, cos(s*91.7)*0.9 + sin(s*13.1)*0.3) + 1e-3);
+        p += dir*uScatter*(5.0+16.0*fract(s*13.7));
+        float a1 = uTime*(0.6+aSeed.y*1.8)*(1.0+k*2.5)+s*50.0, a2 = s*80.0+uTime*(0.4+k);
+        float c1=cos(a1), s1=sin(a1), c2=cos(a2), s2=sin(a2);
+        vec3 lp = position*(1.0+k*0.35)*(1.0-uHide)*(1.0+uScatter*0.6);
+        lp = vec3(lp.x*c1-lp.y*s1, lp.x*s1+lp.y*c1, lp.z);
+        lp = vec3(lp.x*c2+lp.z*s2, lp.y, -lp.x*s2+lp.z*c2);
+        vec3 nr = vec3(s2, 0.0, c2);
+        vec4 mv = modelViewMatrix*vec4(p+lp,1.0);
+        vec3 vn = normalize(mat3(modelViewMatrix)*nr);
+        vSp = pow(abs(dot(vn, normalize(-mv.xyz))), 10.0);
+        vA = (1.0-uScatter*uScatter)*(0.5+0.5*sin(uTime*2.0+s*30.0))*(1.0+uScatter*2.5*(1.0-uScatter)) * (1.0 + ck*1.5);
+        vP = position.xy;
+        gl_Position = projectionMatrix*mv; }`,
+    fragmentShader: /* glsl */`uniform vec3 uCol; varying float vSp; varying float vA; varying vec2 vP;
+      void main(){ float mid = 1.0-smoothstep(0.0,0.06,abs(vP.x));
+        vec3 c = uCol*(0.3 + mid*0.35 + vSp*2.4) + vec3(1.0)*vSp*1.4;
+        gl_FragColor = vec4(c*vA*0.75, 1.0); }`,
+  }), NL);
+  B2.leafMesh.frustumCulled = false; B2.leafMesh.renderOrder = 14; g.add(B2.leafMesh);
+
+  // ================= VEYRA (crystalline dryad) =================
+  B2.vU = { uTime: { value: 0 }, uCol: { value: new THREE.Color(0.22, 1, 0.55) }, uCore: { value: new THREE.Color(0.55, 1.8, 0.85) }, uFlash: { value: 0 }, uCrack: { value: 0 }, uFracture: { value: 0 }, uWhite: { value: 0 }, uDark: { value: 0 } };
+  const vm = b2CrystalMat(B2.vU); B2.vMat = vm;
+  const V = B2.veyra = new THREE.Group(); g.add(V);
+  const add = (geo, x, y, z, rx = 0, ry = 0, rz = 0, parent = V) => { const m = new THREE.Mesh(geo, vm); m.position.set(x, y, z); m.rotation.set(rx, ry, rz); parent.add(m); return m; };
+  add(new THREE.IcosahedronGeometry(0.5, 0).scale(0.9, 1.3, 0.75), 0, 2.35, 0);
+  add(new THREE.IcosahedronGeometry(0.7, 0).scale(1.3, 0.95, 0.8), 0, 3.2, 0, 0, 0.3, 0);
+  add(new THREE.OctahedronGeometry(0.2, 0).scale(1, 1.7, 1), 0, 3.95, 0);
+  add(new THREE.IcosahedronGeometry(0.42, 0).scale(0.82, 1.2, 0.9), 0, 4.42, 0.04);
+  const crownGeo = new THREE.ConeGeometry(0.06, 1, 4).translate(0, 0.5, 0);
+  for (let k = 0; k < 7; k++) { const a = (k - 3) * 0.34; const m = add(crownGeo, Math.sin(a) * 0.28, 4.62, -0.08, -0.35, 0, -a * 1.35); m.scale.set(1, 0.7 + (1 - Math.abs(k - 3) / 3) * 0.8, 1); }
+  // gown of roots
+  const rootGeo = new THREE.ConeGeometry(0.2, 2.6, 5).rotateX(Math.PI).translate(0, -1.3, 0);
+  for (let k = 0; k < 9; k++) { const a = k / 9 * TAU; const m = add(rootGeo, Math.sin(a) * 0.3, 2.25, Math.cos(a) * 0.3); m.rotation.set(Math.cos(a) * 0.38, 0, -Math.sin(a) * 0.38); m.scale.set(1, 0.75 + (k % 3) * 0.15, 1); }
+  // arms (shoulder → elbow → hand)
+  const upGeo = new THREE.CylinderGeometry(0.075, 0.15, 1.15, 6).translate(0, -0.575, 0), foGeo = new THREE.CylinderGeometry(0.045, 0.1, 1.05, 6).translate(0, -0.525, 0), fingGeo = new THREE.OctahedronGeometry(1, 0).scale(0.05, 0.32, 0.03).translate(0, -0.3, 0);
+  for (let side = -1; side <= 1; side += 2) {
+    const sh = new THREE.Group(); sh.position.set(side * 0.85, 3.5, 0); V.add(sh); add(upGeo, 0, 0, 0, 0, 0, 0, sh);
+    const el = new THREE.Group(); el.position.set(0, -1.15, 0); sh.add(el); add(foGeo, 0, 0, 0, 0, 0, 0, el);
+    for (let f = -1; f <= 1; f++) add(fingGeo, 0, -1.05, 0, f * 0.15, 0, f * 0.35 * side, el);
+    B2.arms.push({ sh, el, side });
+  }
+  // shard hair
+  const NH = 40; const hairGeo = new THREE.OctahedronGeometry(1, 0).scale(0.075, 0.5, 0.035).translate(0, -0.5, 0);
+  B2.hair = new THREE.InstancedMesh(hairGeo, vm, NH); B2.hair.instanceMatrix.setUsage(THREE.DynamicDrawUsage); B2.hair.frustumCulled = false; V.add(B2.hair);
+  for (let i = 0; i < NH; i++) { const ph = (i / (NH - 1) - 0.5) * 2.9; B2.hairData.push({ ph, len: 1.5 + frand() * 1.5 + (1 - Math.abs(ph) / 1.45) * 0.8, tilt: 0.2 + frand() * 0.25, sp: frand() * 6 }); }
+  // heart core + halo
+  B2.core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.27, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 3, 1.3) })); B2.core.position.set(0, 3.2, 0.5); V.add(B2.core);
+  B2.haloU = { uCol: { value: new THREE.Color(0.4, 1.6, 0.8) }, uA: { value: 1 }, uTime: { value: 0 } };
+  B2.halo = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({
+    uniforms: B2.haloU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `uniform vec3 uCol; uniform float uA,uTime; varying vec2 vUv; void main(){ vec2 p=vUv*2.0-1.0; float r=length(p); float a=atan(p.y,p.x);
+      float rays = pow(abs(sin(a*4.0+uTime*0.4)),24.0)*exp(-r*2.2)*0.8 + pow(abs(sin(a*3.0-uTime*0.25)),40.0)*exp(-r*1.6)*0.5;
+      float g = exp(-r*r*9.0)*1.3 + exp(-r*4.0)*0.35 + rays; gl_FragColor = vec4(uCol*g*uA*smoothstep(1.0,0.7,r), 1.0); }`,
+  }));
+  B2.halo.scale.setScalar(2.8); B2.halo.renderOrder = 17; g.add(B2.halo);
+  V.scale.setScalar(B2.sc);
+
+  // ================= SAPLINGS (pool 6) =================
+  const spGeo = new THREE.ConeGeometry(0.2, 1.4, 5).translate(0, 0.7, 0);
+  for (let i = 0; i < 6; i++) {
+    const u = { uTime: B2.vU.uTime, uCol: { value: new THREE.Color(0.25, 1, 0.5) }, uCore: { value: new THREE.Color(0.6, 2, 0.9) }, uFlash: { value: 0 }, uCrack: { value: 0 }, uFracture: { value: 0 }, uWhite: { value: 0 }, uDark: { value: 0 } };
+    const m = b2CrystalMat(u); const sg = new THREE.Group();
+    const spec = [[0, 0, 0, 1.3, 0, 0], [0.28, 0, 0.1, 0.8, 0.35, 0.2], [-0.25, 0, 0.15, 0.9, -0.3, -0.15], [0.05, 0, -0.28, 0.7, 0.1, -0.4]];
+    for (const [x, y, z, s, rz, rx] of spec) { const c = new THREE.Mesh(spGeo, m); c.position.set(x, y, z); c.scale.set(s, s, s); c.rotation.set(rx, 0, rz); sg.add(c); }
+    const cr = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 3, 1.2) })); cr.position.y = 0.9; sg.add(cr);
+    sg.visible = false; g.add(sg);
+    const bm = new THREE.Mesh(beamGeo, beamMatBase.clone()); bm.visible = false; bm.renderOrder = 16; bm.frustumCulled = false; g.add(bm); bm.material.uniforms.uCol.value.setRGB(0.25, 1.0, 0.45);
+    const s = { g: sg, u, alive: false, hp: 220, x: 0, z: 0, grow: 0, sporeT: 0, healT: 0, pulse: 0, beam: { m: bm, u: bm.material.uniforms } };
+    s.tgt = { x: 0, y: 0.8, z: 0, r: 0.75, hy: 1.4, alive: false, priority: true, isBoss: false, lanceMul: 1.62, hit: (d, c, src) => b2SapHit(s, d, c, src) };
+    B2.saps.push(s); B2.precomp.push(sg, bm);
+  }
+  // seeds (homing projectiles tracked here)
+  for (let i = 0; i < 8; i++) { const s = { active: false, i: 0, t: 0, state: 0, k: 0, sx: 0, sz: 0, tx: 0, tz: 0, tele: null }; s.cb = () => { }; s.onRes = () => b2SeedLand(s); B2.seeds.push(s); }
+
+  // ================= BLOOM SHIELD PETALS =================
+  B2.bud = new THREE.Group(); g.add(B2.bud);
+  const pp = []; for (let k = 0; k <= 16; k++) { const t = k / 16; pp.push(new THREE.Vector2(2.5 * Math.pow(Math.sin(Math.PI * (0.06 + 0.86 * t) + 0.04), 0.8) * (1 - 0.22 * t) + 0.12, t * 5.8)); }
+  const r0 = pp[0].x;
+  for (let i = 0; i < 3; i++) {
+    const mid = i * TAU / 3 + Math.PI / 3, len = TAU / 3 - 0.14;
+    const geo = new THREE.LatheGeometry(pp, 12, mid - len / 2, len).translate(-Math.sin(mid) * r0, 0, -Math.cos(mid) * r0);
+    const u = { uTime: B2.vU.uTime, uCol: { value: new THREE.Color(0.7, 1.0, 0.85) }, uCrack: { value: 0 }, uFlash: { value: 0 }, uA: { value: 1 } };
+    const mesh = new THREE.Mesh(geo, new THREE.ShaderMaterial({
+      uniforms: u, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying vec3 vO; void main(){ vUv=uv; vO=position; vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); vV=-mv.xyz; gl_Position=projectionMatrix*mv; }`,
+      fragmentShader: GLSL_LIB + /* glsl */`uniform float uTime,uCrack,uFlash,uA; uniform vec3 uCol; varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying vec3 vO;
+        vec2 vor(vec2 p){ vec2 i=floor(p), f=fract(p); float d1=8.0, d2=8.0; for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){ vec2 g=vec2(x,y); vec2 o=vec2(hash12(i+g), hash12(i+g+17.0)); vec2 r=g+o-f; float d=dot(r,r); if(d<d1){d2=d1; d1=d;} else if(d<d2) d2=d; } return vec2(sqrt(d1), sqrt(d2)); }
+        void main(){ float fr = pow(1.0-abs(dot(normalize(vN), normalize(vV))), 1.6);
+          float ex = min(vUv.x, 1.0-vUv.x); float dash = step(0.45, fract(vUv.y*9.0 - uTime*1.2));
+          float edge = smoothstep(0.05, 0.0, ex)*dash + smoothstep(0.03,0.0,vUv.y)*0.6;
+          float rib = smoothstep(0.025, 0.0, abs(vUv.x-0.5))*(1.0-vUv.y*0.6);
+          float vein = smoothstep(0.02,0.0,abs(fract(vUv.x*6.0 + vUv.y*1.5)-0.5)-0.46)*0.4;
+          vec2 vr = vor(vO.xy*1.6 + vO.z*0.9); float ce = smoothstep(0.08, 0.0, vr.y-vr.x)*step(vr.x, uCrack*1.2);
+          vec3 c = uCol*(0.025 + fr*0.38 + rib*0.35 + vein*0.12) + mix(uCol, vec3(1.0), 0.6)*edge*0.9 + vec3(1.6,1.8,2.0)*ce*uCrack;
+          c = mix(c, vec3(2.5), uFlash*0.6);
+          gl_FragColor = vec4(c*uA, 1.0); }`,
+    }));
+    mesh.renderOrder = 13;
+    const pivot = new THREE.Group(); pivot.position.set(Math.sin(mid) * r0, 0, Math.cos(mid) * r0); pivot.add(mesh); pivot.visible = false; B2.bud.add(pivot);
+    const p = { pivot, mesh, u, mid, alive: false, hp: 300, open: 1.4, openT: 0.06, rise: 0, axis: new THREE.Vector3(Math.cos(mid), 0, -Math.sin(mid)) };
+    p.tgt = { x: 0, y: 2.6, z: 0, r: 1.0, hy: 2.6, alive: false, priority: true, isBoss: false, lanceMul: 2.16, hit: (d, c, src) => b2PetalHit(p, d, c, src) };
+    B2.petals.push(p); B2.precomp.push(pivot);
+  }
+  // ================= SOAK TOWER =================
+  B2.towerU = { uTime: B2.vU.uTime, uA: { value: 0 }, uK: { value: 0 } };
+  B2.tower = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 40, 1, true).translate(0, 0.5, 0), new THREE.ShaderMaterial({
+    uniforms: B2.towerU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv=uv; vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); vV=-mv.xyz; gl_Position=projectionMatrix*mv; }`,
+    fragmentShader: `uniform float uTime,uA,uK; varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ float fr = pow(1.0-abs(dot(normalize(vN),normalize(vV))), 2.0); float g = pow(1.0-vUv.y, 1.3)*(0.35+fr*1.6);
+      float s = 0.6+0.4*sin(vUv.x*6.2832*7.0 + uTime*3.0 - vUv.y*9.0);
+      float lvl = exp(-pow((vUv.y - uK*0.35)*18.0, 2.0));
+      vec3 c = vec3(1.0,0.96,0.82)*(g*(0.3+0.8*uK)*s + lvl*1.2*uK);
+      gl_FragColor = vec4(c*uA, 1.0); }`,
+  }));
+  B2.tower.scale.set(2, 10, 2); B2.tower.visible = false; B2.tower.renderOrder = 8; g.add(B2.tower);
+  B2.seedOrb = new THREE.Mesh(new THREE.OctahedronGeometry(0.34, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.5, 1.8) })); B2.seedOrb.visible = false; g.add(B2.seedOrb);
+  B2.precomp.push(B2.tower, B2.seedOrb);
+  // ================= THORN RING =================
+  B2.spikes = new THREE.InstancedMesh(new THREE.ConeGeometry(0.3, 1.7, 5).translate(0, 0.85, 0), pjMat, 60);
+  for (let i = 0; i < 60; i++) B2.spikes.setColorAt(i, _col.setRGB(1.0, 0.12, 0.22).multiplyScalar(0.8 + frand() * 0.5));
+  B2.spikes.instanceMatrix.setUsage(THREE.DynamicDrawUsage); B2.spikes.frustumCulled = false; B2.spikes.visible = false; g.add(B2.spikes);
+  B2.spikeH = new Float32Array(60).map(() => 0.6 + Math.random() * 0.9);
+  B2.ringGlow = new THREE.Mesh(ringGeo, ringMatBase.clone()); B2.ringGlow.visible = false; B2.ringGlow.renderOrder = 15; B2.ringGlow.frustumCulled = false; g.add(B2.ringGlow);
+  B2.ringGlow.material.uniforms.uCol.value.setRGB(1.3, 0.12, 0.25);
+  B2.precomp.push(B2.spikes, B2.ringGlow);
   g.visible = false;
+}
+function b2TilesReset() {
+  const arr = B2.tileMesh.instanceMatrix.array;
+  for (let i = 0; i < B2.NT; i++) {
+    B2.tState[i] = 0; B2.tErupt[i] = -1; B2.tY[i] = 0; B2.tVY[i] = 0; B2.tAng[i] = 0; B2.tGlow[i] = 0;
+    const o = i * 16; for (let k = 0; k < 16; k++) arr[o + k] = 0; arr[o] = arr[o + 5] = arr[o + 10] = arr[o + 15] = 1; arr[o + 12] = B2.tx[i]; arr[o + 13] = B2.ty0[i]; arr[o + 14] = B2.tz[i];
+  }
+  B2.tileMesh.instanceMatrix.needsUpdate = true;
+}
+function b2TreeReset() {
+  const arr = B2.brMesh.instanceMatrix.array;
+  B2.brData.forEach((b, i) => { _q.setFromUnitVectors(_v1.set(0, 1, 0), b.d); _m4.compose(b.s, _q, _s.set(b.rad, b.len, b.rad)); _m4.toArray(arr, i * 16); b.gone = false; });
+  B2.brMesh.instanceMatrix.needsUpdate = true; B2.brokeTree = false;
+}
+function b2SplitTree(nx, nz, fxOn) {
+  const arr = B2.brMesh.instanceMatrix.array; let n = 0;
+  B2.brData.forEach((b, i) => {
+    if (b.depth === 0) return; const mx = (b.s.x + b.e.x) / 2, mz = (b.s.z + b.e.z) / 2;
+    if (mx * nx + mz * nz > 0.3) { b.gone = true; for (let k = 0; k < 16; k++) arr[i * 16 + k] = 0; if (fxOn && n++ % 2 === 0) shatter((b.s.x + b.e.x) / 2, (b.s.y + b.e.y) / 2, (b.s.z + b.e.z) / 2, b.len * 0.3, 3, 0.7, 0.4, 1.4, 9, 2.2, 9); }
+  });
+  B2.brMesh.instanceMatrix.needsUpdate = true; B2.brokeTree = true;
+}
+function b2EruptLine(x0, z0, x1, z1, w) {
+  const t = fx.simTime, dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz) || 1;
+  for (let i = 0; i < B2.NT; i++) {
+    if (!B2.tPlay[i] || B2.tState[i]) continue;
+    const d = segDist(B2.tx[i], B2.tz[i], x0, z0, x1, z1);
+    if (d < w * 0.5 + 0.45) { const along = ((B2.tx[i] - x0) * dx + (B2.tz[i] - z0) * dz) / L; B2.tErupt[i] = t + Math.max(0, along) / 38; }
+  }
+}
+function b2DropHalf(nx, nz, off, instant) {
+  const t = fx.simTime; const arr = B2.tileMesh.instanceMatrix.array;
+  for (let i = 0; i < B2.NT; i++) {
+    const s = B2.tx[i] * nx + B2.tz[i] * nz; if (s <= off) continue;
+    if (instant) { B2.tState[i] = 3; for (let k = 0; k < 16; k++) arr[i * 16 + k] = 0; continue; }
+    B2.tState[i] = 1; B2.tFallAt[i] = t + clamp((s - off) / 20, 0, 1) * 1.2 + frand() * 0.25; B2.tY[i] = 0; B2.tAng[i] = 0;
+  }
+  B2.tileMesh.instanceMatrix.needsUpdate = true;
+}
+function b2UpdateTiles(dt) {
+  const t = fx.simTime, D = B2.tDyn, arr = B2.tileMesh.instanceMatrix.array; let mDirty = false;
+  const rip = B2.rippleT, intro = B2.introT;
+  for (let i = 0; i < B2.NT; i++) {
+    const st = B2.tState[i];
+    if (st === 3) { D[i * 3] = 0; D[i * 3 + 1] = 0; continue; }
+    let y = Math.sin(t * 0.9 + B2.tSeed[i] * 6.28) * 0.03, glow = B2.tGlow[i];
+    if (glow > 0) B2.tGlow[i] = Math.max(0, glow - dt * 1.5);
+    const e = B2.tErupt[i];
+    if (e >= 0) { const k = (t - e) / 0.6; if (k >= 1) B2.tErupt[i] = -1; else if (k > 0) { y += 2.2 * (k < 0.16 ? easeOut(k / 0.16) : 1 - smooth((k - 0.16) / 0.84)); glow += (1 - k) * 0.9; } }
+    if (rip >= 0) { const d = B2.td[i]; const env = clamp(rip * 2, 0, 1) * Math.max(0, 1 - rip / 2.4); const w = Math.sin(d * 1.2 + Math.atan2(B2.tz[i], B2.tx[i]) * 2 - rip * 10); y += w * 0.6 * env; glow += Math.max(0, w) * env * 0.9; }
+    if (intro >= 0) { const k = clamp((intro - 0.1 - B2.td[i] * 0.065) / 0.75, 0, 1); y -= 10 * (1 - easeOut(k)); if (k > 0 && k < 1) glow += (1 - k) * 1.6; }
+    if (st === 1) {
+      if (t >= B2.tFallAt[i]) { B2.tState[i] = 2; B2.tVY[i] = -0.5 - frand() * 2; }
+      else { y += (frand() - 0.5) * 0.08; glow += 0.9; }
+    }
+    if (B2.tState[i] === 2) {
+      B2.tVY[i] -= 24 * dt; B2.tY[i] += B2.tVY[i] * dt; B2.tAng[i] += B2.tW[i] * dt;
+      const o = i * 16;
+      if (B2.tY[i] < -45) { B2.tState[i] = 3; for (let k = 0; k < 16; k++) arr[o + k] = 0; }
+      else { _q.setFromAxisAngle(_v1.set(B2.tAx[i], 0, B2.tAz[i]), B2.tAng[i]); _v2.set(B2.tx[i], B2.ty0[i] + B2.tY[i], B2.tz[i]); _m4.compose(_v2, _q, _s.set(1, 1, 1)); _m4.toArray(arr, o); }
+      mDirty = true; y = 0; glow += 0.6;
+    }
+    D[i * 3] = y; D[i * 3 + 1] = glow;
+  }
+  B2.tDynA.needsUpdate = true; if (mDirty) B2.tileMesh.instanceMatrix.needsUpdate = true;
+}
+// ---- palette ----
+function b2SetPal(name, sweep, cx = 0, cz = 0) {
+  const P = B2PAL[name], U = B2.colU; B2.pal = name;
+  if (sweep) { U.uEdgeB.value.setRGB(P.edge[0], P.edge[1], P.edge[2]); U.uPalR.value = 0.01; U.uPalC.value.set(cx, cz); B2.palT = 0; }
+  else {
+    U.uEdgeA.value.setRGB(P.edge[0], P.edge[1], P.edge[2]); U.uEdgeB.value.copy(U.uEdgeA.value); U.uPalR.value = 0; B2.palT = -1;
+    B2.vU.uCol.value.setRGB(P.body[0], P.body[1], P.body[2]); B2.vU.uCore.value.setRGB(P.core[0], P.core[1], P.core[2]); B2.brU.uCol.value.copy(B2.vU.uCol.value);
+    B2.leafU.uCol.value.setRGB(P.leaf[0], P.leaf[1], P.leaf[2]); U.uFog.value.setRGB(P.fog[0], P.fog[1], P.fog[2]);
+    floorU.uTint.value.setRGB(P.void[0], P.void[1], P.void[2]); floorU.uTint2.value.setRGB(P.void[0], P.void[1], P.void[2]);
+  }
+}
+function b2DampCol(c, a, k) { c.r += (a[0] - c.r) * k; c.g += (a[1] - c.g) * k; c.b += (a[2] - c.b) * k; }
+// ---- seeds & saplings ----
+function b2Seed(ang) {
+  let s = null; for (let k = 0; k < B2.seeds.length; k++) if (!B2.seeds[k].active) { s = B2.seeds[k]; break; } if (!s) return;
+  const x = B2.vx + Math.cos(ang) * 1.6, z = B2.vz + Math.sin(ang) * 1.6;
+  const i = shoot(x, z, ang, 4.0 * DIFF[1].spd, G, 0.5, 12, 60, F_HOME); PJ.turn[i] = 1.2; PJ.y[i] = 1.3;
+  PJ.onLand[i] = s.cb; s.i = i; s.t = 0; s.state = 0; s.k = 0; s.active = true; s.tele = null;
+}
+function b2SeedLand(s) {
+  if (s.active && PJ.alive[s.i] && PJ.onLand[s.i] === s.cb) pjKill(s.i, false);
+  s.active = false; s.tele = null;
+  ring(s.tx, 0.08, s.tz, 0.2, 2.2, 0.45, 0.2, 0.4, 2.2, 0.9, 1.2); burst(s.tx, 0.4, s.tz, 24, 0.5, 2.4, 1.0, 6, 0.6, 0.18, 0.6, 0);
+  b2SpawnSapling(s.tx, s.tz);
+}
+function b2UpdateSeeds(dt) {
+  for (let k = 0; k < B2.seeds.length; k++) {
+    const s = B2.seeds[k]; if (!s.active) continue; const i = s.i;
+    if (!PJ.alive[i] || PJ.onLand[i] !== s.cb) { s.active = false; if (s.tele) { teleCancel(s.tele); s.tele = null; } continue; }
+    s.t += dt;
+    if (frand() < 0.5) emitP(PJ.x[i], PJ.y[i], PJ.z[i], (frand() - 0.5) * 0.6, frand() * 0.8, (frand() - 0.5) * 0.6, 0.6, 2.4, 1.0, 0.5, 0.2, 4);
+    if (s.state === 0) {
+      if (s.t >= 3.4) {
+        s.state = 1; s.k = 0; const sp = Math.hypot(PJ.vx[i], PJ.vz[i]) || 1;
+        _v2a.set(PJ.x[i] + PJ.vx[i] / sp * 1.6, PJ.z[i] + PJ.vz[i] / sp * 1.6); b2Clamp(_v2a); s.tx = _v2a.x; s.tz = _v2a.y;
+        PJ.fl[i] = (PJ.fl[i] | F_NOHIT) & ~F_HOME; PJ.vx[i] = PJ.vz[i] = 0; s.sx = PJ.x[i]; s.sz = PJ.z[i];
+        s.tele = teleCircle(s.tx, s.tz, 1.2, DIFF[1].windup, 12, G, { onResolve: s.onRes });
+      }
+    } else {
+      s.k = Math.min(1, s.k + dt / DIFF[1].windup); const e = smooth(s.k);
+      PJ.x[i] = lerp(s.sx, s.tx, e); PJ.z[i] = lerp(s.sz, s.tz, e); PJ.y[i] = 1.3 + Math.sin(Math.PI * s.k) * 2.4 - s.k * 1.1;
+    }
+  }
+}
+function b2SpawnSapling(x, z) {
+  let alive = 0, s = null; for (const o of B2.saps) { if (o.alive) alive++; else if (!s) s = o; }
+  if (alive >= 4 || !s) return;
+  s.alive = true; s.hp = 220; s.x = x; s.z = z; s.grow = 0; s.sporeT = 1.6; s.healT = 4; s.u.uFlash.value = 1; s.u.uCrack.value = 0;
+  s.g.position.set(x, -0.05, z); s.g.visible = true; s.beam.m.visible = true; s.tgt.alive = true; s.tgt.x = x; s.tgt.z = z;
+  sfx.chime(4, 0.7);
+  ui.tutorial('sapling', 'Saplings HEAL Veyra — destroy them!  (one Lance each)');
+}
+function b2SapHit(s, d, crit, src) {
+  if (!s.alive || game.state !== 'fight') return;
+  s.hp -= d; s.u.uFlash.value = 0.45; s.u.uCrack.value = clamp(1 - s.hp / 220, 0, 1);
+  if (src !== 'bolt') dmgNumber(s.x, 1.9, s.z, String(Math.round(d)), crit ? 1 : 0); else if (frand() < 0.3) burst(s.x, 0.9, s.z, 3, 0.6, 2.2, 1, 3, 0.3, 0.12, 1, 0);
+  if (s.hp <= 0) { b2KillSap(s, true); addCharge(Bc, 15); streakToPlayer(s.x, 0.9, s.z, Bc, 6); dmgNumber(s.x, 2.4, s.z, '+15 BLUE', 4, '#7fb4ff'); }
+}
+function b2KillSap(s, withFx) {
+  if (!s.alive) return; s.alive = false; s.tgt.alive = false; s.g.visible = false; s.beam.m.visible = false;
+  if (withFx) { shatter(s.x, 0.8, s.z, 0.5, 18, 0.4, 2.2, 0.9, 6, 1.4, 9); burst(s.x, 0.8, s.z, 30, 0.5, 2.4, 1.0, 7, 0.7, 0.2, 1, 0); ring(s.x, 0.08, s.z, 0.2, 2.4, 0.4, 0.2, 0.5, 2.4, 1.0, 1.2); sfx.shatter(0.45); }
+}
+function b2UpdateSaps(dt, fighting) {
+  const t = fx.simTime;
+  for (const s of B2.saps) {
+    if (!s.alive) continue;
+    s.grow = Math.min(1, s.grow + dt / 0.8); const gs = easeOut(s.grow) * (1 + Math.sin(t * 3 + s.x) * 0.03);
+    s.g.scale.setScalar(Math.max(0.01, gs)); s.g.rotation.y += dt * 0.4;
+    if (s.u.uFlash.value > 0) s.u.uFlash.value = Math.max(0, s.u.uFlash.value - dt * 4);
+    s.pulse = Math.max(0, s.pulse - dt * 1.5);
+    if (fighting) {
+      s.sporeT -= dt; if (s.sporeT <= 0) { s.sporeT = 3.5; patRing(s.x, s.z, 10, 4.5 * DIFF[1].spd, G, 0.3, 8, rng() * TAU); sfx.shot(G); ring(s.x, 0.1, s.z, 0.2, 1.8, 0.35, 0.15, 0.4, 2.2, 0.9, 1); }
+      s.healT -= dt;
+      if (s.healT <= 0) {
+        s.healT = 4; s.pulse = 1;
+        const b = bossRT; if (!b.dead && !b.transitioning) { const h = 0.01 * b.maxHp; b.hp = Math.min(b.maxHp, b.hp + h); dmgNumber(bossTarget.x, bossTarget.y + 1.6, bossTarget.z, '+' + Math.round(h), 3); }
+        for (let k = 0; k < 10; k++) { const u = k / 10; emitP(lerp(s.x, B2.vx, u * 0.2), 1.2, lerp(s.z, B2.vz, u * 0.2), (B2.vx - s.x) / 0.7, (B2.hy - 1.2) / 0.7, (B2.vz - s.z) / 0.7, 0.6, 2.6, 1.0, 0.7, 0.25, 4); }
+      }
+    }
+    beamSet(s.beam, s.x, 1.0 * gs + 0.1, s.z, B2.vx, B2.hy, B2.vz, 0.05 + s.pulse * 0.12);
+    s.beam.u.uTime.value = t; s.beam.u.uA.value = (0.35 + s.pulse * 1.2) * s.grow;
+  }
+}
+// ---- bloom shield ----
+function b2BloomStart(dur) {
+  const b = B2.bloom; if (b.active) return; b.active = true; b.t = 0; b.dur = dur; b.fade = 0;
+  castBar('Shatterbloom', dur, true); bossRT.shieldMul = 0.25;
+  B2.bud.position.set(B2.vx, 0, B2.vz);
+  for (const p of B2.petals) { p.alive = true; p.hp = 300; p.open = 1.5; p.openT = 0.05; p.rise = 0; p.pivot.visible = true; p.tgt.alive = true; p.u.uCrack.value = 0; p.u.uA.value = 1; p.u.uFlash.value = 1; p.u.uCol.value.copy(B2.colU.uEdgeA.value).lerp(_col.setRGB(1, 1, 1), 0.3); }
+  if (B2.firstBloom) { B2.firstBloom = false; ui.toast('BREAK THE PETALS (Lance) — or shelter in your Lattice', 3.6, true); }
+  sfx.choir(1); bloomSpike(0.6); ring(B2.vx, 0.1, B2.vz, 0.5, 4, 0.6, 0.3, 1.6, 2.2, 2.0, 1.2);
+}
+function b2PetalHit(p, d, crit, src) {
+  if (!p.alive || game.state !== 'fight') return;
+  p.hp -= d; p.u.uFlash.value = 0.7; p.u.uCrack.value = clamp(1 - p.hp / 300, 0, 1);
+  if (src !== 'bolt') dmgNumber(p.tgt.x, 3.2, p.tgt.z, String(Math.round(d)), crit ? 1 : 0, '#e8fff2');
+  if (p.hp <= 0) b2BreakPetal(p, true);
+}
+function b2BreakPetal(p, withFx) {
+  if (!p.alive) return; p.alive = false; p.tgt.alive = false; p.pivot.visible = false;
+  if (withFx) { shatter(p.tgt.x, 2.4, p.tgt.z, 1.4, 40, 1.5, 2.2, 1.8, 8, 1.8, 9); burst(p.tgt.x, 2.4, p.tgt.z, 50, 1.8, 2.4, 2.0, 9, 0.8, 0.22, 1, 0); sfx.shatter(0.8); addTrauma(0.25); bloomSpike(0.5); }
+}
+function b2BloomEnd() { const b = B2.bloom; b.active = false; bossRT.shieldMul = 1; if (bossRT.cast.active && bossRT.cast.name === 'Shatterbloom') bossRT.cast.active = false; }
+function b2BloomBroken() {
+  b2BloomEnd(); for (const p of B2.petals) p.pivot.visible = false;
+  bossRT.stagger = 3; bossRT.staggerMul = 1.5; bossAddFracture(30); b2RingReset();
+  ui.toast('STAGGERED — ×1.5 DAMAGE', 1.8, true); hitstop(0.12); sfx.boom(); B2.vU.uFlash.value = 1; bloomSpike(1.0); addTrauma(0.4);
+  burst(B2.vx, B2.hy, B2.vz, 80, 1.6, 2.4, 1.8, 12, 1.0, 0.25, 1, 0);
+}
+function b2BloomBlast() {
+  const b = B2.bloom; b2BloomEnd(); b.fade = 0.7;
+  for (const p of B2.petals) { if (p.alive) { p.openT = 2.0; p.u.uFlash.value = 1; } p.tgt.alive = false; }
+  const x = B2.vx, z = B2.vz;
+  ring(x, 0.25, z, 1, 32, 1.2, 1.0, 1.6, 2.4, 1.6, 1.5); ring(x, 1.5, z, 0.5, 18, 0.8, 0.5, 2.4, 2.4, 2.4, 1.2);
+  burst(x, 2.5, z, 200, 1.4, 2.6, 1.6, 20, 1.4, 0.28, 1, 0); bloomSpike(2.0); addTrauma(0.8); shockAt(x, 2, z, 0.07); sfx.boom(); sfx.shatter(1.2); rainbowWave(x, z, 0.8, 22);
+  if (player.alive && game.state === 'fight') {
+    const inLat = lattice.active && Math.hypot(player.x - lattice.x, player.z - lattice.z) < lattice.r;
+    if (inLat) { dmgNumber(player.x, 2.6, player.z, 'SHELTERED', 4, '#7dffa8'); ring(lattice.x, 0.2, lattice.z, lattice.r * 0.9, lattice.r * 1.1, 0.5, 0.3, 0.4, 2.6, 1.0, 1.6); }
+    else if (!debug.god && player.invuln <= 0) { hitSrc = 'shatterbloom'; damagePlayer(45, G); }
+  }
+}
+function b2UpdateBloom(dt, fighting) {
+  const b = B2.bloom;
+  if (b.active && fighting) {
+    b.t += dt;
+    let alive = 0; for (const p of B2.petals) if (p.alive) alive++;
+    if (alive === 0) b2BloomBroken();
+    else if (b.t >= b.dur) b2BloomBlast();
+    else {
+      const k = b.t / b.dur; B2.vU.uFlash.value = Math.max(B2.vU.uFlash.value, k > 0.75 ? 0.15 + 0.15 * Math.sin(fx.simTime * 30) : 0);
+      if (frand() < 0.3 + k) { const a = frand() * TAU, r = 3 + frand() * 6; emitP(B2.vx + Math.cos(a) * r, 0.3 + frand() * 3, B2.vz + Math.sin(a) * r, -Math.cos(a) * r * 0.9, 1, -Math.sin(a) * r * 0.9, 1.4, 2.4, 1.6, 0.9, 0.16, 4); }
+    }
+  }
+  if (b.fade > 0) { b.fade -= dt; for (const p of B2.petals) { p.u.uA.value = Math.max(0, b.fade / 0.7); if (b.fade <= 0) { p.alive = false; p.pivot.visible = false; } } }
+  for (const p of B2.petals) {
+    if (!p.pivot.visible) continue;
+    p.rise = Math.min(1, p.rise + dt * 1.8); p.open = damp(p.open, p.openT, p.openT > 1 ? 9 : 3.5, dt);
+    p.pivot.scale.set(1, Math.max(0.01, easeOut(p.rise)), 1); p.pivot.quaternion.setFromAxisAngle(p.axis, p.open + Math.sin(fx.simTime * 1.4 + p.mid) * 0.02);
+    if (p.u.uFlash.value > 0) p.u.uFlash.value = Math.max(0, p.u.uFlash.value - dt * 3);
+    p.tgt.x = B2.bud.position.x + Math.sin(p.mid) * 2.2; p.tgt.z = B2.bud.position.z + Math.cos(p.mid) * 2.2;
+  }
+}
+// ---- soak tower ----
+function b2SoakResolve(ok) {
+  const s = B2.soak; s.active = false; s.fade = 0.8; B2.seedOrb.visible = false;
+  if (ok && s.inT >= 0.75) {
+    addCharge(G, 25); addCharge(R, 25); bossRT.stagger = Math.max(bossRT.stagger, 2.5); bossRT.staggerMul = Math.max(bossRT.staggerMul, 1.5); bossAddFracture(15);
+    beam(s.x, 1.4, s.z, B2.vx, B2.hy, B2.vz, 0.35, 0.6, 1.4, 1.4, 1.1, 0, 1.4);
+    burst(s.x, 1.4, s.z, 60, 2.4, 2.4, 1.8, 9, 0.9, 0.22, 1, 0); streakToPlayer(s.x, 1.4, s.z, G, 10); streakToPlayer(s.x, 1.4, s.z, R, 10);
+    dmgNumber(player.x, 2.7, player.z, 'SEED CLAIMED', 4, '#fff3c0'); B2.vU.uFlash.value = 1; bloomSpike(1.0); sfx.victoryStab(); sfx.perfect(G, 4);
+  } else {
+    const h = 0.04 * bossRT.maxHp; bossRT.hp = Math.min(bossRT.maxHp, bossRT.hp + h); dmgNumber(bossTarget.x, bossTarget.y + 1.6, bossTarget.z, '+' + Math.round(h), 3);
+    patRing(B2.vx, B2.vz, 32, 6 * DIFF[1].spd, G, 0.32, 10, rng() * TAU); sfx.shot(G); sfx.boom();
+    beam(s.x, 1.4, s.z, B2.vx, B2.hy, B2.vz, 0.3, 0.6, 0.4, 2.4, 0.9, 0, 1.2); ring(B2.vx, 0.3, B2.vz, 0.5, 6, 0.6, 0.3, 0.4, 2.4, 1, 1.4);
+    ui.toast('VEYRA DRINKS THE SEED', 1.6, true);
+  }
+}
+function b2UpdateSoak(dt) {
+  const s = B2.soak;
+  if (s.active) {
+    s.t += dt; const inside = player.alive && Math.hypot(player.x - s.x, player.z - s.z) < 2.0;
+    if (s.t > 3.0 && inside) s.inT += dt;
+    B2.towerU.uK.value = clamp(s.t / 4, 0, 1); B2.towerU.uA.value = Math.min(1, s.t / 0.3) * (inside ? 1.3 : 1);
+    B2.seedOrb.position.set(s.x, 1.4 + Math.sin(fx.simTime * 2.5) * 0.15, s.z); B2.seedOrb.rotation.y += dt * 2; B2.seedOrb.rotation.x += dt * 0.7;
+    if (frand() < 0.5) { const a = frand() * TAU; emitP(s.x + Math.cos(a) * 1.9, 0.1, s.z + Math.sin(a) * 1.9, 0, 1.5 + frand() * 2, 0, 1.6, 1.6, 1.3, 1.0, 0.13, 4); }
+  } else if (s.fade > 0) { s.fade -= dt; B2.towerU.uA.value = Math.max(0, s.fade / 0.8) * 2; if (s.fade <= 0) B2.tower.visible = false; }
+}
+// ---- thorn ring ----
+function b2RingReset() {
+  if (!B2.ringOn) return; B2.ringReset = 0.8; B2.ringFrom = B2.ringR;
+  ring(B2.vx, 0.3, B2.vz, B2.ringR, Math.min(16, B2.ringR + 5), 0.6, 0.4, 2.4, 0.4, 0.6, 1.4); sfx.shatter(0.5); ui.toast('THE THORNS RECEDE', 1.4);
+}
+function b2UpdateRing(dt, fighting) {
+  if (!B2.ringOn) return;
+  if (B2.ringReset > 0) { B2.ringReset -= dt; B2.ringR = lerp(B2.ringFrom, 14, easeOut(1 - B2.ringReset / 0.8)); }
+  else if (fighting) B2.ringR = Math.max(6.5, B2.ringR - 0.3 * dt);
+  if (bossRT.fracture >= 100 && !B2.fracFlag) { B2.fracFlag = true; b2RingReset(); } else if (bossRT.fracture < 100) B2.fracFlag = false;
+  const vul = bossRT.vuln > 0; if (vul && !B2.vulnPrev) b2RingReset(); B2.vulnPrev = vul;
+  const cx = B2.vx, cz = B2.vz, Rr = B2.ringR; B2.ringA += dt * 0.12;
+  const arr = B2.spikes.instanceMatrix.array, ac = game.arenaCut;
+  for (let i = 0; i < 60; i++) {
+    const a = i / 60 * TAU + B2.ringA, x = cx + Math.cos(a) * Rr, z = cz + Math.sin(a) * Rr, o = i * 16;
+    const ok = Math.hypot(x, z) < 15.6 && (!ac.on || x * ac.nx + z * ac.nz < ac.off + 0.3);
+    if (!ok) { for (let k = 0; k < 16; k++) arr[o + k] = 0; continue; }
+    const h = B2.spikeH[i] * (0.9 + 0.1 * Math.sin(fx.simTime * 3 + i));
+    _e.set(Math.sin(a) * 0.25 * (i % 2 ? 1 : -0.6), 0, -Math.cos(a) * 0.25 * (i % 2 ? 1 : -0.6)); _q.setFromEuler(_e);
+    _m4.compose(_v1.set(x, -0.1, z), _q, _s.set(1, h, 1)); _m4.toArray(arr, o);
+  }
+  B2.spikes.instanceMatrix.needsUpdate = true;
+  const gu = B2.ringGlow.material.uniforms; gu.uR.value = Rr; gu.uTh.value = 0.3; gu.uOuter.value = Rr + 1.2; gu.uA.value = 0.9 + 0.3 * Math.sin(fx.simTime * 5);
+  B2.ringGlow.position.set(cx, 0.07, cz); B2.ringGlow.scale.setScalar(Rr + 1.2);
+  B2.colU.uRing.value.set(cx, cz, Rr, 1);
+  // hazard
+  B2.ringGrazeCD -= dt;
+  if (fighting && player.alive) {
+    const dx = player.x - cx, dz = player.z - cz, d = Math.hypot(dx, dz) || 1;
+    const s = Rr - 0.35 - PLAYER.hurtR - d;
+    if (s < 0) {
+      hitSrc = 'thorns'; const res = resolveHazard(s, 0.8, R, 12, B2.ringGrazeCD <= 0);
+      if (res === HZ_PERFECT) B2.ringGrazeCD = 1.0;
+      if (res === HZ_HIT || (player.dashI <= 0 && d > Rr - 0.3 && B2.kbT <= 0)) { B2.kbT = 0.25; B2.kbX = -dx / d; B2.kbZ = -dz / d; if (res === HZ_HIT) burst(player.x, 1, player.z, 20, 2.6, 0.4, 0.5, 6, 0.4, 0.15, 1, 0); }
+    } else if (s < 0.8 && B2.ringGrazeCD <= 0) { B2.ringGrazeCD = 1.2; resolveHazard(s, 0.8, R, 0, true); }
+  }
+  if (B2.kbT > 0) { B2.kbT -= dt; player.x += B2.kbX * 13 * dt; player.z += B2.kbZ * 13 * dt; }
+}
+function b2RingOn(on) {
+  B2.ringOn = on; B2.spikes.visible = on; B2.ringGlow.visible = on; if (!on) B2.colU.uRing.value.w = 0;
+  B2.ringR = 14; B2.ringReset = 0; B2.kbT = 0; B2.fracFlag = false; B2.vulnPrev = false;
+}
+// ---- uprooting (phase 3 setup) ----
+function b2Uproot(instant) {
+  let nx = -player.x, nz = -player.z; const l = Math.hypot(nx, nz); if (l < 0.5) { nx = 0; nz = -1; } else { nx /= l; nz /= l; }
+  const ac = game.arenaCut; ac.on = true; ac.nx = nx; ac.nz = nz; ac.off = 1.0;
+  b2DropHalf(nx, nz, 1.0, instant); b2SplitTree(nx, nz, !instant);
+  const tx = -nx * 6.2, tz = -nz * 6.2;
+  if (instant) { B2.vx = tx; B2.vz = tz; B2.move = null; } else B2.move = { t: 0, dur: 0.9, fx: B2.vx, fz: B2.vz, tx, tz };
+  B2.brU.uDim.value = 0.45;
+}
+function b2Reset() {
+  B2.vx = 0; B2.vz = 0.25; B2.move = null; B2.yaw = 0; B2.lift = 0; B2.armRaise = 0;
+  b2TilesReset(); b2TreeReset(); B2.brU.uDim.value = 0; B2.brU.uWhite.value = 0; B2.brU.uFlash.value = 0;
+  B2.vortex = B2.vortexTo = 0; B2.rippleT = -1; B2.introT = -1; B2.white = B2.whiteTo = 0; B2.collapse = B2.collapseTo = 0; B2.scatter = 0; B2.scatterOn = false;
+  const L = B2.leafU; L.uVortex.value = 0; L.uCollapse.value = 0; L.uScatter.value = 0; L.uHide.value = 0; L.uCenter.value.set(0, 0, 0);
+  const vu = B2.vU; vu.uWhite.value = 0; vu.uDark.value = 0; vu.uCrack.value = 0; vu.uFlash.value = 0; B2.veyra.visible = true; B2.halo.visible = true;
+  b2SetPal('grove', false);
+  for (const s of B2.saps) { s.alive = false; s.tgt.alive = false; s.g.visible = false; s.beam.m.visible = false; }
+  for (const s of B2.seeds) { s.active = false; s.tele = null; }
+  for (const p of B2.petals) { p.alive = false; p.tgt.alive = false; p.pivot.visible = false; }
+  B2.bloom.active = false; B2.bloom.fade = 0; B2.soak.active = false; B2.soak.fade = 0; B2.tower.visible = false; B2.seedOrb.visible = false;
+  b2RingOn(false); game.arenaCut.on = false; B2.firstBloom = true;
+  for (const s of B2.saps) targets.push(s.tgt); for (const p of B2.petals) targets.push(p.tgt);
+}
+function b2ClearAdds(withFx) {
+  for (const s of B2.saps) b2KillSap(s, withFx);
+  for (const s of B2.seeds) { if (s.active && PJ.alive[s.i] && PJ.onLand[s.i] === s.cb) pjKill(s.i, withFx); s.active = false; if (s.tele) teleCancel(s.tele); s.tele = null; }
+  if (B2.bloom.active) { for (const p of B2.petals) b2BreakPetal(p, withFx); b2BloomEnd(); }
+  if (B2.soak.active) { B2.soak.active = false; B2.soak.fade = 0.5; B2.seedOrb.visible = false; }
+}
+function b2LineAttack(mode) {
+  const n = mode === 3 ? 4 : mode === 1 ? 1 : 3, w = mode === 3 ? 0.9 : DIFF[1].windup, step = (mode === 3 ? 18 : 20) * Math.PI / 180;
+  castBar('Root Lash', w); B2.armT = w; sfx.growl();
+  for (let k = 0; k < n; k++) {
+    const off = (k - (n - 1) / 2) * step;
+    const set = (o) => { const a = aimAt(B2.vx, B2.vz) + off, c = Math.cos(a), s = Math.sin(a); teleSetLine(o, B2.vx + c * 1.4, B2.vz + s * 1.4, B2.vx + c * 18, B2.vz + s * 18, 2.0); };
+    const o = teleLine(0, 0, 1, 0, 2.0, w, 16, G, { lockAt: 0.5, follow: set, onResolve: b2LashResolve }); set(o);
+  }
+}
+function b2LashResolve(o) {
+  b2EruptLine(o.x, o.z, o.x1, o.z1, o.w);
+  for (let j = 1; j <= 7; j++) { const u = j / 7, px = lerp(o.x, o.x1, u), pz = lerp(o.z, o.z1, u); if (!b2InArena(px, pz, -1)) continue; burst(px, 0.4, pz, 7, 0.7, 2.4, 1.3, 7, 0.6, 0.2, 0.3, 0, 1.2); if (j % 2) shatter(px, 0.4, pz, 0.3, 2, 0.8, 2.2, 1.2, 7, 1.0, 14); }
+  addTrauma(0.22); sfx.swoop();
+}
+function b2LeafWall(life) {
+  for (let i = 0; i <= PJ.hi; i++) if (PJ.alive[i] && (PJ.fl[i] & F_ORBIT)) pjKill(i, true);
+  const mk = (rad, w, col) => {
+    const slots = 20, g1 = Math.floor(rng() * slots), g2 = (g1 + 10) % slots, a0 = rng() * TAU;
+    for (let k = 0; k < slots; k++) {
+      const d1 = Math.min((k - g1 + slots) % slots, (g1 - k + slots) % slots), d2 = Math.min((k - g2 + slots) % slots, (g2 - k + slots) % slots); if (d1 <= 1 || d2 <= 1) continue;
+      const a = a0 + k / slots * TAU; const i = shoot(Math.cos(a) * rad, Math.sin(a) * rad, 0, 0, col, 0.35, 10, life, F_ORBIT | F_HARMLESS);
+      PJ.orR[i] = rad; PJ.orA[i] = a; PJ.orW[i] = w;
+    }
+  };
+  mk(9.5, 0.35, G); mk(6, -0.45, Bc); sfx.swoop(); ring(0, 0.2, 0, 5.5, 10, 0.7, 0.3, 0.4, 2.2, 0.9, 1);
 }
 const BOSS2 = {
-  id: 2, name: 'VEYRA, THE GLASS ORCHARD', subtitle: 'Second Refraction', deathTitle: 'VEYRA', deathSub: 'UNBOUND', stub: true,
-  arena: 1, arenaR: 15, maxHp: 19000, enrage: 270, hit: { x: 0, y: 3, z: 0, r: 2.2, hy: 3 },
-  barGrad: 'linear-gradient(90deg,#1fd16a,#7dffb0 60%,#d6ffe8)', music: ['b2p1', 'b2p2', 'b2p3'],
+  id: 2, name: 'VEYRA, THE GLASS ORCHARD', subtitle: 'Second Refraction', deathTitle: 'VEYRA', deathSub: 'UNBOUND',
+  arena: 1, arenaR: 15, maxHp: 19000, enrage: 270, hit: { x: 0, y: 3.4, z: 0.25, r: 2.2, hy: 3 },
+  barGrad: 'linear-gradient(90deg,#1fd16a,#7dffb0 45%,#b98cff 75%,#ff5a86)', music: ['b2p1', 'b2p2', 'b2p3'],
   phases: [
-    { name: 'Grove', until: 0.65, loop: 12, steps: [[0, 'PetalStorm'], [4, 'ThornVolley'], [7, 'RootLash']] },
-    { name: 'Thornheart', until: 0, loop: 11, steps: [[0, 'PetalStorm'], [3, 'RootLash'], [6, 'ThornVolley'], [8.5, 'RootLash']] },
+    { name: 'Grove', until: 0.7, loop: 15, steps: [[0, 'Seedfall', 3], [5, 'RootLash', 0], [9, 'ThornVolley', 0], [12, 'PetalStorm']] },
+    { name: 'Bloom', until: 0.35, loop: 22, steps: [[0, 'LeafWall', 10.4], [2, 'Shatterbloom', 9], [6, 'RootLash', 1], [10, 'LeafWall', 12.4], [14, 'Soak'], [17, 'Seedfall', 2], [19.5, 'ThornVolley', 0]] },
+    { name: 'Thornheart', until: 0, loop: 12, steps: [[0, 'RootLash', 3], [3.5, 'RootLash', 0], [6, 'Seedfall', 4], [8, 'ThornVolley', 3], [10, 'BloomAlt']] },
   ],
   build: buildBoss2, show(on) { B2.group.visible = on; },
-  reset() { B2.coreU.uCol.value.setRGB(0.2, 1.0, 0.45); },
-  transitionInstant() { B2.coreU.uCol.value.setRGB(1.0, 0.3, 0.5); },
+  reset() { b2Reset(); },
+  transitionInstant(n) {
+    b2ClearAdds(false);
+    if (n === 1) { B2.vortex = B2.vortexTo = 1; B2.leafU.uVortex.value = 1; b2SetPal('bloom', false); }
+    if (n === 2) { b2Uproot(true); b2SetPal('thorn', false); b2RingOn(true); B2.vortex = B2.vortexTo = 1; }
+  },
+  onPhase(n) {
+    if (n === 1) { ui.tutorial('leafwall', 'The leaf walls are harmless while faint — slip through the gaps and GRAZE'); }
+    if (n === 2) { b2RingOn(true); ui.tutorial('thorns', 'The thorns close in — fill FRACTURE or VULNERABLE to push them back'); }
+  },
+  onInterrupt() { b2ClearAdds(true); },
+  apPenalty(cx, cz) { // debug autopilot helper
+    let p = 0; const ac = game.arenaCut; if (ac.on && cx * ac.nx + cz * ac.nz > ac.off - 1.6) p += 25;
+    if (B2.ringOn && Math.hypot(cx - B2.vx, cz - B2.vz) > B2.ringR - 1.6) p += 25;
+    if (B2.soak.active && B2.soak.t > 1.5) p += Math.max(0, Math.hypot(cx - B2.soak.x, cz - B2.soak.z) - 1.2) * 3;
+    if (B2.bloom.active && B2.bloom.t > B2.bloom.dur - 2.5 && lattice.active) p += Math.max(0, Math.hypot(cx - lattice.x, cz - lattice.z) - lattice.r + 1) * 4;
+    return p;
+  },
+  apHook() { if (B2.bloom.active && B2.bloom.t > B2.bloom.dur - 2.8 && !lattice.active && abilityReady('lattice')) useAbility('lattice'); if (abilityReady('lance') && (B2.bloom.active || B2.saps.some((s) => s.alive))) useAbility('lance'); },
   casts: {
-    PetalStorm() { castBar('Petal Storm', 2.5); patSpiral(0, 0, 3, 8, 2.5, 13, 5 * DIFF[1].spd, G, 0.3, 10, rng() * TAU); },
-    ThornVolley() { castBar('Thorn Volley', 1.2); every(0.4, 3, () => { patFan(0, 0, aimAt(0, 0), 5, 0.7, 9 * DIFF[1].spd, R, 0.25, 12); sfx.shot(R); }); },
-    RootLash() { castBar('Root Lash', DIFF[1].windup); const a = aimAt(0, 0); for (let k = -1; k <= 1; k++) { const b = a + k * 0.35; teleLine(0, 0, Math.cos(b) * 18, Math.sin(b) * 18, 2, DIFF[1].windup, 16, G, { onResolve: (o) => { burst((o.x + o.x1) / 2, 0.5, (o.z + o.z1) / 2, 30, 0.6, 2.4, 1, 8, 0.6, 0.2, 1, 0); addTrauma(0.2); } }); } },
+    Seedfall(n = 3) {
+      castBar(n >= 4 ? 'Seed Volley' : 'Seedfall', 1.0); B2.armT = 1.1; sfx.choir(2); B2.vU.uFlash.value = 0.4;
+      after(0.9, () => { const a0 = aimAt(B2.vx, B2.vz); for (let k = 0; k < n; k++) b2Seed(a0 + (k - (n - 1) / 2) * 0.75 + (rng() - 0.5) * 0.25); sfx.shot(G); burst(B2.vx, B2.hy, B2.vz, 30, 0.6, 2.4, 1, 6, 0.6, 0.2, 1, 0); });
+    },
+    RootLash(mode = 0) { b2LineAttack(mode); },
+    ThornVolley(mode = 0) {
+      const n = mode === 3 ? 4 : 3, cnt = mode === 3 ? 7 : 5, spread = (mode === 3 ? 55 : 40) * Math.PI / 180;
+      castBar('Thorn Volley', 0.4 * n + 0.4); B2.armT = 0.4 * n + 0.4; let vi = 0;
+      every(0.4, n, () => { const a = aimAt(B2.vx, B2.vz), c = (++vi === n) ? Bc : R; patFan(B2.vx + Math.cos(a) * 1.5, B2.vz + Math.sin(a) * 1.5, a, cnt, spread, 9 * DIFF[1].spd, c, 0.26, 10); sfx.shot(c); burst(B2.vx + Math.cos(a) * 1.5, 1, B2.vz + Math.sin(a) * 1.5, 10, 2.6, 0.4, 0.5, 4, 0.3, 0.14, 1, 0); }, 0.25);
+    },
+    PetalStorm() { castBar('Petal Storm', 2.5); B2.armT = 2.5; patSpiral(B2.vx, B2.vz, 3, 8, 2.5, 11, 5 * DIFF[1].spd, G, 0.3, 10, rng() * TAU); },
+    LeafWall(life = 10.4) { b2LeafWall(life); },
+    Shatterbloom(dur = 10) { b2BloomStart(dur); },
+    BloomAlt() { if (bossRT.loops % 2 === 0) b2BloomStart(7); },
+    Soak() {
+      const a = rng() * TAU, r = 7 + rng() * 3; _v2a.set(B2.vx + Math.cos(a) * r, B2.vz + Math.sin(a) * r); b2Clamp(_v2a);
+      const s = B2.soak; s.active = true; s.x = _v2a.x; s.z = _v2a.y; s.t = 0; s.inT = 0; s.fade = 0;
+      castBar('Seed of Renewal', 4, true);
+      teleSoak(s.x, s.z, 2, 4, () => b2SoakResolve(true), () => b2SoakResolve(false));
+      B2.tower.position.set(s.x, 0, s.z); B2.tower.visible = true; B2.seedOrb.visible = true; B2.towerU.uA.value = 0;
+      ring(s.x, 0.1, s.z, 0.3, 2.4, 0.5, 0.25, 2, 2, 1.7, 1.3); sfx.chime(6, 0.8);
+      ui.tutorial('soak', 'A Seed of Renewal! Stand in the light as it completes to claim it');
+    },
   },
   update(dt) {
-    const t = fx.simTime; B2.coreU.uTime.value = t; if (bossRT.flash > 0) B2.coreU.uFlash.value = 0.3; else B2.coreU.uFlash.value = Math.max(0, B2.coreU.uFlash.value - dt * 4);
-    B2.core.position.y = 3 + Math.sin(t) * 0.15; B2.core.rotation.y += dt * 0.4; B2.group.rotation.y = Math.sin(t * 0.2) * 0.1;
-    const Lv = floorU.uLights.value, Lc = floorU.uLightCol.value; Lv[0].set(0, 3, 0, 1.2); Lc[0].copy(B2.coreU.uCol.value); for (let k = 1; k < 4; k++) Lv[k].w = 0;
-    floorU.uBossPos.value.set(0, 0); floorU.uBossShadow.value = 1;
+    const t = fx.simTime, b = bossRT, fighting = game.state === 'fight' && !b.dead && !b.transitioning;
+    B2.vU.uTime.value = t; B2.brU.uTime.value = t; B2.leafU.uTime.value = t; B2.haloU.uTime.value = t;
+    // Veyra movement (uprooting) & float
+    if (B2.move) { const m = B2.move; m.t += dt; const k = Math.min(1, m.t / m.dur), e = smooth(k); B2.vx = lerp(m.fx, m.tx, e); B2.vz = lerp(m.fz, m.tz, e); B2.lift = Math.sin(Math.PI * k) * 2.2 + e * 0.6; if (k >= 1) B2.move = null; }
+    else B2.lift = damp(B2.lift, game.arenaCut.on ? 0.6 : 0, 3, dt);
+    const fl = Math.sin(t * 0.9) * 0.12 + B2.lift;
+    B2.veyra.position.set(B2.vx, fl, B2.vz);
+    const want = Math.atan2(player.x - B2.vx, player.z - B2.vz); const lim = game.arenaCut.on ? 3.2 : 0.55;
+    B2.yaw = damp(B2.yaw, clamp(wrapA(want), -lim, lim), 2.5, dt); B2.veyra.rotation.y = B2.yaw;
+    B2.hy = (3.2 * B2.sc) + fl;
+    bossTarget.x = B2.vx; bossTarget.z = B2.vz; bossTarget.y = B2.hy;
+    // arms & hair
+    if (B2.armT > 0) B2.armT -= dt; B2.armRaise = damp(B2.armRaise, B2.armT > 0 || B2.bloom.active ? 1 : 0, 4, dt);
+    for (const a of B2.arms) { a.sh.rotation.set(-0.25 - B2.armRaise * 0.5, 0, a.side * (0.55 + B2.armRaise * 1.05 + Math.sin(t * 0.8 + a.side) * 0.08)); a.el.rotation.set(-0.2, 0, a.side * (0.5 + B2.armRaise * 0.4 + Math.sin(t * 1.1) * 0.1)); }
+    const harr = B2.hair.instanceMatrix.array;
+    for (let i = 0; i < B2.hairData.length; i++) {
+      const h = B2.hairData[i]; const sway = Math.sin(t * 1.3 + h.sp) * 0.07 + (B2.move ? 0.6 : 0);
+      _e.set(h.tilt + Math.abs(h.ph) * 0.12 + sway + 0.35, 0, -h.ph * 0.42 + Math.sin(t * 1.05 + h.sp * 2) * 0.05);
+      _q.setFromEuler(_e); _m4.compose(_v1.set(Math.sin(h.ph) * 0.33, 4.55 - Math.abs(h.ph) * 0.12, Math.cos(h.ph) * 0.18 - 0.22), _q, _s.set(1, h.len, 1)); _m4.toArray(harr, i * 16);
+    }
+    B2.hair.instanceMatrix.needsUpdate = true;
+    // shader state
+    const vu = B2.vU; vu.uCrack.value = damp(vu.uCrack.value, b.vuln > 0 ? 1 : 0, 6, dt); vu.uFracture.value = b.fracture >= 100 ? 1 : 0;
+    if (vu.uFlash.value > 0) vu.uFlash.value = Math.max(0, vu.uFlash.value - dt * 3); if (b.flash > 0) vu.uFlash.value = Math.max(vu.uFlash.value, 0.08);
+    B2.white = damp(B2.white, B2.whiteTo, 2.2, dt); vu.uWhite.value = B2.white; B2.brU.uWhite.value = B2.white * 0.8;
+    const beat = Math.pow(Math.max(0, Math.sin(t * 1.6 * Math.PI)), 10);
+    B2.core.scale.setScalar(1 + beat * 0.3); B2.core.material.color.copy(vu.uCore.value).multiplyScalar(1.6 + beat);
+    B2.halo.position.set(B2.vx + Math.sin(B2.yaw) * 0.5 * B2.sc, B2.hy, B2.vz + Math.cos(B2.yaw) * 0.5 * B2.sc); B2.halo.quaternion.copy(camera.quaternion);
+    B2.haloU.uCol.value.copy(vu.uCore.value).multiplyScalar(0.36 * (1 + beat * 0.6) * (1 - vu.uDark.value) * (1 + (b.stagger > 0 ? 0.8 : 0)));
+    // palette sweep & colour drift
+    if (B2.palT >= 0) { B2.palT += dt; B2.colU.uPalR.value = B2.palT * 22; if (B2.colU.uPalR.value > 36) { B2.colU.uEdgeA.value.copy(B2.colU.uEdgeB.value); B2.colU.uPalR.value = 0; B2.palT = -1; } }
+    const P = B2PAL[B2.pal], kk = 1 - Math.exp(-1.6 * dt);
+    b2DampCol(vu.uCol.value, P.body, kk); b2DampCol(vu.uCore.value, P.core, kk); B2.brU.uCol.value.copy(vu.uCol.value); b2DampCol(B2.leafU.uCol.value, P.leaf, kk); b2DampCol(B2.colU.uFog.value, P.fog, kk);
+    b2DampCol(floorU.uTint.value, P.void, kk); floorU.uTint2.value.copy(floorU.uTint.value);
+    // leaves
+    B2.vortex = B2.vortexTo > B2.vortex ? Math.min(B2.vortexTo, B2.vortex + dt / 1.5) : Math.max(B2.vortexTo, B2.vortex - dt / 1.5);
+    B2.leafU.uVortex.value = B2.vortex; B2.leafU.uCenter.value.set(game.arenaCut.on ? B2.vx * 0.6 : 0, 0, game.arenaCut.on ? B2.vz * 0.6 : 0);
+    B2.collapse = Math.min(B2.collapseTo, B2.collapse + dt / 1.1); B2.leafU.uCollapse.value = B2.collapse; B2.leafU.uCore.value.set(B2.halo.position.x, B2.hy, B2.halo.position.z);
+    if (B2.scatterOn) { B2.scatter = Math.min(1, B2.scatter + dt / 2.6); B2.leafU.uScatter.value = easeOut(B2.scatter); }
+    B2.leafMesh.count = Q.cfg.low ? 600 : Q.name === 'med' ? 1200 : 1500;
+    if (B2.rippleT >= 0) { B2.rippleT += dt; if (B2.rippleT > 2.6) B2.rippleT = -1; }
+    b2UpdateTiles(dt);
+    b2UpdateSeeds(dt);
+    b2UpdateSaps(dt, fighting);
+    b2UpdateBloom(dt, fighting);
+    b2UpdateSoak(dt);
+    b2UpdateRing(dt, fighting);
+    if (B2.brU.uFlash.value > 0) B2.brU.uFlash.value = Math.max(0, B2.brU.uFlash.value - dt * 2);
+    // ambient bioluminescent fog sparkle
+    B2.sparkAcc += dt * (Q.cfg.low ? 14 : 34);
+    while (B2.sparkAcc >= 1) { B2.sparkAcc -= 1; const a = frand() * TAU, r = Math.sqrt(frand()) * 17; const x = Math.cos(a) * r, z = Math.sin(a) * r; const c = B2.leafU.uCol.value; emitP(x, 0.15 + frand() * 1.6, z, (frand() - 0.5) * 0.25, 0.05 + frand() * 0.15, (frand() - 0.5) * 0.25, c.r * 0.9, c.g * 0.9, c.b * 0.9, 4 + frand() * 3, 0.07 + frand() * 0.06, 4); }
+    // floor light blobs: heart + saplings / soak tower
+    const Lv = floorU.uLights.value, Lc = floorU.uLightCol.value;
+    Lv[0].set(B2.vx, 3, B2.vz, B2.veyra.visible ? 1.3 + beat * 0.5 : 0); Lc[0].copy(vu.uCore.value).multiplyScalar(0.6);
+    let li = 1;
+    if (B2.soak.active || B2.soak.fade > 0) { Lv[li].set(B2.soak.x, 2, B2.soak.z, 1.6 * B2.towerU.uA.value); Lc[li].setRGB(1, 0.95, 0.8); li++; }
+    for (const s of B2.saps) { if (li > 3) break; if (s.alive) { Lv[li].set(s.x, 1, s.z, 0.9 * s.grow); Lc[li].setRGB(0.3, 1.0, 0.5); li++; } }
+    for (; li < 4; li++) Lv[li].w = 0;
+    floorU.uBossPos.value.set(B2.vx, B2.vz); floorU.uBossShadow.value = B2.veyra.visible ? 1 : 0;
   },
-  introCine: () => genericIntro(BOSS2, 0, 3, 0),
-  transitionCine: (n) => genericTransition(BOSS2, n, () => BOSS2.transitionInstant(n)),
-  deathCine: () => genericDeath(BOSS2, 0, 3, 0, SAT_BOSS[2]),
+  // ---- cinematics ----
+  introCine() {
+    const keys = [[0, 0, 2.2, 19, 0, 3.2, 0, 58], [1.4, 1.5, 3.4, 15.5, 0, 3.6, 0, 52], [2.8, 3.2, 6.5, 12.5, 0, 3.6, 0, 48], [4.2, 0, 13, 15.5, 0, 1.6, 4, 50]];
+    return {
+      dur: 4.2, skippable: 0.6, skipTo: 3.9,
+      start() { ui.hud(false); player.x = 0; player.z = 7; playerG.visible = false; B2.introT = 0; B2.leafU.uHide.value = 1; B2.vU.uDark.value = 1; B2.halo.visible = false; sfx.fall(); },
+      update(t) { camKeys(t, keys); B2.introT = t; B2.leafU.uHide.value = 1 - smooth((t - 1.2) / 1.4); if (t > 1.5) B2.vU.uDark.value = Math.max(0, 1 - (t - 1.5) / 0.5); },
+      ev: [
+        [0.5, () => { reform(0, 1.15, 7, 60, 0.45, 1.4, 1.6, 2.2, 6); }],
+        [0.95, () => { playerG.visible = true; ring(0, 0.06, 7, 0.3, 5, 0.7, 0.3, 2, 2.2, 2.6, 1.4); bloomSpike(0.8); addTrauma(0.3); sfx.boom(); }],
+        [1.5, () => { B2.halo.visible = true; B2.vU.uFlash.value = 1; B2.brU.uFlash.value = 1; bloomSpike(1.6); rainbowWave(0, 0, 1.2, 16); sfx.chime(2); sfx.chime(4, 0.7); burst(0, 3.4, 0.3, 120, 0.6, 2.4, 1.2, 10, 1.2, 0.25, 1, 0); }],
+        [2.3, () => { ui.letterbox(true); ui.titleCard('VEYRA, THE GLASS ORCHARD', 'Second Refraction'); music.setSection('b2p1'); }],
+      ],
+      end() { B2.introT = -1; B2.leafU.uHide.value = 0; B2.vU.uDark.value = 0; B2.halo.visible = true; playerG.visible = true; },
+    };
+  },
+  transitionCine(n) {
+    const c0 = new THREE.Vector3(), l0 = new THREE.Vector3();
+    if (n === 1) return {
+      dur: 2.4,
+      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.35; ui.toast('AUTUMN OF GLASS', 2); sfx.riser(); b2ClearAdds(true); },
+      update(t) { const k = smooth(t / 2.4); director.camPos.set(lerp(c0.x, 0, k), lerp(c0.y, 25, k), lerp(c0.z, 23, k)); director.camLook.set(lerp(l0.x, 0, k), lerp(l0.y, 2.5, k), lerp(l0.z, 0, k)); director.fov = 54; if (t > 1.8) director.timeScale = lerp(0.35, 1, (t - 1.8) / 0.6); },
+      ev: [
+        [0.15, () => { B2.vortexTo = 1; B2.rippleT = 0; B2.vU.uFlash.value = 1; B2.brU.uFlash.value = 1; bloomSpike(1.0); }],
+        [0.7, () => { b2SetPal('bloom', true, B2.vx, B2.vz); bloomSpike(1.6); addTrauma(0.7); shockAt(0, 3, 0, 0.06); sfx.boom(); sfx.shatter(0.8); burst(0, 3.4, 0, 160, 1.4, 1.0, 2.6, 14, 1.2, 0.3, 1, 0); game.satTarget = Math.min(1, game.sat + 0.12); }],
+      ],
+      end() { director.timeScale = 1; b2SetPal('bloom', false); },
+    };
+    return {
+      dur: 2.8,
+      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.45; ui.toast('UPROOTING', 2); sfx.riser(); b2ClearAdds(true);
+        B2.bud.position.set(B2.vx, 0, B2.vz); for (const p of B2.petals) { p.pivot.visible = true; p.rise = 0.4; p.open = 1.2; p.openT = 0.05; p.u.uA.value = 1; p.u.uCrack.value = 0.4; } },
+      update(t) {
+        const ac = game.arenaCut, nx = ac.on ? ac.nx : 0, nz = ac.on ? ac.nz : 1, k = smooth(t / 2.8);
+        director.camPos.set(lerp(c0.x, -nx * 15, k), lerp(c0.y, 15, k), lerp(c0.z, -nz * 15 + 4, k)); director.camLook.set(lerp(l0.x, nx * 3, k), lerp(l0.y, 0.5, k), lerp(l0.z, nz * 3, k)); director.fov = 56;
+        if (t > 2.2) director.timeScale = lerp(0.45, 1, (t - 2.2) / 0.6);
+      },
+      ev: [
+        [0.6, () => { for (const p of B2.petals) { p.openT = 2.6; p.u.uFlash.value = 0.5; } B2.vU.uFlash.value = 1; sfx.growl(); }],
+        [0.95, () => { for (const p of B2.petals) { shatter(B2.vx + Math.sin(p.mid) * 2.5, 1.5, B2.vz + Math.cos(p.mid) * 2.5, 1.2, 20, 1.4, 2.0, 1.8, 8, 1.6, 9); p.pivot.visible = false; } }],
+        [1.0, () => { b2Uproot(false); addTrauma(0.9); bloomSpike(1.1); shockAt(0, 1, 0, 0.07); sfx.boom(); sfx.shatter(1.4); burst(0, 2, 0, 70, 2.0, 0.6, 1.4, 14, 1.2, 0.28, 1, 0); }],
+        [1.3, () => { b2SetPal('thorn', true, B2.vx, B2.vz); bloomSpike(1.2); game.satTarget = Math.min(1, game.sat + 0.1); }],
+        [2.0, () => { b2RingOn(true); B2.ringR = 18; B2.ringReset = 0.8; B2.ringFrom = 18; }],
+      ],
+      end() { director.timeScale = 1; b2SetPal('thorn', false); B2.move = null; if (game.arenaCut.on) { B2.vx = -game.arenaCut.nx * 6.2; B2.vz = -game.arenaCut.nz * 6.2; } },
+    };
+  },
+  deathCine() {
+    const s0 = game.sat; const c0 = new THREE.Vector3();
+    return {
+      dur: 6.6,
+      start() { c0.copy(cam.pos); ui.hud(false); music.setSection('silence'); director.timeScale = 0.55; B2.whiteTo = 1; B2.vU.uFlash.value = 1; sfx.choir(3); for (const s of B2.saps) b2KillSap(s, true); if (B2.ringOn) { ring(B2.vx, 0.3, B2.vz, B2.ringR, B2.ringR + 4, 0.7, 0.4, 2.4, 0.4, 0.6, 1.2); b2RingOn(false); } },
+      update(t) {
+        const k = smooth(t / 6.6), hx = B2.vx, hz = B2.vz;
+        director.camPos.set(lerp(c0.x, hx + Math.sin(k * 0.9) * 6, smooth(t / 1.5)), lerp(c0.y, 9 - k * 2, smooth(t / 1.5)), lerp(c0.z, hz + 14 - k * 2, smooth(t / 1.5))); director.camLook.set(hx, lerp(3.4, 2, k), hz); director.fov = 50;
+        if (t > 1.0) director.timeScale = 1;
+        if (t > 2.0 && t < 4.0) game.sat = lerp(s0, SAT_BOSS[2], (t - 2) / 2);
+        if (t < 1.7 && frand() < 0.6) { const a = frand() * TAU; emitP(hx + Math.cos(a) * 3, B2.hy + (frand() - 0.5) * 3, hz + Math.sin(a) * 3, -Math.cos(a) * 4, 0, -Math.sin(a) * 4, 2, 2.2, 2.4, 0.7, 0.18, 4); }
+      },
+      ev: [
+        [0.3, () => { B2.collapseTo = 1; B2.vortexTo = 1; }],
+        [1.7, () => {
+          const hx = B2.halo.position.x, hz = B2.halo.position.z;
+          B2.veyra.visible = false; B2.halo.visible = false; B2.scatterOn = true; B2.scatter = 0;
+          shatter(hx, B2.hy, hz, 1.6, 220, 2, 2, 2, 12, 3.2, 6, true); burstRainbow(hx, B2.hy, hz, 280, 15, 2.2, 0.3, 0);
+          rainbowWave(hx, hz, 1.6, 14); setTimeout(() => rainbowWave(hx, hz, 1.2, 12), 550); setTimeout(() => rainbowWave(hx, hz, 0.9, 11), 1150);
+          bloomSpike(2.4); addTrauma(0.9); shockAt(hx, B2.hy, hz, 0.08); sfx.shatter(1.6); sfx.boom(); sfx.victoryStab(); B2.brU.uFlash.value = 1;
+        }],
+        [3.0, () => { ui.letterbox(true); ui.titleCard('VEYRA', 'UNBOUND'); }],
+      ],
+      end() { game.sat = game.satTarget = SAT_BOSS[2]; ui.letterbox(false); },
+    };
+  },
 };
-
 // ------------------------------------------------------------------
-// BOSS 3 — THE NULL SUN, ECLIPSE SOVEREIGN  (STUB — extension point)
-// TODO(next pass): corona fbm, gravitational lens, prism moons, gravity, tether, rings, voids, eclipse, Last Light, dawn finale.
+// BOSS 3 — THE NULL SUN, ECLIPSE SOVEREIGN (Event Horizon)
+// black sun + fbm corona billboard, gravitational lens, prism moons, gravity, corona pulse walls,
+// solar chain tether, singularity voids, eclipse, Supernova countdown, Last Light, dawn finale
 // ------------------------------------------------------------------
-const B3 = { group: new THREE.Group(), sun: null, coronaU: null, corona: null };
+const B3PAL = {
+  corona:  { a: [0.22, 0.015, 0.02], b: [1.0, 0.36, 0.06], c: [1.0, 0.9, 0.75], cor: [0.3, 0.55, 1.0], cor2: [0.8, 0.92, 1.0], ring: [0.45, 0.65, 1.0] },
+  white:   { a: [0.035, 0.02, 0.11], b: [0.32, 0.45, 1.0], c: [0.9, 0.95, 1.0], cor: [0.7, 0.92, 1.0], cor2: [1.0, 1.0, 1.0], ring: [0.75, 0.9, 1.0] },
+  eclipse: { a: [0.09, 0.0, 0.006], b: [0.95, 0.06, 0.04], c: [1.0, 0.8, 0.72], cor: [1.0, 0.2, 0.08], cor2: [1.0, 0.85, 0.7], ring: [1.0, 0.25, 0.12] },
+};
+const B3 = {
+  group: new THREE.Group(), precomp: [], fbmMats: [],
+  sun: null, sunU: null, rim: null, rimU: null, corona: null, coronaU: null, ecl: null, rays: null, raysU: null, halos: [], aurora: [], auroraU: null,
+  moons: [], pulses: [], voids: [],
+  tether: { active: false, t: 0, dur: 6, tick: 0, red: false, m: null, u: null },
+  well: { active: false, t: 0, cast: 2, pull: 3, str: 6, n: 0, px: new Float32Array(4), pz: new Float32Array(4), tele: null },
+  ll: { active: false, done: false, t: 0, dur: 10, spT: 0, spA: 0 },
+  sunY: 4.5, scaleBase: 1, collapseK: 1, cint: 1, darkK: 0, ringK: 0, diamond: 0.0, eclK: 0, eclSlide: 0, pal: 'corona', warp: 0.18, shake: 0,
+  dawn: 0, auroraA: 0, spin: 0, infallAcc: 0, checkpoint: false, hudN: -1, hudCrit: false, firstPulse: true, firstWell: true, firstChain: true, firstCrack: true, moonsDown: false,
+  hud: null, hudN_el: null, prompt: null, deathT: -1,
+};
+function b3Windup() { return bossRT.phase === 2 ? 0.7 : DIFF[2].windup; }
+function b3InArena(o, rmin, rmax) { const r = Math.hypot(o.x, o.y) || 1; const c = clamp(r, rmin, rmax); o.x *= c / r; o.y *= c / r; return o; }
 function buildBoss3() {
   const g = B3.group; scene.add(g);
-  B3.sun = new THREE.Mesh(new THREE.SphereGeometry(2.4, 48, 24), new THREE.MeshBasicMaterial({ color: 0x000000 })); B3.sun.position.y = 4.5; g.add(B3.sun);
-  B3.coronaU = { uTime: { value: 0 }, uCol: { value: new THREE.Color(0.4, 0.7, 1.0) }, uFlash: { value: 0 } };
-  B3.corona = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.ShaderMaterial({
+  // ================= THE SUN: black sphere, fresnel rim shell, corona billboard =================
+  B3.sunU = { uTime: { value: 0 }, uFlash: { value: 0 }, uCrack: { value: 0 }, uFracture: { value: 0 }, uGlow: { value: 0 }, uEdge: { value: new THREE.Color(0.4, 0.6, 1.0) }, uAlpha: { value: 0.9 } };
+  B3.sun = new THREE.Mesh(new THREE.SphereGeometry(2.4, 64, 32), new THREE.ShaderMaterial({
+    uniforms: B3.sunU, transparent: true, depthWrite: false,
+    vertexShader: `varying vec3 vN; varying vec3 vV; varying vec3 vO; void main(){ vO = position; vN = normalize(normalMatrix*normal); vec4 mv = modelViewMatrix*vec4(position,1.0); vV=-mv.xyz; gl_Position=projectionMatrix*mv; }`,
+    fragmentShader: GLSL_LIB + /* glsl */`
+      uniform float uTime,uFlash,uCrack,uFracture,uGlow,uAlpha; uniform vec3 uEdge; varying vec3 vN; varying vec3 vV; varying vec3 vO;
+      vec2 vor(vec2 p){ vec2 i=floor(p), f=fract(p); float d1=8.0, d2=8.0; for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){ vec2 g=vec2(x,y); vec2 o=vec2(hash12(i+g), hash12(i+g+17.0)); vec2 r=g+o-f; float d=dot(r,r); if(d<d1){d2=d1; d1=d;} else if(d<d2) d2=d; } return vec2(sqrt(d1), sqrt(d2)); }
+      void main(){ vec3 n = normalize(vN), v = normalize(vV); float fr = 1.0-abs(dot(n,v));
+        float gran = noise3(vO*1.6 + vec3(0.0, uTime*0.15, 0.0))*0.6 + noise3(vO*4.0 - uTime*0.2)*0.4;
+        vec3 c = vec3(0.004,0.004,0.008) + uEdge*pow(fr, 4.0)*0.55 + uEdge*gran*0.012;
+        // supernova swelling: the surface itself starts to burn
+        vec3 hot = mix(vec3(1.0,0.18,0.04), vec3(1.0,0.75,0.4), smoothstep(0.55, 0.85, gran));
+        c += hot*uGlow*(0.15 + 0.85*smoothstep(0.35, 0.8, gran))*(0.4 + 0.6*pow(fr,0.6));
+        vec2 vr = vor(vO.xy*1.1 + vO.z*0.8); float ce = smoothstep(0.07, 0.0, vr.y-vr.x);
+        c += vec3(2.4,2.5,2.8)*ce*max(uCrack, uFracture*0.35*(0.5+0.5*sin(uTime*9.0)));
+        c = mix(c, vec3(2.4,2.6,3.0)*(0.2+fr), uFlash*0.55);
+        float a = max(uAlpha, max(uFlash*0.6, ce*max(uCrack,0.0)));
+        gl_FragColor = vec4(c/max(a,0.01)*min(a,1.0), a); }`,
+  }));
+  B3.sun.renderOrder = 18; g.add(B3.sun);
+  B3.rimU = { uCol: { value: new THREE.Color(0.5, 0.7, 1.0) }, uA: { value: 1 } };
+  B3.rim = new THREE.Mesh(new THREE.SphereGeometry(2.52, 48, 24), new THREE.ShaderMaterial({
+    uniforms: B3.rimU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: `varying vec3 vN; varying vec3 vV; void main(){ vN = normalize(normalMatrix*normal); vec4 mv = modelViewMatrix*vec4(position,1.0); vV=-mv.xyz; gl_Position=projectionMatrix*mv; }`,
+    fragmentShader: `uniform vec3 uCol; uniform float uA; varying vec3 vN; varying vec3 vV; void main(){ float fr = 1.0-abs(dot(normalize(vN), normalize(vV))); gl_FragColor = vec4(uCol*pow(fr,5.0)*2.2*uA, 1.0); }`,
+  }));
+  B3.rim.renderOrder = 3; g.add(B3.rim);
+  // corona: camera-facing fbm flame billboard (in sun radii; scaled with the sun)
+  B3.coronaU = { uTime: { value: 0 }, uCol: { value: new THREE.Color(0.3, 0.55, 1.0) }, uCol2: { value: new THREE.Color(0.8, 0.92, 1.0) }, uInt: { value: 1 }, uRing: { value: 0 }, uFlash: { value: 0 }, uDiamond: { value: 0 }, uDiaAng: { value: 0.75 }, uGather: { value: 0 } };
+  const cmat = new THREE.ShaderMaterial({
     uniforms: B3.coronaU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, defines: fbmDefines(),
     vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-    fragmentShader: GLSL_LIB + `uniform float uTime,uFlash; uniform vec3 uCol; varying vec2 vUv;
-      void main(){ vec2 p=(vUv-0.5)*14.0; float r=length(p); float a=atan(p.y,p.x);
-        vec2 q = vec2(cos(a), sin(a))*3.0; float f = fbm(q + vec2(r*0.6 - uTime*0.5, uTime*0.1));
-        float rim = exp(-pow((r-2.45)*3.0,2.0))*2.5; float flare = smoothstep(0.35,0.8,f)*exp(-(r-2.4)*0.9)*step(2.3,r);
-        vec3 c = uCol*(rim + flare*2.2) + vec3(1.0)*rim*0.5*uFlash; gl_FragColor = vec4(c*step(2.35,r+0.15), 1.0); }`,
+    fragmentShader: GLSL_LIB + /* glsl */`uniform float uTime,uInt,uRing,uFlash,uDiamond,uDiaAng,uGather; uniform vec3 uCol,uCol2; varying vec2 vUv;
+      void main(){ vec2 p = (vUv-0.5)*8.0; float r = length(p); if (r < 0.96) discard; float a = atan(p.y,p.x); vec2 cs = vec2(cos(a), sin(a));
+        float e = r - 1.0;
+        float f = fbm(cs*2.2 + vec2(e*1.5 - uTime*0.45, e*0.8 + uTime*0.12));
+        float g2 = fbm(cs*4.5 - vec2(uTime*0.3, e*2.2 - uTime*0.6));
+        float rays = pow(noise2(cs*7.0 + vec2(uTime*0.04, 0.0)), 3.0) + 0.5*pow(noise2(cs*15.0 - uTime*0.03), 6.0);
+        float rim = exp(-pow((r-1.02)*mix(14.0, 34.0, uRing), 2.0))*mix(1.6, 3.2, uRing);
+        float halo = exp(-e*3.2)*(0.12 + 0.95*f*f);
+        float flare = smoothstep(0.55, 0.9, f + g2*0.25)*exp(-e*1.4)*0.95;
+        float stream = rays*exp(-e*mix(1.2, 0.6, uRing))*mix(0.3, 0.75, uRing);
+        float body = (halo + flare)*(1.0 - 0.82*uRing) + stream;
+        vec3 c = uCol*body + mix(uCol, uCol2, 0.6)*rim + uCol2*exp(-e*9.0)*0.45*(1.0-uRing*0.6);
+        // last light: everything streams inward
+        c += uCol2*uGather*pow(noise2(cs*9.0 + vec2(0.0, e*3.0 + uTime*4.0)), 2.0)*exp(-e*0.8)*1.4;
+        // diamond-ring flare
+        vec2 dp = p - vec2(cos(uDiaAng), sin(uDiaAng))*1.03; float dl = length(dp);
+        vec2 rq = vec2(dp.x+dp.y, dp.x-dp.y)*0.7071;
+        float star = exp(-abs(dp.x)*30.0)*exp(-abs(dp.y)*0.9) + exp(-abs(dp.y)*30.0)*exp(-abs(dp.x)*0.9) + 0.35*(exp(-abs(rq.x)*40.0)*exp(-abs(rq.y)*2.5) + exp(-abs(rq.y)*40.0)*exp(-abs(rq.x)*2.5));
+        c += vec3(1.0,0.97,0.92)*uDiamond*(star*1.4 + exp(-dl*7.0)*3.0);
+        c += vec3(1.0)*uFlash*exp(-e*3.0)*0.8;
+        float edge = smoothstep(4.0, 3.2, r);
+        gl_FragColor = vec4(c*uInt*edge*smoothstep(0.96, 1.0, r), 1.0); }`,
+  });
+  B3.corona = new THREE.Mesh(new THREE.PlaneGeometry(19.2, 19.2), cmat); B3.corona.renderOrder = 2; g.add(B3.corona); B3.fbmMats.push(cmat);
+  // eclipse moon (phase 3) — a black disc that slides in front of the sun
+  B3.ecl = new THREE.Mesh(new THREE.SphereGeometry(2.5, 48, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.9, depthWrite: false })); B3.ecl.renderOrder = 19; B3.ecl.visible = false; g.add(B3.ecl);
+  // orbital halo rings (armillary)
+  for (let i = 0; i < 2; i++) {
+    const m = new THREE.Mesh(new THREE.RingGeometry(1, 1.035, 160, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 0.7, 1.4), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    m.scale.setScalar(i ? 4.6 : 3.7); m.renderOrder = 3; g.add(m); B3.halos.push({ m, tilt: i ? 0.42 : -0.3, sp: i ? -0.25 : 0.33, a: i * 1.7 });
+  }
+  // god rays (death) — 12 radiating light blades on one billboard
+  B3.raysU = { uA: { value: 0 }, uLen: { value: 0.3 }, uTime: { value: 0 } };
+  B3.rays = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShaderMaterial({
+    uniforms: B3.raysU, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: /* glsl */`uniform float uA,uLen,uTime; varying vec2 vUv;
+      void main(){ vec2 p = vUv*2.0-1.0; float r = length(p); float a = atan(p.y,p.x);
+        float ray = pow(abs(cos(a*6.0 + 0.2*sin(a*3.0 + uTime))), 60.0) + 0.6*pow(abs(cos(a*6.0 + 0.2618)), 160.0);
+        float len = smoothstep(uLen, uLen*0.15, r);
+        vec3 c = vec3(1.0,0.97,0.9)*(ray*len*1.8 + exp(-r*14.0/max(uLen,0.05))*2.2);
+        gl_FragColor = vec4(c*uA, 1.0); }`,
   }));
-  B3.corona.position.y = 4.5; B3.corona.renderOrder = 2; g.add(B3.corona);
+  B3.rays.renderOrder = 30; B3.rays.visible = false; g.add(B3.rays);
+  // ================= PRISM MOONS (R, G, B) =================
+  const octa = new THREE.OctahedronGeometry(0.7, 0); octa.scale(1, 1.35, 1);
+  const haloGeo = new THREE.PlaneGeometry(1, 1);
+  const haloSh = {
+    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `uniform vec3 uCol; uniform float uA; varying vec2 vUv; void main(){ vec2 p=vUv*2.0-1.0; float r=length(p); float a=atan(p.y,p.x);
+      float g = exp(-r*r*10.0)*1.2 + exp(-r*4.5)*0.3 + pow(abs(cos(a*2.0)),40.0)*exp(-r*3.0)*0.6; gl_FragColor = vec4(uCol*g*uA*smoothstep(1.0,0.7,r), 1.0); }`,
+  };
+  for (let i = 0; i < 3; i++) {
+    const c = [R, G, Bc][i], pc = PCOL[c];
+    const u = { uTime: B3.sunU.uTime, uCol: { value: new THREE.Color(pc[0], pc[1], pc[2]) }, uCore: { value: new THREE.Color(pc[0] * 2, pc[1] * 2, pc[2] * 2) }, uFlash: { value: 0 }, uCrack: { value: 0 }, uFracture: { value: 0 }, uWhite: { value: 0 }, uDark: { value: 0 } };
+    const mg = new THREE.Group(); const body = new THREE.Mesh(octa, b2CrystalMat(u)); mg.add(body);
+    const core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(pc[0] * 3, pc[1] * 3, pc[2] * 3) })); mg.add(core);
+    const hu = { uCol: { value: new THREE.Color(pc[0], pc[1], pc[2]) }, uA: { value: 1 } };
+    const halo = new THREE.Mesh(haloGeo, new THREE.ShaderMaterial({ uniforms: hu, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, ...haloSh })); halo.scale.setScalar(3.2); halo.renderOrder = 17; mg.add(halo);
+    g.add(mg);
+    const bm = new THREE.Mesh(beamGeo, beamMatBase.clone()); bm.visible = false; bm.renderOrder = 16; bm.frustumCulled = false; g.add(bm); bm.material.uniforms.uCol.value.setRGB(pc[0], pc[1], pc[2]);
+    const m = { i, c, g: mg, body, core, halo, u, hu, hp: 1400, alive: false, mode: 0, ang: i * TAU / 3, x: 0, y: 4.5, z: 0, streamT: 0, streamA: i * 1.1, dir: i === 1 ? -1 : 1, from: new THREE.Vector3(), flyT: 0, glow: 1, beam: { m: bm, u: bm.material.uniforms }, vis: true };
+    m.tgt = { x: 0, y: 1.5, z: 0, r: 0.95, hy: 1.5, alive: false, priority: true, isBoss: false, lanceMul: 1, hit: (d, cr, src) => b3MoonHit(m, d, cr, src) };
+    B3.moons.push(m); B3.precomp.push(bm);
+  }
+  // ================= CORONA PULSE WALLS (6) =================
+  const wallGeo = new THREE.CylinderGeometry(1, 1, 1, 128, 1, true).translate(0, 0.5, 0);
+  for (let i = 0; i < 6; i++) {
+    const wu = { uCol: { value: new THREE.Color(0.25, 0.5, 1.2) }, uA: { value: 0 }, uTime: B3.sunU.uTime };
+    const wall = new THREE.Mesh(wallGeo, new THREE.ShaderMaterial({
+      uniforms: wu, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+      fragmentShader: `uniform vec3 uCol; uniform float uA,uTime; varying vec2 vUv;
+        void main(){ float h = vUv.y; float g = pow(1.0-h, 2.0); float s = 0.7+0.3*sin(vUv.x*6.2832*40.0 - uTime*5.0 + h*6.0);
+          float top = exp(-pow((h-0.92)*30.0,2.0))*0.6;
+          gl_FragColor = vec4((uCol*(g*s*0.75 + top*0.6) + vec3(0.6,0.7,1.0)*exp(-h*22.0)*0.35)*uA, 1.0); }`,
+    }));
+    wall.visible = false; wall.renderOrder = 15; wall.frustumCulled = false; g.add(wall);
+    const flat = new THREE.Mesh(ringGeo, ringMatBase.clone()); flat.visible = false; flat.renderOrder = 15; flat.frustumCulled = false; g.add(flat);
+    flat.material.uniforms.uCol.value.setRGB(0.5, 0.8, 2.2);
+    B3.pulses.push({ active: false, r: 0, speed: 6, col: Bc, done: false, near: false, wall, wu, flat, fu: flat.material.uniforms });
+    B3.precomp.push(wall, flat);
+  }
+  // ================= SINGULARITY VOIDS (floor uniforms) =================
+  for (let i = 0; i < 6; i++) B3.voids.push({ active: false, x: 0, z: 0, r: 2, t: 0, life: 12, open: 0, born: 0 });
+  // ================= SOLAR CHAIN (tether) =================
+  { const bm = new THREE.Mesh(beamGeo, beamMatBase.clone()); bm.visible = false; bm.renderOrder = 16; bm.frustumCulled = false; g.add(bm); B3.tether.m = bm; B3.tether.u = bm.material.uniforms; B3.tether.o = { m: bm, u: bm.material.uniforms }; B3.precomp.push(bm); }
+  // ================= AURORA (dawn finale) =================
+  B3.auroraU = { uTime: { value: 0 }, uA: { value: 0 } };
+  const amat = new THREE.ShaderMaterial({
+    uniforms: B3.auroraU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, defines: fbmDefines(),
+    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: GLSL_LIB + /* glsl */`uniform float uTime,uA; varying vec2 vUv;
+      void main(){ float x = vUv.x*7.0; float n = fbm(vec2(x*0.9 + uTime*0.04, uTime*0.07));
+        float cur = pow(noise2(vec2(x*5.0 + n*4.0, uTime*0.25)), 2.2)*0.9 + n*0.35;
+        float h = vUv.y; float base = smoothstep(0.0, 0.1, h - (n-0.5)*0.25)*pow(max(1.0-h,0.0), 1.6);
+        vec3 c = mix(vec3(0.15,1.0,0.55), vec3(0.2,0.75,1.0), smoothstep(0.15, 0.5, h)); c = mix(c, vec3(0.75,0.3,1.0), smoothstep(0.45, 0.95, h));
+        float edge = smoothstep(0.0,0.12,vUv.x)*smoothstep(1.0,0.88,vUv.x);
+        gl_FragColor = vec4(c*cur*base*edge*uA*1.25, 1.0); }`,
+  });
+  B3.fbmMats.push(amat);
+  const arcs = [[70, 34, -2.1, 1.7], [86, 42, -0.6, 1.5], [78, 38, 1.0, 1.9]];
+  for (const [rad, h, th, len] of arcs) { const m = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, h, 48, 1, true, th, len).translate(0, h / 2 - 4, 0), amat); m.visible = false; m.renderOrder = -15; m.frustumCulled = false; g.add(m); B3.aurora.push(m); B3.precomp.push(m); }
+  B3.precomp.push(B3.ecl, B3.rays);
+  // HUD refs
+  B3.hud = document.getElementById('snova'); B3.hudN_el = document.getElementById('snovaN'); B3.prompt = document.getElementById('novaPrompt');
+  document.getElementById('novaPromptK').textContent = IS_TOUCH ? '' : '[ 4 / R ]';
   g.visible = false;
 }
+
+// ---- palette ----
+function b3SetPal(name, instant) {
+  B3.pal = name; if (!instant) return; const P = B3PAL[name];
+  floorU.uRampA.value.setRGB(P.a[0], P.a[1], P.a[2]); floorU.uRampB.value.setRGB(P.b[0], P.b[1], P.b[2]); floorU.uRampC.value.setRGB(P.c[0], P.c[1], P.c[2]);
+  B3.coronaU.uCol.value.setRGB(P.cor[0], P.cor[1], P.cor[2]); B3.coronaU.uCol2.value.setRGB(P.cor2[0], P.cor2[1], P.cor2[2]);
+}
+function b3PalStep(dt) {
+  const P = B3PAL[B3.pal], k = 1 - Math.exp(-2.5 * dt);
+  b2DampCol(floorU.uRampA.value, P.a, k); b2DampCol(floorU.uRampB.value, P.b, k); b2DampCol(floorU.uRampC.value, P.c, k);
+  b2DampCol(B3.coronaU.uCol.value, P.cor, k); b2DampCol(B3.coronaU.uCol2.value, P.cor2, k);
+}
+
+// ---- prism moons ----
+function b3MoonHit(m, d, crit, src) {
+  if (!m.alive || game.state !== 'fight') return;
+  m.hp -= d; m.u.uFlash.value = 0.5; m.u.uCrack.value = clamp(1 - m.hp / 1400, 0, 1);
+  if (src !== 'bolt') dmgNumber(m.x, m.y + 1.4, m.z, String(Math.round(d)), crit ? 1 : 0, CSSCOL[m.c]);
+  if (m.hp <= 0) {
+    b3KillMoon(m, true); addCharge(m.c, 20); streakToPlayer(m.x, m.y, m.z, m.c, 10);
+    if (!B3.moons.some((o) => o.alive) && !B3.moonsDown) {
+      B3.moonsDown = true; bossRT.shieldMul = 1; bossRT.stagger = 4; bossRT.staggerMul = 1.5; bossAddFracture(50);
+      ui.toast('THE COURT FALLS — SUN STUNNED', 2.2, true); hitstop(0.12); sfx.boom(); bloomSpike(1.2); addTrauma(0.5); B3.sunU.uFlash.value = 1;
+      burstRainbow(0, B3.sunY, 0, 160, 12, 1.4, 0.25, 0);
+    }
+  }
+}
+function b3KillMoon(m, withFx) {
+  if (!m.alive && !m.vis) return; m.alive = false; m.tgt.alive = false; m.vis = false; m.g.visible = false; m.beam.m.visible = false;
+  if (withFx) { const pc = PCOL[m.c]; shatter(m.x, m.y, m.z, 0.8, 36, pc[0] * 1.6, pc[1] * 1.6, pc[2] * 1.6, 9, 1.8, 9); burst(m.x, m.y, m.z, 70, pc[0] * 2.4, pc[1] * 2.4, pc[2] * 2.4, 10, 0.9, 0.24, 1, 0); ring(m.x, 0.1, m.z, 0.3, 4, 0.5, 0.3, pc[0] * 2, pc[1] * 2, pc[2] * 2, 1.4); sfx.shatter(0.9); addTrauma(0.3); }
+}
+function b3MoonsDetach(instant) {
+  B3.moonsDown = false;
+  for (const m of B3.moons) {
+    m.alive = true; m.vis = true; m.g.visible = true; m.hp = 1400; m.tgt.alive = true; m.u.uCrack.value = 0; m.u.uFlash.value = 1; m.streamT = 1.6 + m.i * 0.3;
+    m.ang = Math.atan2(m.z, m.x); m.beam.m.visible = true;
+    if (instant) { m.mode = 1; m.flyT = 1; } else { m.mode = 2; m.flyT = 0; m.from.set(m.x, m.y, m.z); }
+  }
+  bossRT.shieldMul = 0.5;
+  if (!instant) ui.tutorial('moons', 'The Prism Moons shield the sun (×0.5) — shatter them!');
+}
+function b3MoonPos(m, out) { // orbit around the sun (phase 1)
+  const a = m.ang; return out.set(Math.cos(a) * 4.3, B3.sunY - 0.4 + Math.sin(a * 2 + m.i) * 0.9, Math.sin(a) * 4.3);
+}
+function b3UpdateMoons(dt, fighting) {
+  const t = fx.simTime;
+  for (const m of B3.moons) {
+    if (!m.vis) continue;
+    if (m.mode === 0) { m.ang += dt * 0.6; b3MoonPos(m, _v1); m.x = _v1.x; m.y = _v1.y; m.z = _v1.z; }
+    else if (m.mode === 3) { // intro fly-in
+      m.flyT = Math.min(1, m.flyT + dt / 0.8); m.ang += dt * 0.6; b3MoonPos(m, _v1); const e = easeOut(m.flyT);
+      m.x = lerp(m.from.x, _v1.x, e); m.y = lerp(m.from.y, _v1.y, e); m.z = lerp(m.from.z, _v1.z, e);
+      if (frand() < 0.8) { const pc = PCOL[m.c]; emitP(m.x, m.y, m.z, 0, 0, 0, pc[0] * 2, pc[1] * 2, pc[2] * 2, 0.5, 0.35, 4); }
+      if (m.flyT >= 1) m.mode = 0;
+    } else {
+      m.ang += dt * 0.4 * (m.mode === 2 ? 0.5 : 1);
+      const tx = Math.cos(m.ang) * 9, tz = Math.sin(m.ang) * 9, ty = 1.5 + Math.sin(t * 1.3 + m.i * 2) * 0.25;
+      if (m.mode === 2) { m.flyT = Math.min(1, m.flyT + dt / 1.5); const e = smooth(m.flyT); m.x = lerp(m.from.x, tx, e); m.z = lerp(m.from.z, tz, e); m.y = lerp(m.from.y, ty, e) + Math.sin(Math.PI * m.flyT) * 1.5; if (m.flyT >= 1) m.mode = 1; }
+      else { m.x = tx; m.y = ty; m.z = tz; }
+      // prism court stream: rotating 3-way, 4 volleys/s
+      if (fighting && m.alive && m.mode === 1 && bossRT.vuln <= 0) {
+        m.streamA += dt * 1.15 * m.dir; m.streamT -= dt;
+        if (m.streamT <= 0) { m.streamT += 0.25; for (let k = 0; k < 3; k++) { const a = m.streamA + k * TAU / 3; shoot(m.x + Math.cos(a) * 0.7, m.z + Math.sin(a) * 0.7, a, 6 * DIFF[2].spd, m.c, 0.28, 14, 4.2); } if (m.i === 0) sfx.shot(m.c); }
+      }
+    }
+    m.g.position.set(m.x, m.y, m.z); m.g.rotation.set(Math.sin(t * 0.7 + m.i) * 0.3, t * (1.2 + m.i * 0.2), 0);
+    m.halo.quaternion.copy(camera.quaternion).premultiply(_q.copy(m.g.quaternion).invert());
+    m.tgt.x = m.x; m.tgt.y = m.y; m.tgt.z = m.z;
+    if (m.u.uFlash.value > 0) m.u.uFlash.value = Math.max(0, m.u.uFlash.value - dt * 3);
+    const pulse = 0.85 + 0.15 * Math.sin(t * 3 + m.i * 2);
+    m.hu.uA.value = pulse * (1 - B3.darkK) * m.glow; m.u.uDark.value = B3.darkK;
+    m.core.scale.setScalar(pulse);
+    // shield link to the sun
+    if (m.beam.m.visible) { beamSet(m.beam, m.x, m.y, m.z, 0, B3.sunY, 0, 0.06 + 0.03 * Math.sin(t * 6 + m.i)); m.beam.u.uTime.value = t; m.beam.u.uA.value = 0.55 * (1 - B3.darkK); }
+  }
+}
+
+// ---- corona pulse (expanding ring walls: dash through) ----
+function b3Pulse(speed, col = Bc) {
+  let q = null; for (const o of B3.pulses) if (!o.active) { q = o; break; } if (!q) q = B3.pulses[0];
+  q.active = true; q.r = 2.8; q.speed = speed; q.col = col; q.done = false; q.near = false; q.wall.visible = true; q.flat.visible = true;
+  const pc = PCOL[col]; q.wu.uCol.value.setRGB(pc[0], pc[1], pc[2]); q.fu.uCol.value.setRGB(pc[0] * 1.3, pc[1] * 1.3, pc[2] * 1.3);
+  sfx.swoop(); sfx.tell(1); B3.coronaU.uFlash.value = 0.8; ring(0, 0.2, 0, 2.6, 5, 0.4, 0.4, pc[0] * 2, pc[1] * 2, pc[2] * 2, 1.2);
+}
+function b3UpdatePulses(dt, fighting) {
+  for (const q of B3.pulses) {
+    if (!q.active) continue;
+    q.r += q.speed * dt;
+    const fade = clamp((16.5 - q.r) / 1.5, 0, 1);
+    if (q.r > 16.5) { q.active = false; q.wall.visible = q.flat.visible = false; continue; }
+    q.wall.scale.set(q.r, 1.7, q.r); q.wu.uA.value = fade * Math.min(1, (q.r - 2.8) / 0.8);
+    q.flat.position.set(0, 0.06, 0); const outer = q.r + 1.4; q.flat.scale.setScalar(outer); q.fu.uR.value = q.r; q.fu.uTh.value = 0.45; q.fu.uOuter.value = outer; q.fu.uA.value = fade;
+    if (fighting && player.alive && !q.done) {
+      const d = Math.abs(Math.hypot(player.x, player.z) - q.r) - 0.45 - PLAYER.hurtR;
+      if (d < 0) { hitSrc = 'pulse'; const res = resolveHazard(d, 0.8, q.col, bossRT.phase === 2 ? 16 : 14, true); if (res === HZ_HIT || res === HZ_PERFECT) q.done = true; }
+      else if (d < 0.8) q.near = true;
+    }
+  }
+}
+
+// ---- singularity voids ----
+function b3OpenVoid(x, z, r, life) {
+  let v = null, oldest = null; for (const o of B3.voids) { if (!o.active) { v = o; break; } if (!oldest || o.born < oldest.born) oldest = o; }
+  if (!v) v = oldest;
+  v.active = true; v.x = x; v.z = z; v.r = r; v.t = 0; v.life = life; v.open = 0; v.born = fx.simTime;
+  burst(x, 0.3, z, 60, 2.6, 0.8, 0.3, 9, 0.8, 0.22, 0.8, 0); ring(x, 0.08, z, 0.3, r * 1.8, 0.5, 0.3, 2.6, 0.6, 0.3, 1.4); addTrauma(0.25); sfx.boom();
+}
+function b3CloseVoids() { for (const v of B3.voids) if (v.active && v.t < v.life - 0.6) v.t = v.life - 0.6; }
+function b3UpdateVoids(dt, fighting) {
+  const U = floorU.uVoid.value;
+  for (let i = 0; i < 6; i++) {
+    const v = B3.voids[i];
+    if (!v.active) { U[i].w = 0; continue; }
+    v.t += dt; if (v.t >= v.life) { v.active = false; U[i].w = 0; continue; }
+    v.open = Math.min(1, v.t / 0.45) * Math.min(1, (v.life - v.t) / 0.6);
+    U[i].set(v.x, v.z, v.r, v.open);
+    if (frand() < 0.5) { const a = frand() * TAU; emitP(v.x, 0.05, v.z, a, 2.2, v.r * v.open * 0.95, 2.4, 0.7, 0.25, 1.2, 0.14, 2); }
+    if (fighting && player.alive && player.dashT < 0 && v.open > 0.5) {
+      const dx = player.x - v.x, dz = player.z - v.z, d = Math.hypot(dx, dz) || 0.001, rr = v.r * v.open;
+      if (d < rr - 0.2) {
+        const k = (rr + 0.4) / d; player.x = v.x + dx * k; player.z = v.z + dz * k;
+        burst(player.x, 0.5, player.z, 24, 2.6, 0.6, 0.3, 6, 0.5, 0.18, 1, 0);
+        if (player.hurtI <= 0 && player.invuln <= 0 && !debug.god) { hitSrc = 'void'; damagePlayer(15, R); player.stunT = 0.5; dmgNumber(player.x, 2.8, player.z, 'VOID', 4, '#ff9a6a'); }
+      }
+    }
+  }
+}
+
+// ---- solar chain (tether) ----
+function b3UpdateTether(dt, fighting) {
+  const T = B3.tether;
+  if (!T.active) { if (T.m.visible) T.m.visible = false; return; }
+  T.t += dt;
+  const d = Math.hypot(player.x, player.z), red = d < 8;
+  if (red !== T.red) { T.red = red; if (red) sfx.deny(); }
+  const tc = red ? [2.2, 0.25, 0.3] : [0.4, 0.8, 2.4];
+  T.u.uCol.value.setRGB(tc[0], tc[1], tc[2]); T.u.uTime.value = fx.simTime;
+  T.u.uA.value = Math.min(1, T.t / 0.2) * (T.t > T.dur - 0.3 ? (T.dur - T.t) / 0.3 : 1) * (red ? 1.2 : 0.8);
+  beamSet(T.o, player.x, 1.15 + player.y, player.z, 0, B3.sunY, 0, red ? 0.16 + 0.05 * Math.sin(fx.simTime * 30) : 0.1); T.m.visible = player.alive;
+  if (frand() < 0.5) { const u = frand(); emitP(lerp(player.x, 0, u), lerp(1.15, B3.sunY, u), lerp(player.z, 0, u), (frand() - 0.5), (frand() - 0.5), (frand() - 0.5), tc[0], tc[1], tc[2], 0.4, 0.12, 4); }
+  if (fighting && player.alive) {
+    // the Mirror cuts the chain
+    if (mirror.active && Math.abs(wrapA(Math.atan2(-player.z, -player.x) - mirror.ang)) < Math.PI / 3) {
+      T.active = false; T.m.visible = false; bossAddFracture(20); mirU.uFlash.value = 1.2; sfx.tink(8); sfx.shatter(0.6);
+      ring(mirror.x, 1.15, mirror.z, 0.2, 2.6, 0.35, 0.2, 0.6, 1.2, 2.6, 1.5); burst(mirror.x, 1.2, mirror.z, 40, 0.6, 1.2, 2.6, 8, 0.6, 0.18, 1, 0);
+      dmgNumber(player.x, 2.7, player.z, 'CHAIN CUT', 4, '#9cc8ff'); if (bossRT.cast.name === 'Solar Chain') bossRT.cast.active = false; return;
+    }
+    T.tick -= dt;
+    if (red && T.tick <= 0) { T.tick = 0.5; hitSrc = 'chain'; resolveHazard(-0.1, 0, Bc, 6, false); }
+  }
+  if (T.t >= T.dur) { T.active = false; T.m.visible = false; }
+}
+
+// ---- gravity well ----
+function b3UpdateWell(dt) {
+  const W_ = B3.well; if (!W_.active) return 0;
+  W_.t += dt; const pulling = W_.t >= W_.cast && W_.t < W_.cast + W_.pull;
+  if (W_.t >= W_.cast + W_.pull + 0.1) { W_.active = false; return 0; }
+  // infall streams
+  const n = pulling ? (Q.cfg.low ? 2 : 5) : 1;
+  for (let k = 0; k < n; k++) { const a = frand() * TAU, r = 6 + frand() * 10; emitP(Math.cos(a) * r, 0.2 + frand() * 2, Math.sin(a) * r, -Math.cos(a) * r * 0.8, -0.2, -Math.sin(a) * r * 0.8, 1.6, 0.5, 0.6, 1.1, 0.16, 4); }
+  if (!pulling) return 0;
+  for (let i = 0; i < W_.n; i++) if (Math.hypot(player.x - W_.px[i], player.z - W_.pz[i]) < 1.8) return -1; // sheltered in a pocket
+  return W_.str;
+}
+
+// ---- last light ----
+function b3LastLight() {
+  const ll = B3.ll; if (ll.active || ll.done) return;
+  const b = bossRT; ll.active = true; ll.done = true; ll.t = 0; ll.spT = 0.6; ll.spA = rng() * TAU;
+  bossInterrupt(); b.invuln = true; b.lastLight = true; b.novaInLastLight = false; b.vuln = 0; b.stagger = 0; b.fracture = 100;
+  pjClearAll(true); b3CloseVoids();
+  castBar('LAST LIGHT', ll.dur); ui.el.bigCastName.textContent = 'LAST LIGHT'; ui.el.bigCast.classList.add('on'); B3.prompt.classList.add('on');
+  ui.toast('THE SUN GATHERS ITS LAST LIGHT', 2.6, true);
+  bloomSpike(1.8); addTrauma(0.6); shockAt(0, B3.sunY, 0, 0.07); sfx.riser(); sfx.choir(3); sfx.boom(); B3.sunU.uFlash.value = 1;
+  burst(0, B3.sunY, 0, 160, 2, 2, 2.4, 12, 1.2, 0.25, 1, 0);
+}
+function b3LastLightEnd() {
+  const ll = B3.ll; ll.active = false; bossRT.lastLight = false; ui.el.bigCast.classList.remove('on'); B3.prompt.classList.remove('on');
+  if (bossRT.cast.name === 'LAST LIGHT') bossRT.cast.active = false;
+}
+function b3UpdateLastLight(dt) {
+  const ll = B3.ll; if (!ll.active) return;
+  const b = bossRT; ll.t += dt; b.fracture = 100;
+  ui.set('bigcf', ui.el.bigCastFill, 'tf', `scaleX(${clamp(ll.t / ll.dur, 0, 1).toFixed(3)})`);
+  // slow white spiral to graze (two arms, 5 shots/s)
+  ll.spT -= dt; while (ll.spT <= 0) { ll.spT += 0.4; ll.spA += 0.5; for (let k = 0; k < 2; k++) { const a = ll.spA + k * Math.PI; shoot(Math.cos(a) * 2.9, Math.sin(a) * 2.9, a, 3.0, W, 0.32, 12, 9); } sfx.shot(W); }
+  // sun gathers light inward
+  if (frand() < 0.9) { const a = frand() * TAU, r = 9 + frand() * 6, y = 1 + frand() * 6; emitP(Math.cos(a) * r, y, Math.sin(a) * r, -Math.cos(a) * r * 0.9, (B3.sunY - y) * 0.9, -Math.sin(a) * r * 0.9, 2, 2, 2.3, 1.0, 0.18, 4); }
+  if (b.novaInLastLight && (player.novaT < 0 || player.novaT >= 0.4)) { b3LastLightEnd(); b.invuln = false; bossDie(); return; }
+  if (ll.t >= ll.dur && !b.novaInLastLight) {
+    b3LastLightEnd(); b.invuln = false; bossInterrupt();
+    LU.uWhite.value = 1; b.wipeT = 0; bloomSpike(3); addTrauma(1); shockAt(0, B3.sunY, 0, 0.1); sfx.boom(); sfx.shatter(1.5);
+    ring(0, 0.3, 0, 2, 32, 1.0, 1.0, 2.4, 2.4, 2.6, 1.6); burstRainbow(0, B3.sunY, 0, 200, 18, 1.5, 0.3, 0);
+    ui.toast('THE LAST LIGHT CONSUMES ALL', 2.4, true);
+    if (!debug.god) { player.hurtI = 0; player.invuln = 0; hitSrc = 'lastlight'; damagePlayer(999, W); }
+  }
+}
+
+function b3HudOff() { if (B3.hud) { B3.hud.classList.remove('on'); B3.prompt.classList.remove('on'); } ui.el.bigCast.classList.remove('on'); }
+function b3Reset() {
+  B3.sunY = 4.5; B3.scaleBase = 1; B3.collapseK = 1; B3.cint = 1; B3.ringK = 0; B3.diamond = 0; B3.eclK = 0; B3.eclSlide = 0; B3.darkK = 0; B3.shake = 0;
+  B3.dawn = 0; B3.auroraA = 0; B3.deathT = -1; B3.firstPulse = true; B3.firstWell = true; B3.firstChain = true; B3.firstCrack = true; B3.moonsDown = false; B3.checkpoint = false;
+  B3.sun.visible = B3.rim.visible = B3.corona.visible = true; B3.ecl.visible = false; B3.rays.visible = false; B3.raysU.uA.value = 0;
+  for (const h of B3.halos) h.m.visible = true; for (const a of B3.aurora) a.visible = false; B3.auroraU.uA.value = 0;
+  const su = B3.sunU; su.uCrack.value = 0; su.uFlash.value = 0; su.uGlow.value = 0;
+  const cu = B3.coronaU; cu.uRing.value = 0; cu.uDiamond.value = 0; cu.uInt.value = 1; cu.uGather.value = 0;
+  b3SetPal('corona', true); floorU.uSwirl.value = 1; floorU.uIgnite.value = 99; floorU.uDawn.value = 0; floorU.uFloorDim.value = 0;
+  for (const m of B3.moons) { m.alive = false; m.tgt.alive = false; m.vis = true; m.g.visible = true; m.mode = 0; m.ang = m.i * TAU / 3; m.glow = 1; m.beam.m.visible = false; m.u.uCrack.value = 0; m.hp = 1400; targets.push(m.tgt); }
+  for (const q of B3.pulses) { q.active = false; q.wall.visible = q.flat.visible = false; }
+  for (const v of B3.voids) v.active = false; for (let i = 0; i < 6; i++) floorU.uVoid.value[i].w = 0;
+  B3.tether.active = false; B3.tether.m.visible = false; B3.well.active = false;
+  B3.ll.active = false; B3.ll.done = false; b3HudOff();
+  SECTIONS.b3p3.bpm = 128; starU.uSpin.value = 0;
+}
+function b3ClearMechanics() {
+  for (const q of B3.pulses) { q.active = false; q.wall.visible = q.flat.visible = false; }
+  B3.tether.active = false; B3.tether.m.visible = false; B3.well.active = false;
+}
+function b3GravityWell(mode) {
+  const cast = mode ? 1.2 : 2.0, pull = mode ? 2.0 : 3.0, str = mode ? 5 : 6, n = mode ? 3 : 4;
+  castBar('Gravity Well', cast); sfx.growl(); sfx.riser(); B3.coronaU.uFlash.value = 0.6;
+  const W_ = B3.well; W_.active = true; W_.t = 0; W_.cast = cast; W_.pull = pull; W_.str = str; W_.n = n;
+  const a0 = rng() * TAU;
+  for (let k = 0; k < n; k++) { const a = a0 + k * TAU / n + (rng() - 0.5) * 0.4, r = 8.2 + rng() * 2; W_.px[k] = Math.cos(a) * r; W_.pz[k] = Math.sin(a) * r; teleSafe(W_.px[k], W_.pz[k], 1.8, cast + pull); }
+  W_.tele = teleCircle(0, 0, 5, cast + pull, 30, Bc, { onResolve: () => { ring(0, 0.2, 0, 6, 0.5, 0.5, 0.6, 1.0, 1.4, 2.6, 1.6); burst(0, 0.8, 0, 120, 0.8, 1.2, 2.6, 12, 0.9, 0.25, 0.6, 0); addTrauma(0.5); bloomSpike(1); shockAt(0, 0.5, 0, 0.06); sfx.boom(); } });
+  if (B3.firstWell) { B3.firstWell = false; ui.toast('GRAVITY WELL — shelter in a cyan pocket', 3, true); }
+}
+function b3Sunspot(n) {
+  castBar('Sunspot', 0.3 * n + 0.5);
+  every(0.3, n, () => {
+    _v2a.set(player.x + player.vx * 0.8, player.z + player.vz * 0.8); b3InArena(_v2a, 3.4, 13.4);
+    teleCircle(_v2a.x, _v2a.y, 2.4, b3Windup(), 18, Bc, { onResolve: (o) => {
+      beam(o.x, 18, o.z, o.x, 0, o.z, 1.3, 0.32, 0.35, 0.6, 1.8, 1, 1.4); burst(o.x, 0.4, o.z, 30, 0.6, 1.0, 2.6, 8, 0.6, 0.2, 0.7, 0);
+      ring(o.x, 0.1, o.z, 0.3, 3.4, 0.45, 0.25, 0.6, 1.0, 2.6, 1.3); addTrauma(0.14);
+    } });
+  });
+}
+function b3SolarFlare(mode) { // mode 0: blue wall ×2 · mode 1: eclipse flare (R/B mixed, faster)
+  castBar(mode ? 'Eclipse Flare' : 'Solar Flare', 1.0); B3.coronaU.uFlash.value = 1; sfx.choir(mode ? 2 : 0); B3.sunU.uFlash.value = 0.25;
+  const sp = (mode ? 8 : 7) * DIFF[2].spd;
+  for (let w = 0; w < 2; w++) after(1.0 + w * 2.5, () => {
+    const dir = w ? -1 : 1, a0 = aimAt(0, 0) - dir * TAU / 6;
+    every(1 / 16, 32, (i) => {
+      const a = a0 + dir * (i / 31) * (TAU / 3), c = mode ? (i % 2 ? R : Bc) : Bc;
+      shoot(Math.cos(a) * 2.8, Math.sin(a) * 2.8, a, sp, c, 0.3, 15, 4);
+      if (i % 2 === 0) shoot(Math.cos(a) * 2.8, Math.sin(a) * 2.8, a, sp * 0.74, c, 0.24, 12, 5);
+      if (i % 4 === 0) sfx.shot(c);
+      if (i % 3 === 0) { const pc = PCOL[c]; emitP(Math.cos(a) * 2.6, B3.sunY - 1, Math.sin(a) * 2.6, Math.cos(a) * 6, -3, Math.sin(a) * 6, pc[0] * 2, pc[1] * 2, pc[2] * 2, 0.5, 0.3, 4); }
+    });
+  });
+}
+
 const BOSS3 = {
-  id: 3, name: 'THE NULL SUN', subtitle: 'Eclipse Sovereign', deathTitle: 'THE NULL SUN', deathSub: 'DAWN', stub: true,
+  id: 3, name: 'THE NULL SUN', subtitle: 'Eclipse Sovereign', deathTitle: 'THE NULL SUN', deathSub: 'DAWN',
   arena: 2, arenaR: 15, maxHp: 32000, enrage: 300, hit: { x: 0, y: 4.5, z: 0, r: 2.6, hy: 4.6 },
-  barGrad: 'linear-gradient(90deg,#5a6cff,#b8c8ff 55%,#ffffff)', music: ['b3p1', 'b3p2', 'b3p3'],
+  barGrad: 'linear-gradient(90deg,#ff4a2a,#ffb070 18%,#ffffff 45%,#9fb8ff 70%,#3a52ff)', music: ['b3p1', 'b3p2', 'b3p3'],
   phases: [
-    { name: 'Corona', until: 0.6, loop: 12, steps: [[0, 'SolarFlare'], [4.5, 'Sunspot'], [8, 'WhiteHalo']] },
-    { name: 'Supernova', until: 0, loop: 10, steps: [[0, 'SolarFlare'], [3, 'Sunspot'], [5.5, 'WhiteHalo'], [7.5, 'Sunspot']] },
+    { name: 'Corona', until: 0.7, loop: 14, steps: [[0, 'SolarFlare', 0], [5.5, 'CoronaPulse', 0], [9, 'Sunspot', 5], [11.5, 'PrismShards']] },
+    { name: 'Prism Court', until: 0.4, loop: 18, steps: [[3, 'GravityWell', 0], [8, 'Tether'], [12, 'Sunspot', 6], [15, 'CoronaPulse', 1]] },
+    { name: 'Supernova', until: 0, loop: 16, steps: [[0, 'Cracks'], [2, 'SolarFlare', 1], [6, 'CoronaPulse', 2], [8.5, 'WhiteHalo'], [11, 'FrontalEclipse'], [13, 'GravityWell', 1]] },
   ],
-  build: buildBoss3, show(on) { B3.group.visible = on; },
-  reset() { B3.coronaU.uCol.value.setRGB(0.4, 0.7, 1.0); },
-  transitionInstant() { B3.coronaU.uCol.value.setRGB(1.0, 0.25, 0.15); },
+  camBias: 0.22,
+  build: buildBoss3,
+  show(on) { B3.group.visible = on; if (!on) b3HudOff(); },
+  reset() { b3Reset(); },
+  transitionInstant(n) {
+    b3ClearMechanics();
+    if (n === 1) { b3SetPal('white', true); floorU.uSwirl.value = -1; B3.coronaU.uFlash.value = 0; }
+    if (n === 2) { for (const m of B3.moons) b3KillMoon(m, false); bossRT.shieldMul = 1; b3SetPal('eclipse', true); B3.eclK = 1; B3.eclSlide = 0; B3.ringK = 1; B3.diamond = 0.5; }
+  },
+  onPhase(n) {
+    if (n === 1) b3MoonsDetach(false);
+    if (n === 2) {
+      B3.checkpoint = true; bossRT.enrageLeft = 100; bossRT.enrageWarned = false; B3.hud.classList.add('on');
+      ui.tutorial('supernova', 'SUPERNOVA in 100 s — burn it down before it ignites');
+    }
+  },
+  onInterrupt() { b3ClearMechanics(); },
+  hpCheck() { const b = bossRT; if (b.phase === 2 && !B3.ll.done && b.hp <= 0.1 * b.maxHp) { b.hp = 0.1 * b.maxHp; b3LastLight(); return true; } return false; },
+  enrageName() { return bossRT.phase === 2 ? 'SUPERNOVA' : 'ENRAGE'; },
+  onEnrage() { B3.sunU.uFlash.value = 1; B3.collapseK = 1.6; bloomSpike(3); shockAt(0, B3.sunY, 0, 0.12); ring(0, 0.3, 0, 2, 34, 1.2, 1.2, 2.6, 1.2, 0.6, 1.8); burstRainbow(0, B3.sunY, 0, 260, 22, 1.8, 0.35, 0); sfx.shatter(1.5); },
+  apPenalty(cx, cz) {
+    let p = 0; const r = Math.hypot(cx, cz);
+    if (r < 4.4) p += 30;
+    for (const v of B3.voids) if (v.active && Math.hypot(cx - v.x, cz - v.z) < v.r + 1.2) p += 30;
+    if (B3.tether.active && r < 9.2) p += (9.2 - r) * 6;
+    const W_ = B3.well; if (W_.active) { let best = 1e9; for (let i = 0; i < W_.n; i++) best = Math.min(best, Math.hypot(cx - W_.px[i], cz - W_.pz[i])); p += best * 2.5; }
+    return p;
+  },
+  apHook() {
+    const p = player, r = Math.hypot(p.x, p.z) || 1;
+    if (p.dashT < 0 && p.dashCharges > 0) for (const q of B3.pulses) { if (!q.active || q.done) continue; const d = r - q.r; if (d > 0.1 && d < 1.0 + q.speed * 0.06) { input.mx = -p.x / r; input.mz = -p.z / r; useAbility('dash'); break; } }
+    if (B3.tether.active && r < 7.5 && abilityReady('mirror')) useAbility('mirror');
+    if (bossRT.lastLight && abilityReady('nova')) useAbility('nova');
+  },
   casts: {
-    SolarFlare() { castBar('Solar Flare', 1); const a0 = aimAt(0, 0) - 1.05; every(1 / 16, 32, (i) => { const a = a0 + i / 32 * 2.1; shoot(Math.cos(a) * 2.6, Math.sin(a) * 2.6, a, 7 * DIFF[2].spd, Bc, 0.3, 15); if (i % 4 === 0) sfx.shot(Bc); }, 1); },
-    Sunspot() { castBar('Sunspot', 0.8); every(0.3, 5, () => { teleCircle(player.x + player.vx * 0.8, player.z + player.vz * 0.8, 2.4, DIFF[2].windup, 18, Bc, { onResolve: (o) => { burst(o.x, 0.3, o.z, 26, 0.6, 1.0, 2.6, 7, 0.6, 0.2, 1, 0); addTrauma(0.15); } }); }); },
-    WhiteHalo() { castBar('White Halo', 1.5); every(0.5, 3, (i) => { patRing(0, 0, 36, 3.5, W, 0.3, 15, i * 5 * Math.PI / 180); sfx.shot(W); }); },
+    SolarFlare(mode = 0) { b3SolarFlare(mode); },
+    EclipseFlare() { b3SolarFlare(1); },
+    CoronaPulse(mode = 0) {
+      const n = mode === 1 ? 2 : 3, sp = [6, 7.5, 8][mode] || 6;
+      castBar('Corona Pulse', 1.0 + 0.6 * n); B3.coronaU.uFlash.value = 0.5;
+      teleRing(0, 0, 2.8, 15.2, 1.0, 0, Bc, { noHit: true });
+      every(0.6, n, () => b3Pulse(sp, Bc), 1.0);
+      if (B3.firstPulse) { B3.firstPulse = false; ui.tutorial('pulse', 'DASH through the rings — a perfect dash takes no damage'); }
+    },
+    Sunspot(n = 5) { b3Sunspot(n); },
+    PrismShards() {
+      castBar('Prism Shards', 1.4);
+      for (const m of B3.moons) {
+        if (!m.vis || m.mode !== 0) continue;
+        after(m.i * 0.25, () => {
+          const ox = m.x, oz = m.z; const a = aimAt(ox, oz); m.u.uFlash.value = 1;
+          const o = teleLine(ox, oz, ox + Math.cos(a) * 26, oz + Math.sin(a) * 26, 0.7, 0.55, 0, m.c, { noHit: true, follow: (o) => { const aa = aimAt(m.x, m.z); teleSetLine(o, m.x, m.z, m.x + Math.cos(aa) * 26, m.z + Math.sin(aa) * 26, 0.7); }, lockAt: 0.85 });
+          after(0.55, () => {
+            const sx = o.x, sz = o.z, aa = Math.atan2(o.z1 - o.z, o.x1 - o.x);
+            every(0.08, 5, () => { shoot(sx, sz, aa, 9 * DIFF[2].spd, m.c, 0.3, 15, 4); }); sfx.shot(m.c);
+            const pc = PCOL[m.c]; beam(m.x, m.y, m.z, sx, 0.9, sz, 0.12, 0.3, pc[0], pc[1], pc[2], 1, 1.2); burst(m.x, m.y, m.z, 16, pc[0] * 2, pc[1] * 2, pc[2] * 2, 4, 0.4, 0.16, 1, 0);
+          });
+        });
+      }
+    },
+    MoonsDetach() { b3MoonsDetach(false); },
+    GravityWell(mode = 0) { b3GravityWell(mode); },
+    Tether() {
+      const T = B3.tether; T.active = true; T.t = 0; T.dur = 6; T.tick = 0.4; T.red = false;
+      castBar('Solar Chain', 6, true); sfx.laser(); B3.coronaU.uFlash.value = 0.6;
+      if (B3.firstChain) { B3.firstChain = false; ui.toast('SOLAR CHAIN — stay 8 m from the sun, or cut it with your Mirror', 3.4, true); }
+    },
+    Cracks() {
+      castBar('Singularity', 1.0); sfx.growl();
+      for (let k = 0; k < 3; k++) {
+        if (k === 0) _v2a.set(player.x + (rng() - 0.5) * 2, player.z + (rng() - 0.5) * 2); else { const p = randInArena(12); _v2a.set(p.x, p.y); }
+        b3InArena(_v2a, 5, 12); const mx = _v2a.x, mz = _v2a.y, a = rng() * Math.PI, c = Math.cos(a) * 4.5, s = Math.sin(a) * 4.5;
+        teleLine(mx - c, mz - s, mx + c, mz + s, 1.2, 1.0, 16, R, { onResolve: (o) => { b3OpenVoid((o.x + o.x1) / 2, (o.z + o.z1) / 2, 2.0, 12); } });
+      }
+      if (B3.firstCrack) { B3.firstCrack = false; ui.tutorial('voids', 'Singularity cracks tear the floor open — stay out of the voids'); }
+    },
+    WhiteHalo() {
+      castBar('White Halo', 1.8); B3.coronaU.uFlash.value = 1;
+      const a0 = rng() * TAU;
+      every(0.6, 3, (i) => { patRing(0, 0, 36, 3.2 * DIFF[2].spd, W, 0.3, 15, a0 + i * 5 * Math.PI / 180, null, 0, 0, 9); sfx.shot(W); ring(0, 1, 0, 2.6, 6, 0.4, 0.3, 2, 2, 2, 1.2); });
+      ui.tutorial('white', 'WHITE shots charge every color — graze them to fuel White Nova');
+    },
+    FrontalEclipse() {
+      const w = b3Windup(), half = 40 * Math.PI / 180;
+      castBar('Frontal Eclipse', w + 0.9); sfx.growl();
+      const first = teleCone(0, 0, aimAt(0, 0), half, 16, w, 25, R, {
+        lockAt: 0.45, follow: (o) => { teleSetCone(o, 0, 0, aimAt(0, 0), half, 16); if (second) teleSetCone(second, 0, 0, o.ang + Math.PI, half, 16); },
+        onResolve: (o) => { addTrauma(0.4); bloomSpike(0.8); sfx.boom(); shockAt(0, 1, 0, 0.04); for (let k = 0; k < 50; k++) { const a = o.ang + (frand() - 0.5) * 2 * half, sp = 8 + frand() * 12; emitP(Math.cos(a) * 2.8, 1 + frand(), Math.sin(a) * 2.8, Math.cos(a) * sp, frand() * 2, Math.sin(a) * sp, 2.6, 0.5, 0.2, 0.8, 0.26, 0); } },
+      });
+      const second = teleCone(0, 0, first.ang + Math.PI, half, 16, w + 0.8, 25, R, {
+        lockAt: 1.0, onResolve: (o) => { addTrauma(0.4); bloomSpike(0.8); sfx.boom(); for (let k = 0; k < 50; k++) { const a = o.ang + (frand() - 0.5) * 2 * half, sp = 8 + frand() * 12; emitP(Math.cos(a) * 2.8, 1 + frand(), Math.sin(a) * 2.8, Math.cos(a) * sp, frand() * 2, Math.sin(a) * sp, 2.6, 0.5, 0.2, 0.8, 0.26, 0); } },
+      });
+    },
+    LastLight() { const b = bossRT; if (b.phase !== 2) bossStartTransition(2, true); b.hp = Math.min(b.hp, 0.1 * b.maxHp); b3LastLight(); },
   },
   update(dt) {
-    const t = fx.simTime; B3.coronaU.uTime.value = t; B3.corona.quaternion.copy(camera.quaternion); B3.coronaU.uFlash.value = bossRT.flash > 0 ? 1 : damp(B3.coronaU.uFlash.value, 0, 6, dt);
-    B3.sun.position.y = B3.corona.position.y = 4.5 + Math.sin(t * 0.6) * 0.1;
-    floorU.uSwirl.value = 1;
-    const Lv = floorU.uLights.value, Lc = floorU.uLightCol.value; Lv[0].set(0, 4.5, 0, 0.6); Lc[0].copy(B3.coronaU.uCol.value); for (let k = 1; k < 4; k++) Lv[k].w = 0;
+    const t = fx.simTime, b = bossRT, fighting = game.state === 'fight' && !b.dead && !b.transitioning;
+    B3.sunU.uTime.value = t; B3.coronaU.uTime.value = t; B3.raysU.uTime.value = t; B3.auroraU.uTime.value = t;
+    b3PalStep(dt);
+    // supernova growth (phase 3)
+    if (b.phase === 2 && !b.dead && !B3.ll.active) {
+      const k = clamp(1 - b.enrageLeft / 100, 0, 1);
+      B3.scaleBase = 1 + 0.8 * k; B3.sunU.uGlow.value = k * 0.9;
+      SECTIONS.b3p3.bpm = 128 + Math.round(k * 34);
+      const n = Math.max(0, Math.ceil(b.enrageLeft));
+      if (n !== B3.hudN) { B3.hudN = n; B3.hudN_el.textContent = String(n); B3.hud.style.setProperty('--k', (clamp(b.enrageLeft / 100, 0, 1) * 100).toFixed(1) + '%'); const crit = n <= 20; if (crit !== B3.hudCrit) { B3.hudCrit = crit; B3.hud.classList.toggle('crit', crit); } }
+    } else if (b.phase < 2) { B3.scaleBase = damp(B3.scaleBase, 1, 3, dt); }
+    if (B3.ll.active) B3.scaleBase = damp(B3.scaleBase, 0.8, 1.5, dt);
+    // sun body
+    B3.sunY = 4.5 + Math.sin(t * 0.6) * 0.12;
+    const sc = Math.max(0.02, B3.scaleBase * B3.collapseK);
+    if (B3.collapseK > 1) B3.collapseK = damp(B3.collapseK, 1, 2, dt);
+    const shx = B3.shake > 0 ? (frand() - 0.5) * B3.shake : 0, shz = B3.shake > 0 ? (frand() - 0.5) * B3.shake : 0;
+    B3.sun.position.set(shx, B3.sunY, shz); B3.sun.scale.setScalar(sc); B3.rim.position.copy(B3.sun.position); B3.rim.scale.setScalar(sc);
+    B3.corona.position.copy(B3.sun.position); B3.corona.scale.setScalar(sc); B3.corona.quaternion.copy(camera.quaternion);
+    B3.rays.position.copy(B3.sun.position); B3.rays.quaternion.copy(camera.quaternion);
+    const cu = B3.coronaU, su = B3.sunU;
+    if (cu.uFlash.value > 0) cu.uFlash.value = Math.max(0, cu.uFlash.value - dt * 2.5);
+    if (b.flash > 0) cu.uFlash.value = Math.max(cu.uFlash.value, 0.12);
+    const stun = b.stagger > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(t * 9)) : 1;
+    cu.uInt.value = B3.cint * stun * (1 - B3.darkK) * (B3.ll.active ? 1.3 + 0.3 * Math.sin(t * 8) : 1);
+    cu.uRing.value = B3.ringK; cu.uDiamond.value = B3.diamond * (1 - B3.darkK); cu.uGather.value = damp(cu.uGather.value, B3.ll.active ? 1 : 0, 3, dt);
+    su.uCrack.value = Math.max(su.uCrack.value * (B3.deathT >= 0 ? 1 : 0), damp(su.uCrack.value, b.vuln > 0 ? 1 : 0, 6, dt)); su.uFracture.value = b.fracture >= 100 ? 1 : 0;
+    if (su.uFlash.value > 0) su.uFlash.value = Math.max(0, su.uFlash.value - dt * 3);
+    su.uEdge.value.copy(cu.uCol.value); B3.rimU.uCol.value.copy(cu.uCol2.value).lerp(cu.uCol.value, 0.5); B3.rimU.uA.value = (1 - B3.darkK) * B3.cint;
+    // the sun turns glassy when the player stands behind it on screen (keeps bullets readable)
+    { _v1.set(0, B3.sunY, 0).project(camera); _v2.set(player.x, 1, player.z).project(camera); const asp = VW / VH;
+      const dsx = (_v2.x - _v1.x) * asp, dsy = _v2.y - _v1.y; _v3.set(2.4 * sc, B3.sunY, 0).project(camera); const rs = Math.abs(_v3.x - _v1.x) * asp + 0.05;
+      const behind = player.z < 1 && Math.hypot(dsx, dsy) < rs ? 1 : 0; B3.glass = damp(B3.glass || 0, behind, 6, dt);
+      su.uAlpha.value = (B3.deathT >= 0 ? 1 : 0.9 - 0.55 * B3.glass); B3.ecl.material.opacity = 0.92 - 0.55 * B3.glass; }
+    // eclipse moon in front of the sun (toward the camera)
+    B3.ecl.visible = B3.eclK > 0.01 && B3.sun.visible;
+    if (B3.ecl.visible) {
+      _v1.copy(camera.position).sub(B3.sun.position).normalize(); _v2.set(-_v1.z, 0, _v1.x).normalize();
+      B3.ecl.position.copy(B3.sun.position).addScaledVector(_v1, 1.6).addScaledVector(_v2, B3.eclSlide * 6.5);
+    }
+    // halo rings
+    const P = B3PAL[B3.pal];
+    for (const h of B3.halos) { h.a += dt * h.sp; h.m.position.copy(B3.sun.position); h.m.rotation.set(Math.PI / 2 + h.tilt, 0, h.a); h.m.scale.setScalar((h === B3.halos[0] ? 3.7 : 4.6) * Math.max(1, sc)); h.m.material.color.setRGB(P.ring[0], P.ring[1], P.ring[2]).multiplyScalar(1.2 * (1 - B3.darkK) * B3.cint); }
+    // gravitational lens
+    let warp = 0;
+    if (B3.sun.visible && B3.cint > 0.05) { _v1.set(0, B3.sunY, 0).project(camera); if (_v1.z < 1 && Math.abs(_v1.x) < 1.6 && Math.abs(_v1.y) < 1.6) { LU.uWarpCenter.value.set(_v1.x * 0.5 + 0.5, _v1.y * 0.5 + 0.5); warp = B3.warp * (1 + b.phase * 0.25) * B3.cint * Math.max(1, sc) * (B3.well.active ? 1.6 : 1); } }
+    LU.uWarpStrength.value = warp; LU.uWarpRadius.value = 0.16 * Math.max(1, sc * 0.8);
+    // gravity & the lethal horizon
+    let grav = 0;
+    if (fighting) {
+      grav = [0.8, 1.4, 2.0][b.phase] || 0; if (B3.ll.active) grav = 1.0;
+      const wg = b3UpdateWell(dt); if (wg > 0) grav = wg; else if (wg < 0) grav = 0;
+      if (player.alive) {
+        const r = Math.hypot(player.x, player.z) || 0.001;
+        if (r < 2.6 && player.dashT < 0) {
+          const k = 3.0 / r; player.x *= k; player.z *= k; player.stunT = Math.max(player.stunT, 0.15);
+          hitSrc = 'horizon'; resolveHazard(-0.1, 0, W, 20, false);
+          burst(player.x, 0.6, player.z, 20, 2.4, 1.6, 1.2, 6, 0.5, 0.16, 1, 0);
+        }
+      }
+    } else { B3.well.active = false; }
+    game.gravity = grav;
+    b3UpdateMoons(dt, fighting);
+    b3UpdatePulses(dt, fighting);
+    b3UpdateVoids(dt, fighting);
+    b3UpdateTether(dt, fighting);
+    if (fighting || B3.ll.active) b3UpdateLastLight(dt);
+    // starfield swirl & infalling matter
+    B3.spin += dt * (0.012 + b.phase * 0.008) * (floorU.uSwirl.value < 0 ? -1 : 1) * (1 - B3.dawn); starU.uSpin.value = B3.spin;
+    if (B3.sun.visible && B3.dawn < 0.5) {
+      B3.infallAcc += dt * (Q.cfg.low ? 12 : 30) * B3.cint;
+      while (B3.infallAcc >= 1) {
+        B3.infallAcc -= 1; const a = frand() * TAU, r = 12 + frand() * 6, sw = floorU.uSwirl.value; const ca = Math.cos(a), sa = Math.sin(a);
+        const vx = -ca * 3.2 - sa * 3.4 * sw, vz = -sa * 3.2 + ca * 3.4 * sw; const rc = floorU.uRampB.value;
+        emitP(ca * r, 0.06 + frand() * 0.25, sa * r, vx, 0, vz, rc.r * 1.6, rc.g * 1.6, rc.b * 1.6, 2.6, 0.09 + frand() * 0.08, 4);
+      }
+    }
+    // dawn finale state
+    floorU.uDawn.value = B3.dawn; B3.auroraU.uA.value = B3.auroraA; for (const a of B3.aurora) a.visible = B3.auroraA > 0.001;
+    if (B3.dawn > 0.2 && frand() < 0.5 * B3.dawn) { const a = frand() * TAU, r = Math.sqrt(frand()) * 17; _col.setHSL(frand(), 0.9, 0.7); emitP(Math.cos(a) * r, 0.1, Math.sin(a) * r, 0, 0.5 + frand() * 0.8, 0, _col.r * 1.4, _col.g * 1.4, _col.b * 1.4, 3.5, 0.1, 3); }
+    // floor light blobs: the corona + prism moons
+    const Lv = floorU.uLights.value, Lc = floorU.uLightCol.value;
+    Lv[0].set(0, B3.sunY, 0, B3.sun.visible ? 0.75 * B3.cint * (1 - B3.darkK) * sc : 0); Lc[0].copy(cu.uCol.value);
+    for (let k = 0; k < 3; k++) { const m = B3.moons[k]; if (m.vis && m.g.visible) { Lv[k + 1].set(m.x, m.y, m.z, 0.8 * (1 - B3.darkK)); const pc = PCOL[m.c]; Lc[k + 1].setRGB(pc[0], pc[1], pc[2]); } else Lv[k + 1].w = 0; }
     floorU.uBossPos.value.set(0, 0); floorU.uBossShadow.value = 0;
   },
-  introCine: () => genericIntro(BOSS3, 0, 4.5, 0),
-  transitionCine: (n) => genericTransition(BOSS3, n, () => BOSS3.transitionInstant(n)),
-  deathCine: () => genericDeath(BOSS3, 0, 4.5, 0, 1.0),
+  // ---- cinematics ----
+  introCine() {
+    const keys = [[0, 0, 46, 32, 0, 0, 0, 62], [1.2, 0, 21, 22, 0, 0, 3, 52], [2.4, 8, 6.5, 14, 0, 4.0, 0, 50], [3.4, -4.8, 1.6, 12.0, 0, 5.0, 0, 58], [4.7, -4.2, 2.4, 13.2, 0, 5.2, 0, 55], [5.8, 0, 17.5, 19.5, 0, 0, 6, 50]];
+    return {
+      dur: 5.8, skippable: 0.6, skipTo: 5.4,
+      start() {
+        ui.hud(false); player.x = 0; player.z = 7; playerG.visible = false; floorU.uIgnite.value = 0; B3.cint = 0; sfx.fall();
+        for (const m of B3.moons) { m.vis = false; m.g.visible = false; }
+      },
+      update(t) {
+        camKeys(t, keys);
+        floorU.uIgnite.value = t < 1.2 ? 0 : t > 3.2 ? 99 : (t - 1.2) / 1.7 * 30;
+        B3.cint = smooth((t - 1.9) / 0.5) * (1 + 0.6 * Math.exp(-Math.max(0, t - 2.0) * 3));
+      },
+      ev: [
+        [0.5, () => { reform(0, 1.15, 7, 60, 0.45, 1.4, 1.6, 2.2, 6); }],
+        [0.95, () => { playerG.visible = true; ring(0, 0.06, 7, 0.3, 5, 0.7, 0.3, 2, 2.2, 2.6, 1.4); bloomSpike(0.8); addTrauma(0.3); sfx.boom(); }],
+        [1.2, () => { sfx.riser(); ring(0, 0.1, 0, 2.6, 18, 1.6, 0.8, 2.6, 1.2, 0.5, 1.4); }],
+        [1.95, () => { bloomSpike(2.2); shockAt(0, 4.5, 0, 0.09); addTrauma(0.6); sfx.boom(); sfx.shatter(0.6); burst(0, 4.5, 0, 180, 0.8, 1.3, 2.6, 16, 1.2, 0.3, 1, 0); aberrSpike(0.012); }],
+        ...[0, 1, 2].map((i) => [2.5 + i * 0.3, () => {
+          const m = B3.moons[i]; m.vis = true; m.g.visible = true; m.mode = 3; m.flyT = 0; const a = -Math.PI / 2 + (i - 1) * 1.2;
+          m.from.set(Math.cos(a) * 30, 14, Math.sin(a) * 30); m.x = m.from.x; m.y = m.from.y; m.z = m.from.z; m.u.uFlash.value = 1; sfx.chime(4 + i * 2);
+        }]),
+        [3.4, () => { ui.letterbox(true); ui.titleCard('THE NULL SUN', 'Eclipse Sovereign · Final Refraction'); music.setSection('b3p1'); rainbowWave(0, 0, 0.8, 14); }],
+      ],
+      end() { floorU.uIgnite.value = 99; B3.cint = 1; playerG.visible = true; for (const m of B3.moons) { m.vis = true; m.g.visible = true; if (m.mode === 3) m.mode = 0; } },
+    };
+  },
+  transitionCine(n) {
+    const c0 = new THREE.Vector3(), l0 = new THREE.Vector3();
+    if (n === 1) return { // COLLAPSE
+      dur: 2.6,
+      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.5; ui.toast('COLLAPSE', 2.2); sfx.riser(); b3ClearMechanics(); },
+      update(t) {
+        const k = smooth(t / 0.7); director.camPos.set(lerp(c0.x, 6.5, k), lerp(c0.y, 5.5, k), lerp(c0.z, 13.5, k)); director.camLook.set(lerp(l0.x, 0, k), lerp(l0.y, 3.8, k), lerp(l0.z, 0, k)); director.fov = lerp(50, 56, smooth(t / 2.6));
+        if (t < 0.5) { B3.collapseK = lerp(1, 0.05, easeIn(t / 0.5)); B3.cint = 1 + t * 2; }
+        else if (t < 1.1) { B3.collapseK = 0.05; B3.cint = 0.05; B3.darkK = smooth((t - 0.5) / 0.12); LU.uDark.value = 0.7 * B3.darkK; floorU.uFloorDim.value = B3.darkK; starU.uBright.value = 1 - 0.9 * B3.darkK; nebU.uOp.value = 0.25 * (1 - B3.darkK); }
+        else { const k2 = (t - 1.1) / 0.6; B3.collapseK = k2 < 1 ? lerp(0.05, 1.0, easeOut(k2)) * (1 + 0.25 * Math.sin(Math.min(1, k2) * Math.PI)) : 1; B3.cint = 1.6 - 0.6 * smooth((t - 1.1) / 1.2);
+          B3.darkK = Math.max(0, 1 - (t - 1.1) / 0.3); LU.uDark.value = 0.7 * B3.darkK; floorU.uFloorDim.value = B3.darkK; starU.uBright.value = 1 - 0.9 * B3.darkK; nebU.uOp.value = 0.25 * (1 - B3.darkK); }
+        if (t > 2.0) director.timeScale = lerp(0.5, 1, (t - 2.0) / 0.6);
+      },
+      ev: [
+        [0.0, () => { B3.coronaU.uFlash.value = 1; bloomSpike(1.0); for (const m of B3.moons) m.u.uFlash.value = 1; }],
+        [0.5, () => { sfx.boom(); addTrauma(0.3); }],
+        [1.1, () => { b3SetPal('white', true); floorU.uSwirl.value = -1; bloomSpike(2.5); aberrSpike(0.015); shockAt(0, 4.5, 0, 0.09); addTrauma(0.8); sfx.boom(); sfx.shatter(1.2);
+          burst(0, 4.5, 0, 240, 2.2, 2.4, 2.8, 18, 1.3, 0.3, 1, 0); rainbowWave(0, 0, 1.2, 18); ring(0, 0.2, 0, 2.6, 22, 1.0, 0.9, 1.6, 2.0, 2.6, 1.4); game.satTarget = Math.min(1, game.sat + 0.08); }],
+      ],
+      end() { director.timeScale = 1; B3.collapseK = 1; B3.cint = 1; B3.darkK = 0; LU.uDark.value = 0; floorU.uFloorDim.value = 0; starU.uBright.value = 1; nebU.uOp.value = 0.25; b3SetPal('white', true); floorU.uSwirl.value = -1; },
+    };
+    return { // ECLIPSE
+      dur: 3.0,
+      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.5; ui.toast('ECLIPSE', 2.4); sfx.riser(); b3ClearMechanics(); B3.eclK = 1; B3.eclSlide = 1; B3.diamond = 0;
+        for (const m of B3.moons) if (m.vis) b3KillMoon(m, true); bossRT.shieldMul = 1; music.setSection('silence'); },
+      update(t) {
+        const k = smooth(t / 1.1); director.camPos.set(lerp(c0.x, 0, k), lerp(c0.y, 1.5, k), lerp(c0.z, 11, k)); director.camLook.set(lerp(l0.x, 0, k), lerp(l0.y, 4.5, k), lerp(l0.z, 0, k)); director.fov = lerp(50, 60, k);
+        B3.eclSlide = 1 - smooth((t - 0.3) / 1.45); B3.ringK = smooth((t - 1.1) / 0.65);
+        B3.diamond = t < 1.6 ? 0 : t < 1.8 ? (t - 1.6) / 0.2 * 3.2 : Math.max(0.5, 3.2 * Math.exp(-(t - 1.8) * 2.2));
+        if (t > 2.4) director.timeScale = lerp(0.5, 1, (t - 2.4) / 0.6);
+      },
+      ev: [
+        [1.75, () => { bloomSpike(2.6); aberrSpike(0.014); sfx.chime(9, 1.2); sfx.chime(12, 0.8); }],
+        [1.95, () => { b3SetPal('eclipse', false); game.sat = 1.0; addTrauma(0.7); shockAt(0, 4.5, 0, 0.08); sfx.boom(); rainbowWave(0, 0, 1.0, 16); ring(0, 0.2, 0, 2.6, 24, 1.1, 0.9, 2.6, 0.4, 0.3, 1.5); music.setSection('b3p3'); }],
+      ],
+      end() { director.timeScale = 1; B3.eclK = 1; B3.eclSlide = 0; B3.ringK = 1; B3.diamond = 0.5; b3SetPal('eclipse', true); },
+    };
+  },
+  deathCine() {
+    const c0 = new THREE.Vector3(), l0 = new THREE.Vector3(); const s0 = game.sat; let waveT = 0;
+    return {
+      dur: 8.4,
+      start() {
+        c0.copy(cam.pos); l0.copy(cam.look); ui.hud(false); music.setSection('silence'); b3LastLightEnd(); b3HudOff(); b3ClearMechanics(); b3CloseVoids();
+        player.novaT = -1; player.y = 0; crystalU.uFlash.value = 0; player.invuln = 99; game.gravity = 0; B3.deathT = 0;
+        LU.uWhite.value = 1; director.timeScale = 0.15; B3.sunU.uCrack.value = 1; B3.rays.visible = true; B3.raysU.uA.value = 0; B3.raysU.uLen.value = 0.25; B3.shake = 0.25;
+        sfx.choir(3); bloomSpike(2); sfx.riser();
+      },
+      update(t, dt) {
+        B3.deathT = t;
+        const k1 = smooth(t / 1.0), k2 = smooth((t - 1.4) / 5.0);
+        _v1.set(lerp(c0.x, 0, k1), lerp(c0.y, 3.2, k1), lerp(c0.z, 13.5, k1)); _v2.set(lerp(l0.x, 0, k1), lerp(l0.y, 4.6, k1), lerp(l0.z, 0, k1));
+        director.camPos.set(_v1.x + Math.sin(k2 * 1.2) * 7 * k2, lerp(_v1.y, 13, k2), lerp(_v1.z, 19, k2)); director.camLook.set(0, lerp(_v2.y, 1.6, k2), 0); director.fov = lerp(52, 50, k2);
+        if (t < 1.4) {
+          LU.uWhite.value = t < 0.35 ? 1 : Math.max(0.15, 1 - (t - 0.35) / 0.6);
+          B3.raysU.uA.value = smooth(t / 0.7) * 1.4; B3.raysU.uLen.value = 0.25 + t * 0.35; B3.shake = 0.1 + t * 0.35;
+          director.timeScale = t < 1.0 ? 0.15 : lerp(0.15, 1, (t - 1.0) / 0.4);
+        } else {
+          const u = t - 1.4; LU.uWhite.value = Math.max(0, 0.85 * (1 - u / 0.9)); director.timeScale = 1; B3.shake = 0;
+          B3.raysU.uLen.value = 0.74 + u * 0.9; B3.raysU.uA.value = Math.max(0, 1.4 * (1 - u / 2.2)); if (B3.raysU.uA.value <= 0) B3.rays.visible = false;
+          B3.dawn = smooth((t - 1.7) / 2.6); B3.auroraA = smooth((t - 2.4) / 3.0);
+          game.sat = lerp(s0, 1.0, smooth((t - 1.6) / 2.0)); starU.uColorful.value = smooth((t - 2.0) / 2.5); starU.uBright.value = 1 + 0.8 * smooth((t - 2.0) / 2.5);
+          nebU.uA.value.setRGB(lerp(0.1, 0.55, B3.dawn), lerp(0.2, 0.25, B3.dawn), lerp(0.6, 0.5, B3.dawn)); nebU.uB.value.setRGB(lerp(0.6, 0.1, B3.dawn), lerp(0.2, 0.45, B3.dawn), lerp(0.1, 0.55, B3.dawn)); nebU.uOp.value = 0.25 + 0.15 * B3.dawn;
+          waveT -= dt; if (t > 2.0 && waveT <= 0) { waveT = 1.1; rainbowWave(0, 0, 1.0 + 0.4 * B3.dawn, 13); }
+        }
+      },
+      ev: [
+        [1.4, () => {
+          const sc = B3.sun.scale.x; B3.sun.visible = false; B3.rim.visible = false; B3.corona.visible = false; B3.ecl.visible = false; B3.eclK = 0; for (const h of B3.halos) h.m.visible = false;
+          for (const m of B3.moons) if (m.vis) b3KillMoon(m, true);
+          shatter(0, B3.sunY, 0, 2.4 * sc, 220, 2, 2, 2, 15, 3.6, 4, true); burstRainbow(0, B3.sunY, 0, 420, 20, 2.6, 0.36, 0);
+          ring(0, 0.3, 0, 2, 34, 1.6, 1.2, 2.4, 2.4, 2.6, 1.6); ring(0, B3.sunY, 0, 1, 18, 1.0, 0.6, 2.6, 2.4, 2.0, 1.4);
+          rainbowWave(0, 0, 2.0, 16); bloomSpike(3.2); addTrauma(1); aberrSpike(0.02); shockAt(0, B3.sunY, 0, 0.12); sfx.shatter(1.8); sfx.boom(); LU.uWhite.value = 0.85;
+          game.satTarget = 1;
+        }],
+        [2.1, () => { music.setSection('victory'); sfx.victoryStab(); }],
+        [3.8, () => { ui.letterbox(true); ui.titleCard('THE NULL SUN', 'DAWN', 3.4); }],
+        [5.0, () => { sfx.victoryStab(); for (let i = 0; i < 5; i++) setTimeout(() => sfx.chime(5 + i * 2, 0.7), i * 140); }],
+      ],
+      end() { game.sat = game.satTarget = 1; ui.letterbox(false); B3.dawn = 1; B3.auroraA = 1; starU.uColorful.value = 1; LU.uWhite.value = 0; B3.rays.visible = false; },
+    };
+  },
 };
 
-/* ---- BOSS REGISTRY — add/replace entries here. Each def implements:
+/* ---- BOSS REGISTRY. Each def implements:
    build(), show(on), reset(), update(dt), casts{Name(arg)}, phases[{until,loop,steps:[[t,'Cast',arg]]}],
-   introCine(), transitionCine(n), deathCine(), optional transitionInstant(n), onPhase(n), onInterrupt(), hpCheck() */
+   introCine(), transitionCine(n), deathCine(), optional transitionInstant(n), onPhase(n), onInterrupt(), hpCheck(), enrageName(), onEnrage() */
 const BOSSES = [BOSS1, BOSS2, BOSS3];
-
-// generic cinematics used by the stubs
-function genericIntro(def, hx, hy, hz) {
-  return {
-    dur: 3.0, skippable: 0.6, skipTo: 2.6,
-    start() { ui.hud(false); player.x = 0; player.z = 7; },
-    update(t) { const k = smooth(t / 3); director.camPos.set(Math.sin(k * 0.6) * 4, lerp(4, 8, k), lerp(12, 15, k)); director.camLook.set(hx, hy, hz); director.fov = 50; },
-    ev: [[0.4, () => { ui.letterbox(true); ui.titleCard(def.name, def.subtitle); music.setSection(def.music[0]); bloomSpike(1); }], [0.5, () => { rainbowWave(0, 0, 1, 14); }]],
-    end() { },
-  };
-}
-function genericTransition(def, n, apply) {
-  return {
-    dur: 2.2,
-    start() { director.timeScale = 0.3; sfx.riser(); ui.toast(def.phases[n].name.toUpperCase(), 1.8); },
-    update(t) { const a = t * 0.8; director.camPos.set(Math.sin(a) * 13, 7, Math.cos(a) * 13); director.camLook.set(def.hit.x, def.hit.y, def.hit.z); director.fov = 52; },
-    ev: [[0.6, () => { shatter(def.hit.x, def.hit.y, def.hit.z, def.hit.r, 100, 2, 2, 2.4, 9, 1.5, 3, true); }], [1.0, () => { apply(); bloomSpike(1.6); addTrauma(0.8); shockAt(def.hit.x, def.hit.y, def.hit.z, 0.06); sfx.boom(); rainbowWave(0, 0, 1, 16); game.satTarget = Math.min(1, game.sat + 0.15); }]],
-    end() { director.timeScale = 1; },
-  };
-}
-function genericDeath(def, hx, hy, hz, sat) {
-  const s0 = game.sat;
-  return {
-    dur: 5.0,
-    start() { ui.hud(false); music.setSection('silence'); director.timeScale = 0.5; },
-    update(t) { director.camPos.set(0, lerp(10, 7, smooth(t / 5)), lerp(16, 12, smooth(t / 5))); director.camLook.set(hx, hy * 0.7, hz); director.fov = 50; if (t > 1) director.timeScale = 1; if (t > 1 && t < 3) game.sat = lerp(s0, sat, (t - 1) / 2); },
-    ev: [[0.8, () => { def.show(false); shatter(hx, hy, hz, 2, 220, 2, 2, 2, 12, 3, 6, true); burstRainbow(hx, hy, hz, 260, 14, 2, 0.3, 0); rainbowWave(0, 0, 1.6, 14); bloomSpike(2.2); addTrauma(0.9); sfx.shatter(1.5); sfx.victoryStab(); }],
-      [1.8, () => { ui.letterbox(true); ui.titleCard(def.deathTitle, def.deathSub); }]],
-    end() { game.sat = game.satTarget = sat; ui.letterbox(false); def.show(true); },
-  };
-}
 
 /* =====================================================================
    14  DIRECTOR — cinematics, camera rig, shake
@@ -2661,7 +4167,7 @@ function updateCamera(realDt) {
   } else {
     const p = player;
     cam.lookAhead.x = damp(cam.lookAhead.x, p.vx * 0.35, 3, realDt); cam.lookAhead.z = damp(cam.lookAhead.z, p.vz * 0.35, 3, realDt);
-    let bx = 0, bz = 0; if (bossTarget.alive) { bx = (bossTarget.x - p.x) * 0.18; bz = (bossTarget.z - p.z) * 0.18; const l = Math.hypot(bx, bz); if (l > 3) { bx *= 3 / l; bz *= 3 / l; } }
+    let bx = 0, bz = 0; if (bossTarget.alive) { const cb = (bossRT.def && bossRT.def.camBias) || 0.18, cm = cb > 0.18 ? 4 : 3; bx = (bossTarget.x - p.x) * cb; bz = (bossTarget.z - p.z) * cb; const l = Math.hypot(bx, bz); if (l > cm) { bx *= cm / l; bz *= cm / l; } }
     cam.target.set(p.x + cam.lookAhead.x + bx, 0, p.z + cam.lookAhead.z + bz);
     // in portrait pull the target toward arena center a bit so more of the arena is visible
     cam.target.x *= 1 - portraitK * 0.25;
@@ -2965,7 +4471,7 @@ function apDanger(cx, cz, horizon) {
   let s = 0;
   for (let i = 0; i < TELE_N; i++) { const o = tele[i]; if (!o.active || o.resolved || o.noHit || o.shape >= 4) continue; const sd = teleSD(o, cx, cz); if (sd < 1.0) s += (4 + 10 * (o.t / o.windup)) * (1 + Math.min(4, 1.0 - sd)); }
   for (let i = 0; i < HB_N; i++) { const o = hzBeams[i]; if (!o.active) continue; const d = segDist(cx, cz, o.x0, o.z0, o.x1, o.z1) - o.w / 2; if (d < 1.4) s += 12 + (1.4 - d) * 6; }
-  for (let i = 0; i <= PJ.hi; i++) { if (!PJ.alive[i] || (PJ.fl[i] & (F_REFL | F_HARMLESS))) continue; const fx2 = PJ.x[i] + PJ.vx[i] * horizon, fz2 = PJ.z[i] + PJ.vz[i] * horizon; const d = segDist(cx, cz, PJ.x[i], PJ.z[i], fx2, fz2) - PJ.r[i]; if (d < 0.75) s += 4; else if (d < 1.3) s -= 0.4; }
+  for (let i = 0; i <= PJ.hi; i++) { if (!PJ.alive[i] || (PJ.fl[i] & (F_REFL | F_HARMLESS | F_NOHIT))) continue; const fx2 = PJ.x[i] + PJ.vx[i] * horizon, fz2 = PJ.z[i] + PJ.vz[i] * horizon; const d = segDist(cx, cz, PJ.x[i], PJ.z[i], fx2, fz2) - PJ.r[i]; if (d < 0.75) s += 4; else if (d < 1.3) s -= 0.4; }
   return s;
 }
 function autopilot() {
@@ -2976,14 +4482,16 @@ function autopilot() {
     const cx = p.x + dx * 2.4, cz = p.z + dz * 2.4; const rr = Math.hypot(cx, cz);
     let sc = -apDanger(cx, cz, 0.3) - apDanger(p.x + dx * 0.8, p.z + dz * 0.8, 0.15) * 0.7;
     sc -= Math.abs(rr - 8.5) * 0.35; if (rr > game.arenaR - 1) sc -= 20;
+    if (bossRT.def && bossRT.def.apPenalty) sc -= bossRT.def.apPenalty(cx, cz);
     if (sc > best) { best = sc; bx = dx; bz = dz; }
   }
   input.mx = bx; input.mz = bz;
   if (here > 9 && player.dashT < 0) useAbility('dash');
   if (abilityReady('nova')) useAbility('nova');
   if (abilityReady('lance') && p.r > 50) useAbility('lance');
-  if (PJ.count > 12 && abilityReady('mirror')) useAbility('mirror');
+  if (PJ.count > 12 && abilityReady('mirror') && (bossRT.fracture < 100 || p.b > PLAYER.novaReq + PLAYER.mirCost || here > 9)) useAbility('mirror');
   if (p.hp < 70 && abilityReady('lattice')) useAbility('lattice');
+  if (bossRT.def && bossRT.def.apHook) bossRT.def.apHook();
 }
 
 /* =====================================================================
@@ -3009,7 +4517,7 @@ const ui = {
   set(key, el, prop, v) { if (this.c[key] === v) return; this.c[key] = v; if (prop === 'text') el.textContent = v; else if (prop === 'tf') el.style.transform = v; else if (prop === 'cls') el.className = v; else if (prop === 'bg') el.style.background = v; else if (prop === 'op') el.style.opacity = v; else if (prop === 'html') el.innerHTML = v; },
   hud(on) { this.el.hud.classList.toggle('on', !!on); },
   toast(text, dur = 2.5, warn = false) { const t = this.el.toast; t.textContent = text; t.classList.toggle('warn', !!warn); t.classList.add('on'); this.toastT = dur; },
-  tutorial(key, text) { if (game.tutorial[key]) return; game.tutorial[key] = true; this.toast(text, 3); },
+  tutorial(key, text) { if (game.tutorial[key]) return; if (this.tcT > 0) { game.tutorial[key] = true; setTimeout(() => { if (game.state === 'fight') this.toast(text, 3); }, this.tcT * 1000 + 200); return; } game.tutorial[key] = true; this.toast(text, 3); },
   letterbox(on) { this.el.letterbox.classList.toggle('on', !!on); },
   titleCard(big, sub, dur = 2.8) { this.el.tcBig.textContent = big; this.el.tcSub.textContent = sub || ''; this.el.titleCard.classList.add('on'); this.tcT = dur; },
   pressFlash(name) { const el = this.el.ab[name]; if (!el) return; el.classList.add('pressed'); setTimeout(() => el.classList.remove('pressed'), 110); },
@@ -3139,7 +4647,10 @@ function setArenaLook(arena) {
   else if (arena === 1) { nebU.uA.value.setRGB(0.15, 0.5, 0.3); nebU.uB.value.setRGB(0.35, 0.15, 0.6); }
   else { nebU.uA.value.setRGB(0.1, 0.2, 0.6); nebU.uB.value.setRGB(0.6, 0.2, 0.1); }
   floorU.uPalFrom.value = 0; floorU.uPalTo.value = 0; floorU.uPalRadius.value = 0; floorU.uSwirl.value = 1;
+  floor.position.y = arena === 1 ? -10 : 0; floorU.uEdgeGlow.value = arena === 1 ? 0 : 1;
   for (let i = 0; i < 6; i++) floorU.uVoid.value[i].w = 0;
+  floorU.uIgnite.value = 99; floorU.uDawn.value = 0; floorU.uFloorDim.value = 0; LU.uWarpStrength.value = 0; LU.uDark.value = 0;
+  starU.uColorful.value = 0; starU.uBright.value = 1; nebU.uOp.value = 0.25;
 }
 function startRun(full, idx = 0) {
   game.runMode = full ? 'full' : 'single'; game.facets = []; game.runTime = 0; game.bossTimes = [null, null, null];
@@ -3175,7 +4686,9 @@ function startFight() {
 function retryBoss() {
   showScreen('defeat', false);
   const idx = game.bossIdx;
-  beginBoss(idx, { retry: true, intro: false });
+  const cp = idx === 2 && B3.checkpoint; // boss 3 is long: dying in the Supernova phase restarts there
+  beginBoss(idx, cp ? { retry: true, intro: false, phase: 2, charge: 40 } : { retry: true, intro: false });
+  if (cp) ui.toast('CHECKPOINT — SUPERNOVA', 2.2);
 }
 function onBossDefeated() {
   const idx = game.bossIdx; const t = game.bossTimes[idx];
@@ -3231,6 +4744,9 @@ function showVictory() {
   rows.push(`<div>GRAZES ${game.stats.grazes} · PERFECT DASHES ${game.stats.perfects} · SHATTERED ${game.stats.deaths}</div>`);
   if (game.facets.length) rows.push(`<div>FACETS · ${game.facets.map((id) => FACETS.find((f) => f.id === id).name).join(' · ')}</div>`);
   $('victoryStats').innerHTML = rows.join('');
+  const cred = ['<div class="h">PRISMFALL</div>', '<div>THE LANTERN CHOIR · SILENCED</div>', '<div>VEYRA · UNBOUND</div>', '<div>THE NULL SUN · DAWN</div>',
+    '<div>every light, shard and note was synthesized in your browser</div>', '<div class="h">THANK YOU, LIGHTBREAKER</div>'];
+  $('credits').innerHTML = cred.map((c, i) => c.replace('<div', `<div style="animation-delay:${(1.2 + i * 0.9).toFixed(1)}s"`)).join('');
   showScreen('victory');
   game.newBest = {};
 }
@@ -3265,7 +4781,7 @@ function applyQuality(name) {
   Q.name = name; Q.cfg = QUALITY[name];
   bloom.strength = Q.cfg.bloomStr;
   if (Q.cfg.low) LensFX.defines.LOW = ''; else delete LensFX.defines.LOW; LensFX.needsUpdate = true;
-  for (const m of [floorMat, nebula.material, B1.flame.material, B3.corona.material]) { m.defines.FBM_OCT = Q.cfg.fbm; m.needsUpdate = true; }
+  for (const m of [floorMat, nebula.material, B1.flame.material, ...B3.fbmMats]) { m.defines.FBM_OCT = Q.cfg.fbm; m.needsUpdate = true; }
   starGeo.setDrawRange(0, Q.cfg.stars);
   if (fx.head >= Q.cfg.particles) fx.head = 0;
   Q.emergency = false;
@@ -3381,7 +4897,7 @@ buildBoss1(); buildBoss2(); buildBoss3();
 if (settings.quality !== 'auto') { Q.auto = false; applyQuality(settings.quality); } else applyQuality(Q.name);
 resize();
 function precompile() {
-  const toggles = [B1.group, B2.group, B3.group, latDisc, latWall, mirrorMesh, ...rings.map((r) => r.m), ...beams.map((b) => b.m), ...tele.map((t) => t.m), ...ghosts.map((g) => g.m), ...dmgNums.map((d) => d.sp)];
+  const toggles = [B1.group, B2.group, B3.group, latDisc, latWall, mirrorMesh, ...rings.map((r) => r.m), ...beams.map((b) => b.m), ...tele.map((t) => t.m), ...ghosts.map((g) => g.m), ...dmgNums.map((d) => d.sp), ...B2.precomp, ...B3.precomp];
   const prev = toggles.map((o) => o.visible); toggles.forEach((o) => (o.visible = true)); const hv = B1.heart.visible; B1.heart.visible = true;
   try { renderer.compile(scene, camera); composer.render(0.016); } catch (e) { console.warn(e); }
   toggles.forEach((o, i) => (o.visible = prev[i])); B1.heart.visible = hv;
