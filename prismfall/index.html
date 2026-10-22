@@ -12,7 +12,7 @@
 :root{
   --sat:env(safe-area-inset-top,0px); --sar:env(safe-area-inset-right,0px);
   --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px);
-  --s:1; --serif:Georgia,'Times New Roman',serif;
+  --s:1; --serif:'Iowan Old Style','Palatino Linotype',Palatino,'Book Antiqua',Georgia,'Times New Roman',serif; --hudB:96px;
   --r:#ff2a48; --g:#3dff6a; --b:#4a86ff; --gold:#ffcf6a;
 }
 html,body{margin:0;height:100%;overflow:hidden;background:#000;touch-action:none;overscroll-behavior:none;
@@ -124,18 +124,25 @@ button{font-family:var(--serif);cursor:pointer}
   background:radial-gradient(circle at 40% 35%,#fff,#cfe0ff 30%,#6b8cff 75%,rgba(80,100,255,.6));box-shadow:0 0 20px rgba(150,180,255,.9)}
 
 /* toasts, cards */
-#toast{position:absolute;left:50%;top:36%;transform:translate(-50%,-50%);padding:10px 22px;border-radius:24px;
-  background:rgba(8,8,18,.62);border:1px solid rgba(255,255,255,.25);font-size:15px;letter-spacing:.08em;text-align:center;
-  opacity:0;transition:opacity .3s,transform .3s;max-width:88vw;white-space:normal;box-shadow:0 0 28px rgba(0,0,0,.6)}
-#toast.on{opacity:1;transform:translate(-50%,-60%)}
-#toast.warn{color:#ffdede;border-color:rgba(255,80,80,.7);box-shadow:0 0 30px rgba(255,40,60,.5)}
+#toast{position:absolute;left:50%;top:calc(var(--hudB) + 2px);transform:translate(-50%,-6px);padding:3px 14px;border-radius:12px;
+  background:rgba(8,8,18,.4);border:1px solid rgba(255,255,255,.16);font-size:12px;line-height:1.35;letter-spacing:.08em;text-align:center;color:#f2f0ff;
+  text-shadow:0 0 6px #000,0 1px 2px #000;opacity:0;transition:opacity .3s,transform .3s;width:max-content;max-width:min(92vw,640px);white-space:normal}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+#toast.warn{color:#ffe2e2;border-color:rgba(255,90,90,.55);box-shadow:0 0 14px rgba(255,40,60,.35)}
+/* off-screen objective arrows */
+.oarr{position:absolute;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;display:none;pointer-events:none;filter:drop-shadow(0 0 6px currentColor)}
+.oarr.on{display:block;animation:oarrP .6s ease-in-out infinite alternate}
+.oarr svg{width:100%;height:100%}
+@keyframes oarrP{from{opacity:.55}to{opacity:1}}
 #letterbox .lb{position:absolute;left:0;right:0;height:0;background:#000;transition:height .5s cubic-bezier(.6,0,.3,1)}
 #lbTop{top:0}#lbBot{bottom:0}
 #letterbox.on .lb{height:11vh}
 #titleCard{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;opacity:0;transition:opacity .6s,letter-spacing 2.5s ease-out;letter-spacing:.2em}
 #titleCard.on{opacity:1;letter-spacing:.38em}
-#titleCard .big{font-size:clamp(26px,6vw,58px);font-weight:300;color:#fff;text-shadow:0 0 24px rgba(255,220,180,.65),0 0 2px #fff;padding-left:.38em}
-#titleCard .sub{margin-top:12px;font-size:clamp(11px,2vw,16px);letter-spacing:.5em;color:#dcc;font-style:italic;opacity:.85;padding-left:.5em}
+#titleCard .big{font-size:clamp(26px,6vw,58px);font-weight:400;color:#fff;text-shadow:0 0 14px rgba(255,255,255,.55),0 0 40px rgba(255,200,160,.45),0 2px 6px rgba(0,0,0,.9);padding-left:.38em}
+#titleCard .sub{margin-top:12px;font-size:clamp(14px,2.2vw,19px);letter-spacing:.4em;color:#fff4ea;font-style:italic;opacity:.92;padding-left:.4em;text-shadow:0 0 12px rgba(255,210,170,.7),0 0 3px #000,0 1px 3px #000}
+#titleCard::before{content:"";position:absolute;left:50%;top:50%;width:min(760px,96vw);height:220px;transform:translate(-50%,-50%);z-index:-1;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.5),rgba(0,0,0,0) 68%)}
 #titleCard .rule{width:min(420px,60vw);height:1px;margin:14px auto;background:linear-gradient(90deg,transparent,#fff,transparent)}
 #bigCast{position:absolute;left:50%;top:58%;transform:translateX(-50%);width:min(520px,80vw);text-align:center;display:none}
 #bigCast.on{display:block}
@@ -160,7 +167,7 @@ button{font-family:var(--serif);cursor:pointer}
 #credits div{opacity:0;animation:credIn 1.2s ease-out forwards}
 #credits .h{color:#fff;letter-spacing:.5em;font-size:12px;margin-top:6px}
 @keyframes credIn{from{opacity:0;transform:translateY(10px);filter:blur(4px)}to{opacity:.9;transform:none;filter:none}}
-@media (orientation:portrait){ body.touch #snova{top:calc(var(--sat) + 58px);width:64px;height:64px} body.touch #snova .n{font-size:17px} }
+@media (orientation:portrait){ body.touch #snova{top:calc(var(--sat) + 150px);width:64px;height:64px} body.touch #snova .n{font-size:17px} }
 #fade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .5s}
 #descendText{position:absolute;left:0;right:0;top:45%;text-align:center;opacity:0;transition:opacity .5s}
 #descendText.on{opacity:1}
@@ -175,10 +182,13 @@ button{font-family:var(--serif);cursor:pointer}
 #logo{font-size:clamp(40px,11vw,118px);font-weight:300;letter-spacing:.4em;padding-left:.4em;margin:0;line-height:1.05;
   background:linear-gradient(90deg,#ff5a7a,#ffcf6a,#6affb0,#6ac8ff,#b07aff,#ff5a7a);background-size:200% 100%;
   -webkit-background-clip:text;background-clip:text;color:transparent;animation:hue 6s linear infinite;
-  filter:drop-shadow(0 0 18px rgba(255,255,255,.25));transition:letter-spacing 1.2s,opacity .9s,filter .9s}
+  filter:drop-shadow(0 0 10px rgba(255,255,255,.45)) drop-shadow(0 0 36px rgba(190,150,255,.4));transition:letter-spacing 1.2s,opacity .9s,filter .9s}
 #title.out #logo{letter-spacing:1.2em;opacity:0;filter:blur(12px)}
 @keyframes hue{to{background-position:200% 0}}
-#subtitle{margin-top:10px;font-size:clamp(11px,2.4vw,17px);letter-spacing:.7em;padding-left:.7em;color:#d8d0e8;opacity:.85}
+#subtitle{margin-top:10px;font-size:clamp(12px,2.4vw,17px);letter-spacing:.7em;padding-left:.7em;color:#f1ebff;opacity:.95;text-shadow:0 0 12px rgba(0,0,0,.95),0 0 4px #000,0 0 18px rgba(200,170,255,.45)}
+#title::before{content:"";position:absolute;left:50%;top:44%;width:min(900px,110vw);height:46vh;transform:translate(-50%,-50%);pointer-events:none;
+  background:radial-gradient(ellipse at center,rgba(0,0,0,.55),rgba(0,0,0,0) 70%)}
+#title > *{position:relative}
 #prompt{margin-top:7vh;font-size:clamp(14px,2.6vw,18px);letter-spacing:.35em;color:#fff;animation:pulse 2.2s ease-in-out infinite;cursor:pointer;text-shadow:0 0 10px #000,0 0 22px #000,0 0 4px rgba(255,255,255,.5)}
 @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
 #titleBtns{margin-top:4vh;display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
@@ -215,9 +225,12 @@ input[type=range]{width:140px;accent-color:#9cf}
 @keyframes cardPick{40%{transform:scale(1.08);box-shadow:0 0 60px #fff;filter:brightness(2)}100%{transform:scale(1.4);opacity:0;filter:brightness(4) blur(6px)}}
 #facet h2,#defeat h2,#victory h2{font-weight:300;letter-spacing:.5em;padding-left:.5em;font-size:clamp(22px,5vw,44px);margin:0}
 #facet .sub,#defeat .sub,#victory .sub{margin-top:8px;font-size:12px;letter-spacing:.3em;color:#aab}
-#defeat{background:radial-gradient(ellipse at center,rgba(60,0,10,.25),rgba(0,0,0,.75))}
+#defeat{background:radial-gradient(ellipse at center,rgba(20,0,6,.7),rgba(40,0,8,.45) 45%,rgba(0,0,0,.8))}
 #defeat h2{color:#ffd0d6;text-shadow:0 0 24px rgba(255,40,70,.8)}
-#victory{background:radial-gradient(ellipse at center,rgba(0,0,0,.05),rgba(0,0,0,.55))}
+#victory{background:radial-gradient(ellipse at center,rgba(0,0,0,.6),rgba(0,0,0,.35) 50%,rgba(0,0,0,.65))}
+#facet h2,#defeat h2,#victory h2{text-shadow:0 0 18px rgba(255,255,255,.35)}
+#victory .sub,#victory .endStats,#credits{text-shadow:0 0 10px rgba(0,0,0,.95),0 0 3px #000,0 1px 2px #000}
+#victory .sub{color:#e8eaff}
 #victory h2{background:linear-gradient(90deg,#ff7a9a,#ffe08a,#8affc0,#8ad8ff,#c49aff);-webkit-background-clip:text;background-clip:text;color:transparent}
 .endStats{margin:22px 0;font-size:13px;letter-spacing:.12em;line-height:1.9;color:#dde}
 .endStats .best{color:var(--gold);text-shadow:0 0 8px rgba(255,200,80,.7)}
@@ -232,13 +245,21 @@ body.desk .ab .key{display:block}
 body.touch .ab .key{display:none}
 @media (orientation:portrait){
   body.touch{--s:.9}
-  body.touch #playerFrame{left:50%;transform:translateX(-50%);top:calc(var(--sat) + 112px);width:min(260px,64vw)}
+  body.touch #playerFrame{left:50%;transform:translateX(-50%);top:calc(var(--sat) + 112px);width:min(260px,64vw);padding:4px 10px 5px;border-radius:10px;background:radial-gradient(ellipse at center,rgba(4,6,12,.55),rgba(4,6,12,.25) 70%,transparent);text-shadow:0 0 4px #000,0 0 8px #000}
   body.touch #bossFrame{left:calc(var(--sal) + 12px);transform:none;width:calc(100vw - 70px - var(--sal) - var(--sar))}
   body.touch #castBar{width:min(320px,70vw)}
   body.touch #spectrum{right:auto;left:calc(var(--sal) + 16px);bottom:calc(var(--sab) + 26px)}
   #facet .cards{flex-direction:column;align-items:center;gap:12px}
   .card{width:80%;max-width:420px;min-height:0;padding:14px;flex-direction:row;text-align:left;clip-path:polygon(4% 0,96% 0,100% 15%,100% 85%,96% 100%,4% 100%,0 85%,0 15%)}
   .card .gl{font-size:34px}
+}
+@media (max-height:450px) and (orientation:landscape){
+  body.touch #bossFrame{left:calc(var(--sal) + 200px);transform:none;width:calc(100vw - 262px - var(--sal) - var(--sar));max-width:520px}
+  body.desk #bossFrame{left:calc(var(--sal) + 250px);transform:none;width:calc(100vw - 312px - var(--sal) - var(--sar));max-width:520px}
+  body.touch #spectrum{right:auto;bottom:auto;left:calc(var(--sal) + 16px);top:calc(var(--sat) + 64px);gap:4px;transform:translateX(96px) rotate(90deg);transform-origin:0 0}
+  body.touch .spc{width:8px;height:96px;border-radius:4px}
+  body.touch #spectrum .lab{display:none}
+  body.touch .ab{background:rgba(14,14,26,.4)}
 }
 @media (max-height:440px){
   #bossFrame{width:min(460px,60vw)}
@@ -299,6 +320,7 @@ body.touch .ab .key{display:none}
   </div>
   <div id="joy"><div id="joyBase"></div><div id="joyKnob"></div></div>
   <div id="toast"></div>
+  <div class="oarr" id="oarr0"><svg viewBox="0 0 34 34"><path d="M17 3 L31 29 L17 22 L3 29 Z" fill="currentColor" stroke="#000" stroke-width="1.2" stroke-opacity=".5"/></svg></div><div class="oarr" id="oarr1"><svg viewBox="0 0 34 34"><path d="M17 3 L31 29 L17 22 L3 29 Z" fill="currentColor" stroke="#000" stroke-width="1.2" stroke-opacity=".5"/></svg></div><div class="oarr" id="oarr2"><svg viewBox="0 0 34 34"><path d="M17 3 L31 29 L17 22 L3 29 Z" fill="currentColor" stroke="#000" stroke-width="1.2" stroke-opacity=".5"/></svg></div>
   <div id="snova"><div class="core"></div><div class="rg"></div><div class="n" id="snovaN">100</div><div class="l">SUPERNOVA</div></div>
   <div id="novaPrompt">UNLEASH WHITE NOVA<small id="novaPromptK"></small></div>
   <div id="bigCast"><div class="nm" id="bigCastName">LAST LIGHT</div><div class="bar"><div class="fill" id="bigCastFill"></div><div class="sheen"></div></div></div>
@@ -382,9 +404,9 @@ const URLP = new URLSearchParams(location.search);
 const DEBUG = URLP.get('debug') === '1';
 
 const QUALITY = {
-  high: { name: 'high', pr: 2.0, bloomScale: 1.0, bloomStr: 0.7, particles: 4000, trail: 3, candles: 400, stars: 3000, low: false, fbm: 4 },
-  med:  { name: 'med',  pr: 1.5, bloomScale: 0.6, bloomStr: 0.7, particles: 2500, trail: 4, candles: 300, stars: 2000, low: false, fbm: 4 },
-  low:  { name: 'low',  pr: 1.0, bloomScale: 0.5, bloomStr: 0.55, particles: 1200, trail: 6, candles: 180, stars: 1200, low: true,  fbm: 3 },
+  high: { name: 'high', pr: 2.0, bloomScale: 1.0, bloomStr: 0.7, particles: 4000, trail: 3, candles: 250, stars: 3000, low: false, fbm: 4 },
+  med:  { name: 'med',  pr: 1.5, bloomScale: 0.6, bloomStr: 0.7, particles: 2500, trail: 4, candles: 200, stars: 2000, low: false, fbm: 4 },
+  low:  { name: 'low',  pr: 1.0, bloomScale: 0.5, bloomStr: 0.55, particles: 1200, trail: 6, candles: 120, stars: 1200, low: true,  fbm: 3 },
 };
 const TIERS = ['low', 'med', 'high'];
 
@@ -484,10 +506,12 @@ const LensFX = new THREE.ShaderMaterial({
     uShockCenter: { value: new THREE.Vector2(0.5, 0.5) }, uShockRadius: { value: 0 }, uShockStrength: { value: 0 },
     uSat: { value: 0.42 }, uWhite: { value: 0 }, uVignette: { value: 0.35 }, uLowHp: { value: 0 }, uGrain: { value: 0.04 }, uDark: { value: 0 },
     uHurt: { value: 0 },
+    uNovaC: { value: new THREE.Vector2(0.5, 0.5) }, uNovaR: { value: 0 }, uNovaA: { value: 0 }, uNovaNeg: { value: 0 },
   },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse; uniform float uTime,uAberr,uWarpStrength,uWarpRadius,uShockRadius,uShockStrength,uSat,uWhite,uVignette,uLowHp,uGrain,uDark,uHurt;
+    uniform float uNovaR,uNovaA,uNovaNeg; uniform vec2 uNovaC;
     uniform vec2 uRes,uWarpCenter,uShockCenter; varying vec2 vUv;
     float h12(vec2 p){ vec3 p3=fract(vec3(p.xyx)*.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
     void main(){
@@ -496,7 +520,11 @@ const LensFX = new THREE.ShaderMaterial({
       if(uWarpStrength>0.0){ vec2 d=uv-uWarpCenter; d.x*=asp; float l=length(d)+1e-4; float k=uWarpStrength*exp(-l*l/(uWarpRadius*uWarpRadius))*uWarpRadius/l; vec2 off=d*k; off.x/=asp; uv-=off; }
       if(uShockStrength>0.0){ vec2 s=uv-uShockCenter; s.x*=asp; float sl=length(s)+1e-4; float band=exp(-pow((sl-uShockRadius)*12.0,2.0)); vec2 off=(s/sl)*band*uShockStrength; off.x/=asp; uv-=off; }
       #endif
-      vec2 cd = uv-0.5; float ab = uAberr*(0.6+length(cd)*1.6);
+      // White Nova: radial shock (white core + expanding ring with a chromatic edge; world outside goes to dark silhouettes)
+      float nEdge = 0.0, nIn = 0.0, nCore = 0.0;
+      if (uNovaA > 0.0) { vec2 nq = vUv-uNovaC; nq.x *= asp; float nd = length(nq);
+        nEdge = exp(-pow((nd-uNovaR)*20.0,2.0))*step(0.001,uNovaR); nIn = smoothstep(uNovaR+0.02, uNovaR-0.08, nd); nCore = exp(-nd*nd*38.0); }
+      vec2 cd = uv-0.5; float ab = uAberr*(0.6+length(cd)*1.6) + nEdge*uNovaA*0.045;
       vec3 col;
       #ifdef LOW
       col = texture2D(tDiffuse, uv).rgb;
@@ -508,6 +536,12 @@ const LensFX = new THREE.ShaderMaterial({
       col = mix(vec3(luma), col, s);
       float wl = smoothstep(0.03, 0.35, luma);
       col = mix(col, vec3(wl*2.6) + col*0.25, uWhite);
+      if (uNovaA > 0.0) {
+        vec3 sil = vec3(luma*0.1, luma*0.09, luma*0.14);
+        col = mix(col, sil, uNovaNeg*(1.0-nIn)*0.92);
+        col += col*nIn*uNovaA*0.35;
+        col += vec3(1.0,0.96,0.9)*nEdge*uNovaA*0.9 + vec3(1.0,0.98,0.95)*nCore*uNovaA*0.85;
+      }
       col *= 1.0-uDark;
       vec2 vv = vUv-0.5; vv.x *= mix(1.0, asp, 0.55);
       float vig = smoothstep(0.32, 0.95, length(vv)*1.25);
@@ -541,8 +575,10 @@ function resize() {
   cam.baseFovTarget = ASPECT < 1 ? Math.min(68, 50 + (1 - ASPECT) * 22) : 50;
   cam.offScaleTarget = ASPECT < 1 ? 1.25 : 1.0;
   const short = Math.min(VW, VH);
-  if (IS_TOUCH) document.documentElement.style.setProperty('--s', String((Math.min(1, short / 400) * (ASPECT < 1 ? 0.9 : 1)).toFixed(3)));
+  // ability cluster scale: short landscape phones get a tighter cluster so it doesn't eat the arena
+  if (IS_TOUCH) document.documentElement.style.setProperty('--s', String((ASPECT < 1 ? Math.min(1, short / 400) * 0.9 : clamp(short / 480, 0.66, 1)).toFixed(3)));
   if (typeof joy !== 'undefined') joy.R = clamp(short * 0.14, 48, 80);
+  measureHud();
 }
 let resizeTO = 0;
 function queueResize() { clearTimeout(resizeTO); resizeTO = setTimeout(resize, 100); }
@@ -597,13 +633,13 @@ const floorU = {
   uLatPos: { value: new THREE.Vector3(0, 0, 0) },
   // Event Horizon (boss 3): temperature ramp (outer/mid/inner), ignition radius, dawn reef blend, blackout dim
   uRampA: { value: new THREE.Color(0.22, 0.015, 0.02) }, uRampB: { value: new THREE.Color(1.0, 0.38, 0.07) }, uRampC: { value: new THREE.Color(1.0, 0.93, 0.82) },
-  uIgnite: { value: 99 }, uDawn: { value: 0 }, uFloorDim: { value: 0 },
+  uIgnite: { value: 99 }, uDawn: { value: 0 }, uFloorDim: { value: 0 }, uBeat: { value: 0 },
 };
 const floorMat = new THREE.ShaderMaterial({
   uniforms: floorU, defines: fbmDefines(), transparent: true, depthWrite: true,
   vertexShader: `varying vec3 vW; void main(){ vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
   fragmentShader: GLSL_LIB + /* glsl */`
-    uniform float uTime,uArena,uArenaR,uEdgeGlow,uPalFrom,uPalTo,uPalRadius,uPlayerGlow,uSwirl,uBossShadow,uIgnite,uDawn,uFloorDim;
+    uniform float uTime,uArena,uArenaR,uEdgeGlow,uPalFrom,uPalTo,uPalRadius,uPlayerGlow,uSwirl,uBossShadow,uIgnite,uDawn,uFloorDim,uBeat;
     uniform vec2 uPalCenter,uPlayerPos,uBossPos; uniform vec3 uPlayerColor,uTint,uTint2,uLatPos,uRampA,uRampB,uRampC;
     uniform vec4 uWave[3]; uniform vec4 uLights[4]; uniform vec3 uLightCol[4]; uniform vec4 uRipples[8]; uniform vec4 uVoid[6];
     varying vec3 vW;
@@ -646,11 +682,15 @@ const floorMat = new THREE.ShaderMaterial({
         if (palM > 0.001) {
           vec2 fp = p*0.3 + vec2(uTime*0.05, -uTime*0.035) + grad*0.7;
           float f = fbm(fp + fbm(fp*1.7 - uTime*0.06)*0.9);
-          float vein = smoothstep(0.035, 0.0, abs(f-0.56)) + 0.5*smoothstep(0.02, 0.0, abs(f-0.47));
-          float pool = smoothstep(0.66, 0.8, f);
-          vec3 lava = vec3(1.0,0.38,0.05)*(vein*1.5 + pool*0.9) + vec3(0.25,0.05,0.01)*smoothstep(0.3,0.7,f);
-          lava *= 0.7+0.3*sin(uTime*1.3 + f*9.0);
-          col = mix(col, col*0.7 + lava, palM*smoothstep(uArenaR+6.0, uArenaR-1.0, r));
+          // mostly cooled dark crust; thin glowing cracks, hottest near the heart, pulsing with its beat
+          float vein = smoothstep(0.012, 0.0, abs(f-0.56)) + 0.45*smoothstep(0.008, 0.0, abs(f-0.47));
+          float hot = smoothstep(8.5, 2.2, r);
+          float beat = 0.7 + 0.75*uBeat;
+          vec3 crust = vec3(0.05,0.01,0.005)*(0.55 + 0.9*smoothstep(0.35,0.75,f));
+          vec3 lava = crust + vec3(1.0,0.26,0.035)*vein*(0.16 + 1.25*hot)*beat
+                    + vec3(0.8,0.12,0.015)*smoothstep(0.72,0.86,f)*0.22*hot*beat
+                    + vec3(0.35,0.05,0.0)*exp(-r*r/10.0)*beat*0.35;
+          col = mix(col, col*0.4 + lava, palM*smoothstep(uArenaR+6.0, uArenaR-1.0, r));
         }
         float front = exp(-pow((pd-uPalRadius)*1.1,2.0))*step(0.01,uPalRadius)*(1.0-smoothstep(22.0,30.0,uPalRadius));
         col += vec3(1.0,0.5,0.15)*front*1.4;
@@ -916,10 +956,13 @@ const beamMatBase = new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv=uv; vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); vV=-mv.xyz; gl_Position=projectionMatrix*mv; }`,
   fragmentShader: GLSL_LIB + `uniform float uTime,uA,uLen; uniform vec3 uCol; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
-    void main(){ float f = abs(dot(normalize(vN), normalize(vV))); float core = pow(f, 2.5);
-      float n = noise2(vec2(vUv.x*8.0, vUv.y*uLen*0.6 - uTime*24.0));
-      float tip = smoothstep(0.0,0.03,vUv.y)*smoothstep(1.0,0.9,vUv.y);
-      vec3 c = mix(uCol*1.1, vec3(1.25), core*core*core) * (0.6+0.4*n) * (0.25+core*0.85);
+    void main(){ float f = abs(dot(normalize(vN), normalize(vV)));
+      float core = pow(f, 7.0), body = pow(f, 1.7);
+      float n = noise2(vec2(vUv.x*6.0, vUv.y*uLen*0.8 - uTime*22.0));
+      float n2 = noise2(vec2(vUv.x*3.0+5.0, vUv.y*uLen*0.3 - uTime*8.0));
+      float cap0 = min(0.45, 0.5/max(uLen,0.01)), cap1 = min(0.45, 1.0/max(uLen,0.01));
+      float tip = smoothstep(0.0, cap0, vUv.y)*smoothstep(1.0, 1.0-cap1, vUv.y);
+      vec3 c = uCol*body*(0.4+0.6*n)*(0.65+0.55*n2)*1.25 + vec3(1.15,1.1,1.05)*core*(0.7+0.3*n);
       gl_FragColor = vec4(c*uA*tip, 1.0); }`,
 });
 const beams = [];
@@ -1023,41 +1066,78 @@ function updateShards(dt) {
 }
 
 // ---- Damage numbers (sprite pool) ----
+// Sized in screen pixels (not world units), heavy sans with a dark outline + glow, kept below the top HUD.
 const DN_N = 40;
+const DN_FONT = 'px system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif';
+let hudTopPx = 96;                     // bottom edge of the top HUD band (measured by the UI)
 const dmgNums = [];
-for (let i = 0; i < DN_N; i++) {
+function dnMake() {
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 96;
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false });
   const sp = new THREE.Sprite(mat); sp.visible = false; sp.renderOrder = 999; sp.scale.set(1.6, 0.6, 1); scene.add(sp);
-  dmgNums.push({ sp, cv, ctx: cv.getContext('2d'), tex, mat, t: 0, life: 0.8, x: 0, y: 0, z: 0, size: 1 });
+  return { sp, cv, ctx: cv.getContext('2d'), tex, mat, t: 0, life: 0.8, x: 0, y: 0, z: 0, size: 1 };
 }
+for (let i = 0; i < DN_N; i++) dmgNums.push(dnMake());
 let dnIdx = 0;
+function dnDraw(d, text, kind, color) {
+  const c = d.ctx; c.clearRect(0, 0, 256, 96);
+  const big = kind === 1 ? 62 : kind === 5 ? 46 : kind === 4 ? 40 : 54;
+  c.font = (kind === 4 || kind === 5 ? 'italic 700 ' : '800 ') + big + DN_FONT; c.textAlign = 'center'; c.textBaseline = 'middle';
+  let fill = '#ffffff', glow = 'rgba(255,255,255,0.55)';
+  if (kind === 1) { const gr = c.createLinearGradient(0, 22, 0, 78); gr.addColorStop(0, '#fff8d6'); gr.addColorStop(1, '#ffae22'); fill = gr; glow = 'rgba(255,170,40,0.9)'; }
+  else if (kind === 2) { fill = '#ff5a6e'; glow = 'rgba(255,40,70,0.8)'; } else if (kind === 3) { fill = '#6bffa0'; glow = 'rgba(60,255,140,0.7)'; }
+  else if (kind === 5) { const gr = c.createLinearGradient(30, 0, 226, 0); gr.addColorStop(0, '#ff8aa8'); gr.addColorStop(0.5, '#ffffff'); gr.addColorStop(1, '#8ad8ff'); fill = gr; glow = 'rgba(200,220,255,0.8)'; }
+  if (color) { fill = color; glow = color; }
+  c.lineJoin = 'round';
+  c.shadowColor = glow; c.shadowBlur = 14; c.lineWidth = 9; c.strokeStyle = 'rgba(6,4,12,0.92)'; c.strokeText(text, 128, 50);
+  c.shadowBlur = 0; c.fillStyle = fill; c.fillText(text, 128, 50);
+  d.tex.needsUpdate = true;
+}
 // kind: 0 normal, 1 crit, 2 player hurt, 3 heal, 4 text white, 5 perfect
 function dmgNumber(x, y, z, text, kind = 0, color) {
   const d = dmgNums[dnIdx]; dnIdx = (dnIdx + 1) % DN_N;
-  const c = d.ctx; c.clearRect(0, 0, 256, 96);
-  const big = kind === 1 ? 64 : kind === 5 ? 50 : kind === 4 ? 44 : 52;
-  c.font = (kind === 4 || kind === 5 ? 'italic ' : 'bold ') + big + 'px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  c.lineWidth = 7; c.strokeStyle = 'rgba(0,0,0,0.75)'; c.strokeText(text, 128, 50);
-  let fill = '#ffffff';
-  if (kind === 1) { const gr = c.createLinearGradient(0, 20, 0, 80); gr.addColorStop(0, '#fff6c8'); gr.addColorStop(1, '#ffb52e'); fill = gr; }
-  else if (kind === 2) fill = '#ff5a6e'; else if (kind === 3) fill = '#6bffa0'; else if (kind === 5) { const gr = c.createLinearGradient(30, 0, 226, 0); gr.addColorStop(0, '#ff8aa8'); gr.addColorStop(0.5, '#ffffff'); gr.addColorStop(1, '#8ad8ff'); fill = gr; }
-  if (color) fill = color;
-  c.fillStyle = fill; c.fillText(text, 128, 50);
-  d.tex.needsUpdate = true;
+  dnDraw(d, text, kind, color);
   d.x = x + (frand() - 0.5) * 0.6; d.y = y; d.z = z + (frand() - 0.5) * 0.4; d.t = 0; d.life = kind === 1 ? 1.0 : 0.85;
-  d.size = kind === 1 ? 1.4 : kind === 5 ? 1.25 : kind === 4 ? 1.1 : 1; d.sp.visible = true;
+  d.size = kind === 1 ? 1.45 : kind === 5 ? 1.15 : kind === 4 ? 1.0 : kind === 2 ? 1.05 : 0.95; d.sp.visible = true;
+}
+// rolling per-boss total: every non-crit hit ticks one number up instead of spawning new sprites
+const dnRoll = Object.assign(dnMake(), { val: 0, shown: -1, idle: 0, pop: 0, redraw: 0, ox: 1.3 });
+function dmgRollAdd(n, refl) {
+  const d = dnRoll;
+  if (!d.sp.visible) { d.val = 0; d.shown = -1; d.t = 0; d.ox = frand() < 0.5 ? -1.4 : 1.4; d.sp.visible = true; }
+  d.val += n; d.idle = 0; d.pop = Math.min(1, d.pop + (n > 40 ? 1 : 0.45)); d.refl = !!refl;
+}
+function dmgNumsClear() { for (let i = 0; i < DN_N; i++) dmgNums[i].sp.visible = false; dnRoll.sp.visible = false; dnRoll.val = 0; }
+function dnPlace(sp, x, y, z, sizePx) {
+  // keep it below the HUD band, size it in screen pixels
+  _v1.set(x, y, z).project(camera);
+  const lim = 1 - 2 * (hudTopPx + 14 + sizePx * 0.35) / VH;
+  if (_v1.y > lim && _v1.z < 1) { _v1.y = lim; _v1.unproject(camera); sp.position.copy(_v1); } else sp.position.set(x, y, z);
+  const dist = Math.max(0.5, sp.position.distanceTo(camera.position));
+  const worldPerPx = 2 * dist * Math.tan(camera.fov * Math.PI / 360) / VH;
+  const h = sizePx * worldPerPx; sp.scale.set(h * 256 / 96, h, 1);
 }
 function updateDmgNums(dt) {
-  const sc = cam.offScale * (ASPECT < 1 ? 1.15 : 1);
+  const short = Math.min(VW, VH), basePx = clamp(short * 0.075, 34, 54);
   for (let i = 0; i < DN_N; i++) {
     const d = dmgNums[i]; if (!d.sp.visible) continue;
     d.t += dt; const k = d.t / d.life; if (k >= 1) { d.sp.visible = false; continue; }
     const pop = k < 0.12 ? lerp(1.3, 1.0, k / 0.12) : 1;
-    d.sp.position.set(d.x, d.y + easeOut(k) * 1.2, d.z);
-    const s = d.size * pop * sc; d.sp.scale.set(1.6 * s, 0.6 * s, 1);
+    dnPlace(d.sp, d.x, d.y + easeOut(k) * 1.0, d.z, basePx * d.size * pop);
     d.mat.opacity = k > 0.6 ? (1 - k) / 0.4 : 1;
+  }
+  const r = dnRoll;
+  if (r.sp.visible) {
+    r.idle += dt; r.t += dt; r.redraw -= dt; r.pop = Math.max(0, r.pop - dt * 5);
+    const v = Math.round(r.val);
+    if (v !== r.shown && r.redraw <= 0) { r.shown = v; r.redraw = 0.05; dnDraw(r, String(v), 0, r.refl ? '#bcd6ff' : null); }
+    const fade = r.idle > 0.75 ? 1 - (r.idle - 0.75) / 0.3 : 1;
+    if (fade <= 0) { r.sp.visible = false; r.val = 0; }
+    else {
+      dnPlace(r.sp, bossTarget.x + r.ox, bossTarget.y + 1.3 + Math.min(0.6, r.t * 0.25), bossTarget.z + 0.8, basePx * (1.05 + 0.25 * r.pop) * (v >= 1000 ? 1.1 : 1));
+      r.mat.opacity = fade;
+    }
   }
 }
 
@@ -1066,13 +1146,14 @@ function updateDmgNums(dt) {
    ===================================================================== */
 const TELE_N = 40;
 const teleGeo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+const teleHC = { value: 0 };   // shared: 1 = high-contrast telegraphs (white rim, dark fill) on red/gold floors
 const teleMatBase = new THREE.ShaderMaterial({
-  uniforms: { uShape: { value: 0 }, uFill: { value: 0 }, uColor: { value: new THREE.Color(1, 0.18, 0.25) }, uTint: { value: new THREE.Color(1, 0.2, 0.3) },
+  uniforms: { uHC: teleHC, uShape: { value: 0 }, uFill: { value: 0 }, uColor: { value: new THREE.Color(1, 0.18, 0.25) }, uTint: { value: new THREE.Color(1, 0.2, 0.3) },
     uInner: { value: 0 }, uAngle: { value: 0.5 }, uTime: { value: 0 }, uAlpha: { value: 1 }, uSize: { value: new THREE.Vector2(1, 1) }, uFlash: { value: 0 } },
   transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
   vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
   fragmentShader: /* glsl */`
-    uniform float uShape,uFill,uInner,uAngle,uTime,uAlpha,uFlash; uniform vec3 uColor,uTint; uniform vec2 uSize; varying vec2 vUv;
+    uniform float uShape,uFill,uInner,uAngle,uTime,uAlpha,uFlash,uHC; uniform vec3 uColor,uTint; uniform vec2 uSize; varying vec2 vUv;
     void main(){
       vec2 p = (vUv-0.5)*uSize; // world units, local; +y = forward
       p.y = -p.y;
@@ -1086,7 +1167,7 @@ const teleMatBase = new THREE.ShaderMaterial({
       vec3 col = uColor;
       float pulseF = mix(1.5, 8.0, uFill*uFill);
       float pulse = 0.72+0.28*sin(uTime*pulseF*6.283);
-      float line = smoothstep(0.11, 0.035, edge);
+      float line = smoothstep(0.2, 0.06, edge); float halo = smoothstep(0.6, 0.0, edge);
       float filled = step(e, uFill);
       float a; vec3 c;
       if (uShape > 4.5) { // safe zone (cyan), soft pulsing
@@ -1099,8 +1180,11 @@ const teleMatBase = new THREE.ShaderMaterial({
       } else {
         vec3 inner = mix(col, uTint, smoothstep(0.0, 1.0, uShape>1.5&&uShape<2.5 ? 1.0-e : e)*0.75);
         float leading = filled*smoothstep(0.12, 0.0, abs(e - uFill))*step(uFill,0.99);
-        c = col*line*2.6*pulse + inner*(0.12 + filled*0.35) + vec3(1.0,0.8,0.8)*leading*0.6;
-        a = line*0.95 + 0.12 + filled*0.33 + leading*0.3;
+        float stripes = step(0.55, fract((p.x - p.y)*0.8 + uTime*0.6));
+        vec3 lineC = mix(col, vec3(1.0,0.96,0.92), uHC*0.75);
+        inner = mix(inner, vec3(0.03,0.0,0.01), uHC*0.75);
+        c = lineC*line*2.6*pulse + lineC*halo*0.35*pulse + inner*(0.12 + filled*0.35 + stripes*0.08*(1.0-filled)) + vec3(1.0,0.85,0.8)*leading*0.7;
+        a = line*0.95 + halo*0.2 + 0.12 + filled*(0.33 + uHC*0.12) + leading*0.3 + stripes*0.04*(1.0-filled);
       }
       c = mix(c, vec3(2.4), uFlash); a = mix(a, 0.9, uFlash);
       gl_FragColor = vec4(c, a*uAlpha);
@@ -1343,14 +1427,30 @@ const crystalMat = new THREE.ShaderMaterial({
     }`,
 });
 const playerG = new THREE.Group(); scene.add(playerG);
+const BODY_SC = 1.3;                    // visual scale only: the hurtbox stays PLAYER.hurtR
+const bodyG = new THREE.Group(); bodyG.scale.setScalar(BODY_SC); playerG.add(bodyG);
 const torsoGeo = new THREE.IcosahedronGeometry(0.55, 0); torsoGeo.scale(1, 1.5, 1);
-const torso = new THREE.Mesh(torsoGeo, crystalMat); torso.position.y = 1.15; playerG.add(torso);
-const head = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 0), crystalMat); head.position.y = 2.25; playerG.add(head);
+const headGeo = new THREE.OctahedronGeometry(0.28, 0);
+const torso = new THREE.Mesh(torsoGeo, crystalMat); torso.position.y = 1.15; bodyG.add(torso);
+const head = new THREE.Mesh(headGeo, crystalMat); head.position.y = 2.25; bodyG.add(head);
+// dark inverted-hull rim so the hero reads against bright floors and bloom
+const hullMat = new THREE.MeshBasicMaterial({ color: 0x06040c, side: THREE.BackSide });
+const torsoHull = new THREE.Mesh(torsoGeo, hullMat); torsoHull.scale.setScalar(1.13); torsoHull.renderOrder = -1; torso.add(torsoHull);
+const headHull = new THREE.Mesh(headGeo, hullMat); headHull.scale.setScalar(1.18); headHull.renderOrder = -1; head.add(headHull);
 const limbGeo = new THREE.OctahedronGeometry(1, 0); limbGeo.scale(0.11, 0.42, 0.11);
 const limbs = [];
-for (let i = 0; i < 4; i++) { const l = new THREE.Mesh(limbGeo, crystalMat); playerG.add(l); limbs.push(l); }
+for (let i = 0; i < 4; i++) { const l = new THREE.Mesh(limbGeo, crystalMat); bodyG.add(l); limbs.push(l); }
 const coreGlow = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 3, 3) }));
-coreGlow.position.y = 1.15; playerG.add(coreGlow);
+coreGlow.position.y = 1.15; bodyG.add(coreGlow);
+// bullet-hell style hitbox dot: always drawn on top (beams, the sun, bloom)
+const hitDot = (() => {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const c = cv.getContext('2d');
+  const g = c.createRadialGradient(32, 32, 0, 32, 32, 30); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.32, 'rgba(255,255,255,1)'); g.addColorStop(0.42, 'rgba(10,6,20,0.95)'); g.addColorStop(0.58, 'rgba(10,6,20,0.85)'); g.addColorStop(0.7, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
+  sp.scale.setScalar(0.5); sp.position.y = 1.15; sp.renderOrder = 998; playerG.add(sp); return sp;
+})();
 // spectrum ring
 const specU = { uVal: { value: new THREE.Vector3(0.3, 0.3, 0.3) }, uWhite: { value: 0 }, uTime: { value: 0 }, uPop: { value: new THREE.Vector3() } };
 const specRing = new THREE.Mesh(new THREE.RingGeometry(0.98, 1.2, 96, 1), new THREE.ShaderMaterial({
@@ -1368,14 +1468,14 @@ const specRing = new THREE.Mesh(new THREE.RingGeometry(0.98, 1.2, 96, 1), new TH
       col = mix(col, vec3(1.0,0.97,0.92)*1.3*wp*edge, uWhite);
       gl_FragColor = vec4(col, 1.0); }`,
 }));
-specRing.rotation.x = -Math.PI / 2; specRing.position.y = 0.05; specRing.renderOrder = 6; playerG.add(specRing);
+specRing.rotation.x = -Math.PI / 2; specRing.position.y = 0.05; specRing.renderOrder = 30; specRing.material.depthTest = false; playerG.add(specRing);
 const grazeU = { uA: { value: 0.15 }, uTime: { value: 0 }, uR: { value: PLAYER.grazeR } };
 const grazeRingMesh = new THREE.Mesh(new THREE.RingGeometry(PLAYER.grazeR - 0.03, PLAYER.grazeR + 0.03, 120, 1), new THREE.ShaderMaterial({
   uniforms: grazeU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   vertexShader: `varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
   fragmentShader: `uniform float uA,uTime; varying vec2 vP; void main(){ float a = atan(vP.y,vP.x); float dash = step(0.2, sin(a*40.0 + uTime*1.5)); gl_FragColor = vec4(vec3(0.85,0.92,1.0)*dash*uA*1.6, 1.0); }`,
 }));
-grazeRingMesh.rotation.x = -Math.PI / 2; grazeRingMesh.position.y = 0.06; grazeRingMesh.renderOrder = 6; playerG.add(grazeRingMesh);
+grazeRingMesh.rotation.x = -Math.PI / 2; grazeRingMesh.position.y = 0.06; grazeRingMesh.renderOrder = 30; grazeRingMesh.material.depthTest = false; playerG.add(grazeRingMesh);
 // ghosts (dash afterimages)
 const ghostMatBase = new THREE.ShaderMaterial({
   uniforms: { uCol: { value: new THREE.Color(1, 1, 1) }, uA: { value: 1 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -1386,11 +1486,11 @@ const ghosts = [];
 for (let i = 0; i < 8; i++) { const m = new THREE.Mesh(torsoGeo, ghostMatBase.clone()); m.visible = false; m.renderOrder = 9; scene.add(m); ghosts.push({ m, t: 0, life: 0.35 }); }
 let ghostIdx = 0;
 function spawnGhost(x, y, z, rotY, c) {
-  const g = ghosts[ghostIdx]; ghostIdx = (ghostIdx + 1) % 8; g.m.position.set(x, y, z); g.m.rotation.set(0, rotY, 0); g.t = 0; g.m.visible = true;
+  const g = ghosts[ghostIdx]; ghostIdx = (ghostIdx + 1) % 8; g.m.position.set(x, y * BODY_SC, z); g.m.rotation.set(0, rotY, 0); g.t = 0; g.m.visible = true;
   g.m.material.uniforms.uCol.value.copy(c);
 }
 function updateGhosts(dt) {
-  for (let i = 0; i < 8; i++) { const g = ghosts[i]; if (!g.m.visible) continue; g.t += dt; const k = g.t / g.life; if (k >= 1) { g.m.visible = false; continue; } g.m.material.uniforms.uA.value = (1 - k) * 0.9; g.m.scale.setScalar(1 + k * 0.25); }
+  for (let i = 0; i < 8; i++) { const g = ghosts[i]; if (!g.m.visible) continue; g.t += dt; const k = g.t / g.life; if (k >= 1) { g.m.visible = false; continue; } g.m.material.uniforms.uA.value = (1 - k) * 0.9; g.m.scale.setScalar(BODY_SC * (1 + k * 0.25)); }
 }
 
 // ---- Lattice field ----
@@ -1535,7 +1635,7 @@ function abilityReady(name) {
   return false;
 }
 function useAbility(name) {
-  if (!canControl() && !(name === 'dash' && game.state === 'fight' && player.alive && player.novaT < 0)) return false;
+  if (!canControl() && !((name === 'dash' || name === 'nova') && game.state === 'fight' && player.alive && player.novaT < 0)) return false; // short stuns never eat a dash or the ultimate
   if (!abilityReady(name)) { if (name !== 'dash') sfx.deny(); return false; }
   ui.pressFlash(name);
   switch (name) {
@@ -1569,6 +1669,7 @@ function fireLanceBeam(ang, mul) {
   const tgtD = aim.tgt ? Math.max(1, Math.hypot(aim.tgt.x - x0, aim.tgt.z - z0)) : 10;
   const slope = aim.tgt ? (aim.tgt.y - 1.15) / tgtD : 0;
   beam(x0, 1.15, z0, x1, 1.15 + slope * L, z1, PLAYER.lanceW * 0.5 * (mul < 1 ? 0.6 : 1), 0.22, 1.0, 0.1, 0.18, 0, 1.25);
+  beam(x0, 1.15, z0, x1, 1.15 + slope * L, z1, PLAYER.lanceW * 0.85 * (mul < 1 ? 0.6 : 1), 0.38, 0.9, 0.05, 0.12, 0, 0.45); // tapering afterimage
   ring(x0, 1.15, z0, 0.1, 1.4, 0.25, 0.15, 2.5, 0.4, 0.5, 1.2);
   burst(x0, 1.15, z0, 10, 2.5, 0.4, 0.5, 5, 0.25, 0.14, 1, 4);
   let hitAny = false, critAny = false;
@@ -1584,6 +1685,7 @@ function fireLanceBeam(ang, mul) {
       const hx = x0 + c * along, hz = z0 + s * along, hy = 1.15 + slope * along;
       burst(hx, hy, hz, 40, 2.6, 0.35, 0.4, 9, 0.6, 0.2, 1, 0);
       ring(hx, hy, hz, 0.2, 2.2, 0.3, 0.2, 2.4, 0.5, 0.5, 1);
+      if (t.isBoss) { shockAt(hx, hy, hz, 0.035); aberrSpike(0.006); bossRT.lanceFlash = 1; const hc = bossRT.def && bossRT.def.hue || PCOL[R]; shatter(hx, hy, hz, 0.4, 10, hc[0] * 1.6, hc[1] * 1.6, hc[2] * 1.6, 7, 0.9, 9); }
     }
   }
   // destroy projectiles along the beam
@@ -1627,10 +1729,10 @@ function novaBurst() {
   if (bossRT.def && bossRT.fracture >= 100 && !vulnBefore) bossVulnerable();
   const dmg = 300 + 6 * p.novaConsumed;
   for (let i = 0; i < targets.length; i++) { const t = targets[i]; if (t.alive) t.hit(dmg, true, 'nova'); }
-  ring(p.x, 0.2, p.z, 0.5, 30, 1.1, 0.8, 1.6, 1.6, 1.8, 1.2);
-  ring(p.x, 1.2, p.z, 0.2, 12, 0.7, 0.35, 2, 2, 2.4, 1.2);
-  burstRainbow(p.x, 1.6, p.z, 300, 16, 1.6, 0.24, 0);
-  bloomSpike(2.2); addTrauma(0.9); shockAt(p.x, 1.2, p.z, 0.06); rainbowWave(p.x, p.z, 1.4, 20);
+  ring(p.x, 0.2, p.z, 0.5, 30, 1.0, 0.45, 0.9, 1.0, 1.3, 0.7);
+  ring(p.x, 1.2, p.z, 0.2, 12, 0.6, 0.25, 1.1, 1.1, 1.5, 0.6);
+  burstRainbow(p.x, 1.6, p.z, 180, 16, 1.3, 0.24, 0);
+  bloomSpike(1.1); addTrauma(0.9); shockAt(p.x, 1.2, p.z, 0.06); rainbowWave(p.x, p.z, 1.0, 20);
   aberrSpike(0.012);
   if (hasFacet('afterglow')) p.afterglowT = 5;
 }
@@ -1638,11 +1740,17 @@ function updateNova(realDt) {
   const p = player; if (p.novaT < 0) return;
   const t0 = p.novaT; p.novaT += realDt; const t = p.novaT;
   p.y = Math.min(1, t / 0.3) * (t < 0.8 ? 1 : Math.max(0, 1 - (t - 0.8) / 0.3));
-  if (t < 0.25) LU.uWhite.value = 0; else if (t < 0.4) LU.uWhite.value = (t - 0.25) / 0.15; else if (t < 0.65) LU.uWhite.value = 1; else LU.uWhite.value = Math.max(0, 1 - (t - 0.65) / 0.45);
+  // radial shock: white core at the player, expanding ring with a chromatic edge, world drops to dark silhouettes for a few frames
+  _v1.set(p.x, 1.2 + p.y, p.z).project(camera); LU.uNovaC.value.set(_v1.x * 0.5 + 0.5, _v1.y * 0.5 + 0.5);
+  const rfx = settings.reduceFx;
+  if (t < 0.25) { LU.uNovaA.value = 0; LU.uNovaR.value = 0; }
+  else if (t < 0.4) { LU.uNovaA.value = (t - 0.25) / 0.15 * 0.6; LU.uNovaR.value = 0; LU.uNovaNeg.value = rfx ? 0 : (t - 0.25) / 0.15 * 0.5; }
+  else { const k = clamp((t - 0.4) / 0.6, 0, 1); LU.uNovaR.value = easeOut(k) * 1.5; LU.uNovaA.value = (1 - k * k) * (rfx ? 0.5 : 1); LU.uNovaNeg.value = rfx ? 0 : (t < 0.52 ? 1 : Math.max(0, 1 - (t - 0.52) / 0.14)); }
+  LU.uWhite.value = (!rfx && t >= 0.4 && t < 0.48) ? 0.5 : 0;
   if (t0 < 0.4 && t >= 0.4) novaBurst();
   if (t >= 0.4 && t < 0.8) director.timeScale = 0.35; else if (t >= 0.8 && t < 1.1) director.timeScale = lerp(0.35, 1, (t - 0.8) / 0.3);
   if (t < 0.4) { crystalU.uFlash.value = t / 0.4; burst(p.x, 1.2 + p.y, p.z, 3, 2, 2, 2, 4, 0.4, 0.15, 1, 1); }
-  if (t >= 1.1) { p.novaT = -1; p.y = 0; LU.uWhite.value = 0; director.timeScale = 1; crystalU.uFlash.value = 0; }
+  if (t >= 1.1) { p.novaT = -1; p.y = 0; LU.uWhite.value = 0; LU.uNovaA.value = 0; LU.uNovaNeg.value = 0; director.timeScale = 1; crystalU.uFlash.value = 0; }
 }
 
 // ---- per-frame player update ----
@@ -1775,9 +1883,12 @@ function updatePlayerVisuals(dt) {
   floorU.uPlayerPos.value.set(p.x, p.z);
   floorU.uPlayerColor.value.copy(crystalU.uCore.value);
   const lvl = (p.r + p.g + p.b) / 300;
-  floorU.uPlayerGlow.value = p.alive && playerG.visible ? 0.22 * (0.5 + lvl * 0.9) * (game.state === 'title' ? 0 : 1) : 0;
+  floorU.uPlayerGlow.value = p.alive && playerG.visible ? 0.11 * (0.5 + lvl * 0.9) * (game.state === 'title' ? 0 : 1) : 0;
+  hitDot.visible = p.alive && game.state !== 'title';
+  hitDot.material.opacity = game.state === 'fight' ? 1 : 0.4;
   // body animation
   const sp = Math.hypot(p.vx, p.vz);
+  if (sp > 2 && p.alive && playerG.visible && p.dashT < 0 && dt > 0) { const c = crystalU.uCore.value; emitP(p.x - p.vx * 0.03 + (frand() - 0.5) * 0.2, 0.5 + frand() * 1.2, p.z - p.vz * 0.03 + (frand() - 0.5) * 0.2, -p.vx * 0.08, 0.15, -p.vz * 0.08, c.r * 0.9, c.g * 0.9, c.b * 0.9, 0.35, 0.1, 4); }
   const bob = Math.sin(t * 2.2) * 0.06;
   torso.position.y = 1.15 + bob; coreGlow.position.y = torso.position.y;
   torso.rotation.y += dt * (0.6 + sp * 0.1);
@@ -1891,7 +2002,7 @@ function writePj(arr, i) {
 const bossRT = {
   def: null, idx: 0, hp: 1, maxHp: 1, phase: 0, loopT: 0, cursor: 0, loops: 0, fracture: 0, fracIdle: 0, vuln: 0, stagger: 0, staggerMul: 1, shieldMul: 1,
   cast: { active: false, name: '', dur: 1, t: 0, white: false }, enrageLeft: 240, enrageWarned: false, invuln: false, dead: false, transitioning: false,
-  flash: 0, lastLight: false, novaInLastLight: false, dnAcc: 0, dnT: 0, dnCrit: false, time: 0, wipeT: -1,
+  flash: 0, lastLight: false, novaInLastLight: false, dnAcc: 0, dnT: 0, dnCrit: false, time: 0, wipeT: -1, lanceFlash: 0,
 };
 const bossTarget = { x: 0, y: 2, z: 0, r: 1.6, hy: 2, alive: false, priority: false, isBoss: true, hit: (d, c, s) => bossTakeDamage(d, c, s) };
 function bossMainTarget() { return bossTarget.alive ? bossTarget : null; }
@@ -1964,8 +2075,9 @@ function bossTakeDamage(n, crit, src) {
   if (b.invuln || b.transitioning) { if (src !== 'bolt' || frand() < 0.1) dmgNumber(bossTarget.x, bossTarget.y + 1.5, bossTarget.z, 'IMMUNE', 4, '#aaaacc'); return; }
   let m = 1; if (b.vuln > 0) m *= 2; if (b.stagger > 0) m *= b.staggerMul; m *= b.shieldMul;
   n *= m; b.hp -= n; b.flash = 0.08;
-  if (src === 'bolt') { b.dnAcc += n; b.dnCrit = b.dnCrit || crit; }
-  else dmgNumber(bossTarget.x + (frand() - 0.5) * 1.5, bossTarget.y + 1.2, bossTarget.z + 0.8, String(Math.round(n)), crit ? 1 : 0, src === 'refl' ? '#a8c8ff' : null);
+  // every non-crit source ticks one rolling number up; crits pop on their own
+  if (crit) dmgNumber(bossTarget.x - dnRoll.ox * 0.9 + (frand() - 0.5) * 0.8, bossTarget.y + 1.0, bossTarget.z + 0.8, String(Math.round(n)), 1);
+  else dmgRollAdd(n, src === 'refl');
   if (b.def.onDamage) b.def.onDamage(n, src);
   const ph = b.def.phases[b.phase];
   if (b.phase < b.def.phases.length - 1 && b.hp <= ph.until * b.maxHp) { b.hp = ph.until * b.maxHp; bossStartTransition(b.phase + 1); return; }
@@ -1973,16 +2085,20 @@ function bossTakeDamage(n, crit, src) {
   if (b.hp <= 0) { b.hp = 0; bossDie(); }
 }
 function bossStartTransition(n, instant = false) {
-  const b = bossRT; b.transitioning = true; bossInterrupt(); teleClearAll(); pjClearAll(true); b.vuln = 0; b.stagger = 0;
+  const b = bossRT; if (!b.def) return; n = clamp(n | 0, 1, b.def.phases.length - 1);
+  b.transitioning = true; bossInterrupt(); teleClearAll(); pjClearAll(true); b.vuln = 0; b.stagger = 0;
   hitstop(0.15);
-  const done = () => { b.phase = n; b.loopT = 0; b.cursor = 0; b.loops = 0; b.transitioning = false; if (b.def.onPhase) b.def.onPhase(n); music.setSection(b.def.music[n] || b.def.music[0]); };
+  const done = () => { b.phase = n; b.loopT = 0; b.cursor = 0; b.loops = 0; b.transitioning = false; if (b.def.onPhase) b.def.onPhase(n); music.setSection(b.def.music[n] || b.def.music[0]);
+    if (!instant && game.state === 'fight') { ui.hud(true); ui.letterbox(false); } };
+  if (!instant) { ui.hud(false); ui.letterbox(true); dmgNumsClear(); }
   if (instant) { if (b.def.transitionInstant) b.def.transitionInstant(n); done(); return; }
   const c = b.def.transitionCine(n); const oe = c.end; c.end = () => { oe && oe(); done(); };
   playCine(c);
 }
 function bossDie() {
   const b = bossRT; if (b.dead) return;
-  b.dead = true; bossTarget.alive = false; bossInterrupt(); teleClearAll(); pjClearAll(true);
+  if (!player.alive && game.state === 'fight') { b.hp = Math.max(b.hp, 1); return; } // a shattered Lightbreaker can't win with shots still in flight
+  b.dead = true; bossTarget.alive = false; bossInterrupt(); teleClearAll(); pjClearAll(true); dmgNumsClear();
   for (let i = 0; i < targets.length; i++) if (!targets[i].isBoss) targets[i].alive = false;
   game.bossTimes[b.idx] = game.fightTime;
   hitstop(0.25);
@@ -2000,6 +2116,7 @@ function bossReset(idx, phase = 0) {
   rng = mulberry32(1337 + idx * 101);
   clearTasks(); teleClearAll(); pjClearAll(false); hzBeamsClear();
   game.arenaR = def.arenaR; floorU.uArenaR.value = def.arenaR; game.gravity = 0; game.arenaCut.on = false;
+  teleHC.value = 0; dmgNumsClear();
   def.reset();
   if (phase > 0) { b.hp = def.phases[phase - 1].until * b.maxHp; b.phase = phase; if (def.transitionInstant) for (let p = 1; p <= phase; p++) def.transitionInstant(p); if (def.onPhase) def.onPhase(phase); }
 }
@@ -2016,8 +2133,8 @@ function updateBoss(dt) {
     // enrage
     if (!b.lastLight) b.enrageLeft -= dt;
     if (b.enrageLeft <= 3 && !b.enrageWarned) { b.enrageWarned = true; ui.toast(b.def.enrageName ? b.def.enrageName() : 'ENRAGE', 3, true); sfx.riser(); }
-    if (b.enrageLeft <= 0 && b.wipeT < 0) { b.wipeT = 0; bossInterrupt(); if (b.def.onEnrage) b.def.onEnrage(); LU.uWhite.value = 1; bloomSpike(2.5); addTrauma(1); sfx.boom(); if (!debug.god) { player.hurtI = 0; player.invuln = 0; damagePlayer(999, W); } b.enrageLeft = 9999; }
-    if (b.wipeT >= 0) { b.wipeT += dt; LU.uWhite.value = Math.max(0, 1 - b.wipeT / 1.2); if (b.wipeT > 1.2) b.wipeT = -1; }
+    if (b.enrageLeft <= 0 && b.wipeT < 0) { b.wipeT = 0; bossInterrupt(); if (b.def.onEnrage) b.def.onEnrage(); LU.uWhite.value = 0.6; bloomSpike(1.6); addTrauma(1); sfx.boom(); if (!debug.god) { player.hurtI = 0; player.invuln = 0; damagePlayer(999, W); } b.enrageLeft = 9999; }
+    if (b.wipeT >= 0) { b.wipeT += dt; LU.uWhite.value = b.wipeT < 0.08 ? 0.6 : Math.max(0, 0.35 * (1 - (b.wipeT - 0.08) / 0.5)); if (b.wipeT > 1.2) b.wipeT = -1; }
     // scheduler
     if (b.vuln <= 0 && b.stagger <= 0 && !b.lastLight) {
       const ph = b.def.phases[b.phase];
@@ -2027,9 +2144,8 @@ function updateBoss(dt) {
       updateTasks(dt);
     }
   }
-  // coalesced bolt damage numbers
-  b.dnT += dt; if (b.dnT >= 0.35) { b.dnT = 0; if (b.dnAcc >= 1) { dmgNumber(bossTarget.x + (frand() - 0.5) * 2, bossTarget.y + 1.0, bossTarget.z + 0.8, String(Math.round(b.dnAcc)), b.dnCrit ? 1 : 0); } b.dnAcc = 0; b.dnCrit = false; }
   b.def.update(dt);
+  b.lanceFlash = 0;
 }
 let rippleCD = 0;
 function tryRipple(x, z, s) { if (floorU.uArena.value !== 0 || rippleCD > 0) return; rippleCD = 0.12; addRipple(x, z, s); }
@@ -2161,8 +2277,8 @@ function buildBoss1() {
         vec3 c = base + core + vl*vec3(1.0,0.25,0.2)*(0.35+uPulse*0.9) + fr*vec3(1.0,0.3,0.4)*0.7;
         // burning heart
         float fl = fbm(vO.xy*2.5 - vec2(0.0, uTime*1.4));
-        vec3 fire = vec3(1.0,0.32,0.04)*(0.25+0.9*smoothstep(0.4,0.8,fl)) + vec3(1.0,0.7,0.3)*pow(1.0-fr,4.0)*0.6;
-        c = mix(c, fire + vl*vec3(1.0,0.6,0.2)*0.9, uFire*0.85);
+        vec3 fire = vec3(1.0,0.13,0.02)*(0.3+1.05*smoothstep(0.4,0.8,fl)) + vec3(1.0,0.34,0.05)*pow(1.0-fr,4.0)*0.55 + vec3(0.5,0.02,0.02)*fr*0.6;
+        c = mix(c, fire + vl*vec3(1.0,0.42,0.08)*0.8, uFire*0.88);
         vec2 vr = vor(vO.xy*2.6 + vO.z*0.5); float ce = smoothstep(0.06, 0.0, vr.y-vr.x);
         c += vec3(2.2,2.3,2.6)*ce*max(uCrack, uFracture*0.35*(0.5+0.5*sin(uTime*9.0)));
         c *= 1.0-uDark*0.9;
@@ -2177,22 +2293,35 @@ function buildBoss1() {
     vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
     fragmentShader: GLSL_LIB + `uniform float uTime,uA; varying vec2 vUv;
       void main(){ vec2 p = vUv*2.0-1.0; float n = fbm(vec2(p.x*2.2, p.y*1.6 - uTime*1.8)); float n2 = fbm(vec2(p.x*4.0+3.0, p.y*3.0 - uTime*3.1));
-        float d = length(vec2(p.x*1.35, (p.y+0.45)*0.72)); float s = smoothstep(1.0, 0.0, d + (n-0.5)*0.9 + (n2-0.5)*0.35 + p.y*0.15);
-        vec3 c = mix(vec3(0.7,0.05,0.02), vec3(1.0,0.45,0.06), smoothstep(0.1,0.5,s)); c = mix(c, vec3(1.0,0.9,0.6), smoothstep(0.6,0.95,s));
-        gl_FragColor = vec4(c*s*1.0*uA, 1.0); }`,
+        float d = length(vec2(p.x*1.35, (p.y+0.2)*0.72)); float s = smoothstep(1.0, 0.0, d + (n-0.5)*0.9 + (n2-0.5)*0.35 + p.y*0.15);
+        s *= smoothstep(1.0, 0.72, abs(p.x))*smoothstep(1.0, 0.68, abs(p.y));   // never reach the quad edges
+        vec3 c = mix(vec3(0.6,0.03,0.01), vec3(1.0,0.3,0.04), smoothstep(0.1,0.5,s)); c = mix(c, vec3(1.0,0.58,0.16), smoothstep(0.65,0.95,s));
+        gl_FragColor = vec4(c*s*0.85*uA, 1.0); }`,
   }));
   B1.flame.position.set(0, 2.6, -0.4); B1.flame.renderOrder = 3; g.add(B1.flame);
   // candles: 400 around the pond + 60 floating inside
   const NC = 400, NF = 60;
   const bodyGeo = new THREE.CylinderGeometry(0.07, 0.085, 0.32, 7).translate(0, 0.16, 0);
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd8cfc0, roughness: 0.8, emissive: 0x3a2412, emissiveIntensity: 0.6 });
+  B1.flameMatU = { uTime: { value: 0 }, uFlare: { value: 1 }, uIgnite: { value: 1 }, uIgR: { value: 99 } };
+  // warm ivory wax: dark at the base, lit lip at the top, fading out beyond the pond rim
+  const bodyMat = new THREE.ShaderMaterial({
+    uniforms: B1.flameMatU,
+    vertexShader: `varying float vH; varying float vR; void main(){ vH = position.y/0.32; vec4 w = modelMatrix*instanceMatrix*vec4(position,1.0); vR = length(w.xz); gl_Position = projectionMatrix*viewMatrix*w; }`,
+    fragmentShader: `uniform float uFlare,uIgnite,uIgR; varying float vH; varying float vR;
+      void main(){ float ig = uIgnite*smoothstep(uIgR+1.5, uIgR-1.5, vR);
+        vec3 base = mix(vec3(0.07,0.035,0.02), vec3(0.62,0.48,0.32), smoothstep(0.0,1.0,vH));
+        float lip = smoothstep(0.78,1.0,vH);
+        vec3 c = base*(0.45+0.35*ig) + vec3(1.0,0.45,0.12)*lip*(0.55+0.25*min(uFlare,2.0))*ig;
+        c *= mix(1.0, 0.35, smoothstep(17.0, 21.5, vR));
+        gl_FragColor = vec4(c, 1.0); }`,
+  });
   B1.candles = new THREE.InstancedMesh(bodyGeo, bodyMat, NC + NF);
-  B1.flameMatU = { uTime: { value: 0 }, uFlare: { value: 1 }, uIgnite: { value: 1 } };
   B1.flames = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.2, 0.42), new THREE.ShaderMaterial({
     uniforms: B1.flameMatU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    vertexShader: `uniform float uTime,uFlare; varying vec2 vUv; varying float vF;
+    vertexShader: `uniform float uTime,uFlare,uIgR; varying vec2 vUv; varying float vF;
       void main(){ vec3 c = (modelMatrix*instanceMatrix*vec4(0.0,0.0,0.0,1.0)).xyz; float id = float(gl_InstanceID);
-        float fl = 0.78 + 0.22*sin(uTime*13.0+id*1.7)*sin(uTime*7.3+id*0.37); vF = fl;
+        float cr = length(c.xz);
+        float fl = 0.78 + 0.22*sin(uTime*13.0+id*1.7)*sin(uTime*7.3+id*0.37); vF = fl*smoothstep(uIgR+1.5, uIgR-1.5, cr)*mix(1.0, 0.55, smoothstep(17.0, 21.5, cr));
         float s = sqrt(uFlare)*fl; vec4 mv = viewMatrix*vec4(c + vec3(0.0, 0.32, 0.0), 1.0);
         mv.xy += vec2(position.x + sin(uTime*3.0+id)*0.02*position.y*5.0, position.y + 0.21)*s; vUv = uv; gl_Position = projectionMatrix*mv; }`,
     fragmentShader: `uniform float uFlare,uIgnite; varying vec2 vUv; varying float vF;
@@ -2234,15 +2363,17 @@ const BOSS1 = {
   ],
   build: buildBoss1,
   show(on) { B1.group.visible = on; },
-  setTitleMode() { B1.mode = 'title'; for (const L of B1.lanterns) { L.ign = 0.22; L.mode = 0; L.dark = 0; L.vis = true; } B1.heart.visible = false; B1.flameU.uA.value = 0; B1.fire = 0; B1.heartU.uFire.value = 0; B1.flameMatU.uFlare.value = 1; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 0; floorU.uPalRadius.value = 0; },
+  hue: [1.0, 0.35, 0.12],
+  camTop() { return 3.7; },
+  setTitleMode() { B1.mode = 'title'; for (const L of B1.lanterns) { L.ign = 0.22; L.mode = 0; L.dark = 0; L.vis = true; } B1.heart.visible = false; B1.flameU.uA.value = 0; B1.fire = 0; B1.heartU.uFire.value = 0; B1.flameMatU.uFlare.value = 1; B1.flameMatU.uIgR.value = 99; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 0; floorU.uPalRadius.value = 0; floorU.uBeat.value = 0; },
   reset() {
-    B1.mode = 'fight'; B1.fire = 0; B1.heartU.uFire.value = 0; B1.heartU.uDark.value = 0; B1.heartU.uCrack.value = 0; B1.flameU.uA.value = 0; B1.flameMatU.uFlare.value = 1;
+    B1.mode = 'fight'; B1.fire = 0; B1.heartU.uFire.value = 0; B1.heartU.uDark.value = 0; B1.heartU.uCrack.value = 0; B1.flameU.uA.value = 0; B1.flameMatU.uFlare.value = 1; B1.flameMatU.uIgR.value = 99;
     B1.heart.visible = true; B1.heartYaw = Math.PI / 2; B1.cleaving = false; B1.chorusDir = 1; B1.firstEmber = true; B1.tut = {};
     for (let i = 0; i < 8; i++) { const L = B1.lanterns[i]; L.mode = 0; L.ign = 1; L.dark = 0; L.glowT = 1; L.vis = true; L.g.visible = true; b1LanternOrbitPos(i, L.pos); L.last.copy(L.pos); }
     for (const d of B1.drops) { d.active = false; d.m.visible = false; }
     floorU.uPalFrom.value = 0; floorU.uPalTo.value = 0; floorU.uPalRadius.value = 0;
   },
-  transitionInstant(n) { if (n === 1) { B1.fire = 1; B1.heartU.uFire.value = 1; B1.flameU.uA.value = 1; B1.flameMatU.uFlare.value = 3; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 1; floorU.uPalRadius.value = 40; } },
+  transitionInstant(n) { if (n === 1) { B1.fire = 1; B1.heartU.uFire.value = 1; B1.flameU.uA.value = 1; B1.flameMatU.uFlare.value = 1.6; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 1; floorU.uPalRadius.value = 40; } },
   onPhase(n) { },
   onInterrupt() { for (const L of B1.lanterns) if (L.mode !== 0 && L.mode !== 4) { L.mode = 0; L.glowT = 1; } },
   casts: {
@@ -2352,6 +2483,9 @@ const BOSS1 = {
     hu.uFracture.value = bossRT.fracture >= 100 ? 1 : 0;
     if (hu.uFlash.value > 0) hu.uFlash.value = Math.max(0, hu.uFlash.value - dt * 4);
     if (bossRT.flash > 0) hu.uFlash.value = Math.max(hu.uFlash.value, 0.07);
+    if (bossRT.lanceFlash > 0) hu.uFlash.value = Math.max(hu.uFlash.value, 0.55);
+    floorU.uBeat.value = B1.beat;
+    if (B1.mode === 'fight') teleHC.value = bossRT.phase === 1 ? 1 : 0;
     const hb = 1 + 0.08 * B1.beat; B1.heart.scale.set(1.35 * hb, 1.35 * hb, 1.35 * hb);
     B1.heart.position.y = 2.1 + Math.sin(t * 0.9) * 0.12;
     // heart faces the camera mostly; during cleave turn toward player
@@ -2436,32 +2570,33 @@ const BOSS1 = {
   },
   // ---- cinematics ----
   introCine() {
-    const keys = [[0, 0, 80, 26, 0, 0, 0, 90], [1.6, 0, 15, 19, 0, 0, 4, 52], [2.2, 0, 11, 17, 0, 1, 4, 50], [4.2, 0, 4.2, 11.5, 0, 2.6, 0, 48], [5.0, 0, 6, 13, 0, 2.2, 0, 48]];
+    const keys = [[0, 0, 40, 25, 0, 0, 2, 64], [1.25, 0, 14, 18.5, 0, 0, 4, 46], [2.2, 0, 10, 16, 0, 1, 3.5, 47], [3.5, 0, 3.4, 10.8, 0, 2.7, 0, 44], [4.6, 0, 4.6, 11.8, 0, 2.5, 0, 45], [5.0, 0, 6, 13, 0, 2.2, 0, 48]];
     return {
-      dur: 5.0, skippable: 1.0, skipTo: 4.6,
+      dur: 5.0, skippable: 0.8, skipTo: 4.7,
       start() {
         BOSS1.setTitleMode(); B1.mode = 'intro'; playerG.visible = false; player.x = 0; player.z = 7; starU.uStreak.value = 1; ui.hud(false);
         sfx.fall();
       },
       update(t) {
         camKeys(t, keys);
-        starU.uStreak.value = Math.max(0, 1 - t / 1.6);
+        starU.uStreak.value = Math.max(0, 1 - t / 1.25);
+        B1.flameMatU.uIgR.value = t < 1.3 ? 0 : t > 2.9 ? 99 : (t - 1.3) / 1.4 * 23;
       },
       ev: [
-        [1.2, () => { reform(0, 1.15, 7, 70, 0.4, 1.4, 1.6, 2.2, 6); }],
-        [1.6, () => { playerG.visible = true; ring(0, 0.06, 7, 0.3, 6, 0.8, 0.35, 2, 2.2, 2.6, 1.6); rainbowWave(0, 7, 1.2); bloomSpike(1.5); addTrauma(0.5); sfx.boom(); addRipple(0, 7, 1.5); burstRainbow(0, 0.5, 7, 80, 7, 1.0, 0.18, 4); }],
+        [0.95, () => { reform(0, 1.15, 7, 70, 0.4, 1.4, 1.6, 2.2, 6); }],
+        [1.35, () => { playerG.visible = true; ring(0, 0.06, 7, 0.3, 6, 0.8, 0.35, 2, 2.2, 2.6, 1.6); rainbowWave(0, 7, 1.2); bloomSpike(1.5); addTrauma(0.5); sfx.boom(); addRipple(0, 7, 1.5); burstRainbow(0, 0.5, 7, 80, 7, 1.0, 0.18, 4); }],
         ...Array.from({ length: 8 }, (_, i) => [2.2 + i * 0.25, () => { const L = B1.lanterns[i]; L.ign = 1; L.u.uFlash.value = 1.2; burst(L.pos.x, L.pos.y, L.pos.z, 24, 2.6, 1.2, 0.4, 3, 0.8, 0.18, 1, 3); sfx.chime(i); }]),
         [2.3, () => { B1.heart.visible = true; B1.heartU.uFlash.value = 1; }],
-        [4.2, () => { ui.letterbox(true); ui.titleCard('THE LANTERN CHOIR', 'First Refraction'); music.setSection('b1p1'); }],
+        [3.5, () => { ui.letterbox(true); ui.titleCard('THE LANTERN CHOIR', 'First Refraction', 2.4); music.setSection('b1p1'); }],
       ],
-      end() { B1.mode = 'fight'; for (const L of B1.lanterns) L.ign = 1; B1.heart.visible = true; playerG.visible = true; starU.uStreak.value = 0; },
+      end() { B1.flameMatU.uIgR.value = 99; B1.mode = 'fight'; for (const L of B1.lanterns) L.ign = 1; B1.heart.visible = true; playerG.visible = true; starU.uStreak.value = 0; },
     };
   },
   transitionCine(n) {
     let a0 = 0;
     return {
       dur: 2.2,
-      start() { a0 = Math.atan2(cam.pos.z, cam.pos.x); director.timeScale = 0.25; ui.toast('KINDLING', 1.8); sfx.riser(); },
+      start() { a0 = Math.atan2(cam.pos.z, cam.pos.x); director.timeScale = 0.25; ui.titleCard('KINDLING', '', 1.8); sfx.riser(); },
       update(t, dt) {
         const k = smooth(t / 2.2); const a = a0 + k * (120 * Math.PI / 180); const r = lerp(14, 10, Math.sin(k * Math.PI));
         director.camPos.set(Math.cos(a) * r, lerp(9, 3.5, Math.sin(k * Math.PI)), Math.sin(a) * r); director.camLook.set(0, 2.2, 0); director.fov = 52;
@@ -2472,7 +2607,7 @@ const BOSS1 = {
         [0.3, () => { B1.heart.visible = false; shatter(0, 2.1, 0, 1.2, 120, 1.6, 0.15, 0.2, 9, 1.6, 3); sfx.shatter(1); bloomSpike(1.2); addTrauma(0.5); }],
         [0.45, () => { reform(0, 2.1, 0, 100, 0.45, 1.6, 0.7, 0.15, 8); }],
         [0.9, () => {
-          B1.heart.visible = true; B1.fire = 1; B1.heartU.uFire.value = 1; B1.heartU.uFlash.value = 1; B1.flameU.uA.value = 1; B1.flameMatU.uFlare.value = 3;
+          B1.heart.visible = true; B1.fire = 1; B1.heartU.uFire.value = 1; B1.heartU.uFlash.value = 1; B1.flameU.uA.value = 1; B1.flameMatU.uFlare.value = 1.6;
           floorU.uPalCenter.value.set(0, 0); floorU.uPalFrom.value = 0; floorU.uPalTo.value = 1; floorU.uPalRadius.value = 0.01;
           bloomSpike(1.6); addTrauma(0.8); shockAt(0, 2, 0, 0.06); sfx.boom(); burst(0, 2.1, 0, 120, 2.6, 0.9, 0.2, 14, 1.2, 0.3, 1, 0);
           for (const L of B1.lanterns) { L.u.uFlash.value = 1; burst(L.pos.x, L.pos.y, L.pos.z, 20, 2.6, 0.8, 0.2, 4, 0.8, 0.22, 1, 3); }
@@ -2491,16 +2626,18 @@ const BOSS1 = {
         director.camPos.set(Math.sin(k * 0.8) * 5, lerp(13, 7, k), lerp(16, 12, k)); director.camLook.set(0, lerp(2, 1.5, k), 0); director.fov = 50;
         if (t < 0.5) B1.flameU.uA.value = Math.max(0, 1 - t / 0.4);
         if (t > 1.3 && t < 3.3) game.sat = lerp(SAT_BOSS[0], SAT_BOSS[1], (t - 1.3) / 2);
+        if (t > 1.3) floorU.uPalTo.value = Math.max(0, 1 - smooth((t - 1.3) / 2.2));
+        floorU.uBeat.value = 0;
         if (t > 1.0) director.timeScale = 1;
         if (t > 1.4 && t < 4.5 && frand() < 0.7) { const a = frand() * TAU, r = frand() * 14; emitP(Math.cos(a) * r, 0.1, Math.sin(a) * r, (frand() - 0.5) * 0.3, 0.6 + frand(), (frand() - 0.5) * 0.3, 0.8, 0.75, 0.7, 3.5, 0.12, 3); }
       },
       ev: [
         [0.0, () => { B1.heartU.uFlash.value = 1; bloomSpike(1.2); sfx.boom(); }],
         ...Array.from({ length: 8 }, (_, i) => [0.4 + i * 0.08, () => { const L = B1.lanterns[i]; L.dark = 1; L.mode = 4; L.fallV = 0; L.splashed = false; sfx.chime(7 - i, 0.6); burst(L.pos.x, L.pos.y, L.pos.z, 12, 1.5, 0.8, 0.5, 2, 0.6, 0.15, 1, 3); }]),
-        [1.3, () => { B1.heart.visible = false; B1.heartU.uDark.value = 1; shatter(0, 2.1, 0, 1.4, 220, 2.4, 0.4, 0.5, 11, 3.0, 6, true); burstRainbow(0, 2, 0, 260, 14, 2.0, 0.3, 0); rainbowWave(0, 0, 1.6, 14); setTimeout(() => rainbowWave(0, 0, 1.0, 12), 500); bloomSpike(2.2); addTrauma(0.9); shockAt(0, 2, 0, 0.07); sfx.shatter(1.5); sfx.victoryStab(); B1.flameMatU.uFlare.value = 0.5; }],
+        [1.3, () => { B1.heart.visible = false; B1.heartU.uDark.value = 1; shatter(0, 2.1, 0, 1.4, 220, 2.4, 0.4, 0.5, 11, 3.0, 6, true); burstRainbow(0, 2, 0, 160, 14, 1.5, 0.3, 0); rainbowWave(0, 0, 1.2, 14); setTimeout(() => rainbowWave(0, 0, 1.0, 12), 500); bloomSpike(1.3); addTrauma(0.9); shockAt(0, 2, 0, 0.07); sfx.shatter(1.5); sfx.victoryStab(); B1.flameMatU.uFlare.value = 0.5; }],
         [2.4, () => { ui.letterbox(true); ui.titleCard(BOSS1.deathTitle, BOSS1.deathSub); }],
       ],
-      end() { game.satTarget = game.sat = SAT_BOSS[1]; ui.letterbox(false); },
+      end() { game.satTarget = game.sat = SAT_BOSS[1]; ui.letterbox(false); floorU.uPalTo.value = 0; },
     };
   },
 };
@@ -2678,23 +2815,33 @@ function buildBoss2() {
   };
   grow(new THREE.Vector3(0, -0.3, -1.0), new THREE.Vector3(0, 1, -0.05).normalize(), 4.4, 0.6, 0);
   B2.brData = brs;
-  const brGeo = new THREE.CylinderGeometry(0.62, 1, 1, 6, 3).translate(0, 0.5, 0);
+  const brGeo = new THREE.CylinderGeometry(0.62, 1, 1, 8, 4).translate(0, 0.5, 0);
   const aBr = new Float32Array(brs.length * 3); brs.forEach((b, i) => { aBr[i * 3] = b.depth; aBr[i * 3 + 1] = b.seed; });
   brGeo.setAttribute('aBr', new THREE.InstancedBufferAttribute(aBr, 3));
   B2.brU = { uTime: { value: 0 }, uCol: { value: new THREE.Color(0.22, 1, 0.55) }, uFlash: { value: 0 }, uDim: { value: 0 }, uWhite: { value: 0 } };
   B2.brMesh = new THREE.InstancedMesh(brGeo, new THREE.ShaderMaterial({
     uniforms: B2.brU,
-    vertexShader: /* glsl */`attribute vec3 aBr; varying vec3 vV; varying float vY; varying vec3 vBr;
-      void main(){ vY = position.y; vBr = aBr; vec4 mv = modelViewMatrix*instanceMatrix*vec4(position,1.0); vV = mv.xyz; gl_Position = projectionMatrix*mv; }`,
-    fragmentShader: GLSL_LIB + /* glsl */`uniform float uTime,uFlash,uDim,uWhite; uniform vec3 uCol; varying vec3 vV; varying float vY; varying vec3 vBr;
-      void main(){ vec3 n = normalize(cross(dFdx(vV), dFdy(vV))); float fr = 1.0-abs(dot(n, normalize(-vV)));
+    vertexShader: /* glsl */`attribute vec3 aBr; varying vec3 vV; varying float vY; varying vec3 vBr; varying vec3 vN; varying vec3 vO;
+      void main(){ vY = position.y; vBr = aBr; vO = position; vec4 mv = modelViewMatrix*instanceMatrix*vec4(position,1.0); vV = mv.xyz;
+        mat3 im = mat3(instanceMatrix); vec3 s2 = max(vec3(dot(im[0],im[0]), dot(im[1],im[1]), dot(im[2],im[2])), vec3(1e-6));
+        vN = normalize(normalMatrix*(im*(normal/s2))); gl_Position = projectionMatrix*mv; }`,
+    fragmentShader: GLSL_LIB + /* glsl */`uniform float uTime,uFlash,uDim,uWhite; uniform vec3 uCol; varying vec3 vV; varying float vY; varying vec3 vBr; varying vec3 vN; varying vec3 vO;
+      void main(){ vec3 v = normalize(-vV); float fr = 1.0-abs(dot(normalize(vN), v));
         float sp = fract((vBr.x + vY)*0.45 - uTime*0.38 + vBr.y*0.15); float sap = exp(-pow((sp-0.5)*9.0,2.0));
-        vec3 c = uCol*(0.035 + pow(fr,1.8)*1.05) + uCol*sap*(0.35+0.9*(1.0-fr))*(0.7+0.5*vBr.y) + palette(fr+uTime*0.05+vBr.y)*pow(fr,3.0)*0.25;
+        // internal refraction: caustic bands sliding through the glass, brighter toward the core of the rod
+        float ang = atan(vO.x, vO.z);
+        float caus = pow(0.5+0.5*sin(vY*7.0 + ang*2.0 + fr*5.0 - uTime*1.3 + vBr.y*30.0), 6.0);
+        vec3 c = uCol*(0.03 + pow(fr,1.6)*1.15) + uCol*sap*(0.35+0.9*(1.0-fr))*(0.7+0.5*vBr.y)
+               + palette(fr*0.8 + vY*0.3 + uTime*0.05 + vBr.y)*pow(fr,2.5)*0.4 + mix(uCol, vec3(1.0), 0.4)*caus*(1.0-fr)*0.35;
         c *= 1.0-uDim*0.75;
-        c = mix(c, vec3(1.6,1.8,2.0)*(0.3+fr), uWhite);
+        c = mix(c, vec3(1.3,1.5,1.8)*(0.12+pow(fr,1.4)*1.2) + palette(fr+vY*0.2+uTime*0.1)*pow(fr,2.0)*0.5, uWhite);
         c = mix(c, vec3(2.5), uFlash); gl_FragColor = vec4(c, 1.0); }`,
   }), brs.length);
-  B2.brMesh.frustumCulled = false; g.add(B2.brMesh); b2TreeReset();
+  B2.brMesh.frustumCulled = false; g.add(B2.brMesh);
+  // knuckles hide the hard joints between branch segments
+  const jGeo = new THREE.IcosahedronGeometry(1, 1); jGeo.setAttribute('aBr', new THREE.InstancedBufferAttribute(aBr, 3));
+  B2.brJoint = new THREE.InstancedMesh(jGeo, B2.brMesh.material, brs.length); B2.brJoint.frustumCulled = false; g.add(B2.brJoint);
+  b2TreeReset();
 
   // ================= LEAVES (1500 shards, rest ↔ vortex in the vertex shader) =================
   const NL = 1500; const lg = new THREE.BufferGeometry();
@@ -2866,14 +3013,16 @@ function b2TilesReset() {
 }
 function b2TreeReset() {
   const arr = B2.brMesh.instanceMatrix.array;
-  B2.brData.forEach((b, i) => { _q.setFromUnitVectors(_v1.set(0, 1, 0), b.d); _m4.compose(b.s, _q, _s.set(b.rad, b.len, b.rad)); _m4.toArray(arr, i * 16); b.gone = false; });
-  B2.brMesh.instanceMatrix.needsUpdate = true; B2.brokeTree = false;
+  const ja = B2.brJoint.instanceMatrix.array;
+  B2.brData.forEach((b, i) => { _q.setFromUnitVectors(_v1.set(0, 1, 0), b.d); _m4.compose(b.s, _q, _s.set(b.rad, b.len, b.rad)); _m4.toArray(arr, i * 16); b.gone = false;
+    const jr = b.depth === 0 ? 0 : b.rad * 1.05; _m4.compose(b.s, _q, _s.set(jr, jr * 0.9, jr)); _m4.toArray(ja, i * 16); });
+  B2.brMesh.instanceMatrix.needsUpdate = true; B2.brJoint.instanceMatrix.needsUpdate = true; B2.brokeTree = false;
 }
 function b2SplitTree(nx, nz, fxOn) {
   const arr = B2.brMesh.instanceMatrix.array; let n = 0;
   B2.brData.forEach((b, i) => {
     if (b.depth === 0) return; const mx = (b.s.x + b.e.x) / 2, mz = (b.s.z + b.e.z) / 2;
-    if (mx * nx + mz * nz > 0.3) { b.gone = true; for (let k = 0; k < 16; k++) arr[i * 16 + k] = 0; if (fxOn && n++ % 2 === 0) shatter((b.s.x + b.e.x) / 2, (b.s.y + b.e.y) / 2, (b.s.z + b.e.z) / 2, b.len * 0.3, 3, 0.7, 0.4, 1.4, 9, 2.2, 9); }
+    if (mx * nx + mz * nz > 0.3) { b.gone = true; for (let k = 0; k < 16; k++) { arr[i * 16 + k] = 0; B2.brJoint.instanceMatrix.array[i * 16 + k] = 0; } B2.brJoint.instanceMatrix.needsUpdate = true; if (fxOn && n++ % 2 === 0) shatter((b.s.x + b.e.x) / 2, (b.s.y + b.e.y) / 2, (b.s.z + b.e.z) / 2, b.len * 0.3, 3, 0.7, 0.4, 1.4, 9, 2.2, 9); }
   });
   B2.brMesh.instanceMatrix.needsUpdate = true; B2.brokeTree = true;
 }
@@ -3035,7 +3184,7 @@ function b2BloomBlast() {
   for (const p of B2.petals) { if (p.alive) { p.openT = 2.0; p.u.uFlash.value = 1; } p.tgt.alive = false; }
   const x = B2.vx, z = B2.vz;
   ring(x, 0.25, z, 1, 32, 1.2, 1.0, 1.6, 2.4, 1.6, 1.5); ring(x, 1.5, z, 0.5, 18, 0.8, 0.5, 2.4, 2.4, 2.4, 1.2);
-  burst(x, 2.5, z, 200, 1.4, 2.6, 1.6, 20, 1.4, 0.28, 1, 0); bloomSpike(2.0); addTrauma(0.8); shockAt(x, 2, z, 0.07); sfx.boom(); sfx.shatter(1.2); rainbowWave(x, z, 0.8, 22);
+  burst(x, 2.5, z, 140, 1.4, 2.6, 1.6, 20, 1.4, 0.28, 1, 0); bloomSpike(1.3); addTrauma(0.8); shockAt(x, 2, z, 0.07); sfx.boom(); sfx.shatter(1.2); rainbowWave(x, z, 0.8, 22);
   if (player.alive && game.state === 'fight') {
     const inLat = lattice.active && Math.hypot(player.x - lattice.x, player.z - lattice.z) < lattice.r;
     if (inLat) { dmgNumber(player.x, 2.6, player.z, 'SHELTERED', 4, '#7dffa8'); ring(lattice.x, 0.2, lattice.z, lattice.r * 0.9, lattice.r * 1.1, 0.5, 0.3, 0.4, 2.6, 1.0, 1.6); }
@@ -3096,7 +3245,7 @@ function b2RingReset() {
 function b2UpdateRing(dt, fighting) {
   if (!B2.ringOn) return;
   if (B2.ringReset > 0) { B2.ringReset -= dt; B2.ringR = lerp(B2.ringFrom, 14, easeOut(1 - B2.ringReset / 0.8)); }
-  else if (fighting) B2.ringR = Math.max(6.5, B2.ringR - 0.3 * dt);
+  else if (fighting) B2.ringR = Math.max(7.5, B2.ringR - 0.22 * dt);
   if (bossRT.fracture >= 100 && !B2.fracFlag) { B2.fracFlag = true; b2RingReset(); } else if (bossRT.fracture < 100) B2.fracFlag = false;
   const vul = bossRT.vuln > 0; if (vul && !B2.vulnPrev) b2RingReset(); B2.vulnPrev = vul;
   const cx = B2.vx, cz = B2.vz, Rr = B2.ringR; B2.ringA += dt * 0.12;
@@ -3119,7 +3268,7 @@ function b2UpdateRing(dt, fighting) {
     const dx = player.x - cx, dz = player.z - cz, d = Math.hypot(dx, dz) || 1;
     const s = Rr - 0.35 - PLAYER.hurtR - d;
     if (s < 0) {
-      hitSrc = 'thorns'; const res = resolveHazard(s, 0.8, R, 12, B2.ringGrazeCD <= 0);
+      hitSrc = 'thorns'; const res = resolveHazard(s, 0.8, R, 10, B2.ringGrazeCD <= 0);
       if (res === HZ_PERFECT) B2.ringGrazeCD = 1.0;
       if (res === HZ_HIT || (player.dashI <= 0 && d > Rr - 0.3 && B2.kbT <= 0)) { B2.kbT = 0.25; B2.kbX = -dx / d; B2.kbZ = -dz / d; if (res === HZ_HIT) burst(player.x, 1, player.z, 20, 2.6, 0.4, 0.5, 6, 0.4, 0.15, 1, 0); }
     } else if (s < 0.8 && B2.ringGrazeCD <= 0) { B2.ringGrazeCD = 1.2; resolveHazard(s, 0.8, R, 0, true); }
@@ -3160,12 +3309,13 @@ function b2ClearAdds(withFx) {
   if (B2.soak.active) { B2.soak.active = false; B2.soak.fade = 0.5; B2.seedOrb.visible = false; }
 }
 function b2LineAttack(mode) {
-  const n = mode === 3 ? 4 : mode === 1 ? 1 : 3, w = mode === 3 ? 0.9 : DIFF[1].windup, step = (mode === 3 ? 18 : 20) * Math.PI / 180;
+  const n = mode === 1 ? 1 : 3, w = mode === 3 ? 1.1 : DIFF[1].windup, step = (mode === 3 ? 27 : 20) * Math.PI / 180;
+  const lw = mode === 3 ? 1.6 : 2.0, lock = mode === 3 ? 0.35 : 0.5;
   castBar('Root Lash', w); B2.armT = w; sfx.growl();
   for (let k = 0; k < n; k++) {
     const off = (k - (n - 1) / 2) * step;
-    const set = (o) => { const a = aimAt(B2.vx, B2.vz) + off, c = Math.cos(a), s = Math.sin(a); teleSetLine(o, B2.vx + c * 1.4, B2.vz + s * 1.4, B2.vx + c * 18, B2.vz + s * 18, 2.0); };
-    const o = teleLine(0, 0, 1, 0, 2.0, w, 16, G, { lockAt: 0.5, follow: set, onResolve: b2LashResolve }); set(o);
+    const set = (o) => { const a = aimAt(B2.vx, B2.vz) + off, c = Math.cos(a), s = Math.sin(a); teleSetLine(o, B2.vx + c * 1.4, B2.vz + s * 1.4, B2.vx + c * 18, B2.vz + s * 18, lw); };
+    const o = teleLine(0, 0, 1, 0, lw, w, 16, G, { lockAt: lock, follow: set, onResolve: b2LashResolve }); set(o);
   }
 }
 function b2LashResolve(o) {
@@ -3192,8 +3342,10 @@ const BOSS2 = {
   phases: [
     { name: 'Grove', until: 0.7, loop: 15, steps: [[0, 'Seedfall', 3], [5, 'RootLash', 0], [9, 'ThornVolley', 0], [12, 'PetalStorm']] },
     { name: 'Bloom', until: 0.35, loop: 22, steps: [[0, 'LeafWall', 10.4], [2, 'Shatterbloom', 9], [6, 'RootLash', 1], [10, 'LeafWall', 12.4], [14, 'Soak'], [17, 'Seedfall', 2], [19.5, 'ThornVolley', 0]] },
-    { name: 'Thornheart', until: 0, loop: 12, steps: [[0, 'RootLash', 3], [3.5, 'RootLash', 0], [6, 'Seedfall', 4], [8, 'ThornVolley', 3], [10, 'BloomAlt']] },
+    { name: 'Thornheart', until: 0, loop: 13.5, steps: [[0, 'RootLash', 3], [3.8, 'RootLash', 0], [6.5, 'Seedfall', 3], [9, 'ThornVolley', 3], [11, 'BloomAlt']] },
   ],
+  hue: [0.3, 1.0, 0.6],
+  camTop() { return B2.hy + 2.0 * B2.sc; },
   build: buildBoss2, show(on) { B2.group.visible = on; },
   reset() { b2Reset(); },
   transitionInstant(n) {
@@ -3264,7 +3416,9 @@ const BOSS2 = {
     // shader state
     const vu = B2.vU; vu.uCrack.value = damp(vu.uCrack.value, b.vuln > 0 ? 1 : 0, 6, dt); vu.uFracture.value = b.fracture >= 100 ? 1 : 0;
     if (vu.uFlash.value > 0) vu.uFlash.value = Math.max(0, vu.uFlash.value - dt * 3); if (b.flash > 0) vu.uFlash.value = Math.max(vu.uFlash.value, 0.08);
-    B2.white = damp(B2.white, B2.whiteTo, 2.2, dt); vu.uWhite.value = B2.white; B2.brU.uWhite.value = B2.white * 0.8;
+    if (b.lanceFlash > 0) vu.uFlash.value = Math.max(vu.uFlash.value, 0.5);
+    if (game.state === 'fight') teleHC.value = 0;
+    B2.white = damp(B2.white, B2.whiteTo, 2.2, dt); vu.uWhite.value = B2.white; B2.brU.uWhite.value = B2.white * 0.45;
     const beat = Math.pow(Math.max(0, Math.sin(t * 1.6 * Math.PI)), 10);
     B2.core.scale.setScalar(1 + beat * 0.3); B2.core.material.color.copy(vu.uCore.value).multiplyScalar(1.6 + beat);
     B2.halo.position.set(B2.vx + Math.sin(B2.yaw) * 0.5 * B2.sc, B2.hy, B2.vz + Math.cos(B2.yaw) * 0.5 * B2.sc); B2.halo.quaternion.copy(camera.quaternion);
@@ -3320,7 +3474,7 @@ const BOSS2 = {
     const c0 = new THREE.Vector3(), l0 = new THREE.Vector3();
     if (n === 1) return {
       dur: 2.4,
-      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.35; ui.toast('AUTUMN OF GLASS', 2); sfx.riser(); b2ClearAdds(true); },
+      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.35; ui.titleCard('AUTUMN OF GLASS', '', 2); sfx.riser(); b2ClearAdds(true); },
       update(t) { const k = smooth(t / 2.4); director.camPos.set(lerp(c0.x, 0, k), lerp(c0.y, 25, k), lerp(c0.z, 23, k)); director.camLook.set(lerp(l0.x, 0, k), lerp(l0.y, 2.5, k), lerp(l0.z, 0, k)); director.fov = 54; if (t > 1.8) director.timeScale = lerp(0.35, 1, (t - 1.8) / 0.6); },
       ev: [
         [0.15, () => { B2.vortexTo = 1; B2.rippleT = 0; B2.vU.uFlash.value = 1; B2.brU.uFlash.value = 1; bloomSpike(1.0); }],
@@ -3330,7 +3484,7 @@ const BOSS2 = {
     };
     return {
       dur: 2.8,
-      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.45; ui.toast('UPROOTING', 2); sfx.riser(); b2ClearAdds(true);
+      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.45; ui.titleCard('UPROOTING', '', 2); sfx.riser(); b2ClearAdds(true);
         B2.bud.position.set(B2.vx, 0, B2.vz); for (const p of B2.petals) { p.pivot.visible = true; p.rise = 0.4; p.open = 1.2; p.openT = 0.05; p.u.uA.value = 1; p.u.uCrack.value = 0.4; } },
       update(t) {
         const ac = game.arenaCut, nx = ac.on ? ac.nx : 0, nz = ac.on ? ac.nz : 1, k = smooth(t / 2.8);
@@ -3348,13 +3502,15 @@ const BOSS2 = {
     };
   },
   deathCine() {
-    const s0 = game.sat; const c0 = new THREE.Vector3();
+    const s0 = game.sat; const c0 = new THREE.Vector3(); let ocx = 0, ocz = 0, oa0 = 0;
     return {
       dur: 6.6,
-      start() { c0.copy(cam.pos); ui.hud(false); music.setSection('silence'); director.timeScale = 0.55; B2.whiteTo = 1; B2.vU.uFlash.value = 1; sfx.choir(3); for (const s of B2.saps) b2KillSap(s, true); if (B2.ringOn) { ring(B2.vx, 0.3, B2.vz, B2.ringR, B2.ringR + 4, 0.7, 0.4, 2.4, 0.4, 0.6, 1.2); b2RingOn(false); } },
+      start() { c0.copy(cam.pos); ocx = B2.vx * 0.5; ocz = (B2.vz - 1) * 0.5; oa0 = Math.atan2(c0.z - ocz, c0.x - ocx); ui.hud(false); music.setSection('silence'); director.timeScale = 0.55; B2.whiteTo = 1; B2.vU.uFlash.value = 1; sfx.choir(3); for (const s of B2.saps) b2KillSap(s, true); if (B2.ringOn) { ring(B2.vx, 0.3, B2.vz, B2.ringR, B2.ringR + 4, 0.7, 0.4, 2.4, 0.4, 0.6, 1.2); b2RingOn(false); } },
       update(t) {
-        const k = smooth(t / 6.6), hx = B2.vx, hz = B2.vz;
-        director.camPos.set(lerp(c0.x, hx + Math.sin(k * 0.9) * 6, smooth(t / 1.5)), lerp(c0.y, 9 - k * 2, smooth(t / 1.5)), lerp(c0.z, hz + 14 - k * 2, smooth(t / 1.5))); director.camLook.set(hx, lerp(3.4, 2, k), hz); director.fov = 50;
+        const k = smooth(t / 6.6), hx = B2.vx, hz = B2.vz, e = smooth(t / 1.6);
+        const oa = oa0 + k * 0.85, orr = 18.5 - k * 2.5;
+        director.camPos.set(lerp(c0.x, ocx + Math.cos(oa) * orr, e), lerp(c0.y, 9.5 - k * 1.5, e), lerp(c0.z, ocz + Math.sin(oa) * orr, e));
+        const lk = smooth((t - 1.6) / 2.4); director.camLook.set(lerp(hx, ocx, lk), lerp(3.4, 4.6, lk), lerp(hz, ocz, lk)); director.fov = 50;
         if (t > 1.0) director.timeScale = 1;
         if (t > 2.0 && t < 4.0) game.sat = lerp(s0, SAT_BOSS[2], (t - 2) / 2);
         if (t < 1.7 && frand() < 0.6) { const a = frand() * TAU; emitP(hx + Math.cos(a) * 3, B2.hy + (frand() - 0.5) * 3, hz + Math.sin(a) * 3, -Math.cos(a) * 4, 0, -Math.sin(a) * 4, 2, 2.2, 2.4, 0.7, 0.18, 4); }
@@ -3364,11 +3520,11 @@ const BOSS2 = {
         [1.7, () => {
           const hx = B2.halo.position.x, hz = B2.halo.position.z;
           B2.veyra.visible = false; B2.halo.visible = false; B2.scatterOn = true; B2.scatter = 0;
-          shatter(hx, B2.hy, hz, 1.6, 220, 2, 2, 2, 12, 3.2, 6, true); burstRainbow(hx, B2.hy, hz, 280, 15, 2.2, 0.3, 0);
-          rainbowWave(hx, hz, 1.6, 14); setTimeout(() => rainbowWave(hx, hz, 1.2, 12), 550); setTimeout(() => rainbowWave(hx, hz, 0.9, 11), 1150);
-          bloomSpike(2.4); addTrauma(0.9); shockAt(hx, B2.hy, hz, 0.08); sfx.shatter(1.6); sfx.boom(); sfx.victoryStab(); B2.brU.uFlash.value = 1;
+          shatter(hx, B2.hy, hz, 1.6, 180, 1.3, 1.3, 1.3, 12, 3.2, 6, true); burstRainbow(hx, B2.hy, hz, 170, 15, 1.6, 0.3, 0);
+          rainbowWave(hx, hz, 1.1, 14); setTimeout(() => rainbowWave(hx, hz, 0.8, 12), 550); setTimeout(() => rainbowWave(hx, hz, 0.9, 11), 1150);
+          bloomSpike(1.2); addTrauma(0.9); shockAt(hx, B2.hy, hz, 0.08); sfx.shatter(1.6); sfx.boom(); sfx.victoryStab(); B2.brU.uFlash.value = 1;
         }],
-        [3.0, () => { ui.letterbox(true); ui.titleCard('VEYRA', 'UNBOUND'); }],
+        [3.0, () => { ui.letterbox(true); ui.titleCard('VEYRA', 'UNBOUND', 3.2); }],
       ],
       end() { game.sat = game.satTarget = SAT_BOSS[2]; ui.letterbox(false); },
     };
@@ -3393,8 +3549,21 @@ const B3 = {
   ll: { active: false, done: false, t: 0, dur: 10, spT: 0, spA: 0 },
   sunY: 4.5, scaleBase: 1, collapseK: 1, cint: 1, darkK: 0, ringK: 0, diamond: 0.0, eclK: 0, eclSlide: 0, pal: 'corona', warp: 0.18, shake: 0,
   dawn: 0, auroraA: 0, spin: 0, infallAcc: 0, checkpoint: false, hudN: -1, hudCrit: false, firstPulse: true, firstWell: true, firstChain: true, firstCrack: true, moonsDown: false,
-  hud: null, hudN_el: null, prompt: null, deathT: -1,
+  hud: null, hudN_el: null, prompt: null, deathT: -1, gapA: 0, gapW: 0, gapT: 0,
 };
+const B3_NOVA_T = 120;
+function b3GapRingMat() {
+  return new THREE.ShaderMaterial({
+    uniforms: { uR: { value: 1 }, uTh: { value: 0.2 }, uOuter: { value: 1.2 }, uCol: { value: new THREE.Color() }, uA: { value: 1 }, uGapA: { value: 0 }, uGapW: { value: 0 } },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: ringMatBase.vertexShader,
+    fragmentShader: `uniform float uR,uTh,uOuter,uA,uGapA,uGapW; uniform vec3 uCol; varying vec2 vUv;
+      void main(){ vec2 p = vUv*2.0-1.0; float d = length(p)*uOuter; float k=(d-uR)/uTh; float a = exp(-k*k*2.5) + 0.25*exp(-k*k*0.3)*step(d,uR);
+        float da = abs(mod(atan(-p.y, p.x) - uGapA + 3.14159265, 6.2831853) - 3.14159265);
+        float gap = uGapW > 0.0 ? smoothstep(uGapW - 0.02, uGapW + 0.05, da) : 1.0;
+        gl_FragColor = vec4(uCol*a*uA*gap, 1.0); }`,
+  });
+}
 function b3Windup() { return bossRT.phase === 2 ? 0.7 : DIFF[2].windup; }
 function b3InArena(o, rmin, rmax) { const r = Math.hypot(o.x, o.y) || 1; const c = clamp(r, rmin, rmax); o.x *= c / r; o.y *= c / r; return o; }
 function buildBoss3() {
@@ -3500,19 +3669,22 @@ function buildBoss3() {
   // ================= CORONA PULSE WALLS (6) =================
   const wallGeo = new THREE.CylinderGeometry(1, 1, 1, 128, 1, true).translate(0, 0.5, 0);
   for (let i = 0; i < 6; i++) {
-    const wu = { uCol: { value: new THREE.Color(0.25, 0.5, 1.2) }, uA: { value: 0 }, uTime: B3.sunU.uTime };
+    const wu = { uCol: { value: new THREE.Color(0.25, 0.5, 1.2) }, uA: { value: 0 }, uTime: B3.sunU.uTime, uGapA: { value: 0 }, uGapW: { value: 0 } };
     const wall = new THREE.Mesh(wallGeo, new THREE.ShaderMaterial({
       uniforms: wu, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-      vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-      fragmentShader: `uniform vec3 uCol; uniform float uA,uTime; varying vec2 vUv;
+      vertexShader: `varying vec2 vUv; varying vec2 vP; void main(){ vUv=uv; vP=position.xz; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+      fragmentShader: `uniform vec3 uCol; uniform float uA,uTime,uGapA,uGapW; varying vec2 vUv; varying vec2 vP;
         void main(){ float h = vUv.y; float g = pow(1.0-h, 2.0); float s = 0.7+0.3*sin(vUv.x*6.2832*40.0 - uTime*5.0 + h*6.0);
           float top = exp(-pow((h-0.92)*30.0,2.0))*0.6;
-          gl_FragColor = vec4((uCol*(g*s*0.75 + top*0.6) + vec3(0.6,0.7,1.0)*exp(-h*22.0)*0.35)*uA, 1.0); }`,
+          float da = abs(mod(atan(vP.y, vP.x) - uGapA + 3.14159265, 6.2831853) - 3.14159265);
+          float gap = uGapW > 0.0 ? smoothstep(uGapW - 0.02, uGapW + 0.05, da) : 1.0;
+          float lip = uGapW > 0.0 ? exp(-pow((da - uGapW - 0.05)*40.0, 2.0))*1.4*(1.0-h) : 0.0;
+          gl_FragColor = vec4(((uCol*(g*s*0.75 + top*0.6) + vec3(0.6,0.7,1.0)*exp(-h*22.0)*0.35)*gap + vec3(0.6,1.0,1.0)*lip)*uA, 1.0); }`,
     }));
     wall.visible = false; wall.renderOrder = 15; wall.frustumCulled = false; g.add(wall);
-    const flat = new THREE.Mesh(ringGeo, ringMatBase.clone()); flat.visible = false; flat.renderOrder = 15; flat.frustumCulled = false; g.add(flat);
+    const flat = new THREE.Mesh(ringGeo, b3GapRingMat()); flat.visible = false; flat.renderOrder = 15; flat.frustumCulled = false; g.add(flat);
     flat.material.uniforms.uCol.value.setRGB(0.5, 0.8, 2.2);
-    B3.pulses.push({ active: false, r: 0, speed: 6, col: Bc, done: false, near: false, wall, wu, flat, fu: flat.material.uniforms });
+    B3.pulses.push({ active: false, r: 0, speed: 6, col: Bc, done: false, near: false, gapA: 0, gapW: 0, wall, wu, flat, fu: flat.material.uniforms });
     B3.precomp.push(wall, flat);
   }
   // ================= SINGULARITY VOIDS (floor uniforms) =================
@@ -3619,9 +3791,10 @@ function b3UpdateMoons(dt, fighting) {
 }
 
 // ---- corona pulse (expanding ring walls: dash through) ----
-function b3Pulse(speed, col = Bc) {
+function b3Pulse(speed, col = Bc, gapA = 0, gapW = 0) {
   let q = null; for (const o of B3.pulses) if (!o.active) { q = o; break; } if (!q) q = B3.pulses[0];
   q.active = true; q.r = 2.8; q.speed = speed; q.col = col; q.done = false; q.near = false; q.wall.visible = true; q.flat.visible = true;
+  q.gapA = gapA; q.gapW = gapW; q.wu.uGapA.value = q.fu.uGapA.value = gapA; q.wu.uGapW.value = q.fu.uGapW.value = gapW;
   const pc = PCOL[col]; q.wu.uCol.value.setRGB(pc[0], pc[1], pc[2]); q.fu.uCol.value.setRGB(pc[0] * 1.3, pc[1] * 1.3, pc[2] * 1.3);
   sfx.swoop(); sfx.tell(1); B3.coronaU.uFlash.value = 0.8; ring(0, 0.2, 0, 2.6, 5, 0.4, 0.4, pc[0] * 2, pc[1] * 2, pc[2] * 2, 1.2);
 }
@@ -3634,7 +3807,9 @@ function b3UpdatePulses(dt, fighting) {
     q.wall.scale.set(q.r, 1.7, q.r); q.wu.uA.value = fade * Math.min(1, (q.r - 2.8) / 0.8);
     q.flat.position.set(0, 0.06, 0); const outer = q.r + 1.4; q.flat.scale.setScalar(outer); q.fu.uR.value = q.r; q.fu.uTh.value = 0.45; q.fu.uOuter.value = outer; q.fu.uA.value = fade;
     if (fighting && player.alive && !q.done) {
-      const d = Math.abs(Math.hypot(player.x, player.z) - q.r) - 0.45 - PLAYER.hurtR;
+      const pr = Math.hypot(player.x, player.z) || 0.001;
+      const inGap = q.gapW > 0 && Math.abs(wrapA(Math.atan2(player.z, player.x) - q.gapA)) < q.gapW - PLAYER.hurtR / pr;
+      const d = inGap ? 9 : Math.abs(pr - q.r) - 0.45 - PLAYER.hurtR;
       if (d < 0) { hitSrc = 'pulse'; const res = resolveHazard(d, 0.8, q.col, bossRT.phase === 2 ? 16 : 14, true); if (res === HZ_HIT || res === HZ_PERFECT) q.done = true; }
       else if (d < 0.8) q.near = true;
     }
@@ -3733,7 +3908,7 @@ function b3UpdateLastLight(dt) {
   if (b.novaInLastLight && (player.novaT < 0 || player.novaT >= 0.4)) { b3LastLightEnd(); b.invuln = false; bossDie(); return; }
   if (ll.t >= ll.dur && !b.novaInLastLight) {
     b3LastLightEnd(); b.invuln = false; bossInterrupt();
-    LU.uWhite.value = 1; b.wipeT = 0; bloomSpike(3); addTrauma(1); shockAt(0, B3.sunY, 0, 0.1); sfx.boom(); sfx.shatter(1.5);
+    LU.uWhite.value = 0.6; b.wipeT = 0; bloomSpike(1.6); addTrauma(1); shockAt(0, B3.sunY, 0, 0.1); sfx.boom(); sfx.shatter(1.5);
     ring(0, 0.3, 0, 2, 32, 1.0, 1.0, 2.4, 2.4, 2.6, 1.6); burstRainbow(0, B3.sunY, 0, 200, 18, 1.5, 0.3, 0);
     ui.toast('THE LAST LIGHT CONSUMES ALL', 2.4, true);
     if (!debug.god) { player.hurtI = 0; player.invuln = 0; hitSrc = 'lastlight'; damagePlayer(999, W); }
@@ -3804,6 +3979,8 @@ const BOSS3 = {
     { name: 'Supernova', until: 0, loop: 16, steps: [[0, 'Cracks'], [2, 'SolarFlare', 1], [6, 'CoronaPulse', 2], [8.5, 'WhiteHalo'], [11, 'FrontalEclipse'], [13, 'GravityWell', 1]] },
   ],
   camBias: 0.22,
+  hue: [0.6, 0.8, 1.0],
+  camTop() { return B3.sunY + 2.55 * Math.max(0.3, B3.scaleBase * B3.collapseK); },
   build: buildBoss3,
   show(on) { B3.group.visible = on; if (!on) b3HudOff(); },
   reset() { b3Reset(); },
@@ -3815,16 +3992,17 @@ const BOSS3 = {
   onPhase(n) {
     if (n === 1) b3MoonsDetach(false);
     if (n === 2) {
-      B3.checkpoint = true; bossRT.enrageLeft = 100; bossRT.enrageWarned = false; B3.hud.classList.add('on');
-      ui.tutorial('supernova', 'SUPERNOVA in 100 s — burn it down before it ignites');
+      B3.checkpoint = true; B3.cpTime = game.fightTime; bossRT.enrageLeft = B3_NOVA_T; bossRT.enrageWarned = false; B3.hud.classList.add('on');
+      ui.tutorial('supernova', 'SUPERNOVA in ' + B3_NOVA_T + ' s — burn it down before it ignites');
     }
   },
   onInterrupt() { b3ClearMechanics(); },
   hpCheck() { const b = bossRT; if (b.phase === 2 && !B3.ll.done && b.hp <= 0.1 * b.maxHp) { b.hp = 0.1 * b.maxHp; b3LastLight(); return true; } return false; },
   enrageName() { return bossRT.phase === 2 ? 'SUPERNOVA' : 'ENRAGE'; },
-  onEnrage() { B3.sunU.uFlash.value = 1; B3.collapseK = 1.6; bloomSpike(3); shockAt(0, B3.sunY, 0, 0.12); ring(0, 0.3, 0, 2, 34, 1.2, 1.2, 2.6, 1.2, 0.6, 1.8); burstRainbow(0, B3.sunY, 0, 260, 22, 1.8, 0.35, 0); sfx.shatter(1.5); },
+  onEnrage() { B3.sunU.uFlash.value = 1; B3.collapseK = 1.6; bloomSpike(1.6); shockAt(0, B3.sunY, 0, 0.12); ring(0, 0.3, 0, 2, 34, 1.2, 1.2, 2.6, 1.2, 0.6, 1.8); burstRainbow(0, B3.sunY, 0, 170, 22, 1.4, 0.35, 0); sfx.shatter(1.5); },
   apPenalty(cx, cz) {
     let p = 0; const r = Math.hypot(cx, cz);
+    if (B3.pulses.some((q) => q.active && !q.done)) p += Math.max(0, Math.abs(wrapA(Math.atan2(cz, cx) - B3.gapA)) - B3.gapW * 0.6) * 8;
     if (r < 4.4) p += 30;
     for (const v of B3.voids) if (v.active && Math.hypot(cx - v.x, cz - v.z) < v.r + 1.2) p += 30;
     if (B3.tether.active && r < 9.2) p += (9.2 - r) * 6;
@@ -3833,7 +4011,7 @@ const BOSS3 = {
   },
   apHook() {
     const p = player, r = Math.hypot(p.x, p.z) || 1;
-    if (p.dashT < 0 && p.dashCharges > 0) for (const q of B3.pulses) { if (!q.active || q.done) continue; const d = r - q.r; if (d > 0.1 && d < 1.0 + q.speed * 0.06) { input.mx = -p.x / r; input.mz = -p.z / r; useAbility('dash'); break; } }
+    if (p.dashT < 0 && p.dashCharges > 0) for (const q of B3.pulses) { if (!q.active || q.done || (q.gapW > 0 && Math.abs(wrapA(Math.atan2(p.z, p.x) - q.gapA)) < q.gapW - 0.1)) continue; const d = r - q.r; if (d > 0.1 && d < 1.0 + q.speed * 0.06) { input.mx = -p.x / r; input.mz = -p.z / r; useAbility('dash'); break; } }
     if (B3.tether.active && r < 7.5 && abilityReady('mirror')) useAbility('mirror');
     if (bossRT.lastLight && abilityReady('nova')) useAbility('nova');
   },
@@ -3844,8 +4022,15 @@ const BOSS3 = {
       const n = mode === 1 ? 2 : 3, sp = [6, 7.5, 8][mode] || 6;
       castBar('Corona Pulse', 1.0 + 0.6 * n); B3.coronaU.uFlash.value = 0.5;
       teleRing(0, 0, 2.8, 15.2, 1.0, 0, Bc, { noHit: true });
-      every(0.6, n, () => b3Pulse(sp, Bc), 1.0);
-      if (B3.firstPulse) { B3.firstPulse = false; ui.tutorial('pulse', 'DASH through the rings — a perfect dash takes no damage'); }
+      // one gap (a calm lane) per cast, opened to the player's side: run for it, or dash through the walls
+      const gw = [0.4, 0.36, 0.3][mode] || 0.36, off = [1.0, 1.15, 1.3][mode] || 1.1;
+      const ga = wrapA(Math.atan2(player.z, player.x) + (rng() < 0.5 ? -1 : 1) * (off + rng() * 0.45));
+      const laneT = 1.0 + 0.6 * (n - 1) + 12.5 / sp;
+      const lane = teleCone(0, 0, ga, gw - 0.04, 15.2, laneT, 0, -1, { noHit: true, tag: 7 });
+      lane.u.uColor.value.setRGB(TCOL_SAFE[0], TCOL_SAFE[1], TCOL_SAFE[2]); lane.u.uTint.value.setRGB(TCOL_SAFE[0], TCOL_SAFE[1], TCOL_SAFE[2]);
+      B3.gapA = ga; B3.gapW = gw; B3.gapT = laneT;
+      every(0.6, n, () => b3Pulse(sp, Bc, ga, gw), 1.0);
+      if (B3.firstPulse) { B3.firstPulse = false; ui.tutorial('pulse', 'Corona rings: run for the cyan lane, or DASH through the walls'); }
     },
     Sunspot(n = 5) { b3Sunspot(n); },
     PrismShards() {
@@ -3904,11 +4089,11 @@ const BOSS3 = {
     b3PalStep(dt);
     // supernova growth (phase 3)
     if (b.phase === 2 && !b.dead && !B3.ll.active) {
-      const k = clamp(1 - b.enrageLeft / 100, 0, 1);
+      const k = clamp(1 - b.enrageLeft / B3_NOVA_T, 0, 1);
       B3.scaleBase = 1 + 0.8 * k; B3.sunU.uGlow.value = k * 0.9;
       SECTIONS.b3p3.bpm = 128 + Math.round(k * 34);
       const n = Math.max(0, Math.ceil(b.enrageLeft));
-      if (n !== B3.hudN) { B3.hudN = n; B3.hudN_el.textContent = String(n); B3.hud.style.setProperty('--k', (clamp(b.enrageLeft / 100, 0, 1) * 100).toFixed(1) + '%'); const crit = n <= 20; if (crit !== B3.hudCrit) { B3.hudCrit = crit; B3.hud.classList.toggle('crit', crit); } }
+      if (n !== B3.hudN) { B3.hudN = n; B3.hudN_el.textContent = String(n); B3.hud.style.setProperty('--k', (clamp(b.enrageLeft / B3_NOVA_T, 0, 1) * 100).toFixed(1) + '%'); const crit = n <= 20; if (crit !== B3.hudCrit) { B3.hudCrit = crit; B3.hud.classList.toggle('crit', crit); } }
     } else if (b.phase < 2) { B3.scaleBase = damp(B3.scaleBase, 1, 3, dt); }
     if (B3.ll.active) B3.scaleBase = damp(B3.scaleBase, 0.8, 1.5, dt);
     // sun body
@@ -3923,7 +4108,9 @@ const BOSS3 = {
     if (cu.uFlash.value > 0) cu.uFlash.value = Math.max(0, cu.uFlash.value - dt * 2.5);
     if (b.flash > 0) cu.uFlash.value = Math.max(cu.uFlash.value, 0.12);
     const stun = b.stagger > 0 ? 0.55 + 0.45 * Math.abs(Math.sin(t * 9)) : 1;
-    cu.uInt.value = B3.cint * stun * (1 - B3.darkK) * (B3.ll.active ? 1.3 + 0.3 * Math.sin(t * 8) : 1);
+    cu.uInt.value = B3.cint * stun * (1 - B3.darkK) * (B3.ll.active ? 1.3 + 0.3 * Math.sin(t * 8) : 1) * (1 - 0.5 * (B3.glass || 0));
+    if (b.lanceFlash > 0) su.uFlash.value = Math.max(su.uFlash.value, 0.45);
+    if (game.state === 'fight') teleHC.value = b.phase === 2 ? 1 : 0;
     cu.uRing.value = B3.ringK; cu.uDiamond.value = B3.diamond * (1 - B3.darkK); cu.uGather.value = damp(cu.uGather.value, B3.ll.active ? 1 : 0, 3, dt);
     su.uCrack.value = Math.max(su.uCrack.value * (B3.deathT >= 0 ? 1 : 0), damp(su.uCrack.value, b.vuln > 0 ? 1 : 0, 6, dt)); su.uFracture.value = b.fracture >= 100 ? 1 : 0;
     if (su.uFlash.value > 0) su.uFlash.value = Math.max(0, su.uFlash.value - dt * 3);
@@ -3931,7 +4118,7 @@ const BOSS3 = {
     // the sun turns glassy when the player stands behind it on screen (keeps bullets readable)
     { _v1.set(0, B3.sunY, 0).project(camera); _v2.set(player.x, 1, player.z).project(camera); const asp = VW / VH;
       const dsx = (_v2.x - _v1.x) * asp, dsy = _v2.y - _v1.y; _v3.set(2.4 * sc, B3.sunY, 0).project(camera); const rs = Math.abs(_v3.x - _v1.x) * asp + 0.05;
-      const behind = player.z < 1 && Math.hypot(dsx, dsy) < rs ? 1 : 0; B3.glass = damp(B3.glass || 0, behind, 6, dt);
+      const behind = player.z < 1.5 && Math.hypot(dsx, dsy) < rs * 1.15 ? 1 : 0; B3.glass = damp(B3.glass || 0, behind, 6, dt);
       su.uAlpha.value = (B3.deathT >= 0 ? 1 : 0.9 - 0.55 * B3.glass); B3.ecl.material.opacity = 0.92 - 0.55 * B3.glass; }
     // eclipse moon in front of the sun (toward the camera)
     B3.ecl.visible = B3.eclK > 0.01 && B3.sun.visible;
@@ -3987,7 +4174,7 @@ const BOSS3 = {
   },
   // ---- cinematics ----
   introCine() {
-    const keys = [[0, 0, 46, 32, 0, 0, 0, 62], [1.2, 0, 21, 22, 0, 0, 3, 52], [2.4, 8, 6.5, 14, 0, 4.0, 0, 50], [3.4, -4.8, 1.6, 12.0, 0, 5.0, 0, 58], [4.7, -4.2, 2.4, 13.2, 0, 5.2, 0, 55], [5.8, 0, 17.5, 19.5, 0, 0, 6, 50]];
+    const keys = [[0, 0, 30, 26, 0, 0, 1, 60], [1.1, 0, 19, 21, 0, 0, 3, 48], [2.4, 8, 6.5, 14, 0, 4.0, 0, 50], [3.4, -4.8, 1.6, 12.0, 0, 5.0, 0, 58], [4.7, -4.2, 2.4, 13.2, 0, 5.2, 0, 55], [5.8, 0, 17.5, 19.5, 0, 0, 6, 50]];
     return {
       dur: 5.8, skippable: 0.6, skipTo: 5.4,
       start() {
@@ -4008,7 +4195,7 @@ const BOSS3 = {
           const m = B3.moons[i]; m.vis = true; m.g.visible = true; m.mode = 3; m.flyT = 0; const a = -Math.PI / 2 + (i - 1) * 1.2;
           m.from.set(Math.cos(a) * 30, 14, Math.sin(a) * 30); m.x = m.from.x; m.y = m.from.y; m.z = m.from.z; m.u.uFlash.value = 1; sfx.chime(4 + i * 2);
         }]),
-        [3.4, () => { ui.letterbox(true); ui.titleCard('THE NULL SUN', 'Eclipse Sovereign · Final Refraction'); music.setSection('b3p1'); rainbowWave(0, 0, 0.8, 14); }],
+        [3.4, () => { ui.letterbox(true); ui.titleCard('THE NULL SUN', 'Eclipse Sovereign · Final Refraction', 2.6); music.setSection('b3p1'); rainbowWave(0, 0, 0.8, 14); }],
       ],
       end() { floorU.uIgnite.value = 99; B3.cint = 1; playerG.visible = true; for (const m of B3.moons) { m.vis = true; m.g.visible = true; if (m.mode === 3) m.mode = 0; } },
     };
@@ -4017,7 +4204,7 @@ const BOSS3 = {
     const c0 = new THREE.Vector3(), l0 = new THREE.Vector3();
     if (n === 1) return { // COLLAPSE
       dur: 2.6,
-      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.5; ui.toast('COLLAPSE', 2.2); sfx.riser(); b3ClearMechanics(); },
+      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.5; ui.titleCard('COLLAPSE', '', 2.0); sfx.riser(); b3ClearMechanics(); },
       update(t) {
         const k = smooth(t / 0.7); director.camPos.set(lerp(c0.x, 6.5, k), lerp(c0.y, 5.5, k), lerp(c0.z, 13.5, k)); director.camLook.set(lerp(l0.x, 0, k), lerp(l0.y, 3.8, k), lerp(l0.z, 0, k)); director.fov = lerp(50, 56, smooth(t / 2.6));
         if (t < 0.5) { B3.collapseK = lerp(1, 0.05, easeIn(t / 0.5)); B3.cint = 1 + t * 2; }
@@ -4036,7 +4223,8 @@ const BOSS3 = {
     };
     return { // ECLIPSE
       dur: 3.0,
-      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.5; ui.toast('ECLIPSE', 2.4); sfx.riser(); b3ClearMechanics(); B3.eclK = 1; B3.eclSlide = 1; B3.diamond = 0;
+      start() { c0.copy(cam.pos); l0.copy(cam.look); director.timeScale = 0.5; ui.titleCard('ECLIPSE', '', 2.4); sfx.riser(); b3ClearMechanics(); B3.eclK = 1; B3.eclSlide = 1; B3.diamond = 0;
+        playerG.visible = false; // the low-angle shot sits right behind the player
         for (const m of B3.moons) if (m.vis) b3KillMoon(m, true); bossRT.shieldMul = 1; music.setSection('silence'); },
       update(t) {
         const k = smooth(t / 1.1); director.camPos.set(lerp(c0.x, 0, k), lerp(c0.y, 1.5, k), lerp(c0.z, 11, k)); director.camLook.set(lerp(l0.x, 0, k), lerp(l0.y, 4.5, k), lerp(l0.z, 0, k)); director.fov = lerp(50, 60, k);
@@ -4048,7 +4236,7 @@ const BOSS3 = {
         [1.75, () => { bloomSpike(2.6); aberrSpike(0.014); sfx.chime(9, 1.2); sfx.chime(12, 0.8); }],
         [1.95, () => { b3SetPal('eclipse', false); game.sat = 1.0; addTrauma(0.7); shockAt(0, 4.5, 0, 0.08); sfx.boom(); rainbowWave(0, 0, 1.0, 16); ring(0, 0.2, 0, 2.6, 24, 1.1, 0.9, 2.6, 0.4, 0.3, 1.5); music.setSection('b3p3'); }],
       ],
-      end() { director.timeScale = 1; B3.eclK = 1; B3.eclSlide = 0; B3.ringK = 1; B3.diamond = 0.5; b3SetPal('eclipse', true); },
+      end() { director.timeScale = 1; B3.eclK = 1; B3.eclSlide = 0; B3.ringK = 1; B3.diamond = 0.5; b3SetPal('eclipse', true); playerG.visible = player.alive; },
     };
   },
   deathCine() {
@@ -4058,7 +4246,7 @@ const BOSS3 = {
       start() {
         c0.copy(cam.pos); l0.copy(cam.look); ui.hud(false); music.setSection('silence'); b3LastLightEnd(); b3HudOff(); b3ClearMechanics(); b3CloseVoids();
         player.novaT = -1; player.y = 0; crystalU.uFlash.value = 0; player.invuln = 99; game.gravity = 0; B3.deathT = 0;
-        LU.uWhite.value = 1; director.timeScale = 0.15; B3.sunU.uCrack.value = 1; B3.rays.visible = true; B3.raysU.uA.value = 0; B3.raysU.uLen.value = 0.25; B3.shake = 0.25;
+        LU.uWhite.value = 0.5; director.timeScale = 0.15; B3.sunU.uCrack.value = 1; B3.rays.visible = true; B3.raysU.uA.value = 0; B3.raysU.uLen.value = 0.25; B3.shake = 0.25;
         sfx.choir(3); bloomSpike(2); sfx.riser();
       },
       update(t, dt) {
@@ -4067,11 +4255,11 @@ const BOSS3 = {
         _v1.set(lerp(c0.x, 0, k1), lerp(c0.y, 3.2, k1), lerp(c0.z, 13.5, k1)); _v2.set(lerp(l0.x, 0, k1), lerp(l0.y, 4.6, k1), lerp(l0.z, 0, k1));
         director.camPos.set(_v1.x + Math.sin(k2 * 1.2) * 7 * k2, lerp(_v1.y, 13, k2), lerp(_v1.z, 19, k2)); director.camLook.set(0, lerp(_v2.y, 1.6, k2), 0); director.fov = lerp(52, 50, k2);
         if (t < 1.4) {
-          LU.uWhite.value = t < 0.35 ? 1 : Math.max(0.15, 1 - (t - 0.35) / 0.6);
+          LU.uWhite.value = t < 0.08 ? 0.5 : Math.max(0.0, 0.25 * (1 - (t - 0.08) / 0.5));
           B3.raysU.uA.value = smooth(t / 0.7) * 1.4; B3.raysU.uLen.value = 0.25 + t * 0.35; B3.shake = 0.1 + t * 0.35;
           director.timeScale = t < 1.0 ? 0.15 : lerp(0.15, 1, (t - 1.0) / 0.4);
         } else {
-          const u = t - 1.4; LU.uWhite.value = Math.max(0, 0.85 * (1 - u / 0.9)); director.timeScale = 1; B3.shake = 0;
+          const u = t - 1.4; LU.uWhite.value = u < 0.08 ? 0.55 : Math.max(0, 0.3 * (1 - (u - 0.08) / 0.45)); director.timeScale = 1; B3.shake = 0;
           B3.raysU.uLen.value = 0.74 + u * 0.9; B3.raysU.uA.value = Math.max(0, 1.4 * (1 - u / 2.2)); if (B3.raysU.uA.value <= 0) B3.rays.visible = false;
           B3.dawn = smooth((t - 1.7) / 2.6); B3.auroraA = smooth((t - 2.4) / 3.0);
           game.sat = lerp(s0, 1.0, smooth((t - 1.6) / 2.0)); starU.uColorful.value = smooth((t - 2.0) / 2.5); starU.uBright.value = 1 + 0.8 * smooth((t - 2.0) / 2.5);
@@ -4083,13 +4271,13 @@ const BOSS3 = {
         [1.4, () => {
           const sc = B3.sun.scale.x; B3.sun.visible = false; B3.rim.visible = false; B3.corona.visible = false; B3.ecl.visible = false; B3.eclK = 0; for (const h of B3.halos) h.m.visible = false;
           for (const m of B3.moons) if (m.vis) b3KillMoon(m, true);
-          shatter(0, B3.sunY, 0, 2.4 * sc, 220, 2, 2, 2, 15, 3.6, 4, true); burstRainbow(0, B3.sunY, 0, 420, 20, 2.6, 0.36, 0);
+          shatter(0, B3.sunY, 0, 2.4 * sc, 220, 2, 2, 2, 15, 3.6, 4, true); burstRainbow(0, B3.sunY, 0, 240, 20, 1.8, 0.36, 0);
           ring(0, 0.3, 0, 2, 34, 1.6, 1.2, 2.4, 2.4, 2.6, 1.6); ring(0, B3.sunY, 0, 1, 18, 1.0, 0.6, 2.6, 2.4, 2.0, 1.4);
-          rainbowWave(0, 0, 2.0, 16); bloomSpike(3.2); addTrauma(1); aberrSpike(0.02); shockAt(0, B3.sunY, 0, 0.12); sfx.shatter(1.8); sfx.boom(); LU.uWhite.value = 0.85;
+          rainbowWave(0, 0, 2.0, 16); bloomSpike(1.8); addTrauma(1); aberrSpike(0.02); shockAt(0, B3.sunY, 0, 0.12); sfx.shatter(1.8); sfx.boom(); LU.uWhite.value = 0.55;
           game.satTarget = 1;
         }],
         [2.1, () => { music.setSection('victory'); sfx.victoryStab(); }],
-        [3.8, () => { ui.letterbox(true); ui.titleCard('THE NULL SUN', 'DAWN', 3.4); }],
+        [3.8, () => { ui.letterbox(true); ui.titleCard('THE NULL SUN', 'DAWN', 3.6); }],
         [5.0, () => { sfx.victoryStab(); for (let i = 0; i < 5; i++) setTimeout(() => sfx.chime(5 + i * 2, 0.7), i * 140); }],
       ],
       end() { game.sat = game.satTarget = 1; ui.letterbox(false); B3.dawn = 1; B3.auroraA = 1; starU.uColorful.value = 1; LU.uWhite.value = 0; B3.rays.visible = false; },
@@ -4110,7 +4298,7 @@ function playCine(c) {
   director.cine = c; director.ct = 0; director.evI = 0; director.camOverride = true;
   director.camPos.copy(cam.pos); director.camLook.copy(cam.look); director.fov = cam.fov;
   if (game.state !== 'intro') { game.prevState = game.state; game.state = 'cinematic'; }
-  pjClearAll(true); hzBeamsClear();
+  pjClearAll(true); hzBeamsClear(); dmgNumsClear();
   if (lattice.active) { lattice.t = Math.max(lattice.t, lattice.dur - 0.3); }
   c.start && c.start();
 }
@@ -4151,8 +4339,61 @@ function updateDirector(realDt) {
 }
 const _shk = new THREE.Vector3();
 let titleOrbit = 0;
+// ---- combat framing: keep the boss's top below the HUD band, and keep the player + "go here" objectives
+// (soak, safe pockets, the corona lane) out from under the top HUD and the ability-button cluster.
+const camSafe = { clusterW: 240, clusterH: 240, sab: 0 };
+const FP_N = 32, fpX = new Float32Array(FP_N), fpY = new Float32Array(FP_N), fpZ = new Float32Array(FP_N), fpK = new Uint8Array(FP_N);
+const fit = { zoom: 0, sx: 0, sz: 0 };
+let fpN = 0;
+function fpAdd(x, y, z, k) { if (fpN < FP_N) { fpX[fpN] = x; fpY[fpN] = y; fpZ[fpN] = z; fpK[fpN] = k; fpN++; } }
+function collectFramePts() {
+  fpN = 0; const p = player;
+  if (bossTarget.alive && bossRT.def && bossRT.def.camTop) fpAdd(bossTarget.x, bossRT.def.camTop(), bossTarget.z, 0);
+  if (p.alive) { fpAdd(p.x, 2.6, p.z, 1); fpAdd(p.x, 0, p.z, 1); }
+  let nObj = 0;
+  for (let i = 0; i < TELE_N && nObj < 6; i++) {
+    const o = tele[i]; if (!o.active || o.resolved) continue;
+    if (o.shape === 4 || o.shape === 5) { nObj++; fpAdd(o.x, 0, o.z, 2); fpAdd(o.x, 0, o.z - o.r, 3); fpAdd(o.x, 0, o.z + o.r, 3); fpAdd(o.x - o.r, 0, o.z, 3); fpAdd(o.x + o.r, 0, o.z, 3); }
+    else if (o.tag === 7) { nObj++; const rr = clamp(Math.hypot(p.x, p.z), 5, 11); fpAdd(Math.cos(o.ang) * rr, 0, Math.sin(o.ang) * rr, 2); }
+  }
+}
+const oArr = [0, 1, 2].map((i) => ({ el: document.getElementById('oarr' + i), on: false }));
+function updateFraming(realDt, active) {
+  let shown = 0;
+  if (active) {
+    collectFramePts();
+    const topL = 1 - 2 * (hudTopPx + 26) / VH, sideL = 1 - 2 * 14 / VW;
+    const botBtn = -1 + 2 * (camSafe.clusterH + 10) / VH, botDef = -1 + 2 * (22 + camSafe.sab) / VH, btnX = 1 - 2 * (camSafe.clusterW + 8) / VW;
+    let oT = -9, oB = -9, oL = -9, oR = -9;
+    for (let i = 0; i < fpN; i++) {
+      _v1.set(fpX[i], fpY[i], fpZ[i]).project(camera); if (_v1.z > 1) continue;
+      const k = fpK[i], x = _v1.x, y = _v1.y;
+      oT = Math.max(oT, y - topL);
+      if (k !== 0) { oB = Math.max(oB, (x > btnX ? botBtn : botDef) - y); oL = Math.max(oL, -sideL - x); oR = Math.max(oR, x - sideL); }
+      if (k === 2 && shown < 3 && (x < -0.97 || x > 0.97 || y < -0.97 || y > topL + 0.02)) {
+        // off-screen objective: pin an arrow to the screen edge
+        const a = Math.atan2(y, x); const ex = clamp(x, -0.9, 0.9), ey = clamp(y, -0.88, topL - 0.06);
+        const A = oArr[shown++]; const px = (ex * 0.5 + 0.5) * VW, py = (1 - (ey * 0.5 + 0.5)) * VH;
+        A.el.style.transform = `translate(${px.toFixed(0)}px,${py.toFixed(0)}px) rotate(${(Math.PI / 2 - a).toFixed(2)}rad)`;
+        if (!A.on) { A.on = true; A.el.classList.add('on'); }
+      }
+    }
+    const need = Math.max(oT, oB, oL, oR);
+    if (need > 0) {
+      if ((oT > 0 && oB > -0.1) || (oB > 0 && oT > -0.1) || (oL > 0 && oR > -0.1) || (oR > 0 && oL > -0.1) || need > 0.3) fit.zoom = Math.min(0.5, fit.zoom + need * 1.8 * realDt);
+      const g = 22 * realDt;
+      if (oT > 0) fit.sz -= oT * g; if (oB > 0) fit.sz += oB * g;
+      if (oR > 0) fit.sx += oR * g; if (oL > 0) fit.sx -= oL * g;
+      const l = Math.hypot(fit.sx, fit.sz); if (l > 5) { fit.sx *= 5 / l; fit.sz *= 5 / l; }
+    } else if (need < -0.1) {
+      fit.zoom = Math.max(0, fit.zoom - 0.12 * realDt); fit.sx = damp(fit.sx, 0, 0.6, realDt); fit.sz = damp(fit.sz, 0, 0.6, realDt);
+    }
+  } else { fit.zoom = damp(fit.zoom, 0, 2, realDt); fit.sx = damp(fit.sx, 0, 2, realDt); fit.sz = damp(fit.sz, 0, 2, realDt); }
+  for (let i = shown; i < 3; i++) { const A = oArr[i]; if (A.on) { A.on = false; A.el.classList.remove('on'); } }
+}
 function updateCamera(realDt) {
   cam.baseFov = damp(cam.baseFov, cam.baseFovTarget, 3.3, realDt);
+  if (game.state !== 'paused') updateFraming(realDt, !cam.lock && !director.camOverride && game.state === 'fight' && !!bossRT.def);
   const portraitK = ASPECT < 1 ? clamp((1 - ASPECT) / 0.55, 0, 1) : 0;
   cam.offScaleTarget = 1 + portraitK * 0.6;
   cam.offScale = damp(cam.offScale, cam.offScaleTarget, 3.3, realDt);
@@ -4171,7 +4412,8 @@ function updateCamera(realDt) {
     cam.target.set(p.x + cam.lookAhead.x + bx, 0, p.z + cam.lookAhead.z + bz);
     // in portrait pull the target toward arena center a bit so more of the arena is visible
     cam.target.x *= 1 - portraitK * 0.25;
-    const s = cam.offScale;
+    cam.target.x += fit.sx; cam.target.z += fit.sz;
+    const s = cam.offScale * (1 + fit.zoom);
     _v1.set(cam.target.x, 17 * s, cam.target.z + 12.5 * s);
     const lam = game.state === 'fight' ? 6 : 3;
     cam.pos.x = damp(cam.pos.x, _v1.x, lam, realDt); cam.pos.y = damp(cam.pos.y, _v1.y, lam, realDt); cam.pos.z = damp(cam.pos.z, _v1.z, lam, realDt);
@@ -4392,6 +4634,8 @@ addEventListener('keydown', (e) => {
   if (e.repeat) { input.keys[e.code] = true; return; }
   input.keys[e.code] = true;
   audioInit();
+  if (game.state === 'defeat' && (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyR')) { e.preventDefault(); sfx.ui(); retryBoss(); return; }
+  if (game.state === 'victory' && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); sfx.ui(); showScreen('victory', false); startRun(true, 0); return; }
   if (e.code === 'Escape' || e.code === 'KeyP') { togglePause(); return; }
   if (game.state === 'intro' || game.state === 'cinematic') { if (e.code === 'Space' || e.code === 'Enter' || e.code === 'Escape') skipCine(); return; }
   if (game.state === 'title' && (e.code === 'Enter' || e.code === 'Space') && !anyModal()) { titleStart(); return; }
@@ -4417,10 +4661,15 @@ function updateMouseGround() {
   if (raycaster.ray.intersectPlane(groundPlane, _hit)) { input.groundX = _hit.x; input.groundZ = _hit.z; }
 }
 // touch joystick (pointer events)
+// fingers already down during a cinematic are remembered, and the first left-side one becomes the joystick when play resumes
+const pendTouch = new Map();
 addEventListener('pointerdown', (e) => {
   if (e.pointerType === 'mouse') return;
   audioInit();
-  if (game.state === 'intro' || game.state === 'cinematic') { skipCine(); return; }
+  if (game.state === 'intro' || game.state === 'cinematic') {
+    if (!(e.target && e.target.closest && e.target.closest('.ab,button,.screen'))) pendTouch.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    skipCine(); return;
+  }
   if (game.state !== 'fight') return;
   if (e.target && e.target.closest && e.target.closest('.ab,button,.screen')) return;
   if (joy.id < 0 && e.clientX < VW * 0.55) {
@@ -4430,13 +4679,18 @@ addEventListener('pointerdown', (e) => {
   }
 }, { passive: false });
 addEventListener('pointermove', (e) => {
-  if (e.pointerId !== joy.id) return;
+  if (e.pointerId !== joy.id) { const q = pendTouch.size ? pendTouch.get(e.pointerId) : null; if (q) { q.x = e.clientX; q.y = e.clientY; } return; }
   joy.x = e.clientX; joy.y = e.clientY;
   const dx = joy.x - joy.bx, dy = joy.y - joy.by, l = Math.hypot(dx, dy);
   if (l > joy.R * 1.6) { const k = (l - joy.R * 1.6) / l; joy.bx += dx * k; joy.by += dy * k; }
   joyDraw(); e.preventDefault();
 }, { passive: false });
-function joyRelease(e) { if (e.pointerId !== joy.id) return; joy.id = -1; input.jx = input.jz = 0; joy.el.classList.remove('on'); }
+function joyRelease(e) { if (pendTouch.size) pendTouch.delete(e.pointerId); if (e.pointerId !== joy.id) return; joy.id = -1; input.jx = input.jz = 0; joy.el.classList.remove('on'); }
+function joyAdopt() {
+  for (const [id, q] of pendTouch) {
+    if (q.x < VW * 0.55) { joy.id = id; joy.bx = joy.x = q.x; joy.by = joy.y = q.y; joy.base.style.width = joy.base.style.height = (joy.R * 2) + 'px'; joyDraw(); joy.el.classList.add('on'); pendTouch.delete(id); return; }
+  }
+}
 addEventListener('pointerup', joyRelease); addEventListener('pointercancel', joyRelease);
 function joyDraw() {
   let dx = joy.x - joy.bx, dy = joy.y - joy.by; const l = Math.hypot(dx, dy);
@@ -4455,6 +4709,7 @@ document.querySelectorAll('.ab').forEach((el) => {
   el.addEventListener('contextmenu', (e) => e.preventDefault());
 });
 function updateInput(realDt) {
+  if (pendTouch.size && joy.id < 0 && game.state === 'fight') joyAdopt();
   const k = input.keys;
   let x = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0);
   let z = (k.KeyS || k.ArrowDown ? 1 : 0) - (k.KeyW || k.ArrowUp ? 1 : 0);
@@ -4513,56 +4768,65 @@ const ui = {
     toast: $('toast'), letterbox: $('letterbox'), titleCard: $('titleCard'), tcBig: $('tcBig'), tcSub: $('tcSub'), bigCast: $('bigCast'), bigCastFill: $('bigCastFill'), bigCastName: $('bigCastName'), fade: $('fade'),
     ab: { dash: $('ab-dash'), lance: $('ab-lance'), lattice: $('ab-lattice'), mirror: $('ab-mirror'), nova: $('ab-nova') }, dbg: $('dbg'), descend: $('descendText'), descendSub: $('descendSub'),
   },
-  c: {}, toastT: 0, tcT: 0, cdTick: 0, bossChunk: 1, bossChunkHold: 0, hpChunk: 1, hpChunkHold: 0, lastBossHp: 1, lastHp: 1,
+  c: {}, n: {}, tutQ: [], toastT: 0, tcT: 0, cdTick: 0, comboHueT: 0,
+  setN(key, v) { if (this.n[key] === v) return false; this.n[key] = v; return true; }, bossChunk: 1, bossChunkHold: 0, hpChunk: 1, hpChunkHold: 0, lastBossHp: 1, lastHp: 1,
   set(key, el, prop, v) { if (this.c[key] === v) return; this.c[key] = v; if (prop === 'text') el.textContent = v; else if (prop === 'tf') el.style.transform = v; else if (prop === 'cls') el.className = v; else if (prop === 'bg') el.style.background = v; else if (prop === 'op') el.style.opacity = v; else if (prop === 'html') el.innerHTML = v; },
   hud(on) { this.el.hud.classList.toggle('on', !!on); },
   toast(text, dur = 2.5, warn = false) { const t = this.el.toast; t.textContent = text; t.classList.toggle('warn', !!warn); t.classList.add('on'); this.toastT = dur; },
-  tutorial(key, text) { if (game.tutorial[key]) return; if (this.tcT > 0) { game.tutorial[key] = true; setTimeout(() => { if (game.state === 'fight') this.toast(text, 3); }, this.tcT * 1000 + 200); return; } game.tutorial[key] = true; this.toast(text, 3); },
-  letterbox(on) { this.el.letterbox.classList.toggle('on', !!on); },
+  // tutorials queue up: never on top of a title card or another toast, only during live play
+  tutorial(key, text) { if (game.tutorial[key]) return; game.tutorial[key] = true; if (this.tutQ.length < 4) this.tutQ.push(text); },
+  lbOn: false, letterbox(on) { this.lbOn = !!on; this.el.letterbox.classList.toggle('on', !!on); },
   titleCard(big, sub, dur = 2.8) { this.el.tcBig.textContent = big; this.el.tcSub.textContent = sub || ''; this.el.titleCard.classList.add('on'); this.tcT = dur; },
   pressFlash(name) { const el = this.el.ab[name]; if (!el) return; el.classList.add('pressed'); setTimeout(() => el.classList.remove('pressed'), 110); },
   setupBossFrame(def) {
     this.el.bossNameT.textContent = def.name; this.el.bossHpFill.style.background = def.barGrad;
     let html = ''; for (let i = 0; i < def.phases.length - 1; i++) html += `<div class="notch" style="left:${(def.phases[i].until * 100).toFixed(1)}%"></div>`;
-    this.el.bossNotches.innerHTML = html; this.bossChunk = 1; this.c = {};
+    this.el.bossNotches.innerHTML = html; this.bossChunk = 1; this.c = {}; this.n = {};
   },
   update(realDt) {
     const e = this.el;
     if (this.toastT > 0) { this.toastT -= realDt; if (this.toastT <= 0) e.toast.classList.remove('on'); }
+    else if (this.tutQ.length && this.tcT <= 0 && game.state === 'fight' && this.toastGap <= 0) { this.toast(this.tutQ.shift(), 3.2); }
+    if (this.toastT <= 0) this.toastGap = (this.toastGap || 0) - realDt; else this.toastGap = 0.6;
     if (this.tcT > 0) { this.tcT -= realDt; if (this.tcT <= 0) { e.titleCard.classList.remove('on'); if (game.state === 'fight') this.letterbox(false); } }
+    else if (this.lbOn && game.state === 'fight') this.letterbox(false); // never leave the bars over live gameplay
     if (!bossRT.def) return;
     const b = bossRT;
     // boss frame
     const hpK = clamp(b.hp / b.maxHp, 0, 1);
-    this.set('bhp', e.bossHpFill, 'tf', `scaleX(${hpK.toFixed(4)})`);
+    let q = Math.round(hpK * 4000); if (this.setN('bhp', q)) e.bossHpFill.style.transform = 'scaleX(' + (q / 4000) + ')';
     if (hpK < this.lastBossHp - 1e-5) this.bossChunkHold = 0.4; this.lastBossHp = hpK;
     if (this.bossChunkHold > 0) this.bossChunkHold -= realDt; else this.bossChunk = damp(this.bossChunk, hpK, 5, realDt);
     if (this.bossChunk < hpK) this.bossChunk = hpK;
-    this.set('bchunk', e.bossHpChunk, 'tf', `scaleX(${this.bossChunk.toFixed(3)})`);
-    this.set('bpct', e.bossPct, 'text', (hpK * 100).toFixed(hpK < 0.1 ? 1 : 0) + '%');
-    this.set('enr', e.enrageT, 'text', fmtTime(b.enrageLeft > 9000 ? 0 : b.enrageLeft));
+    q = Math.round(this.bossChunk * 1000); if (this.setN('bchunk', q)) e.bossHpChunk.style.transform = 'scaleX(' + (q / 1000) + ')';
+    q = hpK < 0.1 ? Math.round(hpK * 1000) : 10000 + Math.round(hpK * 100); if (this.setN('bpct', q)) e.bossPct.textContent = (hpK * 100).toFixed(hpK < 0.1 ? 1 : 0) + '%';
+    q = Math.floor(Math.max(0, b.enrageLeft > 9000 ? 0 : b.enrageLeft)); if (this.setN('enr', q)) e.enrageT.textContent = fmtTime(q);
     this.set('enrc', e.enrageT, 'cls', b.enrageLeft < 30 ? 't warn' : 't');
-    this.set('frac', e.fracFill, 'tf', `scaleX(${(b.fracture / 100).toFixed(3)})`);
+    q = Math.round(b.fracture * 10); if (this.setN('frac', q)) e.fracFill.style.transform = 'scaleX(' + (q / 1000) + ')';
     this.set('fracc', e.fracWrap, 'cls', b.fracture >= 100 ? 'full' : '');
     const tags = (b.vuln > 0 ? '<span class="pill vuln">VULNERABLE ×2</span>' : '') + (b.shieldMul < 1 ? `<span class="pill">×${b.shieldMul} DMG</span>` : '') + (b.stagger > 0 ? '<span class="pill">STAGGERED</span>' : '');
     this.set('tags', e.bossTags, 'html', tags);
     const ca = b.cast.active && game.state === 'fight';
     this.set('castOn', e.castBar, 'cls', ca ? (b.cast.white ? 'on white' : 'on') : (b.cast.white ? 'white' : ''));
-    if (ca) { this.set('castN', e.castName, 'text', b.cast.name); this.set('castF', e.castFill, 'tf', `scaleX(${clamp(b.cast.t / b.cast.dur, 0, 1).toFixed(3)})`); }
+    if (ca) { this.set('castN', e.castName, 'text', b.cast.name); q = Math.round(clamp(b.cast.t / b.cast.dur, 0, 1) * 500); if (this.setN('castF', q)) e.castFill.style.transform = 'scaleX(' + (q / 500) + ')'; }
     // player
     const p = player; const pk = clamp(p.hp / p.maxHp, 0, 1);
-    this.set('php', e.hpFill, 'tf', `scaleX(${pk.toFixed(3)})`);
+    q = Math.round(pk * 1000); if (this.setN('php', q)) e.hpFill.style.transform = 'scaleX(' + (q / 1000) + ')';
     if (pk < this.lastHp - 1e-5) this.hpChunkHold = 0.4; this.lastHp = pk;
     if (this.hpChunkHold > 0) this.hpChunkHold -= realDt; else this.hpChunk = damp(this.hpChunk, pk, 5, realDt);
     if (this.hpChunk < pk) this.hpChunk = pk;
-    this.set('pchunk', e.hpChunk, 'tf', `scaleX(${this.hpChunk.toFixed(3)})`);
-    this.set('phpn', e.hpNum, 'text', String(Math.ceil(p.hp)));
+    q = Math.round(this.hpChunk * 1000); if (this.setN('pchunk', q)) e.hpChunk.style.transform = 'scaleX(' + (q / 1000) + ')';
+    q = Math.ceil(p.hp); if (this.setN('phpn', q)) e.hpNum.textContent = String(q);
     this.set('phpc', e.hpFill, 'cls', pk < 0.3 ? 'fill low' : 'fill');
     const comboOn = p.comboN >= 2;
     this.set('combo', e.combo, 'cls', comboOn ? 'on' : '');
-    if (comboOn) { this.set('comboT', e.combo, 'text', 'GRAZE ×' + p.comboN); e.combo.style.color = `hsl(${(performance.now() / 6) % 360},100%,72%)`; }
-    const ch = [p.r, p.g, p.b];
-    for (let i = 0; i < 3; i++) { const v = Math.floor(ch[i]); this.set('sp' + i, e.spcI[i], 'tf', `scaleY(${(ch[i] / 100).toFixed(3)})`); this.set('spn' + i, e.spcN[i], 'text', String(v)); this.set('spc' + i, e.spc[i], 'cls', ch[i] >= 60 ? 'spc full' : 'spc'); }
+    if (comboOn) { if (this.setN('comboN', p.comboN)) e.combo.textContent = 'GRAZE ×' + p.comboN; this.comboHueT -= realDt; if (this.comboHueT <= 0) { this.comboHueT = 0.08; e.combo.style.color = 'hsl(' + Math.round((performance.now() / 6) % 360) + ',100%,72%)'; } }
+    for (let i = 0; i < 3; i++) {
+      const v = i === 0 ? p.r : i === 1 ? p.g : p.b;
+      q = Math.round(v * 5); if (this.setN('sp' + i, q)) e.spcI[i].style.transform = 'scaleY(' + (q / 500) + ')';
+      q = Math.floor(v); if (this.setN('spn' + i, q)) e.spcN[i].textContent = String(q);
+      this.set('spc' + i, e.spc[i], 'cls', v >= 60 ? 'spc full' : 'spc');
+    }
     // abilities (≤30 Hz)
     this.cdTick -= realDt; if (this.cdTick > 0) return; this.cdTick = 1 / 30;
     const m = costMul();
@@ -4570,23 +4834,35 @@ const ui = {
     this.abil('lattice', p.g / (PLAYER.latCost * m), p.cdLattice, PLAYER.latCd);
     this.abil('mirror', p.b / (PLAYER.mirCost * m), p.cdMirror, PLAYER.mirCd);
     // dash
-    const dEl = e.ab.dash; const dk = p.dashCharges >= p.dashMax ? 0 : 1 - p.dashRecharge / PLAYER.dashCd;
-    this.set('dashcd', dEl.querySelector('.cd'), 'bg', p.dashCharges === 0 ? `conic-gradient(rgba(0,0,0,.62) ${(dk * 100).toFixed(1)}%, transparent 0)` : 'none');
-    this.set('dashcdt', dEl.querySelector('.cdt'), 'text', p.dashCharges === 0 ? (PLAYER.dashCd - p.dashRecharge).toFixed(1) : '');
-    const pips = dEl.querySelectorAll('.pips i');
-    for (let i = 0; i < 3; i++) this.set('pip' + i, pips[i], 'cls', i >= p.dashMax ? 'hidden' : i < p.dashCharges ? 'on' : '');
+    const D = this.abEl('dash'); const dk = p.dashCharges >= p.dashMax ? 0 : 1 - p.dashRecharge / PLAYER.dashCd;
+    q = p.dashCharges === 0 ? Math.round(dk * 200) : -1; if (this.setN('dashcd', q)) D.cd.style.background = q >= 0 ? 'conic-gradient(rgba(0,0,0,.62) ' + (q / 2) + '%, transparent 0)' : 'none';
+    q = p.dashCharges === 0 ? Math.round((PLAYER.dashCd - p.dashRecharge) * 10) : -1; if (this.setN('dashcdt', q)) D.cdt.textContent = q >= 0 ? (q / 10).toFixed(1) : '';
+    for (let i = 0; i < 3; i++) this.set('pip' + i, D.pips[i], 'cls', i >= p.dashMax ? 'hidden' : i < p.dashCharges ? 'on' : '');
     this.set('nova', e.ab.nova, 'cls', abilityReady('nova') && game.state === 'fight' ? 'ab ready' : 'ab');
-    this.set('dashFill', dEl.querySelector('.fill'), 'tf', `scaleY(${p.dashCharges > 0 ? 1 : 0.15})`);
+    this.set('dashFill', D.fill, 'tf', p.dashCharges > 0 ? 'scaleY(1)' : 'scaleY(0.15)');
   },
+  abEls: {},
+  abEl(name) { let o = this.abEls[name]; if (!o) { const el = this.el.ab[name]; o = this.abEls[name] = { el, fill: el.querySelector('.fill'), cd: el.querySelector('.cd'), cdt: el.querySelector('.cdt'), pips: Array.from(el.querySelectorAll('.pips i')) }; } return o; },
   abil(name, afford, cd, cdMax) {
-    const el = this.el.ab[name]; const a = clamp(afford, 0, 1);
-    this.set(name + 'f', el.querySelector('.fill'), 'tf', `scaleY(${a.toFixed(2)})`);
-    this.set(name + 'd', el, 'cls', afford >= 1 ? 'ab' : 'ab dim');
+    const A = this.abEl(name); const a = clamp(afford, 0, 1);
+    let q = Math.round(a * 100); if (this.setN(name + 'f', q)) A.fill.style.transform = 'scaleY(' + (q / 100) + ')';
+    this.set(name + 'd', A.el, 'cls', afford >= 1 ? 'ab' : 'ab dim');
     const k = cd > 0 ? cd / cdMax : 0;
-    this.set(name + 'c', el.querySelector('.cd'), 'bg', k > 0 ? `conic-gradient(rgba(0,0,0,.62) ${(k * 100).toFixed(1)}%, transparent 0)` : 'none');
-    this.set(name + 't', el.querySelector('.cdt'), 'text', cd > 0 ? (cd < 1 ? cd.toFixed(1) : String(Math.ceil(cd))) : '');
+    q = k > 0 ? Math.round(k * 200) : -1; if (this.setN(name + 'c', q)) A.cd.style.background = q >= 0 ? 'conic-gradient(rgba(0,0,0,.62) ' + (q / 2) + '%, transparent 0)' : 'none';
+    q = cd > 0 ? (cd < 1 ? Math.round(cd * 10) : 100 + Math.ceil(cd)) : -1; if (this.setN(name + 't', q)) A.cdt.textContent = q < 0 ? '' : q < 100 ? (q / 10).toFixed(1) : String(q - 100);
   },
 };
+function measureHud() {
+  try {
+    const bf = $('bossFrame').getBoundingClientRect(), pf = $('playerFrame').getBoundingClientRect();
+    hudTopPx = Math.round(Math.max(bf.bottom, pf.bottom));
+    document.documentElement.style.setProperty('--hudB', hudTopPx + 'px');
+    const s = parseFloat(getComputedStyle(document.body).getPropertyValue('--s')) || 1;
+    const dr = $('ab-dash').getBoundingClientRect();
+    const sab = Math.max(0, VH - dr.bottom - 22 * s), sar = Math.max(0, VW - dr.right - 22 * s);
+    camSafe.sab = sab; camSafe.clusterH = 235 * s + sab; camSafe.clusterW = 235 * s + sar;
+  } catch (e) { }
+}
 function showScreen(id, on = true) { $(id).classList.toggle('hidden', !on); }
 function anyModal() { return ['bossSel', 'settings', 'pause', 'facet', 'defeat', 'victory'].some((id) => !$(id).classList.contains('hidden')); }
 function renderStats() {
@@ -4625,7 +4901,14 @@ $('btnRetry').addEventListener('click', () => { sfx.ui(); retryBoss(); });
 $('btnDefTitle').addEventListener('click', () => { sfx.ui(); toTitle(); });
 $('btnAgain').addEventListener('click', () => { sfx.ui(); showScreen('victory', false); startRun(true, 0); });
 $('btnVicTitle').addEventListener('click', () => { sfx.ui(); toTitle(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && game.state === 'fight') togglePause(true); });
+// background tabs: silence everything (the sequencer's setInterval gets throttled and stutters otherwise)
+let auWasRunning = false;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (game.state === 'fight') togglePause(true);
+    if (AU.ctx && AU.ctx.state === 'running') { auWasRunning = true; try { AU.ctx.suspend(); } catch (e) { } }
+  } else if (AU.ctx && auWasRunning) { auWasRunning = false; try { AU.ctx.resume(); } catch (e) { } }
+});
 
 /* =====================================================================
    18  GAME — state machine & flow
@@ -4653,12 +4936,14 @@ function setArenaLook(arena) {
   starU.uColorful.value = 0; starU.uBright.value = 1; nebU.uOp.value = 0.25;
 }
 function startRun(full, idx = 0) {
-  game.runMode = full ? 'full' : 'single'; game.facets = []; game.runTime = 0; game.bossTimes = [null, null, null];
+  game.runMode = full ? 'full' : 'single'; game.facets = []; game.runTime = 0; game.bossTimes = [null, null, null]; game.cpBoss = {}; game.checkpointed = false;
   game.stats.grazes = 0; game.stats.perfects = 0; game.stats.deaths = 0; game.stats.time = 0; game.tutorial = {};
   game.sat = game.satTarget = SAT_BOSS[idx];
   beginBoss(idx, { intro: true });
 }
+game.gen = 0; game.checkpointed = false;
 function beginBoss(idx, opts = {}) {
+  const gen = ++game.gen; ui.tutQ.length = 0;
   ['title', 'bossSel', 'settings', 'pause', 'facet', 'defeat', 'victory'].forEach((s) => showScreen(s, false));
   $('title').classList.remove('out');
   ui.hud(false); ui.letterbox(false); ui.el.descend.classList.remove('on');
@@ -4671,7 +4956,7 @@ function beginBoss(idx, opts = {}) {
   game.fightTime = 0; director.timeScale = 1; LU.uWhite.value = 0; LU.uDark.value = 0;
   ui.setupBossFrame(def);
   ui.el.fade.style.opacity = '0';
-  if (opts.retry) { playerG.visible = false; reform(player.x, 1.15, player.z, 60, 0.8, 1.4, 1.6, 2.2, 6); setTimeout(() => { if (player.alive) { playerG.visible = true; ring(player.x, 0.06, player.z, 0.3, 4, 0.6, 0.3, 2, 2.2, 2.6, 1.4); } }, 800); player.invuln = 1.2; }
+  if (opts.retry) { playerG.visible = false; reform(player.x, 1.15, player.z, 60, 0.8, 1.4, 1.6, 2.2, 6); setTimeout(() => { if (game.gen === gen && player.alive && game.state !== 'title') { playerG.visible = true; ring(player.x, 0.06, player.z, 0.3, 4, 0.6, 0.3, 2, 2.2, 2.6, 1.4); } }, 800); player.invuln = 1.2; }
   if (opts.intro) {
     game.state = 'intro';
     const c = def.introCine(); const oe = c.end; c.end = () => { oe && oe(); startFight(); };
@@ -4680,20 +4965,30 @@ function beginBoss(idx, opts = {}) {
 }
 function startFight() {
   game.state = 'fight'; ui.hud(true);
+  ui.letterbox(false); ui.tcT = Math.min(ui.tcT, 1.2); // never keep the cinematic bars over live play
+  measureHud();
   const def = bossRT.def; music.setSection(def.music[bossRT.phase] || def.music[0]);
-  if (bossRT.idx === 0 && bossRT.phase === 0) { setTimeout(() => ui.tutorial('move', IS_TOUCH ? 'Move: drag the left side of the screen' : 'Move: WASD  ·  Aim: mouse  ·  Dash: SPACE'), 900); setTimeout(() => ui.tutorial('dash', 'Dash through attacks for PERFECT grazes'), 6500); }
+  if (bossRT.idx === 0 && bossRT.phase === 0) {
+    const gen = game.gen;
+    ui.tutorial('move', IS_TOUCH ? 'Move: drag the left side of the screen' : 'Move: WASD  ·  Aim: mouse  ·  Dash: SPACE');
+    setTimeout(() => { if (game.gen === gen && game.state === 'fight') ui.tutorial('dash', 'Dash through attacks for PERFECT grazes'); }, 6500);
+  }
 }
 function retryBoss() {
   showScreen('defeat', false);
   const idx = game.bossIdx;
   const cp = idx === 2 && B3.checkpoint; // boss 3 is long: dying in the Supernova phase restarts there
+  const cpT = B3.cpTime || 0;
   beginBoss(idx, cp ? { retry: true, intro: false, phase: 2, charge: 40 } : { retry: true, intro: false });
-  if (cp) ui.toast('CHECKPOINT — SUPERNOVA', 2.2);
+  if (cp) { game.fightTime = cpT; B3.cpTime = cpT; game.checkpointed = true; ui.toast('CHECKPOINT — SUPERNOVA', 2.2); } // the clock resumes from the Supernova start; no best time
+  else game.checkpointed = false;
 }
 function onBossDefeated() {
   const idx = game.bossIdx; const t = game.bossTimes[idx];
   const key = 'b' + (idx + 1); game.newBest = game.newBest || {};
-  if (t != null && (store.best[key] == null || t < store.best[key])) { store.best[key] = t; game.newBest[key] = true; }
+  game.cpBoss = game.cpBoss || {}; game.cpBoss[key] = !!game.checkpointed;
+  if (t != null && !game.checkpointed && (store.best[key] == null || t < store.best[key])) { store.best[key] = t; game.newBest[key] = true; }
+  game.checkpointed = false;
   store.unlocked = Math.max(store.unlocked || 1, Math.min(3, idx + 2)); saveStore();
   if (idx < BOSSES.length - 1) showFacet(); else showVictory();
 }
@@ -4736,11 +5031,12 @@ function showVictory() {
   game.state = 'victory'; ui.hud(false); music.setSection('victory');
   starU.uColorful.value = 1; game.satTarget = 1;
   let run = null;
-  if (game.runMode === 'full' && game.bossTimes.every((t) => t != null)) { run = game.bossTimes.reduce((a, b) => a + b, 0); if (store.best.run == null || run < store.best.run) { store.best.run = run; game.newBest.run = true; } saveStore(); }
+  const cpb = game.cpBoss || {}; const anyCp = cpb.b1 || cpb.b2 || cpb.b3;
+  if (game.runMode === 'full' && game.bossTimes.every((t) => t != null)) { run = game.bossTimes.reduce((a, b) => a + b, 0); if (!anyCp && (store.best.run == null || run < store.best.run)) { store.best.run = run; game.newBest.run = true; } saveStore(); }
   const nb = game.newBest || {};
   const rows = [];
   if (run != null) rows.push(`<div class="${nb.run ? 'best' : ''}">TOTAL ${fmtTimeMs(run)}${nb.run ? ' · NEW BEST' : ''}</div>`);
-  game.bossTimes.forEach((t, i) => { if (t != null) rows.push(`<div class="${nb['b' + (i + 1)] ? 'best' : ''}">${BOSSES[i].name} · ${fmtTimeMs(t)}</div>`); });
+  game.bossTimes.forEach((t, i) => { if (t != null) rows.push(`<div class="${nb['b' + (i + 1)] ? 'best' : ''}">${BOSSES[i].name} · ${fmtTimeMs(t)}${cpb['b' + (i + 1)] ? ' · CHECKPOINT' : ''}</div>`); });
   rows.push(`<div>GRAZES ${game.stats.grazes} · PERFECT DASHES ${game.stats.perfects} · SHATTERED ${game.stats.deaths}</div>`);
   if (game.facets.length) rows.push(`<div>FACETS · ${game.facets.map((id) => FACETS.find((f) => f.id === id).name).join(' · ')}</div>`);
   $('victoryStats').innerHTML = rows.join('');
@@ -4748,7 +5044,7 @@ function showVictory() {
     '<div>every light, shard and note was synthesized in your browser</div>', '<div class="h">THANK YOU, LIGHTBREAKER</div>'];
   $('credits').innerHTML = cred.map((c, i) => c.replace('<div', `<div style="animation-delay:${(1.2 + i * 0.9).toFixed(1)}s"`)).join('');
   showScreen('victory');
-  game.newBest = {};
+  game.newBest = {}; game.cpBoss = {};
 }
 function showDefeat() {
   game.state = 'defeat'; ui.hud(false);
@@ -4760,6 +5056,7 @@ function showDefeat() {
 function toTitle() {
   ['bossSel', 'settings', 'pause', 'facet', 'defeat', 'victory'].forEach((s) => showScreen(s, false));
   if (director.cine) { director.cine = null; director.camOverride = false; }
+  game.gen++; pendTouch.clear(); ui.tutQ.length = 0; dmgNumsClear(); LU.uNovaA.value = 0; LU.uNovaNeg.value = 0;
   game.state = 'title'; ui.hud(false); ui.letterbox(false); ui.el.titleCard.classList.remove('on'); ui.el.fade.style.opacity = '0';
   clearTasks(); teleClearAll(); pjClearAll(false); hzBeamsClear();
   bossRT.def = null; bossTarget.alive = false; targets.length = 0;
@@ -4770,8 +5067,8 @@ function toTitle() {
 }
 function togglePause(force) {
   const want = force !== undefined ? force : game.state !== 'paused';
-  if (want && game.state === 'fight') { game.prevState = 'fight'; game.state = 'paused'; showScreen('pause'); joy.id = -1; joy.el.classList.remove('on'); input.jx = input.jz = 0; if (AU.ctx) AU.ctx.suspend && AU.music.gain.setTargetAtTime(0.15, AU.ctx.currentTime, 0.1); }
-  else if (!want && game.state === 'paused') { game.state = game.prevState || 'fight'; showScreen('pause', false); showScreen('settings', false); if (AU.ctx) AU.music.gain.setTargetAtTime(0.5, AU.ctx.currentTime, 0.1); }
+  if (want && game.state === 'fight') { game.prevState = 'fight'; game.state = 'paused'; showScreen('pause'); joy.id = -1; joy.el.classList.remove('on'); input.jx = input.jz = 0; if (AU.ctx) { AU.music.gain.setTargetAtTime(0.15, AU.ctx.currentTime, 0.1); } }
+  else if (!want && game.state === 'paused') { game.state = game.prevState || 'fight'; showScreen('pause', false); showScreen('settings', false); if (AU.ctx) { AU.music.gain.setTargetAtTime(0.5, AU.ctx.currentTime, 0.1); } }
 }
 
 /* =====================================================================
@@ -4843,7 +5140,9 @@ function frame(now) {
   if (!paused) updateNova(realDt * debug.timeScale);
   updateCamera(realDt);
   // post-processing uniforms
-  bloom.strength = Q.cfg.bloomStr + director.bloomBoost;
+  bloom.strength = Math.min(game.state === 'fight' ? 1.6 : 1.4, Q.cfg.bloomStr + director.bloomBoost);
+  // photosensitivity: full-screen white is capped (and nearly off with Reduce Effects)
+  if (LU.uWhite.value > 0) LU.uWhite.value = Math.min(LU.uWhite.value, settings.reduceFx ? 0.12 : 0.6);
   LU.uAberr.value = 0.0015 + director.aberr;
   game.sat = damp(game.sat, game.satTarget + (game.state === 'fight' && bossRT.def ? 0.25 * bossRT.phase / Math.max(1, bossRT.def.phases.length - 1) * 0.6 : 0), 1.5, realDt);
   LU.uSat.value = clamp(game.sat, 0, 1);
@@ -4873,7 +5172,8 @@ window.__game = {
   get cine() { return director.cine ? { t: director.ct, dur: director.cine.dur, ts: director.timeScale, hs: director.hitstopT } : null; },
   start() { if (director.cine) { director.cine = null; director.camOverride = false; } startRun(true, 0); endCine(); ui.tcT = 0.01; ui.letterbox(false); ui.el.titleCard.classList.remove('on'); },
   setBoss(n, skipIntro = true) { if (director.cine) { director.cine = null; director.camOverride = false; } game.sat = game.satTarget = SAT_BOSS[clamp(n - 1, 0, 2)]; beginBoss(clamp(n - 1, 0, 2), { intro: !skipIntro }); },
-  setPhase(p, opts = {}) { if (!bossRT.def) return; if (opts.instant) bossStartTransition(p, true); else { bossRT.hp = bossRT.def.phases[p - 1].until * bossRT.maxHp; bossStartTransition(p); } },
+  // p is the 0-based phase index (1 = second phase); out-of-range values are clamped
+  setPhase(p, opts = {}) { if (!bossRT.def) return false; const n = bossRT.def.phases.length; p = clamp(Math.round(+p || 0), 1, n - 1); if (opts.instant) bossStartTransition(p, true); else { bossRT.hp = bossRT.def.phases[p - 1].until * bossRT.maxHp; bossStartTransition(p); } return p; },
   killBoss() { if (bossRT.def && !bossRT.dead) { if (game.state !== 'fight') game.state = 'fight'; bossDie(); } },
   damageBoss(n) { const was = game.state; bossTakeDamage(n, false, 'debug'); return was; },
   godMode(on = true) { debug.god = !!on; },
@@ -4882,7 +5182,7 @@ window.__game = {
   forceQuality(t) { if (t === 'auto') { Q.auto = true; return; } Q.auto = false; applyQuality(t); },
   skipCinematic() { skipCine(true); },
   setCam(x, y, z, lx, ly, lz) { if (x === null || x === undefined) { cam.lock = null; return; } cam.lock = { pos: new THREE.Vector3(x, y, z), look: new THREE.Vector3(lx, ly, lz) }; },
-  cast(name) { const d = bossRT.def; if (d && d.casts[name]) { d.casts[name](); return true; } return false; },
+  cast(name, arg) { const d = bossRT.def; if (d && d.casts[name]) { d.casts[name](arg); return true; } return false; },
   facet(id) { pickFacet(id); }, victory() { showVictory(); }, defeat() { player.hurtI = 0; player.invuln = 0; debug.god = false; damagePlayer(9999, R); },
   use(name) { return useAbility(name); }, autopilot(on = true) { debug.autopilot = !!on; debug.log = []; }, get hitLog() { return debug.log || []; }, move(x, z) { input.jx = x; input.jz = z; },
   setPlayer(x, z) { player.x = x; player.z = z; },
