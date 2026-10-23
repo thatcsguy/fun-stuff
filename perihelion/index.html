@@ -10127,8 +10127,9 @@ const G = window.G = { THREE };
   const PI = Math.PI, TAU = PI * 2;
   const ACC = '#a77bff', HOT = '#f2e8ff', FLARE = '#ff7a3a', EMBER = '#ffb347', GOLD = '#ffc94d', GOLD_HOT = '#fff1c2';
   const VIOLET_DEEP = '#5a2cc8';
-  const HOVER_Y = 3.7, STAR_R = 1.75;
-  const EH_TIME = 45;                      // Event Horizon collapse timer (boss clock seconds)
+  const HOT_T = '#cdb6ff';                 // Event Horizon telegraph accent: white-hot violet that still reads over the brass
+  const HOVER_Y = 3.9, STAR_R = 1.75, MODEL_K = 1.12;
+  const EH_TIME = 48;                      // Event Horizon collapse timer (boss clock seconds)
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
   const lerp = (a, b, t) => a + (b - a) * t;
   const damp = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
@@ -10149,6 +10150,8 @@ const G = window.G = { THREE };
   const accentNow = () => (G.colors && G.colors.accent) || ACC;
   const starPos = (b) => V3(0, (b && b.data && b.data.hoverY) || HOVER_Y, 0);   // play-local (the boss root sits at the origin)
   // run fn after sec of boss clock unless the phase ends first (b.wait rejects with Abort)
+  // per-phase damage scale for ordinary attacks (heavy casts and lethal waves keep their fixed values)
+  const dk = (b, v) => Math.round(v * ((b && b.data && b.data.dmgK) || 1));
   const later = (b, sec, fn) => { b.wait(sec).then(() => { try { fn(); } catch (e) { logE('later', e); } }, () => { }); };
   const SHADER_TAIL = '\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n';
 
@@ -10164,7 +10167,7 @@ const G = window.G = { THREE };
     varying vec3 vN; varying vec3 vVN; varying vec3 vV;
     void main(){ vN = normal; vVN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position, 1.); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`;
   const STAR_FS = `
-    uniform float uTime, uCrack, uCollapse, uHorizon, uCalm, uHit, uOpacity, uRear, uSwell, uHot;
+    uniform float uTime, uCrack, uCollapse, uHorizon, uCalm, uHit, uOpacity, uRear, uSwell, uHot, uExpo;
     uniform vec3 uVein;
     varying vec3 vN; varying vec3 vVN; varying vec3 vV;
     ${NOISE}
@@ -10185,16 +10188,17 @@ const G = window.G = { THREE };
       float back = dot(n, vec3(-1., 0., 0.));
       float fis = smoothstep(.72, .97, back) * (.55 + .45 * vn(n * 14. + t));
       col += vec3(2.4, 1.7, .6) * fis * uRear * (.8 + .4 * sin(t * 6.));
-      col *= 1. + uSwell * .9;
-      vec3 dw = mix(vec3(.95, .7, 2.4), vec3(2.5, 2.25, 2.9), smoothstep(.3, .8, w));
-      col = mix(col, dw * (.6 + .6 * pow(mu, .3)) + uVein * rc * 1.5, uCollapse);
+      col *= 1. + uSwell * .45;
+      float prim = pow(1. - mu, 2.2);
+      vec3 dw = vec3(.03, .015, .07) + vec3(.7, .45, 1.6) * prim * 1.8 + vec3(.5, .3, 1.1) * smoothstep(.55, .9, w) * .35 * (1. - prim);
+      col = mix(col, dw + uVein * rc * .9, uCollapse);
       float rim = pow(1. - mu, 3.5);
       vec3 hor = vec3(1.5, 1.3, 2.6) * rim * 2.4 + vec3(2.2, 1.5, .6) * fis * uRear * .6;
       col = mix(col, hor, uHorizon);
-      vec3 calm = mix(vec3(1.6, 1.05, .55), vec3(2.6, 2.1, 1.4), smoothstep(.3, .85, w)) * (.55 + .7 * pow(mu, .4));
+      vec3 calm = mix(vec3(1.25, .82, .42), vec3(1.95, 1.55, 1.0), smoothstep(.3, .85, w)) * (.55 + .7 * pow(mu, .4));
       col = mix(col, calm, uCalm);
       col += uHit * vec3(.9, .7, 1.2) * .5;
-      gl_FragColor = vec4(col, uOpacity);
+      gl_FragColor = vec4(col * uExpo, uOpacity);
       ${SHADER_TAIL}
     }`;
   const UV_VS = `varying vec2 vUv; varying vec3 vP; void main(){ vUv = uv; vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`;
@@ -10241,7 +10245,7 @@ const G = window.G = { THREE };
       float streak = pow(vn(vec3(cs * 18., u * 30.)), 3.);
       float band = smoothstep(0., .07, u) * (1. - smoothstep(.62, 1., u));
       float hot = exp(-u * 3.2);
-      vec3 col = mix(uC1, uC2, hot) * (.35 + 1.7 * n * n + streak * 1.4) * (.55 + 1.9 * hot);
+      vec3 col = mix(uC1, uC2, hot) * (.25 + 1.1 * n * n + streak * .9) * (.45 + 1.1 * hot);
       gl_FragColor = vec4(col * band * uA * uOpacity, 1.);
       ${SHADER_TAIL}
     }`;
@@ -10393,11 +10397,11 @@ const G = window.G = { THREE };
     const goldGem = G.mat.emissive(GOLD_HOT, 2.6);
     D.mats = { brass, brassDark, brassInlay, maskMat, gemMat, eyeMat, goldGem };
 
-    const hover = new T3.Group(); hover.position.y = HOVER_Y; g.add(hover); D.hover = hover;
+    const hover = new T3.Group(); hover.position.y = HOVER_Y; hover.scale.setScalar(MODEL_K); g.add(hover); D.hover = hover;
     // ---- the star
     D.starU = {
       uTime: { value: 0 }, uCrack: { value: 0 }, uCollapse: { value: 0 }, uHorizon: { value: 0 }, uCalm: { value: 0 }, uHit: { value: 0 },
-      uOpacity: { value: 1 }, uRear: { value: 1 }, uSwell: { value: 0 }, uHot: { value: 0 }, uVein: { value: new T3.Color(ACC).multiplyScalar(1.5) },
+      uOpacity: { value: 1 }, uRear: { value: 1 }, uSwell: { value: 0 }, uHot: { value: 0 }, uExpo: { value: 1 }, uVein: { value: new T3.Color(ACC).multiplyScalar(1.5) },
     };
     const starMat = shaderMat(STAR_VS, STAR_FS, D.starU, { transparent: false, depthWrite: true });
     const star = new T3.Mesh(new T3.SphereGeometry(STAR_R, 64, 40), starMat); star.name = 'star';
@@ -10567,7 +10571,12 @@ const G = window.G = { THREE };
     let sc = lerp(1, 0.46, collapseK) * (1 + D.swell * 0.16 + D.pulse * 0.1 + Math.sin(t * 1.3) * 0.012);
     sc = lerp(sc, 0.82, calmK) * D.starScaleK;
     D.star.scale.setScalar(Math.max(0.01, sc * lerp(0.4, 1, em)));
+    // close-up cinematics: tame the HDR star so bloom does not white out the frame
+    let ek = 1;
+    if (G.camera) { D.hover.getWorldPosition(_v2); ek = clamp((G.camera.position.distanceTo(_v2) - 5) / 14, 0.42, 1); }
+    D.ek = damp(D.ek || 1, ek, 4, dt); ek = D.ek;
     const U = D.starU;
+    U.uExpo.value = ek;
     U.uTime.value = t; U.uCrack.value = C.crack; U.uCollapse.value = clamp(collapseK - C.horizon * 0.2, 0, 1); U.uHorizon.value = C.horizon; U.uCalm.value = calmK;
     U.uHit.value = Math.max(b.hitFlash || 0, D.castGlow * (0.35 + 0.35 * Math.sin(t * 14))); U.uSwell.value = D.swell + D.pulse * 0.6; U.uHot.value = C.hot;
     U.uRear.value = b.alive ? 1 : Math.max(0, 1 - calmK * 2);
@@ -10577,7 +10586,7 @@ const G = window.G = { THREE };
     const CU = D.coronaU; CU.uTime.value = t;
     const coreR = 0.36 * sc;
     CU.uCore.value = Math.max(0.05, coreR); CU.uRays.value = 0.55 + C.crack * 0.7 + collapseK * 0.4 + D.swell * 0.8;
-    CU.uInt.value = C.corona * em * (1 + D.pulse * 1.5 + D.swell * 0.6) * (1 - C.horizon * 0.55);
+    CU.uInt.value = C.corona * em * (1 + D.pulse * 0.6 + D.swell * 0.35) * (1 - C.horizon * 0.55) * ek;
     _v.set(1, 0.69, 0.44).lerp(V3(0.75, 0.55, 1.0), Math.max(C.crack * 0.45, collapseK)).lerp(V3(1, 0.97, 1.0), C.horizon * 0.8).lerp(V3(1, 0.86, 0.55), calmK);
     CU.uC1.value.setRGB(_v.x * 1.3, _v.y * 1.3, _v.z * 1.3);
     _v.set(1, 0.23, 0.1).lerp(V3(0.6, 0.3, 1.0), Math.max(C.crack * 0.6, collapseK)).lerp(V3(0.5, 0.35, 1), C.horizon).lerp(V3(1, 0.62, 0.25), calmK);
@@ -10588,18 +10597,18 @@ const G = window.G = { THREE };
       L.U.uTime.value = t;
       const ph = (t * L.sp + L.ph) % 1;
       L.U.uHead.value = ph < 0.55 ? ph / 0.55 * 1.1 : 1.1;
-      L.U.uA.value = (ph < 0.85 ? 1 : 1 - (ph - 0.85) / 0.15) * (1 - collapseK) * (1 - calmK * 0.6) * em * (1 + C.crack * 0.5);
+      L.U.uA.value = (ph < 0.85 ? 1 : 1 - (ph - 0.85) / 0.15) * (1 - collapseK) * (1 - calmK * 0.6) * em * (1 + C.crack * 0.5) * ek;
       L.m.scale.setScalar(sc);
       L.m.visible = L.U.uA.value > 0.01;
     }
     // accretion disk
-    const dk = C.disk * (1 - calmK);
-    D.disk.visible = dk > 0.01;
+    const diskK = C.disk * (1 - calmK);
+    D.disk.visible = diskK > 0.01;
     if (D.disk.visible) {
-      const DU = D.diskU; DU.uTime.value = t; DU.uA.value = dk * (1 + D.pulse); DU.uSpin.value = 1.1 + C.horizon * 1.4;
+      const DU = D.diskU; DU.uTime.value = t; DU.uA.value = diskK * (1 + D.pulse * 0.35) * ek; DU.uSpin.value = 1.1 + C.horizon * 1.4;
       DU.uC1.value.set(C.horizon > 0.5 ? '#c8a8ff' : ACC).multiplyScalar(0.9 + C.horizon * 0.4);
       D.disk.rotation.z = t * 0.05;
-      D.disk.scale.setScalar(lerp(0.6, 1, dk));
+      D.disk.scale.setScalar(lerp(0.6, 1, diskK));
     }
     // mask halves split apart as the star dies; the eyes flare with casts and close in death
     const split = C.mask;
@@ -10653,7 +10662,7 @@ const G = window.G = { THREE };
     D.pendant.rotation.y += dt * 0.4;
     D.pendant.position.y = -STAR_R * lerp(1, 0.6, collapseK) - 0.05;
     // reignition core
-    if (D.coreK != null) { D.coreGlow.material.opacity = clamp(D.coreK, 0, 1); D.coreGlow.scale.setScalar(0.2 + D.coreK * 6); }
+    if (D.coreK != null) { D.coreGlow.material.opacity = clamp(D.coreK, 0, 1) * 0.75 * ek; D.coreGlow.scale.setScalar(0.2 + D.coreK * 3.5); }
     // floor discs
     D.heatU.uTime.value = t; D.heatU.uA.value = C.heat * em * (1 + D.pulse * 1.5 + D.swell);
     D.heatU.uCol.value.set(calmK > 0.4 ? '#ffb050' : (collapseK > 0.5 ? '#8a5cff' : '#ff5a20'));
@@ -10729,7 +10738,7 @@ const G = window.G = { THREE };
       test: (ring, theta, lt, pad) => pad > 0 && !st.braced && ring === 0,
       draw: (group) => {
         if (!wellGeo) { wellGeo = new T3.RingGeometry(4.4, 13.6, 160, 1); wellGeo.rotateX(-PI / 2); }
-        const U = { uTime: { value: 0 }, uProg: { value: 0 }, uBrace: { value: 0 }, uA: { value: 1 }, uCol: { value: new T3.Color(accentNow()) }, uGold: { value: new T3.Color(GOLD) } };
+        const U = { uTime: { value: 0 }, uProg: { value: 0 }, uBrace: { value: 0 }, uA: { value: 1 }, uCol: { value: new T3.Color(ACC) }, uGold: { value: new T3.Color(GOLD) } };
         const m = new T3.Mesh(wellGeo, shaderMat(`varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`, WELL_FS, U, {}));
         m.userData.sharedGeo = true; m.position.y = 0.075; m.renderOrder = 7; m.frustumCulled = false;
         group.add(m);
@@ -10771,17 +10780,26 @@ const G = window.G = { THREE };
       return;
     }
     const to = S.ring - 1;
-    if (G.hz.gapAt(to, S.theta)) return;        // the well never drags you onto broken track
+    // the well never drags you onto broken track (checked along the landing path)
+    for (let k = 0; k <= 6; k++) if (G.hz.gapAt(to, S.theta + S.dir * k * 0.1)) return;
     G.player.forceShift(-1, {});
     sfx('shift', { dir: 'in' });
     fx('text', S.pos.clone().setY(S.pos.y + 1.9), 'PULLED IN', { color: '#d9c8ff', size: 0.55, life: 0.8 });
     const p = S.pos.clone().setY(0.4);
     fx('lance', p, starPos(b), { color: accentNow(), width: 0.25, life: 0.3, intensity: 1.6, flare: false });
+    // from Fracture on, being dragged in has a price: the ring you land on is struck 1.5 s later (shift back out or run)
+    if (D.wellPunish) later(b, 0.32, () => {
+      const P = PS(); if (!P || !P.alive || P.ring !== to) return;
+      for (let k = 0; k <= 8; k++) if (G.hz.gapAt(to + 1, P.theta + P.dir * k * 0.15)) return;   // the escape ring must be whole ahead
+      if (to === 0) G.hz.ring({ ring: 0, warn: 1.5, active: 0.4, dmg: dk(b, 22), label: 'Tidal Crush' });
+      else G.hz.arc({ rings: [to], center: b.playerAhead(1.55), width: 0.9, warn: 1.55, active: 0.25, dmg: dk(b, 22), label: 'Tidal Shear' });
+      D.pulse = Math.max(D.pulse, 0.6);
+    });
   }
 
   // ================================================================ ATTACK PRIMITIVES
   const otherRings = (r) => [0, 1, 2].filter(k => k !== r);
-  function pairFor(b, r) { if (r === 0) return [0, 1]; if (r === 2) return [1, 2]; return b.rand() < 0.5 ? [0, 1] : [1, 2]; }
+  function pairFor(b, r) { if (r === 0 || b.data.twoRings) return [0, 1]; if (r === 2) return [1, 2]; return b.rand() < 0.5 ? [0, 1] : [1, 2]; }
   function trackFlare(b, h) { if (h && h.hazard) b.data.flares.push(h); return h; }
 
   // Flare Lash: one long flare across two rings; the uncovered wedge sits behind the knight
@@ -10791,7 +10809,7 @@ const G = window.G = { THREE };
     const span = o.span || PI * 1.5;
     const from = th - d * (o.back != null ? o.back : 1.0), to = from + d * span;
     b.data.swellT = 0.4; later(b, (o.warn || 2.0) + 0.3, () => { b.data.swellT = 0; });
-    const h = trackFlare(b, G.hz.sweep({ rings, from, to, warn: o.warn || 2.0, dur: o.dur || 2.8, width: 0.24, dmg: o.dmg || 24, label: o.label || 'Flare Lash', color: o.color }));
+    const h = trackFlare(b, G.hz.sweep({ rings, from, to, warn: o.warn || 2.0, dur: o.dur || 2.8, width: 0.24, dmg: dk(b, o.dmg || 24), label: o.label || 'Flare Lash', color: o.color }));
     if (!b.data.said.lash) { b.data.said.lash = 1; b.say('Burn.', 1.6); }
     if (o.noWait) return h;
     await h;
@@ -10799,7 +10817,10 @@ const G = window.G = { THREE };
   // Solar Flares: three short flares from three angles, all on the same two rings; the third ring is free
   async function solarFlares(b, o = {}) {
     const r = b.playerRing();
-    const free = o.free != null ? o.free : (r === 1 ? (b.rand() < 0.5 ? 0 : 2) : 1);
+    let free = o.free != null ? o.free : (r === 1 ? (b.rand() < 0.5 ? 0 : 2) : 1);
+    // never leave as the only free ring one that drifting shards are still running along
+    const shardOn = (k) => G.hz.active.some(h => h.kind === 'orb' && !h.finished && Math.round(h.ring0) === k);
+    if (o.free == null && shardOn(free)) { const alt = [0, 1, 2].filter(k => k !== free && !shardOn(k)).sort((a, c) => Math.abs(a - r) - Math.abs(c - r)); if (alt.length) free = alt[0]; }
     const rings = o.rings || otherRings(free);
     const base = b.playerAhead(2.0) + b.randRange(-0.3, 0.3), n = o.n || 3;
     const hs = [];
@@ -10807,7 +10828,7 @@ const G = window.G = { THREE };
     for (let i = 0; i < n; i++) {
       const c = base + i * TAU / n + (i ? b.randRange(-0.2, 0.2) : 0);
       const sg = i % 2 ? 1 : -1;
-      hs.push(trackFlare(b, G.hz.sweep({ rings, from: c - sg * 0.95, to: c + sg * 0.95, warn: (o.warn || 1.9) + i * 0.32, dur: 1.4, width: 0.24, dmg: o.dmg || 22, label: o.label || 'Solar Flare', color: o.color })));
+      hs.push(trackFlare(b, G.hz.sweep({ rings, from: c - sg * 0.95, to: c + sg * 0.95, warn: (o.warn || 1.9) + i * 0.32, dur: 1.4, width: 0.24, dmg: dk(b, o.dmg || 22), label: o.label || 'Solar Flare', color: o.color })));
     }
     world('ringGlow', free, GOLD, 0.45, 2.4);
     if (!b.data.said.flares) { b.data.said.flares = 1; b.say('My flares reach every orbit but one.', 2.6); }
@@ -10816,7 +10837,7 @@ const G = window.G = { THREE };
   }
   // a single prominence: erupts on the inner ring and leaps outward ring by ring
   function prominence(b, c, o = {}) {
-    const w = o.width || 0.5, t0 = o.warn || 1.7, step = o.step || 0.42, dmg = o.dmg || 22;
+    const w = o.width || 0.5, t0 = o.warn || 1.7, step = o.step || 0.42, dmg = dk(b, o.dmg || 22);
     const rings = o.rings || [0, 1, 2];
     let last = null;
     rings.forEach((k, idx) => {
@@ -10834,7 +10855,7 @@ const G = window.G = { THREE };
           return (lt, dt) => {
             U.uTime.value += dt;
             const e = lt - warn + 0.12;
-            U.uHead.value = clamp(e / 0.15, 0, 1.1); U.uA.value = e > 0 ? clamp(1 - (e - 0.24) / 0.18, 0, 1) * 1.5 : 0;
+            U.uHead.value = clamp(e / 0.15, 0, 1.1); U.uA.value = e > 0 ? clamp(1 - (e - 0.24) / 0.18, 0, 1) * 1.0 : 0;
           };
         },
         onFire: () => {
@@ -10878,15 +10899,16 @@ const G = window.G = { THREE };
   }
   async function surgeLash(b) {
     coronaSurge(b, {});
-    flareLash(b, { rings: [1, 2], noWait: true, warn: 2.2 });
+    // the lash starts far enough behind that "Shift out for the surge, then back in before the beam" always fits
+    flareLash(b, { rings: [1, 2], noWait: true, warn: 2.2, back: 1.65 });
     await b.wait(3.3);
   }
   // two flares on two rings sweeping toward each other through the knight
   async function pincer(b, o = {}) {
     const r = b.playerRing(), th = b.playerTheta(), d = b.playerDir();
     const rings = pairFor(b, r), mine = rings.indexOf(r) >= 0 ? r : rings[0], other = rings.find(k => k !== mine);
-    trackFlare(b, G.hz.sweep({ rings: [mine], from: th - d * 1.3, to: th + d * 2.3, warn: 1.9, dur: 2.0, width: 0.24, dmg: 22, label: 'Pincer Flare', color: o.color }));
-    trackFlare(b, G.hz.sweep({ rings: [other], from: th + d * 2.8, to: th - d * 0.9, warn: 2.3, dur: 2.0, width: 0.24, dmg: 22, label: 'Pincer Flare', color: o.color }));
+    trackFlare(b, G.hz.sweep({ rings: [mine], from: th - d * 1.3, to: th + d * 2.3, warn: 1.9, dur: 2.0, width: 0.24, dmg: dk(b, 22), label: 'Pincer Flare', color: o.color }));
+    trackFlare(b, G.hz.sweep({ rings: [other], from: th + d * 2.8, to: th - d * 0.9, warn: 2.3, dur: 2.0, width: 0.24, dmg: dk(b, 22), label: 'Pincer Flare', color: o.color }));
     if (!b.data.said.pincer) { b.data.said.pincer = 1; b.say('Nowhere to run but where I allow.', 2.4); }
     await b.wait(3.1);
   }
@@ -10895,7 +10917,7 @@ const G = window.G = { THREE };
     const D = b.data;
     let warn = o.warn || 2.6;
     if (D.well && D.well.h) { const f = D.well.h.fireAt - (G.t || 0); if (f > 0.4 && f < 4) warn = Math.max(warn, f + 1.3); }
-    const h = G.hz.ring({ ring: 0, warn, active: 0.4, dmg: o.dmg || 32, label: 'Corona Surge', color: o.color });
+    const h = G.hz.ring({ ring: 0, warn, active: 0.4, dmg: dk(b, o.dmg || 32), label: 'Corona Surge', color: o.color });
     D.swellT = 0.5; later(b, warn, () => { D.swellT = 0; D.pulse = 1; });
     await h;
   }
@@ -10903,8 +10925,39 @@ const G = window.G = { THREE };
   async function lensing(b, o = {}) {
     const r = b.playerRing(), n = o.n || 4;
     const top = starPos(b).add(V3(0, STAR_R + 0.8, 0));
-    for (let i = 0; i < n; i++) G.hz.bolt({ from: top.clone(), ring: r, theta: b.playerAhead((o.lead || 1.4) + i * (o.gapT || 0.55)), warn: (o.warn || 1.5) + i * 0.18, radius: 1.0, dmg: o.dmg || 20, label: o.label || 'Lensed Light', color: o.color });
+    for (let i = 0; i < n; i++) G.hz.bolt({ from: top.clone(), ring: r, theta: b.playerAhead((o.lead || 1.4) + i * (o.gapT || 0.55)), warn: (o.warn || 1.5) + i * 0.18, radius: 1.0, dmg: dk(b, o.dmg || 20), label: o.label || 'Lensed Light', color: o.color });
     await b.wait((o.warn || 1.5) + n * 0.18 + 0.5);
+  }
+
+  // Drifting Shards: fragments of broken track slide along the rings straight at the knight (their motion is the
+  // telegraph; they are slower than the knight, so Reverse outruns them, or Shift to a clean ring)
+  function shardStream(b, o = {}) {
+    const r = b.playerRing(), d = b.playerDir(), n = o.n || 3, th0 = b.playerTheta();
+    const rings = o.rings || [r];
+    rings.forEach((k, j) => {
+      for (let i = 0; i < n; i++) {
+        const th = th0 + d * ((o.lead || 2.9) + i * (o.space || 0.7) + j * 0.45);
+        fx('shards', G.polar(RING(k), th, 0.2), { color: '#ffcf7a', count: 6, speed: 3, floor: -2 });
+        G.hz.orb({ ring: k, theta: th, omega: -d * (o.omega || 0.42), radius: 0.55, dmg: dk(b, 20), label: 'Drifting Shard', color: o.color, life: o.life || 5.5 });
+      }
+    });
+    sfx('crack', { vol: 0.6 });
+    if (!b.data.said.shards) { b.data.said.shards = 1; b.say('Every broken piece of your orbit falls back to me.', 2.6); }
+  }
+  // Photon Sphere: the knight's ring detonates except one gold gap just behind where they will be (Eclipse-halt or
+  // a late Reverse lands in it); the neighbouring ring takes lensed bolts on the knight's path, so a Shift needs timing
+  async function photonSphere(b, o = {}) {
+    const r = b.playerRing(), d = b.playerDir(), warn = o.warn || 2.6;
+    const gapC = b.playerAhead(warn) - d * 1.0;
+    G.hz.ring({ ring: r, warn, active: 0.4, dmg: dk(b, 26), gaps: [{ center: gapC, width: 0.8 }], label: 'Photon Sphere', color: o.color });
+    const top = starPos(b).add(V3(0, STAR_R + 0.8, 0));
+    const maxR = b.data.twoRings ? 1 : 2;
+    for (const k of [r - 1, r + 1]) if (k >= 0 && k <= maxR) for (let i = 0; i < 2; i++) {
+      G.hz.bolt({ from: top.clone(), ring: k, theta: b.playerAhead(1.7 + i * 0.75), warn: 1.7 + i * 0.3, radius: 1.0, dmg: dk(b, 20), label: 'Lensed Light', color: o.color });
+    }
+    world('ringGlow', r, GOLD, 0.25, warn);
+    if (!b.data.said.photon) { b.data.said.photon = 1; b.say('Light itself bends to orbit me. Find the gap.', 2.6); }
+    await b.wait(warn + 0.45);
   }
 
   // ---- Fracture: segments of track break away (gap hazards) -------------------------------------------
@@ -10922,7 +10975,7 @@ const G = window.G = { THREE };
   }
   function makeGap(b, ring, center, width, o = {}) {
     if (!o.force && !gapOk(b, ring, center, width)) return null;
-    const h = G.hz.gap({ ring, center: G.wrap(center), width, dmg: o.dmg != null ? o.dmg : 25, label: o.label || 'Broken Track' });
+    const h = G.hz.gap({ ring, center: G.wrap(center), width, dmg: o.dmg != null ? o.dmg : 30, label: o.label || 'Broken Track' });
     const g = { ring, center: G.wrap(center), width, h };
     b.data.gaps.push(g);
     return g;
@@ -10930,7 +10983,7 @@ const G = window.G = { THREE };
   function crack(b, ring, center, o = {}) {
     const width = o.width || 0.42, warn = o.warn || 2.2;
     if (!gapOk(b, ring, center, width)) return false;
-    G.hz.arc({ rings: [ring], center, width, warn, active: 0.2, dmg: o.dmg || 20, label: 'Fracture', color: o.color });
+    G.hz.arc({ rings: [ring], center, width, warn, active: 0.2, dmg: dk(b, o.dmg || 20), label: 'Fracture', color: o.color });
     later(b, warn, () => {
       const g = makeGap(b, ring, center, width);
       if (g) { fx('shards', G.polar(RING(ring), center, 0.2), { color: '#ffcf7a', count: 14, speed: 4, floor: -3 }); cam('shake', 0.3, 0.25); }
@@ -11040,6 +11093,13 @@ const G = window.G = { THREE };
       world('ringGlow', 'all', accentNow(), 0.5, lead);
       sfx('retrograde', {}); sfx('warn', { vol: 0.6 });
       const S0 = PS(); if (S0) fx('text', S0.pos.clone().setY(S0.pos.y + 1.9), 'RETROGRADE', { color: '#d9c8ff', size: 0.55, life: 1.2 });
+      if (o.trap && S0 && S0.alive) {
+        // where the knight will be 0.9 s after the forced flip, running the other way
+        const om = G.OMEGA * (S0.speedMul || 1);
+        const c = G.player.predictTheta(lead) - S0.dir * om * 0.9;
+        const r0 = S0.ring, rings = i === flips - 1 ? pairFor(b, r0) : [r0];
+        G.hz.arc({ rings, center: c, width: 0.75, warn: lead + 0.9, active: 0.25, dmg: dk(b, 22), label: 'Retrograde Snare' });
+      }
       await b.wait(lead);
       const S = PS();
       if (S && S.alive && !S.novaActive && S.dir !== want) G.player.forceReverse();
@@ -11060,7 +11120,7 @@ const G = window.G = { THREE };
       else if (i === 1) lensing(b, { n: 3, lead: 1.5, warn: 1.5 });
       else prominences(b, { n: 2, noWait: true, exhale: false, lead: 2.0 });
     };
-    const task = retrograde(b, { onFlip }).catch(() => { });
+    const task = retrograde(b, { onFlip, trap: b.phase >= 1 }).catch(() => { });
     await b.wait(1.2);
     if (o.extra) await o.extra(b);
     await task;
@@ -11073,7 +11133,7 @@ const G = window.G = { THREE };
     let last = null;
     for (let k = 0; k < 3; k++) {
       const c = base + k * 0.8;
-      last = G.hz.rotor({ rings: [k], slices: [{ center: c, width: 0.5 }, { center: c + PI, width: 0.5 }], omega: sg * om[k], warn: 2.0, dur: o.dur || 9, tick: 0.5, dmg: 15, label: 'Accretion Disk' });
+      last = G.hz.rotor({ rings: [k], slices: [{ center: c, width: 0.5 }, { center: c + PI, width: 0.5 }], omega: sg * om[k], warn: 2.0, dur: o.dur || 9, tick: 0.5, dmg: dk(b, 15), label: 'Accretion Disk' });
     }
     b.data.pulse = 1;
     if (!b.data.said.disk) { b.data.said.disk = 1; b.say('Orbit me as the dust does. Faster near the heart.', 2.8); }
@@ -11084,7 +11144,7 @@ const G = window.G = { THREE };
   // White-hot variants for the Event Horizon
   async function infall(b, o = {}) {
     const c = b.playerAhead(2.4 + 0.5) + b.randRange(-0.25, 0.25);
-    const h = G.hz.wave({ from: 'out', speed: o.speed || 5.5, thickness: 0.9, gaps: [{ center: c, width: 0.8 }, { center: c + PI, width: 0.8 }], warn: o.warn || 2.3, dmg: o.dmg || 22, label: o.label || 'Infall' });
+    const h = G.hz.wave({ from: 'out', speed: o.speed || 5.5, thickness: 0.9, gaps: [{ center: c, width: 0.8 }, { center: c + PI, width: 0.8 }], warn: o.warn || 2.3, dmg: dk(b, o.dmg || 22), label: o.label || 'Infall', color: o.color || '#b493ff' });
     b.data.pulse = 0.6;
     await h;
   }
@@ -11155,11 +11215,41 @@ const G = window.G = { THREE };
   }
 
   // ================================================================ SCRIPTS
-  function rotation(b, list, rest, castFn, castEvery, firstCast) {
+  // the gravity well is a rotation step of its own, so its answer (Shift OUT) never fights another attack's answer;
+  // its companions agree with it (they punish the inner ring)
+  async function calm(b, maxSec) {
+    const t0 = b.clock;
+    await b.until(() => b.clock - t0 > maxSec || !G.hz.active.some(h => !h.finished && h.kind !== 'gap' && !h.soak && h.kind !== 'contact'));
+  }
+  async function wellCombo(b, o = {}) {
+    const ph = b.phase;
+    await calm(b, 2.5);
+    const h = gravityWell(b, o);
+    // past the horizon the inner ring is eaten: anchors planted there are marked, then swallowed when the well fires
+    if (b.data.twoRings) {
+      const pred = (a) => a.ring === 0;
+      try { if (G.player.anchors.list.some(pred)) { G.player.anchors.mark(pred, true); if (!b.data.said.eat) { b.data.said.eat = 1; b.say('Your little stars fall in with everything else.', 2.4); } } } catch (e) { logE('anchors.mark', e); }
+      h.done.then(() => { if (G.combat.boss !== b || !b.alive) return; try { G.player.anchors.smash(pred); } catch (e) { logE('anchors.smash', e); } });
+    }
+    if (ph === 0) { if (b.playerRing() <= 1) coronaSurge(b, {}); }
+    else if (ph === 1) { await b.wait(0.3); shardStream(b, { rings: [0], n: 2, lead: 2.7 }); }
+    else if (ph === 2) { await b.wait(0.4); prominence(b, b.playerAhead(2.3), { rings: [0], warn: 1.9 }); }
+    else { await b.wait(0.3); flareLash(b, { rings: [0], span: PI * 1.3, back: 0.8, noWait: true, color: HOT_T, label: 'White Flare' }); }
+    await h;
+    await b.wait(0.5);
+  }
+  function rotation(b, list, rest, castFn, castEvery, firstCast, well) {
     const D = b.data; let i = 0;
     D.nextCast = castFn ? b.clock + firstCast : Infinity;
+    D.nextWell = well ? b.clock + b.randRange(well.every[0], well.every[1]) * 0.75 : Infinity;
     b.loop(async () => {
       if (D.consumed) { await b.wait(30); return; }
+      if (well && b.clock >= D.nextWell && !(castFn && b.clock >= D.nextCast)) {
+        await wellCombo(b, well);
+        D.nextWell = b.clock + b.randRange(well.every[0], well.every[1]);
+        await b.wait(b.randRange(rest[0], rest[1]));
+        return;
+      }
       if (castFn && b.clock >= D.nextCast) {
         await castFn(b);
         D.nextCast = b.clock + castEvery;
@@ -11171,18 +11261,12 @@ const G = window.G = { THREE };
       await b.wait(b.randRange(rest[0], rest[1]));
     });
   }
-  function wellLoop(b, every, o) {
-    const D = b.data;
-    b.loop(async () => {
-      await b.wait(b.randRange(every[0], every[1]));
-      await b.until(() => !D.noWell && !b.casting);
-      if (D.consumed) return;
-      await gravityWell(b, o);
-    });
-  }
   // common per-frame logic
   function phaseTick(b, dt) {
     const D = b.data;
+    // WORKAROUND (07_player.js updateNova): the Supernova sets state.invuln = true and never clears it, which made the
+    // knight immortal for the rest of the fight. Clear it here once the Supernova is over.
+    const S = PS(); if (S && S.invuln && !S.novaActive) S.invuln = false;
     tickSpin(b);
     if (D.exhaleEnd && b.clock > D.exhaleEnd) { D.exhaleEnd = 0; b.faceTo(null); D.swellT = 0; }
     if (D.well && D.well.h && D.well.h.hazard && D.well.h.hazard.finished) D.well = null;
@@ -11193,13 +11277,14 @@ const G = window.G = { THREE };
     L.crack = i >= 1 ? 1 : 0; L.crownBreak = i >= 1 ? 1 : 0;
     L.collapse = i >= 2 ? 1 : 0; L.disk = i >= 2 ? 1 : 0; L.mask = i >= 2 ? (i >= 3 ? 1 : 0.5) : 0;
     L.horizon = i >= 3 ? 1 : 0; L.hot = i >= 3 ? 1 : 0;
-    L.heat = i >= 3 ? 0.4 : 1; L.corona = i >= 3 ? 0.8 : 1; L.calm = 0;
+    L.heat = i >= 3 ? 0.22 : i >= 2 ? 0.4 : 1; L.corona = i >= 3 ? 0.32 : i >= 2 ? 0.5 : 1; L.calm = 0;
   }
   function snapLook(b) { const D = b.data; for (const k in D.look) D.cur[k] = D.look[k]; }
   function enterPhase(b, i) {
     const D = b.data;
     b.turnRate = [0.42, 0.46, 0.5, 0.32][i]; b.trackPlayer = true; b.facingTarget = null;
     D.exhaleEnd = 0; D.swellT = 0; D.noWell = false; D.retro = false;
+    D.dmgK = [1, 1.1, 1.32, 1.4][i]; D.wellPunish = i >= 1; D.twoRings = i >= 3;
     if (D.spin) endSpin(b);
     world('ringArrows', 'all', 1, false);
     setLook(b, i);
@@ -11241,7 +11326,7 @@ const G = window.G = { THREE };
   }
   function enterHorizon(b, fromRetry) {
     const D = b.data;
-    G.colors.accent = HOT; world('setAccent', HOT);
+    G.colors.accent = HOT_T; world('setAccent', HOT_T);
     if (!D.outer || !D.outer.length || D.outer.some(g => g.h.hazard.finished)) breakOuterRing(b, false);
     if (fromRetry) applyCollapseWorld(b, true);
     world('tilt', 0.29, 0.12, fromRetry ? 0 : 2.0, { spin: 0.08 });
@@ -11264,8 +11349,7 @@ const G = window.G = { THREE };
         await b.wait(1.4);
         rotation(b, [
           lashCombo, salvoCombo, solarFlares, surgeLash, pincer, (bb) => salvoCombo(bb, { n: 2 }), (bb) => lashCombo(bb, { surge: true }), solarFlares,
-        ], [0.35, 0.7], coronalMass, 24, 13);
-        wellLoop(b, [10.5, 13], { warn: 2.4, window: 1.2, crush: 28 });
+        ], [0.35, 0.7], coronalMass, 24, 13, { every: [10.5, 13], warn: 2.4, window: 1.2, crush: 28 });
       },
     },
     {
@@ -11284,13 +11368,17 @@ const G = window.G = { THREE };
       async script(b) {
         await b.wait(1.0);
         rotation(b, [
-          fracture, spinCombo, salvoCombo, retroCombo, async (bb) => { solarFlares(bb); await bb.wait(1.0); await fracture(bb, { n: 1 }); },
-          lashCombo, pincer, async (bb) => { fracture(bb, { n: 1 }); await bb.wait(0.8); await lensing(bb, {}); },
-        ], [0.35, 0.7], sunquake, 24, 12);
+          async (bb) => { fracture(bb, { n: 2 }); await bb.wait(1.4); shardStream(bb, {}); await bb.wait(2.2); },
+          spinCombo, salvoCombo, retroCombo,
+          async (bb) => { solarFlares(bb); await bb.wait(1.0); await fracture(bb, { n: 1 }); },
+          lashCombo,
+          async (bb) => { await pincer(bb); shardStream(bb, { n: 3 }); await bb.wait(1.6); },
+          async (bb) => { fracture(bb, { n: 1 }); await bb.wait(0.8); await lensing(bb, { n: 5 }); },
+        ], [0.2, 0.5], sunquake, 24, 12, { every: [14, 17.5], warn: 2.4, window: 1.2, crush: 28 });
       },
     },
     {
-      name: 'Collapse', hpStart: 0.40, sky: false,
+      name: 'Collapse', hpStart: 0.42, sky: false,
       enter(b) {
         const D = b.data, first = D.phaseSeen == null;
         enterPhase(b, 2);
@@ -11306,20 +11394,21 @@ const G = window.G = { THREE };
       async script(b) {
         await b.wait(0.8);
         rotation(b, [
-          (bb) => accretion(bb, { extra: (x) => lensing(x, { n: 3 }) }),
+          (bb) => accretion(bb, { extra: (x) => lensing(x, { n: 4 }) }),
           (bb) => lashCombo(bb, { surge: true }),
+          photonSphere,
           (bb) => retroCombo(bb, {}),
+          async (bb) => { shardStream(bb, { n: 3 }); await bb.wait(1.0); await solarFlares(bb); },
           (bb) => spinCombo(bb, {}),
           async (bb) => { fracture(bb, { n: 1 }); await bb.wait(0.6); await salvoCombo(bb, {}); },
-          solarFlares,
-          (bb) => accretion(bb, { dur: 8, extra: (x) => salvoCombo(x, { n: 2 }) }),
+          async (bb) => { photonSphere(bb).catch(() => { }); await bb.wait(3.4); await pincer(bb); },
+          (bb) => accretion(bb, { dur: 8, extra: async (x) => { await salvoCombo(x, { n: 2 }); shardStream(x, { n: 2 }); } }),
           pincer,
-        ], [0.3, 0.6], collapseCast, 24, 14);
-        wellLoop(b, [11, 13.5], { warn: 2.2, window: 1.2, crush: 28 });
+        ], [0.1, 0.3], collapseCast, 24, 14, { every: [11, 13.5], warn: 2.2, window: 1.2, crush: 28 });
       },
     },
     {
-      name: 'Event Horizon', hpStart: 0.12, sky: false,
+      name: 'Event Horizon', hpStart: 0.15, sky: false,
       enter(b) {
         const D = b.data, retry = D.phaseSeen == null;
         enterPhase(b, 3);
@@ -11340,15 +11429,17 @@ const G = window.G = { THREE };
       },
       async script(b) {
         await b.wait(0.6);
-        const W = (o) => ({ color: HOT, ...o });
+        const W = (o) => ({ color: HOT_T, ...o });
         rotation(b, [
-          (bb) => flareLash(bb, W({ rings: [0, 1], span: PI * 1.65, back: 0.7, label: 'White Flare', dmg: 24 })),
-          (bb) => infall(bb, { dmg: 24 }),
+          (bb) => flareLash(bb, W({ rings: [0, 1], span: PI * 1.65, back: 0.7, label: 'White Flare' })),
+          async (bb) => { infall(bb, {}).catch(() => { }); await bb.wait(2.0); await lensing(bb, W({ n: 3, lead: 1.5 })); },
           (bb) => prominences(bb, W({ n: 3, rings: [0, 1], exhale: true, exhaleDur: 3.0 })),
+          (bb) => photonSphere(bb, W({})),
           (bb) => { const f = bb.playerRing() === 0 ? 1 : 0; return solarFlares(bb, W({ free: f, rings: [1 - f], n: 3, label: 'White Flare' })); },
-          (bb) => lensing(bb, W({ n: 4, label: 'Lensed Light', dmg: 20 })),
-        ], [0.9, 1.4], null, 0, 0);
-        wellLoop(b, [5.6, 7.0], { warn: 1.9, window: 1.0, crush: 20, label: 'Event Horizon' });
+          async (bb) => { shardStream(bb, W({ rings: [0, 1], n: 2, lead: 2.7 })); await bb.wait(1.6); await lensing(bb, W({ n: 3, lead: 1.6 })); },
+          (bb) => pincer(bb, W({})),
+          (bb) => lensing(bb, W({ n: 5, label: 'Lensed Light' })),
+        ], [0.2, 0.45], null, 0, 0, { every: [6.5, 8], warn: 2.0, window: 1.1, crush: 22, label: 'Event Horizon' });
       },
     },
   ];
@@ -11365,7 +11456,7 @@ const G = window.G = { THREE };
         'text-shadow:0 0 8px rgba(0,0,0,.95),0 0 12px rgba(167,123,255,.7);padding:5px 10px 6px;border:1px solid rgba(200,170,255,.6);border-radius:3px;' +
         'background:linear-gradient(180deg,rgba(14,6,30,.78),rgba(4,2,12,.7));box-shadow:0 0 18px rgba(167,123,255,.35);min-width:148px;' +
         (touch ? 'right:calc(var(--sar,0px) + 12px);top:calc(var(--sat,0px) + 84px);text-align:right;' : 'left:calc(var(--sal,0px) + 14px);top:calc(var(--sat,0px) + 42px);');
-      el.innerHTML = '<div style="opacity:.85">EVENT HORIZON</div><div class="t" style="font:700 22px system-ui,sans-serif;letter-spacing:.06em;font-variant-numeric:tabular-nums;margin-top:1px">0:45</div>' +
+      el.innerHTML = '<div style="opacity:.85">EVENT HORIZON</div><div class="t" style="font:700 22px system-ui,sans-serif;letter-spacing:.06em;font-variant-numeric:tabular-nums;margin-top:1px">0:48</div>' +
         '<div style="height:4px;margin-top:4px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:100%;transform-origin:0 50%;background:linear-gradient(90deg,#5a2cc8,#c8a8ff,#ffffff)"></i></div>';
       hud.appendChild(el); D.ehEl = el; D.ehTxt = el.querySelector('.t'); D.ehBar = el.querySelector('i');
     }
@@ -11400,7 +11491,7 @@ const G = window.G = { THREE };
   // close-ups are framed for 16:9; on portrait screens pull them back along their view line
   function fitKeys(keys, home) {
     const asp = (typeof innerWidth === 'number' && innerHeight) ? innerWidth / innerHeight : 1.78;
-    const k = clamp(Math.pow(1.45 / asp, 0.75), 1, 2.1);
+    const k = clamp(Math.pow(1.45 / asp, 0.75), 1, 1.7);
     if (k <= 1.001) return keys;
     return keys.map(key => {
       if (key.pos === home || !Array.isArray(key.pos) || !Array.isArray(key.look)) return key;
@@ -11422,7 +11513,7 @@ const G = window.G = { THREE };
       if (to === 1) {
         // ---- Corona -> Fracture: the star convulses, the crown cracks, the rings break apart and drift
         b.say('My crown... cracks? Then let the heavens crack with it!', 3.0);
-        D.swellT = 1; fx('flash', FLARE, 0.3, 0.5); cam('shake', 0.5, 0.8); post('bloomPulse', 0.6, 1.2);
+        D.swellT = 1; fx('flash', FLARE, 0.18, 0.4); cam('shake', 0.5, 0.8); post('bloomPulse', 0.25, 0.8);
         await cwait(0.7);
         D.look.crack = 1; D.look.crownBreak = 1; D.pulse = 1.5;
         for (let i = 0; i < 6; i++) fx('shards', starPos(b).add(G.polar(3.0, i / 6 * TAU, 0)), { color: '#ffd27a', count: 6, speed: 4, floor: 0 });
@@ -11446,13 +11537,14 @@ const G = window.G = { THREE };
       } else if (to === 2) {
         // ---- Fracture -> Collapse: the star swells one last time, then implodes; the plane tilts, the black hole opens
         b.say('I will not go out. I will go IN.', 2.8);
-        D.swellT = 1.4; post('bloomPulse', 0.5, 1.4);
+        D.swellT = 1.4; post('bloomPulse', 0.2, 1.0);
         for (let i = 0; i < 6; i++) { fx('lance', starPos(b), G.polar(RING(i % 3), i * 1.1, 0.3), { color: FLARE, width: 0.5, life: 0.25 }); await cwait(0.18); }
         await cwait(0.3);
         // implosion
-        D.swellT = 0; D.look.collapse = 1; D.look.disk = 1; D.look.mask = 0.5; D.pulse = 2;
+        D.swellT = 0; D.look.collapse = 1; D.look.disk = 1; D.look.mask = 0.5; D.look.corona = 0.5; D.look.heat = 0.4; D.pulse = 2;
         world('setSky', 'collapse', 2, 0.8);
-        fx('flash', '#ffffff', 0.55, 0.9); cam('shake', 1.1, 1.0); sfx('thunder', {}); sfx('gravity', { vol: 1 });
+        fx('flash', '#e8dcff', 0.3, 0.7); cam('shake', 1.1, 1.0); sfx('thunder', {}); sfx('gravity', { vol: 1 });
+        post('bloomPulse', 0, 1.1);          // shorten the collapse sky's own 2.5 s bloom set-piece so the implosion stays visible
         fx('shockwave', starPos(b), { color: HOT, radius: 9, life: 0.7 });
         fx('shockwave', V3(0, 0.3, 0), { color: ACC, radius: 16, life: 1.4 });
         for (let k = 0; k < 3; k++) fx('ringFlash', k, { color: HOT, life: 1.0, intensity: 1.6 });
@@ -11466,9 +11558,9 @@ const G = window.G = { THREE };
         // ---- Collapse -> Event Horizon: white-hot; the outer ring breaks away; the horizon opens; Supernova primed
         b.say('Past the horizon there is no orbit. Only the fall.', 3.0);
         D.said.eh = 1;
-        fx('flash', '#ffffff', 0.4, 0.6); cam('shake', 0.6, 0.8);
-        G.colors.accent = HOT; world('setAccent', HOT);
-        D.look.horizon = 1; D.look.hot = 1; D.look.mask = 1; D.look.heat = 0.4; D.pulse = 1.5;
+        fx('flash', '#ffffff', 0.22, 0.5); cam('shake', 0.6, 0.8);
+        G.colors.accent = HOT_T; world('setAccent', HOT_T);
+        D.look.horizon = 1; D.look.hot = 1; D.look.mask = 1; D.look.heat = 0.22; D.look.corona = 0.32; D.pulse = 1.5;
         await cwait(0.7);
         breakOuterRing(b, true);
         for (let i = 0; i < 10; i++) fx('shards', G.polar(RING(2), i / 10 * TAU, 0.2), { color: '#ffd27a', count: 6, speed: 4, floor: -4 });
@@ -11542,12 +11634,12 @@ const G = window.G = { THREE };
     // REIGNITION
     D.look.horizon = 0; D.look.collapse = 0; D.look.calm = 1; D.look.hot = 0; D.look.mask = 0; D.look.crack = 0; D.look.crownBreak = 0; D.look.corona = 1.1; D.look.heat = 1;
     D.cur.horizon = 0; D.cur.collapse = 0.2; D.cur.calm = 0.7;
-    D.starScaleK = 1; D.pulse = 2; D.coreK = 1.4; D.eyeCloseT = true;
-    fx('flash', '#fff2d0', 0.55, 1.4); post('bloomPulse', 1.2, 2.2);
+    D.starScaleK = 1; D.pulse = 1.2; D.coreK = 1.0; D.eyeCloseT = true;
+    fx('flash', '#fff2d0', 0.34, 1.0); post('bloomPulse', 0.55, 1.5);
     fx('shockwave', starPos(b), { color: GOLD_HOT, radius: 12, life: 1.0 });
     fx('shockwave', V3(0, 0.4, 0), { color: GOLD_HOT, radius: 24, life: 1.8 });
     fx('shockwave', V3(0, 0.4, 0), { color: GOLD, radius: 15, life: 1.3 });
-    fx('burst', starPos(b), { color: GOLD_HOT, count: 80, speed: 13, size: 0.75, life: 1.5 });
+    fx('burst', starPos(b), { color: GOLD_HOT, count: 46, speed: 13, size: 0.6, life: 1.4 });
     for (let i = 0; i < 6; i++) fx('starFall', G.polar(3 + i * 1.7, i * 1.05, 0.2), GOLD_HOT);
     cam('shake', 1.2, 1.2); sfx('bossDeath', {}); sfx('thunder', {});
     G.colors.accent = ACC; world('setAccent', ACC);
@@ -11594,7 +11686,7 @@ const G = window.G = { THREE };
   G.bosses = G.bosses || [];
   G.bosses[2] = {
     name: 'HELIARCH', title: 'the Dying Sun', accent: ACC, sky: 'collapse', music: 2,
-    maxHp: 24000, parTime: 285, hitRadius: 1.6, hitHeight: 3.7, fadeOpacity: 0.35,
+    maxHp: 25000, parTime: 285, hitRadius: 1.8, hitHeight: 3.9, fadeOpacity: 0.35,
     phases: PHASES,
     build, animate: animateAll, onTransition, onDeath, teardown,
   };
