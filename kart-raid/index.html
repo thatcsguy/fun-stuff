@@ -709,6 +709,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
     dpr: num('dpr', null),          // extra: lock device pixel ratio (disables adaptive DPR)
     msaa: num('msaa', null),        // extra: override scene MSAA samples (0 = off)
     touch: num('touch', null),      // extra: force touch UI on (1) / off (0)
+    safe: num('safe', null),        // extra: graphics safe level 0-4 (see gfxSafe)
   };
   if (G.params.seed === null) G.params.seed = G.params.test ? 1 : (Math.random() * 1e9) | 0;
 
@@ -871,8 +872,16 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
   // ------------------------------------------------------------------
   // Post chain: RenderPass -> UnrealBloom (reduced res) -> FinalPass (grade + ACES + sRGB, to screen)
   // ------------------------------------------------------------------
+  // Graphics safe level (black-screen fallbacks, see gfxWatch below): 0 full, 1 no MSAA, 2 + 8-bit targets,
+  // 3 + no bloom, 4 no post chain (plain renderer.render). iOS WebKit starts at 1: multisampled half-float
+  // scene targets resolve to black there. ?safe=N overrides; a level the watchdog reaches is remembered.
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let gfxSafe = isIOS ? 1 : 0;
+  try { gfxSafe = Math.max(gfxSafe, +localStorage.getItem('db_gfx_safe') || 0); } catch (e) { /* ignore */ }
+  if (G.params.safe != null) gfxSafe = +G.params.safe | 0;
+  gfxSafe = Math.max(0, Math.min(4, gfxSafe));
   // HDR targets need EXT_color_buffer_(half_)float. Without it (some iOS builds) use 8-bit targets with a lower threshold.
-  const hdrOK = renderer.capabilities.isWebGL2 && (renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float'));
+  const hdrOK = gfxSafe < 2 && renderer.capabilities.isWebGL2 && (renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float'));
   G.post_hdr = hdrOK;
   const rtMain = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: hdrOK ? THREE.HalfFloatType : THREE.UnsignedByteType, samples: 0 });
   const composer = G.composer = new EffectComposer(renderer, rtMain);
@@ -1027,7 +1036,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
   // MSAA on the scene target (WebGL2; cheap on tile GPUs). ?msaa=N overrides. finalPass.needsSwap is false, so the
   // composer never ping-pongs: RenderPass + bloom always use readBuffer and only that target is multisampled.
   function setMSAA(n) {
-    const want = G.params.msaa != null ? +G.params.msaa : n;
+    const want = G.params.msaa != null ? +G.params.msaa : gfxSafe >= 1 ? 0 : n;
     const max = renderer.capabilities.maxSamples || 0;
     const sm = renderer.capabilities.isWebGL2 ? Math.min(want || 0, max) : 0;
     const rb = composer.readBuffer, wb = composer.writeBuffer;
@@ -1237,7 +1246,9 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
     cam.update(rdt);
     for (let i = 0; i < renderLate.length; i++) { const m = renderLate[i]; try { m.render(rdt, alpha); } catch (e) { G.logError(m.name + '.render', e); } }
     updatePost(rdt);
-    composer.render(rdt);
+    if (gfxSafe >= 4) { renderer.setRenderTarget(null); renderer.render(scene, camera); G.perf.sceneCalls = renderer.info.render.calls; }
+    else composer.render(rdt);
+    gfxWatch();
     G.perf.drawCalls = renderer.info.render.calls;
     if (frameWaiters.length) flushWaiters();
   }
@@ -1267,8 +1278,48 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
     simStep, renderFrame,
   };
 
+  // Black-screen watchdog. For the first seconds of rendering, sample nine canvas pixels right after the frame is
+  // drawn (no preserveDrawingBuffer needed). The clear colour and sky are never pure black, so ~1.5 s of all-zero
+  // samples means the post chain is failing on this GPU: step down one safe level and remember it.
+  function applyGfxSafe() {
+    G.perf.gfxSafe = gfxSafe;
+    setMSAA(G.quality.settings.msaa);
+    if (gfxSafe >= 2) {
+      const rts = [composer.renderTarget1, composer.renderTarget2, bloom.renderTargetBright, ...bloom.renderTargetsHorizontal, ...bloom.renderTargetsVertical];
+      for (const rt of rts) if (rt && rt.texture.type !== THREE.UnsignedByteType) { rt.texture.type = THREE.UnsignedByteType; rt.dispose(); }
+      if (G.post_hdr) { G.post_hdr = false; bloom.threshold = G.bloomDefaults.threshold = 0.85; }
+    }
+    bloom.enabled = gfxSafe < 3;
+  }
+  let watchLeft = 40, blackRun = 0, lastCheck = 0;
+  const px = new Uint8Array(4);
+  function gfxWatch() {
+    const now = performance.now();
+    if (watchLeft <= 0 || gfxSafe >= 4 || now - lastCheck < 250) return;
+    lastCheck = now;
+    // 3x3 grid; "black" = at least 7 exactly-zero samples (the final pass still draws speed lines over a dead scene)
+    let zeros = 0;
+    try {
+      const gl = renderer.getContext(), w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+      renderer.setRenderTarget(null);
+      for (let i = 0; i < 9; i++) {
+        gl.readPixels((w * (0.3 + 0.2 * (i % 3))) | 0, (h * (0.3 + 0.2 * ((i / 3) | 0))) | 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        if (!(px[0] || px[1] || px[2])) zeros++;
+      }
+    } catch (e) { watchLeft = 0; return; }
+    const black = zeros >= 7;
+    if (!black) { blackRun = 0; watchLeft--; return; }
+    if (++blackRun < 6) return;
+    blackRun = 0; watchLeft = 40; gfxSafe++;
+    console.warn('[gfx] black frames detected, safe level ->', gfxSafe);
+    try { localStorage.setItem('db_gfx_safe', String(gfxSafe)); } catch (e) { /* ignore */ }
+    applyGfxSafe();
+  }
+  G.gfx = { get safe() { return gfxSafe; }, set(n) { gfxSafe = Math.max(0, Math.min(4, n | 0)); applyGfxSafe(); } };
+
   G.quality.set(G.params.quality !== 'auto' && TIERS[G.params.quality] ? G.params.quality : (isCoarse ? 'med' : 'high'));
   G.quality.auto = G.params.quality === 'auto';
+  applyGfxSafe();
   resize();
 
   G.register('core', {});
