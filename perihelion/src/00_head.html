@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#04030c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Perihelion">
+<meta name="description" content="PERIHELION: the Orrery Raid. A celestial brass boss rush.">
+<title>PERIHELION: The Orrery Raid</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#04030c;color:#f3e6c4;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
+  touch-action:none;overscroll-behavior:none;-webkit-text-size-adjust:100%}
+:root{--gold:#ffc94d;--gold-hot:#fff1c2;--brass:#b8893a;--indigo:#0b0a24;--void:#04030c;--accent:#5fe3ff;
+  --serif:"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --sat:env(safe-area-inset-top,0px);--sar:env(safe-area-inset-right,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px)}
+canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0;outline:none;touch-action:none}
+/* loading veil */
+#veil{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
+  background:radial-gradient(ellipse at 50% 45%,#141136 0%,#07061a 55%,#04030c 100%);transition:opacity 1s ease;pointer-events:none}
+#veil.gone{opacity:0}
+#veil .orr{position:relative;width:92px;height:92px}
+#veil .orr i{position:absolute;inset:0;border:1px solid rgba(255,201,77,.55);border-radius:50%;box-shadow:0 0 12px rgba(255,201,77,.25)}
+#veil .orr i:nth-child(1){animation:vspin 3.2s linear infinite;transform:rotateX(68deg)}
+#veil .orr i:nth-child(2){inset:12px;animation:vspin2 2.3s linear infinite;border-color:rgba(255,241,194,.7)}
+#veil .orr i:nth-child(3){inset:38px;border:0;background:radial-gradient(circle,#fff1c2 0%,#ffc94d 40%,rgba(255,201,77,0) 72%);animation:vpulse 1.6s ease-in-out infinite}
+#veil .orr b{position:absolute;left:50%;top:-3px;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:#fff1c2;box-shadow:0 0 10px #ffc94d;transform-origin:3px 49px;animation:vorbit 2.3s linear infinite}
+#veil .word{font-family:var(--serif);letter-spacing:.42em;font-size:15px;color:#e8c77a;text-shadow:0 0 14px rgba(255,201,77,.45);padding-left:.42em}
+@keyframes vspin{from{transform:rotateX(68deg) rotateZ(0)}to{transform:rotateX(68deg) rotateZ(360deg)}}
+@keyframes vspin2{from{transform:rotateY(64deg) rotateZ(0)}to{transform:rotateY(64deg) rotateZ(-360deg)}}
+@keyframes vorbit{to{transform:rotate(360deg)}}
+@keyframes vpulse{50%{transform:scale(1.25);opacity:.75}}
+#boot-err{position:fixed;left:12px;right:12px;bottom:12px;z-index:101;font:12px/1.4 ui-monospace,Menlo,monospace;color:#ffb0a0;
+  background:rgba(20,6,10,.85);border:1px solid #803030;border-radius:6px;padding:8px 10px;display:none;white-space:pre-wrap}
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script>
+// surfaces a failed module load (e.g. CDN unreachable) instead of an endless veil
+window.addEventListener('error', function (e) {
+  if (window.G && window.G.core) return;
+  var el = document.getElementById('boot-err'); if (!el) return;
+  el.style.display = 'block'; el.textContent = 'Failed to start: ' + (e.message || e.type) + (e.filename ? ' (' + e.filename.split('/').pop() + ')' : '');
+}, true);
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="veil"><div class="orr"><i></i><i></i><i></i><b></b></div><div class="word">PERIHELION</div></div>
+<div id="boot-err"></div>
