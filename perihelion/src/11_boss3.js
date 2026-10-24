@@ -16,7 +16,7 @@
   const VIOLET_DEEP = '#5a2cc8';
   const HOT_T = '#cdb6ff';                 // Event Horizon telegraph accent: white-hot violet that still reads over the brass
   const HOVER_Y = 3.9, STAR_R = 1.75, MODEL_K = 1.12;
-  const EH_TIME = 48;                      // Event Horizon collapse timer (boss clock seconds)
+  const EH_TIME = 50;                      // Event Horizon collapse timer (boss clock seconds)
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
   const lerp = (a, b, t) => a + (b - a) * t;
   const damp = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
@@ -38,7 +38,8 @@
   const starPos = (b) => V3(0, (b && b.data && b.data.hoverY) || HOVER_Y, 0);   // play-local (the boss root sits at the origin)
   // run fn after sec of boss clock unless the phase ends first (b.wait rejects with Abort)
   // per-phase damage scale for ordinary attacks (heavy casts and lethal waves keep their fixed values)
-  const dk = (b, v) => Math.round(v * ((b && b.data && b.data.dmgK) || 1));
+  // (capped: the quick-telegraph attacks never pass 44, the 2.6 s ring detonations never pass 56)
+  const dk = (b, v) => Math.min(Math.round(v * ((b && b.data && b.data.dmgK) || 1)), v >= 26 ? 56 : 44);
   const later = (b, sec, fn) => { b.wait(sec).then(() => { try { fn(); } catch (e) { logE('later', e); } }, () => { }); };
   const SHADER_TAIL = '\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n';
 
@@ -647,6 +648,8 @@
       onFire: () => resolveWell(b, st, crush, label),
     });
     st.h = h;
+    // from Fracture on, the well swallows the anchors left on the inner ring
+    if (D.wellPunish) burnAnchors(b, h, (a) => a.ring === 0);
     h.done.then(() => { if (D.well === st) D.well = null; D.dips[0] = D.dips[1] = D.dips[2] = 0; });
     return h;
   }
@@ -678,12 +681,18 @@
     if (D.wellPunish) later(b, 0.32, () => {
       const P = PS(); if (!P || !P.alive || P.ring !== to) return;
       for (let k = 0; k <= 8; k++) if (G.hz.gapAt(to + 1, P.theta + P.dir * k * 0.15)) return;   // the escape ring must be whole ahead
-      if (to === 0) G.hz.ring({ ring: 0, warn: 1.5, active: 0.4, dmg: dk(b, 22), label: 'Tidal Crush' });
+      if (to === 0) burnAnchors(b, G.hz.ring({ ring: 0, warn: 1.5, active: 0.4, dmg: dk(b, 22), label: 'Tidal Crush' }), (a) => a.ring === 0);
       else G.hz.arc({ rings: [to], center: b.playerAhead(1.55), width: 0.9, warn: 1.55, active: 0.25, dmg: dk(b, 22), label: 'Tidal Shear' });
       D.pulse = Math.max(D.pulse, 0.6);
     });
   }
 
+  // a whole-ring detonation burns the anchors on it: marked for the whole warning, destroyed when it fires
+  function burnAnchors(b, h, pred) {
+    try { G.player.anchors.mark(pred, true); } catch (e) { logE('anchors.mark', e); }
+    if (h && h.done) h.done.then(() => { if (G.combat.boss !== b || !b.alive) return; try { G.player.anchors.smash((a) => a.warn && pred(a)); } catch (e) { logE('anchors.smash', e); } });
+    return h;
+  }
   // ================================================================ ATTACK PRIMITIVES
   const otherRings = (r) => [0, 1, 2].filter(k => k !== r);
   function pairFor(b, r) { if (r === 0 || b.data.twoRings) return [0, 1]; if (r === 2) return [1, 2]; return b.rand() < 0.5 ? [0, 1] : [1, 2]; }
@@ -697,6 +706,8 @@
     const from = th - d * (o.back != null ? o.back : 1.0), to = from + d * span;
     b.data.swellT = 0.4; later(b, (o.warn || 2.0) + 0.3, () => { b.data.swellT = 0; });
     const h = trackFlare(b, G.hz.sweep({ rings, from, to, warn: o.warn || 2.0, dur: o.dur || 2.8, width: 0.24, dmg: dk(b, o.dmg || 24), label: o.label || 'Flare Lash', color: o.color }));
+    // from the second phase the lash scorches the anchors left in its path
+    if (b.phase >= 1) burnAnchors(b, h, (a) => rings.includes(a.ring) && (((d * (a.theta - from)) % TAU) + TAU) % TAU < span);
     if (!b.data.said.lash) { b.data.said.lash = 1; b.say('Burn.', 1.6); }
     if (o.noWait) return h;
     await h;
@@ -716,11 +727,13 @@
       const c = base + i * TAU / n + (i ? b.randRange(-0.2, 0.2) : 0);
       const sg = i % 2 ? 1 : -1;
       hs.push(trackFlare(b, G.hz.sweep({ rings, from: c - sg * 0.95, to: c + sg * 0.95, warn: (o.warn || 1.9) + i * 0.32, dur: 1.4, width: 0.24, dmg: dk(b, o.dmg || 22), label: o.label || 'Solar Flare', color: o.color })));
+      if (b.phase >= 2) burnAnchors(b, hs[i], (a) => rings.includes(a.ring) && Math.abs(angDiff(a.theta, c)) < 1.0);
     }
     world('ringGlow', free, GOLD, 0.45, 2.4);
     if (!b.data.said.flares) { b.data.said.flares = 1; b.say('My flares reach every orbit but one.', 2.6); }
     await hs[hs.length - 1];
     b.data.swellT = 0;
+    if (o.exhale !== false && b.phase >= 1) exhale(b, 2.2);
   }
   // a single prominence: erupts on the inner ring and leaps outward ring by ring
   function prominence(b, c, o = {}) {
@@ -757,8 +770,13 @@
     });
     return last;
   }
-  // the star exhales after a salvo: its facing locks, so the back stays put for a few seconds
-  function exhale(b, dur) { const D = b.data; b.faceTo(b.facing); D.exhaleEnd = b.clock + dur; D.swellT = -0.3; }
+  // the star exhales after a salvo: it turns its mask toward the far side (where the knight is heading, plus half a
+  // turn) and holds it there, so its back comes round to the knight: a deliberate back window
+  function exhale(b, dur) {
+    const D = b.data;
+    b.faceTo(G.wrap(b.playerAhead(1.6) + PI)); b.turnRate = 1.5;
+    D.exhaleEnd = b.clock + dur + 1.4; D.swellT = -0.3;
+  }
   async function prominences(b, o = {}) {
     const n = o.n || 3, c0 = b.playerAhead(o.lead || 2.0) + (o.off || 0);
     let last = null;
@@ -798,6 +816,7 @@
     trackFlare(b, G.hz.sweep({ rings: [other], from: th + d * 2.8, to: th - d * 0.9, warn: 2.3, dur: 2.0, width: 0.24, dmg: dk(b, 22), label: 'Pincer Flare', color: o.color }));
     if (!b.data.said.pincer) { b.data.said.pincer = 1; b.say('Nowhere to run but where I allow.', 2.4); }
     await b.wait(3.1);
+    if (o.exhale !== false && b.phase >= 1) exhale(b, 2.2);
   }
   // Corona Surge: the inner ring detonates. Timed to land just after a pending gravity well
   async function coronaSurge(b, o = {}) {
@@ -805,6 +824,7 @@
     let warn = o.warn || 2.6;
     if (D.well && D.well.h) { const f = D.well.h.fireAt - (G.t || 0); if (f > 0.4 && f < 4) warn = Math.max(warn, f + 1.3); }
     const h = G.hz.ring({ ring: 0, warn, active: 0.4, dmg: dk(b, o.dmg || 32), label: 'Corona Surge', color: o.color });
+    burnAnchors(b, h, (a) => a.ring === 0);
     D.swellT = 0.5; later(b, warn, () => { D.swellT = 0; D.pulse = 1; });
     await h;
   }
@@ -836,7 +856,7 @@
   async function photonSphere(b, o = {}) {
     const r = b.playerRing(), d = b.playerDir(), warn = o.warn || 2.6;
     const gapC = b.playerAhead(warn) - d * 1.0;
-    G.hz.ring({ ring: r, warn, active: 0.4, dmg: dk(b, 26), gaps: [{ center: gapC, width: 0.8 }], label: 'Photon Sphere', color: o.color });
+    burnAnchors(b, G.hz.ring({ ring: r, warn, active: 0.4, dmg: dk(b, 26), gaps: [{ center: gapC, width: 0.8 }], label: 'Photon Sphere', color: o.color }), (a) => a.ring === r && Math.abs(angDiff(a.theta, gapC)) > 0.4);
     const top = starPos(b).add(V3(0, STAR_R + 0.8, 0));
     const maxR = b.data.twoRings ? 1 : 2;
     for (const k of [r - 1, r + 1]) if (k >= 0 && k <= maxR) for (let i = 0; i < 2; i++) {
@@ -907,8 +927,9 @@
       for (const side of [-1, 1]) {
         const th = g.center + side * (g.width / 2 + 0.5);
         if (G.hz.gapAt(g.ring, th)) continue;
-        const fwd = (((th - S.theta) * S.dir) % TAU + TAU) % TAU / om;
-        const back = (((S.theta - th) * S.dir) % TAU + TAU) % TAU / om + 0.6;
+        const aF = (((th - S.theta) * S.dir) % TAU + TAU) % TAU, aG = (((g.center - S.theta) * S.dir) % TAU + TAU) % TAU;
+        const fwd = aF / om + (aG < aF ? 1.4 : 0);                          // the forward route crosses the gap: shift round it
+        const back = (TAU - aF) / om + 0.6 + (aG > aF ? 1.4 : 0);
         const tt = Math.min(fwd, back) + Math.abs(g.ring - S.ring) * 0.7;
         if (tt > 1.2 && tt < bestT) { bestT = tt; best = { g, th }; }
       }
@@ -1148,14 +1169,24 @@
       await b.wait(b.randRange(rest[0], rest[1]));
     });
   }
+  // filler (every phase, sparser in the Corona): a single sunspot bolt on the knight's path every few seconds, never while a gravity
+  // well, a lethal wave or a cast is pending (so it never fights those answers)
+  function sunspots(b, every) {
+    b.loop(async () => {
+      await b.wait(b.randRange(every[0], every[1]));
+      const D = b.data, S = PS();
+      if (!S || !S.alive || !b.alive || b.casting || D.consumed || D.noWell || D.retro || (D.well && D.well.h && D.well.h.hazard && !D.well.h.hazard.finished)) return;
+      // only where its answer (Reverse, or Shift) agrees with everything live: never with waves, ring blasts or other bolts
+      if (G.hz.active.some(h => !h.finished && (h.kind === 'wave' || h.kind === 'ring' || h.kind === 'bolt' || h.lethal))) return;
+      const w = 1.2;
+      G.hz.bolt({ from: starPos(b).add(V3(0, STAR_R + 0.8, 0)), ring: S.ring, theta: b.playerAhead(w), warn: w, radius: 1.0, dmg: dk(b, 13), label: 'Sunspot', color: D.twoRings ? HOT_T : undefined });
+    });
+  }
   // common per-frame logic
   function phaseTick(b, dt) {
     const D = b.data;
-    // WORKAROUND (07_player.js updateNova): the Supernova sets state.invuln = true and never clears it, which made the
-    // knight immortal for the rest of the fight. Clear it here once the Supernova is over.
-    const S = PS(); if (S && S.invuln && !S.novaActive) S.invuln = false;
     tickSpin(b);
-    if (D.exhaleEnd && b.clock > D.exhaleEnd) { D.exhaleEnd = 0; b.faceTo(null); D.swellT = 0; }
+    if (D.exhaleEnd && b.clock > D.exhaleEnd) { D.exhaleEnd = 0; b.faceTo(null); D.swellT = 0; b.turnRate = D.baseTurn || 0.42; }
     if (D.well && D.well.h && D.well.h.hazard && D.well.h.hazard.finished) D.well = null;
   }
 
@@ -1169,9 +1200,9 @@
   function snapLook(b) { const D = b.data; for (const k in D.look) D.cur[k] = D.look[k]; }
   function enterPhase(b, i) {
     const D = b.data;
-    b.turnRate = [0.42, 0.46, 0.5, 0.32][i]; b.trackPlayer = true; b.facingTarget = null;
+    b.turnRate = D.baseTurn = [0.42, 0.46, 0.5, 0.32][i]; b.trackPlayer = true; b.facingTarget = null;
     D.exhaleEnd = 0; D.swellT = 0; D.noWell = false; D.retro = false;
-    D.dmgK = [1, 1.1, 1.32, 1.4][i]; D.wellPunish = i >= 1; D.twoRings = i >= 3;
+    D.dmgK = [1.35, 1.75, 2.0, 2.0][i]; D.wellPunish = i >= 1; D.twoRings = i >= 3;
     if (D.spin) endSpin(b);
     world('ringArrows', 'all', 1, false);
     setLook(b, i);
@@ -1198,6 +1229,7 @@
     const D = b.data;
     const S = PS();
     if (S && S.ring === 2) G.player.forceShift(-1, { fall: true });
+    if (G.player.disableRing) G.player.disableRing(2, true);   // Shift Out from the middle ring now bumps (and still braces)
     D.outer = [];
     const base = (S ? S.theta : 0) + PI;
     for (let k = 0; k < 3; k++) {
@@ -1234,9 +1266,10 @@
       update: phaseTick,
       async script(b) {
         await b.wait(1.4);
+        sunspots(b, [4.4, 5.8]);
         rotation(b, [
           lashCombo, salvoCombo, solarFlares, surgeLash, pincer, (bb) => salvoCombo(bb, { n: 2 }), (bb) => lashCombo(bb, { surge: true }), solarFlares,
-        ], [0.35, 0.7], coronalMass, 24, 13, { every: [10.5, 13], warn: 2.4, window: 1.2, crush: 28 });
+        ], [0.3, 0.6], coronalMass, 24, 13, { every: [10.5, 13], warn: 2.4, window: 1.2, crush: 28 });
       },
     },
     {
@@ -1254,6 +1287,7 @@
       },
       async script(b) {
         await b.wait(1.0);
+        sunspots(b, [2.9, 3.9]);
         rotation(b, [
           async (bb) => { fracture(bb, { n: 2 }); await bb.wait(1.4); shardStream(bb, {}); await bb.wait(2.2); },
           spinCombo, salvoCombo, retroCombo,
@@ -1261,7 +1295,7 @@
           lashCombo,
           async (bb) => { await pincer(bb); shardStream(bb, { n: 3 }); await bb.wait(1.6); },
           async (bb) => { fracture(bb, { n: 1 }); await bb.wait(0.8); await lensing(bb, { n: 5 }); },
-        ], [0.2, 0.5], sunquake, 24, 12, { every: [14, 17.5], warn: 2.4, window: 1.2, crush: 28 });
+        ], [0.1, 0.3], sunquake, 24, 12, { every: [12.5, 15.5], warn: 2.4, window: 1.2, crush: 28 });
       },
     },
     {
@@ -1280,22 +1314,24 @@
       },
       async script(b) {
         await b.wait(0.8);
+        sunspots(b, [2.5, 3.4]);
         rotation(b, [
           (bb) => accretion(bb, { extra: (x) => lensing(x, { n: 4 }) }),
           (bb) => lashCombo(bb, { surge: true }),
           photonSphere,
-          (bb) => retroCombo(bb, {}),
+          // the heavens turn back while the disk spins: each forced reverse sends the knight into the slices' path
+          (bb) => retroCombo(bb, { extra: (x) => accretion(x, { dur: 8 }) }),
           async (bb) => { shardStream(bb, { n: 3 }); await bb.wait(1.0); await solarFlares(bb); },
           (bb) => spinCombo(bb, {}),
           async (bb) => { fracture(bb, { n: 1 }); await bb.wait(0.6); await salvoCombo(bb, {}); },
           async (bb) => { photonSphere(bb).catch(() => { }); await bb.wait(3.4); await pincer(bb); },
           (bb) => accretion(bb, { dur: 8, extra: async (x) => { await salvoCombo(x, { n: 2 }); shardStream(x, { n: 2 }); } }),
-          pincer,
+          async (bb) => { shardStream(bb, { n: 2, lead: 3.2 }); await bb.wait(0.5); await pincer(bb); },
         ], [0.1, 0.3], collapseCast, 24, 14, { every: [11, 13.5], warn: 2.2, window: 1.2, crush: 28 });
       },
     },
     {
-      name: 'Event Horizon', hpStart: 0.15, sky: false,
+      name: 'Event Horizon', hpStart: 0.12, sky: false,
       enter(b) {
         const D = b.data, retry = D.phaseSeen == null;
         enterPhase(b, 3);
@@ -1317,6 +1353,7 @@
       async script(b) {
         await b.wait(0.6);
         const W = (o) => ({ color: HOT_T, ...o });
+        sunspots(b, [2.3, 3.3]);
         rotation(b, [
           (bb) => flareLash(bb, W({ rings: [0, 1], span: PI * 1.65, back: 0.7, label: 'White Flare' })),
           async (bb) => { infall(bb, {}).catch(() => { }); await bb.wait(2.0); await lensing(bb, W({ n: 3, lead: 1.5 })); },
@@ -1326,7 +1363,7 @@
           async (bb) => { shardStream(bb, W({ rings: [0, 1], n: 2, lead: 2.7 })); await bb.wait(1.6); await lensing(bb, W({ n: 3, lead: 1.6 })); },
           (bb) => pincer(bb, W({})),
           (bb) => lensing(bb, W({ n: 5, label: 'Lensed Light' })),
-        ], [0.2, 0.45], null, 0, 0, { every: [6.5, 8], warn: 2.0, window: 1.1, crush: 22, label: 'Event Horizon' });
+        ], [0.05, 0.2], null, 0, 0, { every: [6.5, 8], warn: 2.0, window: 1.1, crush: 22, label: 'Event Horizon' });
       },
     },
   ];
@@ -1343,7 +1380,7 @@
         'text-shadow:0 0 8px rgba(0,0,0,.95),0 0 12px rgba(167,123,255,.7);padding:5px 10px 6px;border:1px solid rgba(200,170,255,.6);border-radius:3px;' +
         'background:linear-gradient(180deg,rgba(14,6,30,.78),rgba(4,2,12,.7));box-shadow:0 0 18px rgba(167,123,255,.35);min-width:148px;' +
         (touch ? 'right:calc(var(--sar,0px) + 12px);top:calc(var(--sat,0px) + 84px);text-align:right;' : 'left:calc(var(--sal,0px) + 14px);top:calc(var(--sat,0px) + 42px);');
-      el.innerHTML = '<div style="opacity:.85">EVENT HORIZON</div><div class="t" style="font:700 22px system-ui,sans-serif;letter-spacing:.06em;font-variant-numeric:tabular-nums;margin-top:1px">0:48</div>' +
+      el.innerHTML = '<div style="opacity:.85">EVENT HORIZON</div><div class="t" style="font:700 22px system-ui,sans-serif;letter-spacing:.06em;font-variant-numeric:tabular-nums;margin-top:1px">0:50</div>' +
         '<div style="height:4px;margin-top:4px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:100%;transform-origin:0 50%;background:linear-gradient(90deg,#5a2cc8,#c8a8ff,#ffffff)"></i></div>';
       hud.appendChild(el); D.ehEl = el; D.ehTxt = el.querySelector('.t'); D.ehBar = el.querySelector('i');
     }
@@ -1431,7 +1468,6 @@
         D.swellT = 0; D.look.collapse = 1; D.look.disk = 1; D.look.mask = 0.5; D.look.corona = 0.5; D.look.heat = 0.4; D.pulse = 2;
         world('setSky', 'collapse', 2, 0.8);
         fx('flash', '#e8dcff', 0.3, 0.7); cam('shake', 1.1, 1.0); sfx('thunder', {}); sfx('gravity', { vol: 1 });
-        post('bloomPulse', 0, 1.1);          // shorten the collapse sky's own 2.5 s bloom set-piece so the implosion stays visible
         fx('shockwave', starPos(b), { color: HOT, radius: 9, life: 0.7 });
         fx('shockwave', V3(0, 0.3, 0), { color: ACC, radius: 16, life: 1.4 });
         for (let k = 0; k < 3; k++) fx('ringFlash', k, { color: HOT, life: 1.0, intensity: 1.6 });

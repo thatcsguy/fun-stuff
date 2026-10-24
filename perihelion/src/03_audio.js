@@ -619,7 +619,9 @@
     on('reverse', () => sfx('reverse', EV));
     on('playerDamaged', (d) => { if (!d.blocked && d.amount > 0) { sfx('hurt', { gap: 0.15, amount: d.amount }); A.duck(0.35, 0.5); } });
     on('phaseTransition', () => { sfx('swell', EV); A.duck(0.6, 2.5); });
-    on('phaseStart', (d) => { if (typeof d.index === 'number') A.setIntensity(Math.min(3, d.index)); });
+    // intensity per phase comes from the boss definition (G.combat.musicIntensity: the last phase is always layer 3)
+    const phaseLayer = (i) => { try { const c = G.combat; if (c && c.musicIntensity && c.def) return c.musicIntensity(c.def, i); } catch (e) { } return Math.min(3, i | 0); };
+    on('phaseStart', (d) => { if (typeof d.index === 'number') A.setIntensity(phaseLayer(d.index)); });
     on('castStart', (d) => sfx('castStart', { gap: 0.15, interruptible: d.interruptible }));
     on('castEnd', (d) => { if (!d.interrupted) sfx('castDone', EV); });
     on('constellation', (d) => { if (d.active) sfx('constellation', EV); });
@@ -639,7 +641,7 @@
     });
     on('telegraph', (d) => sfx('telegraph', { gap: 0.12, lethal: d.lethal, dur: d.dur ?? d.warn, ticks: d.lethal ? true : false }));
     on('bossDefeated', () => { sfx('bossDeath', EV); A.duck(0.8, 3); });
-    on('fightStart', (d) => { A.setIntensity(Math.min(3, d.fromPhase | 0)); const def = G.combat && G.combat.def; A.music(d.practice || d.bossIndex === 'practice' ? 'practice' : (def && def.music != null ? def.music : d.bossIndex)); });
+    on('fightStart', (d) => { A.setIntensity(phaseLayer(d.fromPhase | 0)); const def = G.combat && G.combat.def; A.music(d.practice || d.bossIndex === 'practice' ? 'practice' : (def && def.music != null ? def.music : d.bossIndex)); });
     on('fightEnd', (d) => { if (d.result === 'victory') A.music('victory'); else if (d.result === 'defeat') A.music('defeat'); });
     on('playerDied', () => A.duck(0.8, 2));
     on('stateChange', (d) => {

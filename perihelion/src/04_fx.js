@@ -390,13 +390,14 @@
     g.instanceCount = 0;
     const m = new THREE_.ShaderMaterial({
       transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
-      uniforms: { uTex: { value: tex } },
+      uniforms: { uTex: { value: tex }, uK: { value: 1 } },
       vertexShader: /* glsl */`
+        uniform float uK;
         attribute vec4 iPos; attribute vec3 iGly; attribute vec4 iCol; varying vec2 vUv; varying vec4 vC;
         void main(){
           vec4 mv = modelViewMatrix * vec4(iPos.xyz, 1.);
           // constant-ish screen size: scale with distance
-          float s = iPos.w * (-mv.z) * .04;
+          float s = iPos.w * (-mv.z) * .04 * uK;   // uK: smaller on tall portrait screens (sized to the short side)
           mv.xy += (position.xy + iGly.yz) * s;
           gl_Position = projectionMatrix * mv;
           float gi = iGly.x; vec2 cell = vec2(mod(gi, 16.), 5. - floor(gi / 16.));
@@ -449,6 +450,7 @@
       }
     }
     NUM.mesh.geometry.instanceCount = gi;
+    { const w = innerWidth, h = Math.max(1, innerHeight); NUM.mesh.material.uniforms.uK.value = Math.min(1, 1.6 * Math.min(w, h) / h); }
     if (gi) { NUM.aPos.needsUpdate = true; NUM.aGly.needsUpdate = true; NUM.aCol.needsUpdate = true; }
   }
 
@@ -533,7 +535,7 @@
       const cc = tmpC2.setRGB(c.r + (1 - c.r) * wk, c.g + (1 - c.g) * wk, c.b + (1 - c.b) * wk).multiplyScalar(num(o.intensity, 1.6));
       spawnP(p.x + cx * 0.1, p.y + cy * 0.1, p.z + cz * 0.1, cx * s, cy * s, cz * s, cc, sz * (0.5 + Math.random()), life * (0.5 + Math.random() * 0.7), gr, drag, Math.random() < shape ? 1 : 0);
     }
-    if (o.flare !== false) flare(p, { color: o.color, size: num(o.flareSize, sz * 6 + 0.6), life: Math.min(0.35, life * 0.5) });
+    if (o.flare !== false) flare(p, { color: o.color, size: num(o.flareSize, Math.min(2.4, sz * 6 + 0.6)), life: Math.min(0.35, life * 0.5) });
   }
   const tmpC2 = new THREE_.Color();
   function spark(pos, color, o = {}) {

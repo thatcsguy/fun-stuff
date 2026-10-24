@@ -69,11 +69,17 @@
     void main(){ vUv = uv; vec4 wp = modelMatrix * vec4(position,1.0); vP = wp.xz; gl_Position = projectionMatrix * viewMatrix * wp; }`;
   const TELE_FS = `
     precision highp float;
-    uniform vec3 uColor; uniform float uProgress, uTime, uLethal, uAlpha, uFire, uLive, uMode, uArrow, uWaveR, uWaveW, uSwept;
+    uniform vec3 uColor; uniform float uProgress, uTime, uLethal, uAlpha, uFire, uLive, uMode, uArrow, uWaveR, uWaveW, uSwept, uSoft, uCap;
     uniform vec2 uSize;
     varying vec2 vUv; varying vec2 vP;
     void main(){
       vec3 acc = uColor; vec3 col = acc; float a = 0.0;
+      // the hazard hue at full saturation (max channel 1): live fills and the fire flash are tinted with it and
+      // scaled by uCap (set per frame from the sky's bloom), so bloom never turns a live shape into a white blob
+      // fills use a saturation-boosted accent: pale accents (ice cyan, lavender) otherwise wash toward white over gold
+      float accC = max(acc.r, max(acc.g, acc.b)) - min(acc.r, min(acc.g, acc.b));   // chroma: very pale accents get a stronger push
+      vec3 accS = max(mix(vec3(dot(acc, vec3(0.2126, 0.7152, 0.0722))), acc, clamp(0.5 / max(accC, 0.01), 1.35, 3.0)), vec3(0.0));
+      vec3 tint = accS / max(0.001, max(accS.r, max(accS.g, accS.b)));
       float pulse = 0.5 + 0.5 * sin(uTime * mix(5.0, 19.0, uProgress));
       if (uMode < 0.5 || uMode > 5.5) {
         float dx = min(vUv.x, 1.0 - vUv.x) * uSize.x;
@@ -103,15 +109,18 @@
           if (uSwept > 0.0) sw = step(uSwept, vUv.x);
           if (uSwept < 0.0) sw = step(vUv.x, 1.0 + uSwept);
           // unfilled part shades the gold track in a dark accent tint; the fill is the saturated accent
-          float base = 0.22 + 0.04 * pulse;
+          float base = 0.26 + 0.04 * pulse;
           float fillA = filled * (0.2 + 0.08 * pulse + 0.08 * uLethal * pulse);
           a = base + fillA + front * 0.5 + hatch * filled * 0.2 + chev * 0.22;
-          col = mix(acc * 0.18, acc * 0.95, filled) + acc * front * 0.8 + vec3(chev * 0.25);
-          if (uLive > 0.5) { a = 0.5 + 0.15 * sin(uTime * 30.0 + (vP.x - vP.y) * 2.0); col = mix(acc * 1.15, vec3(1.2), 0.2); }
+          col = mix(accS * 0.12, accS * 0.95, filled) + acc * front * 0.8 + vec3(chev * 0.25);
+          if (uLive > 0.5) {
+            if (uSoft > 0.5) { a = 0.30 + 0.05 * pulse; col = tint * 0.62 * uCap; }     // long-lived hazards: a calm, solid fill
+            else { a = 0.42 + 0.10 * sin(uTime * 30.0 + (vP.x - vP.y) * 2.0); col = mix(tint, vec3(1.0), 0.12) * 0.9 * uCap; }
+          }
           // dark rim behind the bright edge so it reads on gold metal
           col = mix(col, vec3(0.0, 0.0, 0.02), rim * 0.85);
           a = max(a, rim * 0.55);
-          col = mix(col, acc * 1.9 + vec3(0.2), edge);
+          col = mix(col, (acc * 1.9 + vec3(0.2)) * mix(1.0, 0.8 * uCap, uLive), edge);   // live edges are capped too
           a = max(a, edge * (0.75 + 0.25 * pulse));
           a *= sw;
           a *= uAlpha;
@@ -127,10 +136,10 @@
         float front = (1.0 - smoothstep(0.0, 0.04, abs(f - uProgress))) * step(0.02, uProgress);
         float cross = (1.0 - smoothstep(0.02, 0.06, min(abs(vUv.x - 0.5), abs(vUv.y - 0.5)) * uSize.x)) * step(rr, 0.45) * 0.6;
         a = 0.22 + filled * (0.22 + 0.1 * pulse) + front * 0.55 + cross;
-        col = mix(acc * 0.18, acc * 0.95, filled) + acc * front * 0.8;
-        if (uLive > 0.5) { a = 0.8; col = vec3(1.3); }
+        col = mix(accS * 0.12, accS * 0.95, filled) + acc * front * 0.8;
+        if (uLive > 0.5) { a = 0.62; col = mix(tint, vec3(1.0), 0.2) * 0.95 * uCap; }
         col = mix(col, vec3(0.0, 0.0, 0.02), rim * 0.85); a = max(a, rim * 0.55);
-        col = mix(col, acc * 2.2 + vec3(0.25), edge); a = max(a, edge);
+        col = mix(col, (acc * 2.2 + vec3(0.25)) * mix(1.0, 0.8 * uCap, uLive), edge); a = max(a, edge);
         a *= uAlpha;
       } else if (uMode < 2.5) { // wave band
         float rr = length(vP);
@@ -169,7 +178,8 @@
         a = (band * (on * 0.95 + 0.12) + inner * (0.6 + 0.4 * pulse)) * uAlpha;
         col = mix(col, vec3(1.6), inner);
       }
-      a += uFire * 0.6; col = mix(col, vec3(2.0), uFire * 0.7);
+      // fire pop: a quarter-second impact cue, kept near the bloom knee so a big shape flashes its hue, not white
+      a += uFire * 0.38 * (1.0 - 0.5 * uSoft); col = mix(col, mix(tint, vec3(1.0), 0.3) * 1.02 * uCap, uFire * 0.65);
       if (a < 0.004) discard;
       gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
     }`;
@@ -182,7 +192,7 @@
         uniforms: {
           uColor: { value: new T3.Color() }, uProgress: { value: 0 }, uTime: { value: 0 }, uLethal: { value: 0 }, uAlpha: { value: 1 },
           uFire: { value: 0 }, uLive: { value: 0 }, uMode: { value: 0 }, uArrow: { value: 0 }, uWaveR: { value: 0 }, uWaveW: { value: 0.45 },
-          uSwept: { value: 0 }, uSize: { value: new T3.Vector2(1, 1) },
+          uSwept: { value: 0 }, uSize: { value: new T3.Vector2(1, 1) }, uSoft: { value: 0 }, uCap: { value: 1 },
         },
       });
     }
@@ -193,6 +203,7 @@
     if (opts.lethal) m.uniforms.uLethal.value = 1;
     if (opts.arrow) m.uniforms.uArrow.value = opts.arrow;
     if (opts.additive) m.blending = T3.AdditiveBlending;
+    if (opts.soft) m.uniforms.uSoft.value = 1;
     return m;
   }
 
@@ -270,7 +281,12 @@
     return h;
   }
   function addMesh(h, mesh) { h.group.add(mesh); if (mesh.material && mesh.material.uniforms) h.mats.push(mesh.material); return mesh; }
+  // live look: 'flash' (pulsing tinted fill, the default for short hazards) or 'soft' (calm fill; the default for
+  // hazards that stay live 2.5 s or more, e.g. rotors and long customs). Per hazard: o.liveStyle = 'soft' | 'flash'.
   function register(h) {
+    const ls = h.o && h.o.liveStyle;
+    h.liveStyle = ls === 'soft' || ls === 'flash' ? ls : (h.active >= 2.5 && h.active !== Infinity ? 'soft' : 'flash');
+    if (h.liveStyle === 'soft') for (const m of h.mats) if (m.uniforms.uSoft) m.uniforms.uSoft.value = 1;
     const layer = (G.layers && G.layers.fx) || G.scene;
     if (layer && h.group.children.length) layer.add(h.group);
     HZ.active.push(h);
@@ -323,7 +339,7 @@
     h.onFire = () => {
       for (const r of h.rings) fx('ringFlash', r, { color: h.color, a0: h.center - h.width / 2, a1: h.center + h.width / 2, life: 0.5 });
       const R = RINGS();
-      for (const r of h.rings) for (let k = -1; k <= 1; k++) fx('burst', polar(R[r], h.center + k * h.width * 0.3, 0.3), { color: h.color, count: 10, speed: 4, size: 0.5, life: 0.6 });
+      for (const r of h.rings) for (let k = -1; k <= 1; k++) fx('burst', polar(R[r], h.center + k * h.width * 0.3, 0.3), { color: h.color, count: 7, speed: 4, size: 0.5, life: 0.6, flareSize: 1.2 });   // small flares: nine of them bloom into a white slab
       sfx('crack', { vol: h.lethal ? 1 : 0.7 });
       if (h.lethal) cam('shake', 0.5, 0.35);
     };
@@ -402,7 +418,7 @@
     world('ringGlow', h.ring, h.color, h.lethal ? 1 : 0.7, h.warn + h.active);
     h.onFire = () => {
       for (const [a0, a1] of complementArcs(h.gaps)) fx('ringFlash', h.ring, { color: h.color, a0, a1, life: 0.7 });
-      for (let i = 0; i < 10; i++) { const th = i / 10 * TAU; if (!inGaps(th, h.gaps, 0)) fx('burst', polar(R, th, 0.3), { color: h.color, count: 8, speed: 5, size: 0.5, life: 0.7 }); }
+      for (let i = 0; i < 10; i++) { const th = i / 10 * TAU; if (!inGaps(th, h.gaps, 0)) fx('burst', polar(R, th, 0.3), { color: h.color, count: 8, speed: 5, size: 0.5, life: 0.7, flareSize: 1.2 }); }
       sfx(h.lethal ? 'thunder' : 'crack', {});
       cam('shake', h.lethal ? 0.8 : 0.4, 0.4);
       if (h.lethal) fx('flash', h.color, 0.25, 0.25);
@@ -633,7 +649,7 @@
         if (r.blocked) return;    // Aegis holds you up
         const R = RINGS();
         let d = 1;
-        const ok = (k) => k >= 0 && k < R.length && !HZ.gapAt(k, pl.theta);
+        const ok = (k) => k >= 0 && k < R.length && !HZ.gapAt(k, pl.theta) && (!G.player.ringOk || G.player.ringOk(k));
         if (ok(pl.ring + 1)) d = 1; else if (ok(pl.ring - 1)) d = -1; else d = pl.ring < 2 ? 1 : -1;
         try { G.player.forceShift && G.player.forceShift(d, { fall: true }); } catch (e) { logE('forceShift', e); }
         sfx('bump', {});
@@ -720,8 +736,16 @@
   };
   HZ.list = () => HZ.active.filter(h => !h.finished);
 
+  // live-fill brightness cap: brighter skies (more bloom) and LDR targets (lower bloom threshold) get dimmer fills
+  function liveCap() {
+    const bl = (G.post && G.post.base && G.post.base.bloom) || 0.85;
+    let c = clamp(1.05 - (bl - 0.8) * 0.9, 0.7, 1.0);
+    if (G.gfx && G.gfx.hdr === false) c *= 0.88;
+    return c;
+  }
   function updateHazards(dtH, dt) {
     const pl = P();
+    const cap = liveCap();
     const canHit = pl && PLAY(G.state) && pl.alive;
     for (const h of HZ.active.slice()) {
       if (h.dead) continue;
@@ -744,7 +768,7 @@
       // telegraph uniforms
       const prog = h.warn > 0 ? clamp(h.lt / h.warn, 0, 1) : 1;
       for (const m of h.mats) {
-        const u = m.uniforms; u.uTime.value = h.visTime;
+        const u = m.uniforms; u.uTime.value = h.visTime; if (u.uCap) u.uCap.value = cap;
         if (u.uMode.value === 0 || u.uMode.value === 1 || u.uMode.value === 5) { u.uProgress.value = prog; u.uLive.value = (h.state === 'live' && h.kind !== 'sweep' && h.kind !== 'wave' && h.kind !== 'orb' && h.kind !== 'soak') ? 1 : 0; }
         u.uFire.value = h.fireFlash;
       }
@@ -1036,7 +1060,8 @@
     const src = info.source || 'strike';
     const st = G.player && G.player.stats; if (st && st.damageBySkill) st.damageBySkill[src] = (st.damageBySkill[src] || 0) + amt;
     const crit = !!(behind && info.behindEligible !== false) || !!info.crit;
-    if (!G.settings || G.settings.numbers !== false) fx('number', pos, amt, { crit, color: crit ? '#fff1c2' : '#ffc94d' });
+    // Strike ticks (2+ per second) stay small and short so the big hits (Comet, lances, Nova) read
+    if (!G.settings || G.settings.numbers !== false) fx('number', pos, amt, src === 'strike' ? { crit, color: crit ? '#ffe9a8' : '#e9b850', size: crit ? 0.95 : 0.7, life: 0.7, rise: 1.1 } : { crit, color: crit ? '#fff1c2' : '#ffc94d' });
     b.hitFlash = 1;
     emit('bossDamaged', { amount: amt, source: src, crit, behind, pos });
     return amt;
@@ -1069,8 +1094,10 @@
     b.invulnerable = true;
     pendingTransition = { from, to };
   }
+  const heroDown = () => { const p = P(); return !!(p && !p.alive) || C.deathT > 0 || G.state === 'dead'; };
   async function doTransition(from, to) {
     const b = C.boss; if (!b) return;
+    if (heroDown()) { pendingTransition = null; return; }      // the hero fell on the threshold frame: the defeat flow wins
     const fc = C.fightCount;
     C.transitioning = true; b.invulnerable = true;
     abortScripts(b);
@@ -1079,14 +1106,21 @@
     emit('phaseTransition', { from, to });
     const ph = b.def.phases[to] || {};
     if (ph.sky !== false) { const sk = skyFor(b.def, to); world('setSky', sk[0], sk[1], ph.skyDur != null ? ph.skyDur : 2.5); }
-    try { G.audio && G.audio.setIntensity && G.audio.setIntensity(Math.min(3, to)); } catch (e) { }
+    try { G.audio && G.audio.setIntensity && G.audio.setIntensity(musicIntensity(b.def, to)); } catch (e) { }
     let p;
     try { p = b.def.onTransition ? b.def.onTransition(b, from, to) : defaultTransition(b, from, to); } catch (e) { logE('onTransition', e); }
     await raceTimeout(p, 9);
     if (fc !== C.fightCount || C.boss !== b) return;
     await flowWait(0.15);
     if (fc !== C.fightCount || C.boss !== b) return;
-    C.transitioning = false; b.invulnerable = false;
+    C.transitioning = false;
+    if (heroDown()) {
+      // the hero died during the cinematic (e.g. a raid hit queued on the same frame): never resume the fight;
+      // finish the defeat flow here if it did not already run
+      if (G.state !== 'dead' && !(C.deathT > 0)) { C.deathPhase = from; C.deathT = 0.01; }
+      return;
+    }
+    b.invulnerable = false;
     setState(C.practice ? 'practice' : 'fight');
     runPhase(b, to);
   }
@@ -1098,6 +1132,17 @@
     return [(typeof sk === 'string' && sk) || def.sky || 'night', Math.min(3, i)];
   }
   C.skyFor = skyFor;
+  // music intensity layer (0-3) for phase i: phase.intensity, else def.intensity[i], else spread over the phases so
+  // the last phase always reaches the top layer (3 phases: 0, 2, 3; 4 phases: 0, 1, 2, 3)
+  function musicIntensity(def, i) {
+    const phs = (def && def.phases) || [], ph = phs[i] || {};
+    if (typeof ph.intensity === 'number') return clamp(Math.round(ph.intensity), 0, 3);
+    if (def && Array.isArray(def.intensity) && typeof def.intensity[i] === 'number') return clamp(Math.round(def.intensity[i]), 0, 3);
+    const n = phs.length;
+    if (n <= 1) return 0;
+    return clamp(Math.round(i * 3 / (n - 1)), 0, 3);
+  }
+  C.musicIntensity = musicIntensity;
   function defaultTransition(b) {
     fx('flash', b.def.accent || accentHex(), 0.35, 0.6);
     fx('shockwave', new T3.Vector3(0, 0.3, 0), { color: b.def.accent || accentHex(), radius: 16, life: 1.2 });
@@ -1199,7 +1244,8 @@
     b.phase = fromPhase; C.startPhase = fromPhase;
     buildRearSigil();
     try { G.player && G.player.reset && G.player.reset({ keepStats, practice, meter: opts.meter }); } catch (e) { logE('player.reset', e); }
-    C.introT = opts.skipIntro || (G.params && (G.params.bot || G.params.skipintro)) ? 0.4 : (practice ? 1.8 : 2.6);
+    const quick = opts.skipIntro === false ? false : !!(opts.skipIntro || (G.params && (G.params.bot || G.params.skipintro)));
+    C.introT = quick ? 0.4 : (practice ? 1.8 : 2.6);
     setState('intro');
     emit('fightStart', { bossIndex: C.bossIndex, practice, fromPhase, name: def.name, title: def.title, accent });
     return true;
@@ -1288,7 +1334,9 @@
     if (fadeCheck <= 0) {
       fadeCheck = 0.1;
       const pl = P(); let want = false;
-      if (pl && pl.pos && b.root.visible) {
+      // never ghost the boss in its own close-ups: cinematics (transitions, Supernova, death), transitions, death
+      const scripted = (G.cam && G.cam.inCinematic) || C.transitioning || !b.alive || b.dying || G.state === 'cinematic' || G.state === 'victory';
+      if (pl && pl.pos && b.root.visible && !scripted) {
         fadeBox.setFromObject(b.model);
         if (!fadeBox.isEmpty()) {
           // hero on the far side of the boss (screen-wise) and inside its projected box
@@ -1373,7 +1421,7 @@
     }
     if (!C.boss) { if (HZ.active.length) updateHazards(dt * HZ.speed, dt); return; }
     if (st === 'intro') {
-      C.introT -= rdt;
+      C.introT -= dt;              // game time: fast-forward and pause behave like real play
       if (C.introT <= 0) beginFight();
     }
     if (st === 'fight') C.fightTime += dt;
@@ -1383,6 +1431,7 @@
       updateAdds(dtH, dt);
       updateBoss(dt);
     }
+    if (pendingTransition && heroDown()) pendingTransition = null;
     if (pendingTransition && PLAY(G.state) && !(P() && P().novaActive)) {
       const p = pendingTransition; pendingTransition = null;
       doTransition(p.from, p.to);
@@ -1421,6 +1470,7 @@
       if (!C.boss || C.practice) return;
       C.deathPhase = C.boss.phase;
       C.deathT = 1.8;
+      pendingTransition = null;
     });
   };
 
@@ -1434,39 +1484,42 @@
       name: 'Practice', hpStart: 1.0,
       enter(b) { b.turnRate = 0.3; },
       async script(b) {
+        // lesson lines name the control the player actually has: keys on desktop, buttons on touch
+        const K = (key, btn) => G.isTouch ? btn : key;
+        const say = (t) => b.say(t, 4.4);
         b.loop(async () => {
           await b.wait(12);
-          b.say('Interruptible cast: press ECLIPSE (E) before it ends');
+          say('Gold-framed cast: press ' + K('ECLIPSE (E)', 'the ECLIPSE button') + ' before it ends');
           await b.cast({ name: 'Practice Hymn', dur: 3.5, interruptible: true, onInterrupt: () => b.say('Interrupted! The dummy is staggered: x1.3 damage'), onDone: () => b.say('Cast completed. Next time, Eclipse it.') });
         });
         const R = b.R;
         const lessons = [
           async () => {
-            b.say('WEDGE: Reverse (A/D) or Shift (W/S) out of the shape');
+            say('WEDGE: the fill shows when it fires. ' + K('Reverse (A/D) or Shift (W/S)', 'REVERSE or IN/OUT') + ' out of it');
             const c = b.playerAhead(2.2);
             await G.hz.arc({ rings: [b.playerRing()], center: c, width: 0.9, warn: 2.8, dmg: 15, label: 'Wedge' });
           },
           async () => {
-            b.say('SWEEP: the beam travels the marked arc. Reverse into the open part');
+            say('SWEEP: the beam travels the marked arc. Reverse into the open part');
             const th = b.playerTheta(), d = b.playerDir();
             const from = th - d * 1.6;
             await G.hz.sweep({ rings: [0, 1], from, to: from + d * PI * 1.4, warn: 2.6, dur: 3.2, dmg: 15, label: 'Sweep' });
           },
           async () => {
-            b.say('RING: the whole ring detonates. Shift to another ring');
+            say('RING: the whole ring detonates. Shift to another ring');
             await G.hz.ring({ ring: b.playerRing(), warn: 3.0, dmg: 20, label: 'Ring Blast' });
           },
           async () => {
-            b.say('ROTOR: slices rotate. Match their speed or wait in a gap');
+            say('ROTOR: slices rotate. Match their speed, or ' + K('Eclipse (E)', 'ECLIPSE') + ' to wait in a gap');
             await G.hz.rotor({ rings: [1, 2], slices: [{ center: 0, width: 0.5 }, { center: PI, width: 0.5 }], omega: 0.35, warn: 2.2, dur: 7, dmg: 10, label: 'Rotor' });
           },
           async () => {
-            b.say('WAVE: an outward shockwave. Be inside a gold gap or Shift through it');
+            say('WAVE: an outward shockwave. Be inside a gold gap, or Shift as it crosses you');
             const th = b.playerAhead(2.4);
             await G.hz.wave({ from: 'in', speed: 4.5, gaps: [{ center: th, width: 0.8 }, { center: th + PI, width: 0.8 }], warn: 3.2, dmg: 20, label: 'Wave' });
           },
           async () => {
-            b.say('ORBS: travelling stars. Dodge, or let Aegis (F) reflect them');
+            say('ORBS: travelling stars. Dodge, or ' + K('Aegis (F)', 'AEGIS') + ' just before they hit: a reflected lance');
             const r = b.playerRing();
             for (let i = 0; i < 3; i++) { G.hz.orb({ ring: r, theta: b.playerTheta() + b.playerDir() * (2.4 + i * 0.6), omega: -b.playerDir() * 0.35, life: 9, dmg: 10, label: 'Orb' }); await b.wait(0.4); }
             await b.wait(4);
@@ -1478,25 +1531,33 @@
             await b.wait(3.6);
           },
           async () => {
-            b.say('SOAK STAR: run through it before its timer ends');
+            say('SOAK STAR: run through it before its timer ends');
             const r = (b.playerRing() + 1) % 3;
             await G.hz.soak({ ring: r, theta: b.playerAhead(4), warn: 7, failDmg: 10, label: 'Soak', onSoak: () => b.say('Soaked!') });
           },
           async () => {
-            b.say('BLOCKER: a pylon on your ring. Strike kills it, or Reverse / Shift around');
+            say('BLOCKER: a pylon on your ring. Strike kills it, or Reverse / Shift around');
             const r = b.playerRing();
             ADDS.spawn({ ring: r, theta: b.playerAhead(3), hp: 160, contactDmg: 10, label: 'Pylon' });
             await b.wait(6);
           },
           async () => {
-            b.say('BROKEN TRACK: running into a gap drops you a ring. Shift around it');
+            say('BROKEN TRACK: running into a gap drops you a ring. Shift around it');
             const r = b.playerRing();
             const h = G.hz.gap({ ring: r, center: b.playerAhead(3.5), width: 0.5, dmg: 10, label: 'Gap' });
             await b.wait(8); h.cancel();
           },
           async () => {
-            b.say('Plant ANCHORS (Q) around the dummy; pass over them to pulse + heal');
+            say('Plant ANCHORS' + K(' (Q)', '') + ' around the dummy; run back over them to pulse and heal');
             await b.wait(4);
+          },
+          async () => {
+            say('COMET: hold ' + K('SPACE', 'COMET') + ', release while BEHIND the dummy (gold sigil) for x1.5');
+            await b.wait(5);
+          },
+          async () => {
+            say('LETHAL: striped shapes hit hard. Leave that ring before the fill completes');
+            await G.hz.ring({ ring: b.playerRing(), warn: 3.2, dmg: 60, lethal: true, label: 'Lethal Ring' });
           },
         ];
         let i = 0;

@@ -672,9 +672,6 @@
   function speedControl(b, dt) {
     const D = b.data, S = P();
     if (!S) return;
-    // framework workaround (07_player.js updateNova never clears S.invuln): without this the hero stays
-    // invulnerable forever after the first Supernova
-    if (S.invuln && !S.novaActive) S.invuln = false;
     D.sirenT = Math.max(0, D.sirenT - dt);
     let m = 1;
     // flood and enthrall do not stack: never slower than 0.6 (0.36 left no way out of a curtain lane)
@@ -813,6 +810,13 @@
       L.follow = () => { const hz = h.hazard; return hz.lt < hz.warn ? from : hz.beamAt(hz.lt) - d * 0.12; };
       h.done.then(() => { if (L.busy === h.id) { L.busy = 0; L.follow = null; L.glow = 0; if (C().boss === b && b.alive) loopIdle(b, L); } });
     }
+    // from Bloom on, the breaching loop scours its ring: anchors on the swept arc are marked, then crushed
+    if (b.phase >= 2) {
+      const span = Math.abs(to - from);
+      const swept = (a) => a.ring === ring && ((((a.theta - from) * d) % TAU + TAU) % TAU) < span;
+      try { G.player.anchors.mark(swept, true); } catch (e) { logE('anchors.mark', e); }
+      h.done.then(() => { if (C().boss !== b || !b.alive) return; try { G.player.anchors.smash((a) => a.warn && swept(a)); } catch (e) { logE('anchors.smash', e); } });
+    }
     return h;
   }
   function loopIdle(b, L) {
@@ -829,7 +833,10 @@
     const D = b.data;
     D.squeezeT = 1;
     const h = G.hz.ring({ ring: 0, warn: o.warn || 2.4, active: 0.4, dmg: o.dmg || 28, label: 'Constrict', gaps: o.gaps });
-    h.done.then(() => { D.squeezeT = 0; });
+    // the coil crushes the inner ring's anchors too (marked for the whole warning)
+    const inner = (a) => a.ring === 0;
+    try { G.player.anchors.mark(inner, true); } catch (e) { logE('anchors.mark', e); }
+    h.done.then(() => { D.squeezeT = 0; if (C().boss !== b || !b.alive) return; try { G.player.anchors.smash((a) => a.warn && inner(a)); } catch (e) { logE('anchors.smash', e); } });
     return h;
   }
 
@@ -912,6 +919,10 @@
       },
       onFire: () => { sfx('rumble', { vol: 0.9 }); cam('shake', 0.35, 0.5); },
     });
+    // the tide washes away anchors left on the outer two rings outside the gaps (marked now; the flood keeps its own)
+    const wash = (a) => a.ring > 0 && !inGap(a.theta, 0);
+    try { if (G.player.anchors.list.some(wash)) { G.player.anchors.mark(wash, true); if (!D.saidWash) { D.saidWash = 1; b.say('The tide takes what you leave on the shore.', 2.2); } } } catch (e) { logE('anchors.mark', e); }
+    h.done.then(() => { if (C().boss !== b || !b.alive) return; try { G.player.anchors.smash((a) => a.warn && wash(a)); } catch (e) { logE('anchors.smash', e); } });
     return h;
   }
 
@@ -929,7 +940,7 @@
     blk.piece = (warn) => {
       const bt0 = blk.now();
       const h = G.hz.custom({
-        warn, active: 7.6, dmg: 18, tick: 1.0, label: 'Coiled Body',
+        warn, active: 7.6, dmg: 20, tick: 1.0, label: 'Coiled Body',
         test: (ring, theta, lt, pad) => ring === 1 && inArcR(1, theta, centerAt(bt0 + lt), w / 2, pad + 0.15),
       });
       blk.pieces.push(h); if (blk.pieces.length > 3) blk.pieces.shift();
@@ -946,6 +957,20 @@
     loopTarget(L, { r: R[1], c: c0, w, A: 0.12, k: 3, yb: 0.42, weave: 0, flow: 1.4 }, { dive: true });
     L.follow = () => centerAt(blk.now());
     return blk;
+  }
+  // the Tide blocker crushes anchors on the middle ring as it slides over them (they are marked ~4 s ahead of it)
+  function coilCrush(b) {
+    const D = b.data, blk = D.blk, A = G.player.anchors && G.player.anchors.list; if (!blk || !A || !A.length || D.dying) return;
+    const bt = blk.now(), c = blk.centerAt(bt);
+    let om = blk.sched[0].om; for (const x of blk.sched) if (x.lt0 <= bt) om = x.om;
+    const sg = om >= 0 ? 1 : -1;
+    for (const a of A.slice()) {
+      if (a.ring !== 1) continue;
+      const da = angDiff(a.theta, c);
+      if (Math.abs(da) < blk.w / 2 + 0.1) { try { G.player.anchors.smash((x) => x === a); } catch (e) { logE('anchors.smash', e); } }
+      else if (!a.warn && da * sg > 0 && da * sg < 1.1) { a.coilMark = true; try { G.player.anchors.mark((x) => x === a, true); } catch (e) { logE('anchors.mark', e); } }
+      else if (a.warn && a.coilMark && !(da * sg > 0 && da * sg < 1.4)) { a.coilMark = false; try { G.player.anchors.mark((x) => x === a, false); } catch (e) { logE('anchors.mark', e); } }   // the coil turned away
+    }
   }
   function blockerVisual(b, dt) {
     const D = b.data, bb = D.blkBand; if (!bb) return;
@@ -997,7 +1022,7 @@
       const th = b.playerAhead(Math.min(tArr, 3)) + d * G.OMEGA * Math.max(0, tArr - 3);
       const R = RR()[ring];
       out.push(G.hz.soak({
-        ring, theta: th, warn: tArr + (o.slack || 2.2), radius: 0.8, failDmg: o.failDmg || 15, label: 'Star Seed', color: ACC,
+        ring, theta: th, warn: tArr + (o.slack || 2.2), radius: 0.8, failDmg: o.failDmg || 20, label: 'Star Seed', color: ACC,
         onSoak: () => { fx('burst', G.polar(R, th, 0.9), { color: ROSE, count: 22, speed: 6, size: 0.6, life: 0.7, star: true }); },
         onFail: () => {
           b.say('The seed blooms into wisps.', 1.6);
@@ -1046,10 +1071,14 @@
         group.add(m);
       },
       onFire: () => {
+        try { G.player.anchors.smash((a) => a.warn && inLane(a)); } catch (e) { logE('anchors.smash', e); }
         sfx('thunder', { vol: 1 }); cam('shake', 0.9, 0.6); fx('flash', ACC, 0.3, 0.3);
         for (let r = 0; r < 3; r++) { fx('burst', G.polar(R[r], th0, 0.4), { color: ACC, count: 22, speed: 7, size: 0.7, life: 0.7 }); fx('shockwave', G.polar(R[r], th0, 0.1), { color: ACC, radius: 2.6, life: 0.5 }); }
       },
     });
+    // anchors in the lane are crushed by the dive (marked for the whole warning)
+    const inLane = (a) => Math.abs(angDiff(a.theta, th0)) * R[a.ring] < hw + 0.3 && Math.abs(angDiff(a.theta, th0)) < PI / 2;
+    try { G.player.anchors.mark(inLane, true); } catch (e) { logE('anchors.mark', e); }
     D.dive = { h, th0, warn, t0: b.clock };
     b.data.jawT = 0.3;
     D.pose = 'dive';
@@ -1080,6 +1109,12 @@
   }
   const STORM_T = 75;   // Storm phase timer (s) before the Maelstrom enrage
   const otherRing = (r, k) => [0, 1, 2].filter(x => x !== r)[k % 2];
+  // the head turns to gather its tail on the far side of where the hero is heading: a deliberate back window
+  async function tailWatch(b, dur) {
+    const tr = b.turnRate;
+    b.faceTo(wrap(b.playerAhead(2.4) + PI)); b.turnRate = 1.3;
+    try { await b.wait(dur); } finally { b.faceTo(null); b.turnRate = tr; }
+  }
   const phases = [
     // ------------------------------------------------------------------ P1 VEIL
     {
@@ -1092,8 +1127,8 @@
         let v = 0;
         b.loop(async () => {
           // the veil: curtains on every ring (gaps offset per ring) most of the time
-          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 0.95, 0.24 * (v++ % 2 ? -1 : 1), { n: 2 }), warn: 2.1, dur: 9.0, dmg: 10 });
-          await b.wait(2.1 + 9.0 + 3.6);
+          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 0.95, 0.24 * (v++ % 2 ? -1 : 1), { n: 2 }), warn: 2.1, dur: 9.0, dmg: 12 });
+          await b.wait(2.1 + 9.0 + 2.8);
         });
         b.loop(async () => {
           // bolts, wisps and lashes woven through the veil
@@ -1112,13 +1147,13 @@
             constrict(b, { warn: 2.5, dmg: 30 });
             await b.wait(0.5);
             await coilLash(b, { ring: 2, warn: 2.0, dur: 2.2, dmg: 26 });
-            b.trackPlayer = false; await b.wait(2.2); b.trackPlayer = true;      // it rests, facing locked: a back window
+            await tailWatch(b, 4.4);      // it turns to gather its tail: a back window
           } else {
             // twin lash: two rings at once, in opposite directions
             const r = b.playerRing(), r2 = otherRing(r, k >> 1);
             coilLash(b, { ring: r, warn: 1.9, dur: 2.3, dmg: 26 });
             await coilLash(b, { ring: r2, dir: -b.playerDir(), from: b.playerTheta() + b.playerDir() * 1.0, warn: 1.9, dur: 2.3, dmg: 26, loop: b.data.loops[1] });
-            await b.wait(0.6);
+            await tailWatch(b, 3.6);
           }
           spawnWisps(b, 2, [0, 2]);
           await b.wait(1.6);
@@ -1133,7 +1168,7 @@
     {
       name: 'Tide', hpStart: 0.75, sky: ['aurora', 1],
       enter(b) { b.turnRate = 0.42; b.trackPlayer = true; b.facingTarget = null; applyArena(b, 1); },
-      update(b, dt) { speedControl(b, dt); },
+      update(b, dt) { speedControl(b, dt); coilCrush(b); },
       async script(b) {
         startBlocker(b);
         b.loop(async () => { await b.wait(7); if (b.data.blk) b.data.blk.piece(0); });
@@ -1143,7 +1178,7 @@
         const tide = (o = {}) => {
           const th = b.playerAhead(o.warn || 2.6), d = b.playerDir();
           const g1 = th + d * (1.4 + G.rand() * 0.6), g2 = th + PI + (G.rand() - 0.5) * 1.0;
-          return tidalPull(b, { gaps: [{ center: g1, width: 0.8 }, { center: g2, width: 0.8 }], warn: o.warn || 2.6, speed: o.speed || 5.4, dmg: 34 });
+          return tidalPull(b, { gaps: [{ center: g1, width: 0.8 }, { center: g2, width: 0.8 }], warn: o.warn || 2.6, speed: o.speed || 5.4, dmg: 36 });
         };
         b.loop(async () => {
           tide();
@@ -1156,10 +1191,13 @@
           spitBolts(b, 3, { t0: 1.4, dt: 0.7, warn: 1.55, dmg: 20 });
           await b.wait(2.4);
           tide({ speed: 6.5, warn: 2.5 });
-          await b.wait(3.2);
-          if (k % 2 === 0) { await coilLash(b, { ring: b.playerRing() === 2 ? 2 : 0, warn: 1.8, dur: 2.2, dmg: 26, loop: b.data.loops[1] }); }
-          else { moonfall(b, 3, { t0: 1.3 }); await b.wait(1.6); spawnWisps(b, 2, [0, 2], { spd: 0.34 }); }
-          await b.wait(1.6);
+          // the shelter is not free: venom lands on the flooded ring ahead of the hero (reverse inside the flood)
+          await b.wait(0.6);
+          spitBolts(b, 2, { ring: 0, t0: 2.4, dt: 1.0, warn: 2.3, dmg: 20 });
+          await b.wait(2.6);
+          if (k % 2 === 0) { await coilLash(b, { ring: b.playerRing() === 2 ? 2 : 0, warn: 1.65, dur: 2.2, dmg: 26, loop: b.data.loops[1] }); }
+          else { moonfall(b, 3, { t0: 1.3 }); await b.wait(1.6); spawnWisps(b, 2, [0, 2], { spd: 0.34 }); await b.wait(0.8); await coilLash(b, { ring: b.playerRing(), warn: 1.65, dur: 2.2, dmg: 26, loop: b.data.loops[1] }); }
+          await b.wait(1.2);
           k++;
         });
         b.loop(async () => { await b.wait(9 + G.rand() * 4); await flipBlocker(b, 1.8); });
@@ -1167,10 +1205,10 @@
         b.loop(async () => {
           await b.wait(3.0);
           // one veiled ring at a time (outer, then inner): the coil body already holds the middle ring
-          curtains(b, { lanes: curtainLanes(b, [v % 2 ? 0 : 2], 1.0, 0.27 * (v++ % 2 ? -1 : 1), { n: 2, offs: [0, 0, PI / 2] }), warn: 2.0, dur: 9.0, dmg: 12 });
+          curtains(b, { lanes: curtainLanes(b, [v % 2 ? 0 : 2], 1.0, 0.27 * (v++ % 2 ? -1 : 1), { n: 2, offs: [0, 0, PI / 2] }), warn: 2.0, dur: 9.0, dmg: 14 });
           await b.wait(2.0 + 9.0 + 1.5);
         });
-        b.loop(async () => { await b.wait(17); await sirenSong(b); await b.wait(5); });
+        b.loop(async () => { await b.wait(15); await sirenSong(b); await b.wait(4); });
       },
     },
     // ------------------------------------------------------------------ P3 BLOOM
@@ -1188,21 +1226,21 @@
           await b.wait(2.4);
           const used = seeds.map(s => s.hazard.ring);
           const free = [0, 1, 2].find(r => r !== used[1] && r !== used[2]);
-          coilLash(b, { ring: free != null ? free : otherRing(b.playerRing(), k), warn: 1.8, dur: 2.2, dmg: 26 });
-          await b.wait(5.6);
-          await venomBeam(b, { warn: 2.4, dur: 3.5, dmg: 32 });
+          coilLash(b, { ring: free != null ? free : otherRing(b.playerRing(), k), warn: 1.65, dur: 2.2, dmg: 28 });
+          await b.wait(4.8);
+          await venomBeam(b, { warn: 2.4, dur: 3.5, dmg: 36 });
           await b.wait(1.0);
           // the bloom veil: curtains, wisps, a lash and moonfall through it
-          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 1.0, 0.29 * (k % 2 ? -1 : 1), { n: 2 }), warn: 2.0, dur: 8.5, dmg: 12 });
+          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 1.1, 0.31 * (k % 2 ? -1 : 1), { n: 2 }), warn: 2.0, dur: 9.0, dmg: 15 });
           await b.wait(2.6);
-          spawnWisps(b, 2, null, { spd: 0.34 });
+          spawnWisps(b, 3, null, { spd: 0.34 });
           await b.wait(1.8);
-          await coilLash(b, { ring: b.playerRing(), warn: 1.7, dur: 2.2, dmg: 26, loop: b.data.loops[1] });
+          await coilLash(b, { ring: b.playerRing(), warn: 1.7, dur: 2.2, dmg: 28, loop: b.data.loops[1] });
           await b.wait(0.8);
-          moonfall(b, 3, { t0: 1.3 });
-          await b.wait(3.4);
-          if (k % 2 === 0) { constrict(b, { warn: 2.4, dmg: 30 }); await b.wait(0.4); moonfall(b, 3, { ring: 2, t0: 1.6 }); await b.wait(2.4); b.trackPlayer = false; await b.wait(2.0); b.trackPlayer = true; }
-          else { starSeeds(b, 2, { t0: 2.1, gap: 2.3, slack: 2.0 }); await b.wait(2.5); spitBolts(b, 3, { t0: 1.4, dt: 0.7, dmg: 20 }); await b.wait(3.5); }
+          moonfall(b, 3, { t0: 1.3, dmg: 22 });
+          await b.wait(2.6);
+          if (k % 2 === 0) { constrict(b, { warn: 2.4, dmg: 32 }); await b.wait(0.4); moonfall(b, 3, { ring: 2, t0: 1.6, dmg: 22 }); await b.wait(2.4); await tailWatch(b, 3.6); }
+          else { starSeeds(b, 2, { t0: 2.1, gap: 2.3, slack: 2.0 }); await b.wait(2.5); spitBolts(b, 3, { t0: 1.4, dt: 0.7, dmg: 22 }); await b.wait(3.5); }
           k++;
         });
         b.loop(async () => { await b.wait(16); await sirenSong(b); await b.wait(8); });
@@ -1227,31 +1265,34 @@
         b.loop(async () => {
           await skyDive(b, { warn: 2.8, dmg: 70 });
           await b.wait(0.6);
-          thunder(b, 3, { warn: 1.45, dmg: 20 });
+          thunder(b, 4, { warn: 1.45, dmg: 22 });
           await b.wait(2.0);
-          await b.wait(1.4);
+          await b.wait(0.8);
           spawnWisps(b, 2, null, { spd: 0.38 });
           await b.wait(1.4);
-          await coilLash(b, { ring: b.playerRing(), warn: 1.6, dur: 2.0, dmg: 28, loop: D.loops[k % 2] });
+          await coilLash(b, { ring: b.playerRing(), warn: 1.6, dur: 2.0, dmg: 30, loop: D.loops[k % 2] });
           await b.wait(0.4);
-          await skyDive(b, { warn: 2.8, dmg: 70 });
+          const dv = skyDive(b, { warn: 2.8, dmg: 70 });
+          await b.wait(0.9);
+          coilLash(b, { ring: b.playerRing(), warn: 1.7, dur: 2.0, dmg: 30, loop: D.loops[(k + 1) % 2] });
+          await dv;
           await b.wait(0.4);
-          thunder(b, 3, { warn: 1.4, dmg: 20 });
+          thunder(b, 3, { warn: 1.4, dmg: 22 });
           await b.wait(2.0);
-          moonfall(b, 3, { t0: 1.2, dt: 0.55, label: 'Storm Lightning' });
+          moonfall(b, 3, { t0: 1.2, dt: 0.55, dmg: 22, label: 'Storm Lightning' });
           await b.wait(1.8);
           k++;
         });
         let v = 0;
         b.loop(async () => {
           await b.wait(0.5);
-          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 0.95, 0.34 * (v % 2 ? -1 : 1), { alt: v++ % 3 === 2, n: 2 }), warn: 1.9, dur: 7.5, dmg: 10 });
-          await b.wait(1.9 + 7.5 + 2.6);
+          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 1.05, 0.36 * (v % 2 ? -1 : 1), { alt: v++ % 3 === 2, n: 2 }), warn: 1.9, dur: 8.0, dmg: 14 });
+          await b.wait(1.9 + 8.0 + 1.8);
         });
         b.loop(async () => {
-          await b.wait(15);
+          await b.wait(12);
           if (D.stormT > 14) await sirenSong(b, { dur: 3.0 });
-          await b.wait(14);
+          await b.wait(13);
         });
         // the storm timer: at 0:00 the Maelstrom completes and the sky strikes every 5 s
         (async () => {
@@ -1273,21 +1314,6 @@
       },
     },
   ];
-
-  // framework workaround (06_combat.js doTransition): if the hero died during the transition cinematic,
-  // C.update's defeat flow already set 'dead', but doTransition then forces 'fight' and runs the phase with a
-  // dead hero (fight never ends). Put the state back to 'dead' and do not start the phase script.
-  for (const ph of phases) {
-    const scr = ph.script, ent = ph.enter;
-    ph.enter = function (b) {
-      if (P() && !P().alive) { if (!C().deathT && G.state === 'fight') G.setState('dead'); return; }
-      return ent && ent.call(this, b);
-    };
-    ph.script = async function (b) {
-      if (P() && !P().alive) return;
-      return scr.call(this, b);
-    };
-  }
 
   // ================================================================ STORM HUD (timer chip)
   function stormHud(b, create) {
@@ -1617,7 +1643,7 @@
   // ================================================================ DEFINITION
   G.bosses[1] = {
     name: 'OUROS', title: 'the Aurora Coil', accent: ACC, sky: 'aurora', music: 1,
-    maxHp: 20500, parTime: 240, hitRadius: 1.5, hitHeight: 3.2, fadeOpacity: 0.32,
+    maxHp: 22000, parTime: 240, hitRadius: 1.5, hitHeight: 3.2, fadeOpacity: 0.32,
     phases,
     build, animate, teardown,
     onTransition: (b, from, to) => transition(b, from, to),

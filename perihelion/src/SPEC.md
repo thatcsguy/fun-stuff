@@ -430,7 +430,7 @@ through the rings (sections of body physically occupy arcs of rings and move). 4
   on different rings ahead of you on a timer (miss one = 20 raid damage and it spawns wisps); combined with curtains
   and coil lash. Aegis reflect on *Venom Beam* (a channelled sweep).
 - **P4 "Storm" (20-0%)**: the storm: everything faster, lightning-lit aurora, the serpent's head dives through the
-  arena (a lethal-tier lane marked across all rings), final enrage cast at 0:00 of a 60 s soft timer (screen shows
+  arena (a lethal-tier lane marked across all rings), final enrage cast at 0:00 of a soft timer (75 s as tuned, `STORM_T` in 10_boss2.js) (screen shows
   the storm closing; if it completes, a heavy hit every 5 s).
 
 ### Boss 3: HELIARCH, the Dying Sun (accent violet, white-hot finale; sky: collapse)
@@ -448,7 +448,7 @@ swollen star with a face-like corona mask; flares lash out from it. 3 phases + d
   everything.
 - **Desperation "Event Horizon" (12-0%)**: only two rings remain (the outer breaks away), the event horizon pulls
   in a little every few seconds, Supernova is fully charged on entry for a final duel: a DPS race against a visible
-  collapse timer (about 45 s; when it reaches zero, the player is consumed). Victory: the sun reignites into a
+  collapse timer (50 s as tuned, `EH_TIME` in 11_boss3.js; when it reaches zero, the player is consumed). Victory: the sun reignites into a
   calm new star (gorgeous moment).
 
 ---------------------------------------------------------------------------------------------------------------

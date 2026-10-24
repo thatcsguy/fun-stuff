@@ -119,6 +119,8 @@ body.touch #practiceHelp .keys{display:none}
 #controls{position:absolute;inset:0;opacity:0;transition:opacity .4s;pointer-events:none}
 #controls.on{opacity:1}
 #controls.on .tbtn,#controls.on .skill{pointer-events:auto}
+#controls.on.cine{opacity:.32}
+#hud.cine #keyHints,#hud.cine #chips{opacity:0}
 .tbtn,.skill{position:absolute;touch-action:none;-webkit-user-select:none;user-select:none;cursor:pointer;border:0;padding:0;background:none}
 .plate{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 35%,rgba(48,38,100,.75),rgba(10,8,30,.82) 70%);
   box-shadow:0 0 0 1.5px rgba(255,201,77,.65),0 0 0 4px rgba(6,4,20,.6),0 0 0 5px rgba(255,201,77,.22),0 6px 18px rgba(0,0,0,.55),inset 0 0 14px rgba(255,201,77,.12)}
@@ -143,6 +145,11 @@ body.touch #practiceHelp .keys{display:none}
 #tOut svg{top:58%!important}
 #tIn .lbl{bottom:auto;top:62%}
 #tOut .lbl{bottom:auto;top:18%}
+/* rocker half that cannot move you: dim at the inner/outer edge; struck through when that ring is disabled (broken away) */
+.rk.edge .ic,.rk.edge .lbl{opacity:.3}
+.rk.void .plate{background:repeating-linear-gradient(135deg,rgba(12,8,30,.88) 0 6px,rgba(70,22,46,.88) 6px 9px)}
+.rk.void .ic{opacity:.2}.rk.void .lbl{color:#ff9fb8}
+.rk.void::after{content:'';position:absolute;left:28%;right:28%;top:46%;height:2px;border-radius:2px;background:#ff8aa8;transform:rotate(-28deg);box-shadow:0 0 6px #ff5f86;pointer-events:none}
 
 /* skills (touch geometry; desktop overrides below) */
 .skill{width:calc(var(--sz)*var(--s));height:calc(var(--sz)*var(--s));right:calc(var(--sar) + var(--rx)*var(--s));bottom:calc(var(--sab) + var(--by)*var(--s))}
@@ -208,7 +215,8 @@ body:not(.touch) .skill .nm{display:block;position:absolute;left:50%;top:-15px;t
   body.touch .chip{font-size:8.5px;letter-spacing:.12em;padding:3px 6px 3px 7px}
   body.touch #say{top:auto;bottom:calc(var(--sab) + 186px * var(--s) + 102px);font-size:13px}
   body.touch #practiceHelp{top:calc(var(--sat) + 74px)}
-  body.touch #phaseBanner{top:20%}
+  body.touch #phaseBanner{top:calc(var(--sat) + 76px)}   /* above the outer ring's top arc */
+  body.touch #phaseBanner .n{font-size:clamp(26px,8vw,40px)}
 }
 /* desktop + landscape: status chips and subtitles live in the side columns, never over the outer ring */
 @media (orientation:landscape){
@@ -301,7 +309,7 @@ body:not(.touch) .skill .nm{display:block;position:absolute;left:50%;top:-15px;t
 .setRow input[type=range]{width:150px;accent-color:#ffc94d}
 .seg{display:flex;border:1px solid rgba(255,201,77,.5);border-radius:2px;overflow:hidden}
 .seg button{background:transparent;border:0;color:#e2cf9c;padding:6px 9px;font:600 11px var(--sans);letter-spacing:.06em;cursor:pointer}
-.seg button.on{background:linear-gradient(180deg,#fff1c2,#e0a83e);color:#1a1204}
+#ui .seg button.on{background:linear-gradient(180deg,#fff1c2,#e0a83e);color:#1a1204}
 .tog{width:46px;height:24px;border-radius:12px;border:1px solid rgba(255,201,77,.6);background:rgba(6,4,20,.8);position:relative;cursor:pointer;padding:0}
 .tog::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#7a6a50;transition:left .15s,background .15s}
 .tog.on::after{left:25px;background:var(--gold);box-shadow:0 0 8px var(--gold)}

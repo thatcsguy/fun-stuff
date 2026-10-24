@@ -177,7 +177,8 @@
           float rim = smoothstep(0.04, 0.5, a) * (1.0 - core);
           float flow = 0.55 + 0.45 * sin(vUv.x * 34.0 - uT * (3.0 + uFlow * 6.0));
           float veins = smoothstep(0.82, 1.0, sin(vUv.x * 90.0 + sin(vUv.y * 20.0) * 2.0 - uT * 2.0)) * core * 0.35;
-          vec3 col = mix(uAcc * 1.8 * flow, uAcc * 0.16, core) + uAcc * veins;
+          vec3 hc = uAcc * 1.8 * flow; hc *= min(1.0, 0.9 / max(0.001, max(hc.r, max(hc.g, hc.b))));   // big floor quad: keep it under the bloom knee
+          vec3 col = mix(hc, uAcc * 0.16, core) + uAcc * veins;
           float alpha = (core * 0.5 + rim * (0.55 + 0.35 * uFlow) * flow + veins) * uA;
           if (alpha < 0.004) discard;
           gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
@@ -211,7 +212,7 @@
           float streak = 0.5 + 0.5 * sin(vUv.x * 46.0 - uT * 7.0 + vUv.y * 6.0);
           float ends = smoothstep(0.0, 0.06, vUv.x) * (1.0 - smoothstep(0.94, 1.0, vUv.x));
           float a = up * up * ends * (0.35 + 0.65 * streak) * uA;
-          gl_FragColor = vec4(mix(uC * 1.5, vec3(1.4), up * 0.35), a);
+          gl_FragColor = vec4(mix(uC * 0.72, vec3(0.85), up * 0.3), a * 0.8); // kept below the bloom knee so the wall reads, not whites out
         }`,
     });
   }
@@ -601,9 +602,6 @@
     D.column.visible = cm.uA.value > 0.01;
     if (casting) cm.uC.value.set(casting.name === 'Solstice' ? ICE : casting.name === 'Vesper Bell' ? DUSK : GOLD_HOT);
     D.column.scale.set(0.6 + 0.6 * colOn, 1, 0.6 + 0.6 * colOn);
-    // the framework's occlusion fade also runs during cinematics (ghosting the Warden in its own close-ups):
-    // switch it off while the camera is scripted
-    b.def.fadeOpacity = (G.cam && G.cam.inCinematic) || (G.combat && G.combat.transitioning) || D.death ? 1 : 0.35;
     // snow
     if (D.snow) updateSnow(D, dt);
     // death choreography
@@ -708,16 +706,7 @@
     const pl = G.layers && G.layers.play; if (pl) pl.worldToLocal(tmpV2);
     return tmpV2.clone();
   }
-  // WORKAROUND (framework bug, reported): 07_player.js nova() sets S.invuln = true and updateNova() never clears
-  // it, so after the first Supernova the hero is invulnerable for the rest of the fight. Clear it once the nova
-  // and its 1 s after-glow are over.
-  function fixNovaInvuln() {
-    const ps = PS(); if (!ps || !ps.invuln || ps.novaActive) return;
-    try { const m = G.player.motion(); if (m.postNovaT > 0 || (G.combat && G.combat.transitioning)) return; } catch (e) { return; }
-    ps.invuln = false;
-  }
   function phaseUpdate(b, dt) {
-    fixNovaInvuln();
     faceUpdate(b, dt);
     const D = b.data;
     // tension: last 10% of HP pushes the music to the top layer
@@ -739,7 +728,7 @@
     const warn = k.warn(o.warn || 2.2), dur = k.dur(o.dur || 2.7);
     quickTurn(b, from, 4.0);
     D.handLenT = 2.4; D.poseT.rear = 0.5; D.twistT = -0.35 * s;
-    const h = b.hz.sweep({ rings, from, to, warn, dur, width: 0.24, dmg: 24, label: 'Meridian Sweep' });
+    const h = b.hz.sweep({ rings, from, to, warn, dur, width: 0.24, dmg: 26, label: 'Meridian Sweep' });
     await b.wait(Math.max(0.3, warn - 0.35));
     lockFacing(b, () => h.hazard.beamAt(h.hazard.lt));
     D.poseT.rear = 0; D.twistT = 0.25 * s;
@@ -766,7 +755,7 @@
         const th = b.playerAhead(w);
         last = th; maxW = Math.max(maxW, w);
         const src = from || G.polar(RING(r) * 0.4, th + 0.6, 22);
-        b.hz.bolt({ from: src, ring: r, theta: th, warn: w, radius: 1.05, dmg: 20, label: 'Hour Strike' });
+        b.hz.bolt({ from: src, ring: r, theta: th, warn: w, radius: 1.05, dmg: 22, label: 'Hour Strike' });
         if (o.sky) world('meteor', '#d8f6ff');
       }
       // the hour strikes twice: the echo volley aims at wherever the hero went
@@ -786,7 +775,7 @@
     for (let j = 0; j < lines; j++) {
       const w = k.warn(j === 0 ? 1.8 : 1.6);
       const th = b.playerAhead(w);
-      for (let r = 0; r < 3; r++) b.hz.bolt({ from: G.polar(4, th + 0.5, 24), ring: r, theta: th, warn: w + r * 0.06, radius: 1.1, dmg: 20, label: 'Falling Hours' });
+      for (let r = 0; r < 3; r++) b.hz.bolt({ from: G.polar(4, th + 0.5, 24), ring: r, theta: th, warn: w + r * 0.06, radius: 1.1, dmg: 22, label: 'Falling Hours' });
       world('meteor', '#d8f6ff');
       await b.wait(1.05);
     }
@@ -805,9 +794,9 @@
       if (front && ps.ring <= 1 && !D.faceLock && !D.cutting) { D.cutting = true; try { await shadowCut(b, { free: true }); } finally { D.cutting = false; } return; }
       const w = (b.phase >= 2 ? 1.1 : 1.2) * (D.warnMul || 1);
       const th = b.playerAhead(w), src = crestTip(b);
-      b.hz.bolt({ from: src, ring: ps.ring, theta: th, warn: w, radius: 1.0, dmg: 13, label: 'Hour Tick' });
+      b.hz.bolt({ from: src, ring: ps.ring, theta: th, warn: w, radius: 1.0, dmg: 15, label: 'Hour Tick' });
       // from Dusk on, the tick is doubled onto a neighbouring ring so a blind shift is punished too
-      if (b.phase >= 1 && b.rand() < 0.6) b.hz.bolt({ from: src, ring: adjRing(b, ps.ring), theta: th, warn: w + 0.15, radius: 1.0, dmg: 13, label: 'Hour Tick' });
+      if (b.phase >= 1 && b.rand() < 0.6) b.hz.bolt({ from: src, ring: adjRing(b, ps.ring), theta: th, warn: w + 0.15, radius: 1.0, dmg: 15, label: 'Hour Tick' });
       // and at Midnight a frost orb sometimes runs at the hero
       if (b.phase >= 2 && b.rand() < 0.35) { const dd = b.playerDir(); b.hz.orb({ ring: ps.ring, theta: ps.theta + dd * 2.6, omega: -dd * 0.45, life: 7, radius: 0.55, dmg: 15, label: 'Frost Orb', color: '#9fefff' }); }
       fx('spark', src, ACC);
@@ -844,7 +833,7 @@
     if (o.three) spots.push([adjRing(b, r), b.playerAhead(w + 0.6)]);
     if (o.ring != null) { spots.length = 0; spots.push([o.ring, b.playerAhead(w)], [o.ring, b.playerTheta() - d * 2.1]); }
     D.poseT.slam = 1;
-    for (const [ring, th] of spots) b.hz.bolt({ from: G.polar(2.0, th, 9), ring, theta: th, warn: w, radius: 0.95, dmg: 16, label: 'Pylon Drop' });
+    for (const [ring, th] of spots) b.hz.bolt({ from: G.polar(2.0, th, 9), ring, theta: th, warn: w, radius: 0.95, dmg: 18, label: 'Pylon Drop' });
     await b.wait(w);
     D.poseT.slam = 0;
     for (const [ring, th] of spots) {
@@ -903,7 +892,7 @@
     if (!o.free) lockFacing(b, c);
     D.twistT = -0.55; D.handLenT = 1.6;
     const warn = k.warn(1.5);
-    const h = b.hz.arc({ rings: [0, 1], center: c, width: 1.15, warn, active: 0.25, dmg: 22, label: 'Shadow Cut' });
+    const h = b.hz.arc({ rings: [0, 1], center: c, width: 1.15, warn, active: 0.25, dmg: 24, label: 'Shadow Cut' });
     await b.wait(warn);
     D.twistT = 0.7;
     await b.wait(0.35);
@@ -927,12 +916,12 @@
     try { G.player.anchors.mark(pred, true); } catch (e) { logE('mark', e); }
     D.handLenT = 3.5; D.poseT.slam = 0.6;
     const warn = k.warn(2.4);
-    const h = b.hz.arc({ rings: [0, 1, 2], center: th, width: half * 2, warn, active: 0.3, dmg: 22, label: 'Shadow Grasp' });
+    const h = b.hz.arc({ rings: [0, 1, 2], center: th, width: half * 2, warn, active: 0.3, dmg: 24, label: 'Shadow Grasp' });
     if (!D.said.grasp && A.length) { D.said.grasp = 1; b.say('The shadow reaches for your anchors: pulse them first!', 2.6); }
     await b.wait(warn);
     try { G.player.anchors.smash(pred); } catch (e) { logE('smash', e); }
     D.poseT.slam = 1;
-    for (let r = 0; r < 3; r++) fx('burst', G.polar(RING(r), th, 0.3), { color: ACC, count: 14, speed: 5, size: 0.5, life: 0.6 });
+    for (let r = 0; r < 3; r++) fx('burst', G.polar(RING(r), th, 0.3), { color: ACC, count: 10, speed: 5, size: 0.42, life: 0.6, flareSize: 1.3 });
     cam('shake', 0.4, 0.3);
     await b.wait(0.5);
     D.poseT.slam = 0; D.handLenT = D.look === 1 ? 1.3 : 1;
@@ -1080,7 +1069,7 @@
     const res = await b.cast({
       name: 'Zenith Hymn', dur: 3.0, interruptible: true,
       onDone: () => {
-        G.player.damage(18, 'Zenith Hymn'); D.emp = 2; D.colBoost = 1;
+        G.player.damage(15, 'Zenith Hymn'); D.emp = 2; D.colBoost = 1;
         fx('flash', GOLD_HOT, 0.3, 0.4); fx('shockwave', V3(0, 0.3, 0), { color: GOLD_HOT, radius: 15, life: 0.9 });
         cam('shake', 0.4, 0.4); b.say('The Warden blazes at zenith: its next strikes quicken!', 2.4);
       },
@@ -1125,7 +1114,7 @@
         await b.wait(1.0);
         if (b.casting && b.casting.name === 'Solstice') {
           const r = b.playerRing();
-          for (let i = 0; i < 3; i++) { const w = 1.5 + i * 0.5; b.hz.bolt({ from: G.polar(2, b.playerAhead(w), 20), ring: r, theta: b.playerAhead(w), warn: w, radius: 1.0, dmg: 18, label: 'Hour Strike' }); }
+          for (let i = 0; i < 3; i++) { const w = 1.5 + i * 0.5; b.hz.bolt({ from: G.polar(2, b.playerAhead(w), 20), ring: r, theta: b.playerAhead(w), warn: w, radius: 1.0, dmg: 20, label: 'Hour Strike' }); }
         }
       } catch (e) { if (!G.combat.isAbort(e)) logE('solstice.side', e); }
     })();
@@ -1202,7 +1191,7 @@
       update: phaseUpdate,
       async script(b) {
         await b.wait(1.2);
-        runCycle(b, [meridian, hourStrike, equinox, pylons, (bb) => hourStrike(bb, { volleys: 2 }), meridian, equinox, shadowCut], [0.6, 1.0]);
+        runCycle(b, [meridian, hourStrike, equinox, pylons, (bb) => hourStrike(bb, { volleys: 2 }), meridian, equinox, shadowCut], [0.5, 0.85]);
         fillerLoop(b, [2.8, 4.0]);
       },
     },
@@ -1216,8 +1205,8 @@
       },
       async script(b) {
         await b.wait(0.8);
-        runCycle(b, [armillary, fallingHours, lengthens, grasp, twinEquinox, (bb) => hourStrike(bb, { sky: true, volleys: 2, plantDur: 3.0 }), pylons, lengthens, equinox, meridian], [0.5, 0.9]);
-        fillerLoop(b, [2.4, 3.4]);
+        runCycle(b, [armillary, fallingHours, lengthens, grasp, twinEquinox, (bb) => hourStrike(bb, { sky: true, volleys: 2, plantDur: 3.0 }), pylons, lengthens, equinox, meridian], [0.35, 0.7]);
+        fillerLoop(b, [2.2, 3.1]);
       },
     },
     {
@@ -1227,8 +1216,8 @@
       async script(b) {
         await b.wait(0.6);
         runCycle(b, [sweepEquinox, longNight, (bb) => hourStrike(bb, { plantDur: 2.6, n: 4, volleys: 2 }), pylonSpin,
-          (bb) => lengthens(bb, { gapW: 0.76, offLo: 0.1, offHi: 0.4, rest: 2.0 }), fallingHours, twinEquinox, grasp], [0.4, 0.7]);
-        fillerLoop(b, [2.0, 3.0]);
+          (bb) => lengthens(bb, { gapW: 0.76, offLo: 0.1, offHi: 0.4, rest: 2.0 }), fallingHours, twinEquinox, grasp], [0.3, 0.55]);
+        fillerLoop(b, [1.8, 2.7]);
       },
     },
   ];
@@ -1396,7 +1385,6 @@
   function teardown(b) {
     const D = b.data || {};
     removeSnow(D);
-    if (b.def) b.def.fadeOpacity = 0.35;
     world('setRingRime', 0);
     try { G.world && G.world.reset && G.world.reset(); } catch (e) { logE('teardown.world', e); }
   }
@@ -1405,7 +1393,7 @@
   G.bosses = G.bosses || [];
   G.bosses[0] = {
     name: 'GNOMON', title: 'the Brass Warden', accent: ACC, sky: 'night', music: 0,
-    maxHp: 18000, parTime: 195, hitRadius: 1.0, hitHeight: 4.6, fadeOpacity: 0.35,
+    maxHp: 18500, parTime: 200, hitRadius: 1.0, hitHeight: 4.6, fadeOpacity: 0.35,
     phases: PHASES,
     build, animate, onTransition, onDeath, teardown,
   };

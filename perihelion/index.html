@@ -178,6 +178,8 @@ body.touch #practiceHelp .keys{display:none}
 #controls{position:absolute;inset:0;opacity:0;transition:opacity .4s;pointer-events:none}
 #controls.on{opacity:1}
 #controls.on .tbtn,#controls.on .skill{pointer-events:auto}
+#controls.on.cine{opacity:.32}
+#hud.cine #keyHints,#hud.cine #chips{opacity:0}
 .tbtn,.skill{position:absolute;touch-action:none;-webkit-user-select:none;user-select:none;cursor:pointer;border:0;padding:0;background:none}
 .plate{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 35%,rgba(48,38,100,.75),rgba(10,8,30,.82) 70%);
   box-shadow:0 0 0 1.5px rgba(255,201,77,.65),0 0 0 4px rgba(6,4,20,.6),0 0 0 5px rgba(255,201,77,.22),0 6px 18px rgba(0,0,0,.55),inset 0 0 14px rgba(255,201,77,.12)}
@@ -202,6 +204,11 @@ body.touch #practiceHelp .keys{display:none}
 #tOut svg{top:58%!important}
 #tIn .lbl{bottom:auto;top:62%}
 #tOut .lbl{bottom:auto;top:18%}
+/* rocker half that cannot move you: dim at the inner/outer edge; struck through when that ring is disabled (broken away) */
+.rk.edge .ic,.rk.edge .lbl{opacity:.3}
+.rk.void .plate{background:repeating-linear-gradient(135deg,rgba(12,8,30,.88) 0 6px,rgba(70,22,46,.88) 6px 9px)}
+.rk.void .ic{opacity:.2}.rk.void .lbl{color:#ff9fb8}
+.rk.void::after{content:'';position:absolute;left:28%;right:28%;top:46%;height:2px;border-radius:2px;background:#ff8aa8;transform:rotate(-28deg);box-shadow:0 0 6px #ff5f86;pointer-events:none}
 
 /* skills (touch geometry; desktop overrides below) */
 .skill{width:calc(var(--sz)*var(--s));height:calc(var(--sz)*var(--s));right:calc(var(--sar) + var(--rx)*var(--s));bottom:calc(var(--sab) + var(--by)*var(--s))}
@@ -267,7 +274,8 @@ body:not(.touch) .skill .nm{display:block;position:absolute;left:50%;top:-15px;t
   body.touch .chip{font-size:8.5px;letter-spacing:.12em;padding:3px 6px 3px 7px}
   body.touch #say{top:auto;bottom:calc(var(--sab) + 186px * var(--s) + 102px);font-size:13px}
   body.touch #practiceHelp{top:calc(var(--sat) + 74px)}
-  body.touch #phaseBanner{top:20%}
+  body.touch #phaseBanner{top:calc(var(--sat) + 76px)}   /* above the outer ring's top arc */
+  body.touch #phaseBanner .n{font-size:clamp(26px,8vw,40px)}
 }
 /* desktop + landscape: status chips and subtitles live in the side columns, never over the outer ring */
 @media (orientation:landscape){
@@ -360,7 +368,7 @@ body:not(.touch) .skill .nm{display:block;position:absolute;left:50%;top:-15px;t
 .setRow input[type=range]{width:150px;accent-color:#ffc94d}
 .seg{display:flex;border:1px solid rgba(255,201,77,.5);border-radius:2px;overflow:hidden}
 .seg button{background:transparent;border:0;color:#e2cf9c;padding:6px 9px;font:600 11px var(--sans);letter-spacing:.06em;cursor:pointer}
-.seg button.on{background:linear-gradient(180deg,#fff1c2,#e0a83e);color:#1a1204}
+#ui .seg button.on{background:linear-gradient(180deg,#fff1c2,#e0a83e);color:#1a1204}
 .tog{width:46px;height:24px;border-radius:12px;border:1px solid rgba(255,201,77,.6);background:rgba(6,4,20,.8);position:relative;cursor:pointer;padding:0}
 .tog::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#7a6a50;transition:left .15s,background .15s}
 .tog.on::after{left:25px;background:var(--gold);box-shadow:0 0 8px var(--gold)}
@@ -826,10 +834,12 @@ const G = window.G = { THREE };
       uShadow: { value: new THREE.Vector3(0.80, 0.84, 1.18) }, uHigh: { value: new THREE.Vector3(1.10, 1.02, 0.86) },
       uSat: { value: 1.06 }, uAspect: { value: 1 }, uTint: { value: new THREE.Vector3(1, 1, 1) }, uDesat: { value: 0 },
       uPulse: { value: new THREE.Vector4(0.5, 0.5, -1, 0) },
+      tAvg: { value: null }, uAvgK: { value: 0 }, uAvgT: { value: 0.18 },
+      tBloom: { value: null }, uBloomOn: { value: 0 }, tAdapt: { value: null }, uAEOn: { value: 0 }, uAET: { value: 0.2 }, uAEMin: { value: 0.5 },
     },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
     fragmentShader: /* glsl */`
-      uniform sampler2D tDiffuse; uniform float uTime, uExposure, uVignette, uGrain, uSat, uAspect, uDesat;
+      uniform sampler2D tDiffuse, tAvg, tAdapt, tBloom; uniform float uBloomOn, uTime, uExposure, uVignette, uGrain, uSat, uAspect, uDesat, uAvgK, uAvgT, uAEOn, uAET, uAEMin;
       uniform vec4 uFlash, uFade, uPulse; uniform vec3 uShadow, uHigh, uTint; varying vec2 vUv;
       vec3 rrt(vec3 v){ vec3 a = v * (v + .0245786) - .000090537; vec3 b = v * (.983729 * v + .4329510) + .238081; return a / b; }
       vec3 aces(vec3 c){
@@ -848,6 +858,18 @@ const G = window.G = { THREE };
           uv -= normalize(dv + 1e-6) / vec2(uAspect, 1.) * w * .02;
         }
         vec3 col = texture2D(tDiffuse, uv).rgb * uTint;
+        // anti-whiteout: a coarse bloom mip is a local average of the over-bright parts of the frame; where a big area
+        // is blown out (a model near the camera, stacked additive fx), compress it so the frame stays readable
+        if (uAvgK > 0.) { float al = dot(texture2D(tAvg, vUv).rgb, vec3(.2126, .7152, .0722)); col *= 1. / (1. + uAvgK * max(0., al - uAvgT)); }
+        // auto exposure (darken only): the adapted average scene luminance is held at or under a per-state target,
+        // so a pale sky, a bright model filling a close-up or stacked fx never wash the whole frame out
+        if (uAEOn > 0.) {
+          float m = texture2D(tAdapt, vec2(.5)).r; float av = m / max(.002, 1. - m);
+          // a hugely over-bright frame (a star filling a close-up) also sheds most of its bloom, which would otherwise
+          // stay as a flat milky haze however far the exposure comes down
+          if (uBloomOn > 0.) col = max(col - texture2D(tBloom, vUv).rgb * smoothstep(.35, 2.5, av) * .8, vec3(0.));
+          col *= max(uAEMin, pow(min(1., uAET / max(av, 1e-4)), .8));
+        }
         col = aces(col);
         // split tone: indigo shadows, warm-gold highlights (display-referred)
         float l = dot(col, vec3(.2126, .7152, .0722));
@@ -864,24 +886,49 @@ const G = window.G = { THREE };
         col *= 1. + g * uGrain;
         col = mix(col, uFlash.rgb, clamp(uFlash.a, 0., .85));
         col = mix(col, uFade.rgb, clamp(uFade.a, 0., 1.));
+        // triangular dither (+-1 LSB) against 8-bit banding of dark gradients (aurora/nebula skies on phones);
+        // pure black stays black so the watchdog still sees a dead frame
+        vec2 fc = gl_FragCoord.xy + fract(uTime * 7.13) * 41.;
+        float dn = fract(52.9829189 * fract(dot(fc, vec2(.06711056, .00583715)))) + fract(52.9829189 * fract(dot(fc.yx + 17.3, vec2(.06711056, .00583715)))) - 1.;
+        col += dn * (1. / 255.) * step(.003, col.r + col.g + col.b);
         gl_FragColor = vec4(col, 1.);
       }`,
   };
 
-  // post API (transient flash/pulses decay on real time)
+  // post API (transient flash/pulses decay on real time, in every tick: fast-forward steps decay them too, so a
+  // screenshot after __game.fastForward shows what a player would see)
   const pulse = { flash: 0, flashDecay: 3, bloomAdd: 0, bloomDecay: 2, shockT: -1, shockDur: 0.8, shockAmt: 1, fade: 0, fadeTarget: 0, fadeRate: 2 };
   const shockPos = new THREE.Vector2();
   G.post = {
     base: { bloom: 0.85, bloomRadius: 0.55, exposure: 1.0, vignette: 0.32, grain: 0.035 },
     FLASH_MAX: 0.55,
     get uniforms() { return gradePass ? gradePass.uniforms : GradeShader.uniforms; },
+    // in normal play ('fight' / 'practice') a bright flash is capped so it never whites the screen out: at most
+    // PLAY_FLASH_MAX, and above 0.2 for at most ~0.3 s (cinematics keep the full FLASH_MAX)
+    PLAY_FLASH_MAX: 0.4, PLAY_BLOOM_MAX: 0.45, PLAY_BLOOM_DUR: 0.9,
+    CINE_BLOOM_MAX: 0.6, CINE_BLOOM_DUR: 1.2,
+    antiWhite: { play: 1.6, cine: 1.0, t: 0.16 },
     flash(color = '#ffffff', amt = 0.5, dur = 0.3) {
       amt = Math.min(G.post.FLASH_MAX, Math.max(0, amt));
       const u = G.post.uniforms.uFlash.value; tmpC.set(color);
+      if ((state === 'fight' || state === 'practice') && (0.2126 * tmpC.r + 0.7152 * tmpC.g + 0.0722 * tmpC.b) > 0.3) {
+        amt = Math.min(amt, G.post.PLAY_FLASH_MAX);
+        if (amt > 0.2) dur = Math.min(dur, 0.3 * amt / (amt - 0.2));
+      } else if ((0.2126 * tmpC.r + 0.7152 * tmpC.g + 0.0722 * tmpC.b) > 0.3 && amt > 0.3) {
+        dur = Math.min(dur, 0.45 * amt / (amt - 0.3));   // cinematic whiteouts: a brief beat (above 0.3 for <= 0.45 s)
+      }
       if (amt >= pulse.flash * 0.7) u.set(tmpC.r, tmpC.g, tmpC.b, 0);
       pulse.flash = Math.max(pulse.flash, amt); pulse.flashDecay = pulse.flash / Math.max(0.05, dur);
     },
-    bloomPulse(add = 0.6, dur = 0.6) { pulse.bloomAdd = Math.max(pulse.bloomAdd, add); pulse.bloomDecay = pulse.bloomAdd / Math.max(0.05, dur); },
+    bloomPulse(add = 0.6, dur = 0.6) {
+      if (state === 'fight' || state === 'practice') { add = Math.min(add, G.post.PLAY_BLOOM_MAX); dur = Math.min(dur, G.post.PLAY_BLOOM_DUR); }
+      else { add = Math.min(add, G.post.CINE_BLOOM_MAX); dur = Math.min(dur, G.post.CINE_BLOOM_DUR); }
+      pulse.bloomAdd = Math.max(pulse.bloomAdd, add); pulse.bloomDecay = pulse.bloomAdd / Math.max(0.05, dur);
+    },
+    get pulses() { return { flash: pulse.flash, bloomAdd: pulse.bloomAdd, fade: pulse.fade }; },
+    // auto exposure settings / test hooks: G.post.ae.snap = true adapts instantly on the next rendered frame
+    get ae() { return AE; },
+    aeRead() { try { if (!AE.last) return null; const b = G.gfx.hdr ? new Uint16Array(4) : new Uint8Array(4); renderer.readRenderTargetPixels(AE.last, 0, 0, 1, 1, b); const m = G.gfx.hdr ? THREE.DataUtils.fromHalfFloat(b[0]) : b[0] / 255; return { m, avg: m / Math.max(0.002, 1 - m) }; } catch (e) { return String(e); } },
     shock(worldPos, amt = 1, dur = 0.8) {
       if (!camera) return; tmpV.copy(worldPos).project(camera); if (tmpV.z > 1) return;
       shockPos.set(tmpV.x * 0.5 + 0.5, tmpV.y * 0.5 + 0.5); pulse.shockT = 0; pulse.shockDur = dur; pulse.shockAmt = amt;
@@ -900,18 +947,32 @@ const G = window.G = { THREE };
       G.post.base.vignette = 0.32; pulse.fadeTarget = 0; pulse.fade = 0; pulse.flash = 0; pulse.bloomAdd = 0;
     },
   };
-  function updatePost(rdt) {
-    const U = G.post.uniforms, b = G.post.base;
-    pulse.flash = Math.max(0, pulse.flash - pulse.flashDecay * rdt); U.uFlash.value.w = pulse.flash;
+  // decay of the transient pulses: runs every tick (rendered or not)
+  function stepPost(rdt) {
+    pulse.flash = Math.max(0, pulse.flash - pulse.flashDecay * rdt);
     pulse.bloomAdd = Math.max(0, pulse.bloomAdd - pulse.bloomDecay * rdt);
-    if (bloom) { bloom.strength = Math.min(2.2, b.bloom + pulse.bloomAdd); bloom.radius = b.bloomRadius; }
     if (pulse.fade !== pulse.fadeTarget) { const d = pulse.fadeRate * rdt; pulse.fade = Math.abs(pulse.fadeTarget - pulse.fade) <= d ? pulse.fadeTarget : pulse.fade + Math.sign(pulse.fadeTarget - pulse.fade) * d; }
+    if (pulse.shockT >= 0) { pulse.shockT += rdt; if (pulse.shockT >= pulse.shockDur) pulse.shockT = -2; }
+  }
+  // uniform writes: rendered frames only
+  function updatePost() {
+    const U = G.post.uniforms, b = G.post.base;
+    U.uFlash.value.w = pulse.flash;
+    if (bloom) { bloom.strength = Math.min(2.2, b.bloom + pulse.bloomAdd); bloom.radius = b.bloomRadius; }
     U.uFade.value.w = pulse.fade;
-    if (pulse.shockT >= 0) {
-      pulse.shockT += rdt; const u = pulse.shockT / pulse.shockDur;
-      if (u >= 1) { pulse.shockT = -1; U.uPulse.value.z = -1; } else U.uPulse.value.set(shockPos.x, shockPos.y, u * 0.9, (1 - u) * pulse.shockAmt);
-    }
+    if (pulse.shockT === -2) { pulse.shockT = -1; U.uPulse.value.z = -1; }
+    else if (pulse.shockT >= 0) { const u = pulse.shockT / pulse.shockDur; U.uPulse.value.set(shockPos.x, shockPos.y, u * 0.9, (1 - u) * pulse.shockAmt); }
     U.uExposure.value = b.exposure; U.uVignette.value = b.vignette; U.uGrain.value = b.grain;
+    // anti-whiteout strength per state (menu off; play strongest; cinematics allow more spectacle)
+    const aw = G.post.antiWhite;
+    U.uBloomOn.value = bloom && bloom.enabled ? 1 : 0; if (bloom) U.tBloom.value = bloom.renderTargetsHorizontal[0].texture;
+    if (bloom && bloom.enabled && bloom.renderTargetsVertical[3]) { U.tAvg.value = bloom.renderTargetsVertical[3].texture; U.uAvgK.value = state === 'fight' || state === 'practice' ? aw.play : (state === 'menu' || state === 'boot') ? 0 : aw.cine; U.uAvgT.value = aw.t; }
+    else U.uAvgK.value = 0;
+    // auto exposure: target per state (play darkest), smoothing on real time (at least one 60 Hz step per rendered frame)
+    AE.K = AE.snap ? 1 : Math.max(G.gfx.hdr ? 0 : 0.12, 1 - Math.exp(-Math.max(G.rdt || 0, 1 / 60) * AE.rate)); AE.snap = false;   // 8-bit: a floor so smoothing never stalls
+    U.uAEOn.value = AE.on && G.aePass && G.aePass.enabled && U.tAdapt.value ? 1 : 0;
+    U.uAET.value = state === 'fight' || state === 'practice' || state === 'intro' || state === 'dead' ? AE.play : (state === 'menu' || state === 'boot') ? AE.menu : AE.cine;
+    U.uAEMin.value = AE.min;
     U.uTime.value = G.now; U.uAspect.value = camera ? camera.aspect : 1;
     if (renderer) renderer.toneMappingExposure = b.exposure;
     // safe level 4 (no post): DOM fallback for flash/fade
@@ -928,6 +989,39 @@ const G = window.G = { THREE };
     flashEl.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:4;display:none;opacity:0';
     document.body.appendChild(flashEl); return flashEl;
   };
+
+  // ------------------------------------------------------------------
+  // Auto-exposure measurement: the frame (after bloom) is reduced to a 64x64 luminance map, then to one adapted value
+  // (1x1 ping-pong, exponential smoothing). Values are stored as l/(1+l) so tiny HDR hot spots cannot dominate.
+  // ------------------------------------------------------------------
+  const AE = { on: true, rate: 2.2, snap: true, i: 0, K: 1, play: 0.12, cine: 0.15, menu: 0.3, min: 0.08, last: null };
+  function makeAEPass() {
+    const type = G.gfx.hdr ? THREE.HalfFloatType : THREE.UnsignedByteType;
+    const mk = (w, h) => new THREE.WebGLRenderTarget(w, h, { type, depthBuffer: false, generateMipmaps: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+    const lumaRT = mk(64, 64), adapt = [mk(1, 1), mk(1, 1)];
+    const qCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), qScene = new THREE.Scene();
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2)); quad.frustumCulled = false; qScene.add(quad);
+    const VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }';
+    const lumaMat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, uniforms: { tDiffuse: { value: null } }, vertexShader: VS,
+      fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ float l = dot(texture2D(tDiffuse, vUv).rgb, vec3(.2126, .7152, .0722)); l = l < 6e4 ? max(l, 0.) : 0.; gl_FragColor = vec4(vec3(l / (1. + l)), 1.); }' });
+    const adaptMat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false, uniforms: { tLuma: { value: null }, tPrev: { value: null }, uK: { value: 1 } }, vertexShader: VS,
+      fragmentShader: `uniform sampler2D tLuma, tPrev; uniform float uK; varying vec2 vUv;
+        void main(){ float s = 0.; for (int j = 0; j < 32; j++) for (int i = 0; i < 32; i++) s += texture2D(tLuma, (vec2(float(i), float(j)) * 2. + 1.) / 64.).r;
+          float cur = s / 1024.; float prev = texture2D(tPrev, vec2(.5)).r; gl_FragColor = vec4(vec3(mix(prev, cur, uK)), 1.); }` });
+    return {
+      enabled: true, needsSwap: false, clear: false, renderToScreen: false, isAE: true,
+      setSize() {}, dispose() { lumaRT.dispose(); adapt[0].dispose(); adapt[1].dispose(); },
+      render(r, writeBuffer, readBuffer) {
+        lumaMat.uniforms.tDiffuse.value = readBuffer.texture; quad.material = lumaMat;
+        r.setRenderTarget(lumaRT); r.render(qScene, qCam);
+        const src = adapt[AE.i], dst = adapt[1 - AE.i];
+        adaptMat.uniforms.tLuma.value = lumaRT.texture; adaptMat.uniforms.tPrev.value = src.texture; adaptMat.uniforms.uK.value = AE.K;
+        quad.material = adaptMat; r.setRenderTarget(dst); r.render(qScene, qCam);
+        AE.i = 1 - AE.i; AE.last = dst;
+        if (gradePass) gradePass.uniforms.tAdapt.value = dst.texture;
+      },
+    };
+  }
 
   function setMSAA() {
     if (!composer) return;
@@ -1130,6 +1224,8 @@ const G = window.G = { THREE };
     const now = performance.now();
     if (watchLeft <= 0 || gfxSafe >= 4 || now - lastCheck < 250) return;
     lastCheck = now;
+    // a deliberate fade / dark flash to black (cinematics) is not a dead pipeline
+    { const fl = G.post.uniforms.uFlash.value; if (pulse.fade > 0.3 || (pulse.flash > 0.3 && fl.x + fl.y + fl.z < 0.3)) { blackRun = 0; return; } }
     let zeros = 0;
     try {
       const gl = renderer.getContext(), w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
@@ -1153,8 +1249,10 @@ const G = window.G = { THREE };
   G.perf = { fps: 60, frameMs: 16.7, calls: 0, tris: 0 };
   const ft = new Float32Array(60); let ftI = 0, ftN = 0, badSince = -1, goodSince = -1, perfStart = 0;
   function adapt(rdt) {
-    if (rdt <= 0 || rdt > 0.25) return;
-    ft[ftI] = rdt * 1000; ftI = (ftI + 1) % 60; ftN = Math.min(60, ftN + 1);
+    // > 1 s is a hitch (tab switch, GC, debugger): skip it; slower-than-4 fps frames still count (as 250 ms) so a
+    // device that renders a few frames a second does step down instead of being ignored
+    if (rdt <= 0 || rdt > 1) return;
+    ft[ftI] = Math.min(250, rdt * 1000); ftI = (ftI + 1) % 60; ftN = Math.min(60, ftN + 1);
     let s = 0; for (let i = 0; i < ftN; i++) s += ft[i];
     const avg = s / ftN; G.perf.frameMs = avg; G.perf.fps = 1000 / avg;
     if (!G.quality.auto || ftN < 60 || G.now - perfStart < 4 || document.hidden) return;
@@ -1192,9 +1290,10 @@ const G = window.G = { THREE };
       if (m && typeof m.update === 'function') { try { m.update(dt); } catch (e) { G.log.error(ORDER[i] + '.update', e); } }
     }
     try { cam.update(rdt); } catch (e) { G.log.error('cam.update', e); }
+    try { stepPost(rdt); } catch (e) { G.log.error('post.step', e); }
     if (!render) return;
     try {
-      updatePost(rdt);
+      updatePost();
       renderer.info.reset();
       if (gfxSafe >= 4) { renderer.setRenderTarget(null); renderer.render(scene, camera); }
       else composer.render(rdt);
@@ -1270,9 +1369,14 @@ const G = window.G = { THREE };
       renderPass = new RenderPass(scene, camera);
       composer.addPass(renderPass);
       bloom = G.bloomPass = new UnrealBloomPass(new THREE.Vector2(256, 256), G.post.base.bloom, G.post.base.bloomRadius, G.gfx.hdr ? 0.92 : 0.72);
+      // guard the bloom input: a single NaN/Inf (or >65k half-float) scene pixel otherwise spreads through the
+      // separable blur into a hard glowing square; clamp extreme HDR so one hot pixel cannot dominate either
+      { const hm = bloom.materialHighPassFilter, k = 'vec4 texel = texture2D( tDiffuse, vUv );';
+        if (hm && hm.fragmentShader.includes(k)) { hm.fragmentShader = hm.fragmentShader.replace(k, k + ' texel.rgb = all(lessThan(abs(texel.rgb), vec3(6e4))) ? min(max(texel.rgb, vec3(0.)), vec3(40.)) : vec3(0.);'); hm.needsUpdate = true; } }
       const bss = bloom.setSize.bind(bloom);
       bloom.setSize = (w, h) => { const s = G.quality.settings.bloomScale; bss(Math.max(8, Math.round(w * s)), Math.max(8, Math.round(h * s))); };
       composer.addPass(bloom);
+      G.aePass = makeAEPass(); composer.addPass(G.aePass);
       gradePass = G.gradePass = new ShaderPass(GradeShader);
       gradePass.needsSwap = false;
       composer.addPass(gradePass);
@@ -2058,7 +2162,9 @@ const G = window.G = { THREE };
     on('reverse', () => sfx('reverse', EV));
     on('playerDamaged', (d) => { if (!d.blocked && d.amount > 0) { sfx('hurt', { gap: 0.15, amount: d.amount }); A.duck(0.35, 0.5); } });
     on('phaseTransition', () => { sfx('swell', EV); A.duck(0.6, 2.5); });
-    on('phaseStart', (d) => { if (typeof d.index === 'number') A.setIntensity(Math.min(3, d.index)); });
+    // intensity per phase comes from the boss definition (G.combat.musicIntensity: the last phase is always layer 3)
+    const phaseLayer = (i) => { try { const c = G.combat; if (c && c.musicIntensity && c.def) return c.musicIntensity(c.def, i); } catch (e) { } return Math.min(3, i | 0); };
+    on('phaseStart', (d) => { if (typeof d.index === 'number') A.setIntensity(phaseLayer(d.index)); });
     on('castStart', (d) => sfx('castStart', { gap: 0.15, interruptible: d.interruptible }));
     on('castEnd', (d) => { if (!d.interrupted) sfx('castDone', EV); });
     on('constellation', (d) => { if (d.active) sfx('constellation', EV); });
@@ -2078,7 +2184,7 @@ const G = window.G = { THREE };
     });
     on('telegraph', (d) => sfx('telegraph', { gap: 0.12, lethal: d.lethal, dur: d.dur ?? d.warn, ticks: d.lethal ? true : false }));
     on('bossDefeated', () => { sfx('bossDeath', EV); A.duck(0.8, 3); });
-    on('fightStart', (d) => { A.setIntensity(Math.min(3, d.fromPhase | 0)); const def = G.combat && G.combat.def; A.music(d.practice || d.bossIndex === 'practice' ? 'practice' : (def && def.music != null ? def.music : d.bossIndex)); });
+    on('fightStart', (d) => { A.setIntensity(phaseLayer(d.fromPhase | 0)); const def = G.combat && G.combat.def; A.music(d.practice || d.bossIndex === 'practice' ? 'practice' : (def && def.music != null ? def.music : d.bossIndex)); });
     on('fightEnd', (d) => { if (d.result === 'victory') A.music('victory'); else if (d.result === 'defeat') A.music('defeat'); });
     on('playerDied', () => A.duck(0.8, 2));
     on('stateChange', (d) => {
@@ -2486,13 +2592,14 @@ const G = window.G = { THREE };
     g.instanceCount = 0;
     const m = new THREE_.ShaderMaterial({
       transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
-      uniforms: { uTex: { value: tex } },
+      uniforms: { uTex: { value: tex }, uK: { value: 1 } },
       vertexShader: /* glsl */`
+        uniform float uK;
         attribute vec4 iPos; attribute vec3 iGly; attribute vec4 iCol; varying vec2 vUv; varying vec4 vC;
         void main(){
           vec4 mv = modelViewMatrix * vec4(iPos.xyz, 1.);
           // constant-ish screen size: scale with distance
-          float s = iPos.w * (-mv.z) * .04;
+          float s = iPos.w * (-mv.z) * .04 * uK;   // uK: smaller on tall portrait screens (sized to the short side)
           mv.xy += (position.xy + iGly.yz) * s;
           gl_Position = projectionMatrix * mv;
           float gi = iGly.x; vec2 cell = vec2(mod(gi, 16.), 5. - floor(gi / 16.));
@@ -2545,6 +2652,7 @@ const G = window.G = { THREE };
       }
     }
     NUM.mesh.geometry.instanceCount = gi;
+    { const w = innerWidth, h = Math.max(1, innerHeight); NUM.mesh.material.uniforms.uK.value = Math.min(1, 1.6 * Math.min(w, h) / h); }
     if (gi) { NUM.aPos.needsUpdate = true; NUM.aGly.needsUpdate = true; NUM.aCol.needsUpdate = true; }
   }
 
@@ -2629,7 +2737,7 @@ const G = window.G = { THREE };
       const cc = tmpC2.setRGB(c.r + (1 - c.r) * wk, c.g + (1 - c.g) * wk, c.b + (1 - c.b) * wk).multiplyScalar(num(o.intensity, 1.6));
       spawnP(p.x + cx * 0.1, p.y + cy * 0.1, p.z + cz * 0.1, cx * s, cy * s, cz * s, cc, sz * (0.5 + Math.random()), life * (0.5 + Math.random() * 0.7), gr, drag, Math.random() < shape ? 1 : 0);
     }
-    if (o.flare !== false) flare(p, { color: o.color, size: num(o.flareSize, sz * 6 + 0.6), life: Math.min(0.35, life * 0.5) });
+    if (o.flare !== false) flare(p, { color: o.color, size: num(o.flareSize, Math.min(2.4, sz * 6 + 0.6)), life: Math.min(0.35, life * 0.5) });
   }
   const tmpC2 = new THREE_.Color();
   function spark(pos, color, o = {}) {
@@ -2991,7 +3099,7 @@ const G = window.G = { THREE };
         gRing_frost = 0.;
         if (uRime > .001) {
           float n = rn(vRingPos.xz * 6.) * .55 + rn(vRingPos.xz * 23.) * .3 + rn(vRingPos.xz * 61.) * .15;
-          gRing_frost = clamp((uRime * 1.05 - .42 + abs(gRing_ac) * .5 - vRingPos.y * 2. - n * .85) * 2.2, 0., 1.) * .62;
+          gRing_frost = clamp((uRime * 1.05 - .42 + abs(gRing_ac) * .5 - vRingPos.y * 2. - n * .85) * 2.2, 0., 1.) * .46;   // capped: the brass must still read gold under the rime
         }`)
         .replace('#include <map_fragment>', `#include <map_fragment>
         { float rr0 = length(vRingPos.xz);
@@ -2999,7 +3107,7 @@ const G = window.G = { THREE };
           float pat = rn(vRingPos.xz * .55) * .6 + rn(vRingPos.xz * 1.7) * .4;
           diffuseColor.rgb *= mix(vec3(.84, .8, .74), vec3(1.08, 1.04, .98), pat);
           diffuseColor.rgb *= .94 + .1 * rn(vec2(rr0 * 55., 1.7)); }
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.34, .46, .58), gRing_frost * .7);`)
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.26, .36, .48), gRing_frost * .7);`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         roughnessFactor *= .78 + .44 * rn(vec2(length(vRingPos.xz) * 38., 3.1)) * (.6 + .4 * rn(vRingPos.xz * .9));
         roughnessFactor = mix(roughnessFactor, .5, gRing_frost);`)
@@ -3059,7 +3167,18 @@ const G = window.G = { THREE };
               vec3 c = mix(uC2, uC1, n) * (.18 + .55 * n * n) + uC1 * pow(n2, 5.) * 1.1 + uC1 * rim * .5;
               gl_FragColor = vec4(c * edge * uA * .52, 1.); }` }));
       flood.position.y = 0.012; flood.visible = false; flood.renderOrder = 2; arena.add(flood);
-      W.rings.push({ i, R, mesh, mat, u: mat.userData.u, halo, flood, gaps: [], chunks: [], glow: { col: new C('#ffffff'), amt: 0, decay: 0, hold: 0 }, arrow: { dir: 1, show: 0, target: 0, flip: 0 }, floodAmt: 0, floodTarget: 0 });
+      const rs = { i, R, mesh, mat, u: mat.userData.u, halo, flood, gaps: [], chunks: [], glow: { col: new C('#ffffff'), amt: 0, decay: 0, hold: 0 }, arrow: { dir: 1, show: 0, target: 0, flip: 0 }, floodAmt: 0, floodTarget: 0 };
+      W.rings.push(rs);
+      // read-only ring state on the exposed mesh (G.world.rings[i].flood etc.) for tests, the bot and bosses
+      Object.defineProperties(mesh, {
+        flood: { get: () => rs.floodAmt, configurable: true },          // current flood level 0..1
+        floodTarget: { get: () => rs.floodTarget, configurable: true },
+        flooded: { get: () => rs.floodTarget > 0.5, configurable: true },
+        arrowDir: { get: () => (rs.arrow.pendingDir != null ? rs.arrow.pendingDir : rs.arrow.dir), configurable: true },   // the direction the chevrons point (+1 ccw)
+        arrowShown: { get: () => rs.arrow.target > 0, configurable: true },
+        broken: { get: () => rs.gaps.map(g => ({ center: g.center, width: g.width })), configurable: true },
+        glowAmt: { get: () => rs.glow.amt, configurable: true },
+      });
     });
   }
 
@@ -3228,7 +3347,9 @@ const G = window.G = { THREE };
           // storm clouds: heavy dark masses with lit edges
           if (uStorm > .001) { float cl = fbm(d * 2.6 + vec3(0., 0., 4.)); float m = smoothstep(.36, .56, cl);
             col = mix(col, col * .18 + vec3(.015, .02, .035), uStorm * m) + vec3(.15, .3, .3) * uStorm * smoothstep(.6, .62, cl) * (1. - smoothstep(.62, .7, cl)) * .3; }
-          gl_FragColor = vec4(col * uGain, 1.);
+          col *= uGain;
+          { vec2 fc = gl_FragCoord.xy; col += (fract(52.9829189 * fract(dot(fc, vec2(.06711056, .00583715)))) - .5) * (1. / 255.); }   // 8-bit cubes: dither
+          gl_FragColor = vec4(max(col, vec3(0.)), 1.);
         }`,
     });
     W.bakeScene.add(new T.Mesh(new T.SphereGeometry(50, 64, 32), W.bakeMat));
@@ -3239,12 +3360,13 @@ const G = window.G = { THREE };
       uTime: { value: 0 }, uStars: { value: 1 }, uPix: { value: 0.0008 }, uStarTint: { value: new C('#ffffff') },
       uHole: { value: 0 }, uHoleDir: { value: new V(0.3, -0.6, -0.7).normalize() }, uHoleR: { value: 0.11 },
       uFlash: { value: 0 }, uFlashCol: { value: new C('#cfe6ff') }, uDim: { value: 0 }, uTwinkle: { value: 1 },
+      uDither: { value: 1 }, uCeil: { value: 10 },   // soft luminance ceiling of the baked sky (play readability; set per frame in update)
     };
     const dome = new T.Mesh(new T.SphereGeometry(SKY_R, 64, 32), new T.ShaderMaterial({
       side: T.BackSide, depthWrite: false, depthTest: false, uniforms: W.domeU,
       vertexShader: 'varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
       fragmentShader: /* glsl */`
-        uniform samplerCube uCubeA, uCubeB; uniform float uMix, uTime, uStars, uPix, uHole, uHoleR, uFlash, uDim, uTwinkle;
+        uniform samplerCube uCubeA, uCubeB; uniform float uMix, uTime, uStars, uPix, uHole, uHoleR, uFlash, uDim, uTwinkle, uCeil, uDither;
         uniform vec3 uHoleDir, uFlashCol, uStarTint; varying vec3 vDir;
         float h13(vec3 p){ p = fract(p * .1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
         vec3 h33(vec3 p){ p = fract(p * vec3(.1031, .1030, .0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
@@ -3270,6 +3392,9 @@ const G = window.G = { THREE };
             pring = (exp(-pow((a - uHoleR * 1.12) / (uHoleR * .05), 2.)) * 1.2 + exp(-pow((a - uHoleR * 1.3) / (uHoleR * .25), 2.)) * .25) * uHole;
           }
           vec3 col = mix(textureCube(uCubeA, dl).rgb, textureCube(uCubeB, dl).rgb, uMix);
+          // soft knee on the nebula/aurora luminance: bright skies keep their hue and structure but stay dark enough
+          // behind the play area that gold rings, the knight and the accent telegraphs pop
+          { float l = max(dot(col, vec3(.2126, .7152, .0722)), .5 * max(col.r, max(col.g, col.b))); col *= uCeil * (1. - exp(-l / uCeil)) / max(l, 1e-5); }
           vec3 st = starLayer(dl, 70., .16, .0008, 1.9) + starLayer(dl, 180., .22, .00058, 1.15) + starLayer(dl, 420., .3, .00045, .7);
           col += min(st * uStars * uStarTint, vec3(.8));
           col *= 1. + uFlash * 3.;
@@ -3277,6 +3402,9 @@ const G = window.G = { THREE };
           col = mix(col, vec3(0.), shadow);
           col += vec3(1.1, .9, .7) * pring * .6;
           col *= 1. - uDim;
+          // triangular dither at the step of an 8-bit linear target (safe level 2+ / no float targets): no sky banding
+          { vec2 fc = gl_FragCoord.xy + fract(uTime * 7.13) * 41.; float n = fract(52.9829189 * fract(dot(fc, vec2(.06711056, .00583715)))) + fract(52.9829189 * fract(dot(fc.yx + 17.3, vec2(.06711056, .00583715)))) - 1.;
+            col += n * uDither * (.6 / 255.) * step(.0005, col.r + col.g + col.b); col = max(col, vec3(0.)); }
           gl_FragColor = vec4(col, 1.);
           ${SHADER_TAIL}
         }`,
@@ -3664,7 +3792,7 @@ const G = window.G = { THREE };
     if (dur === 0) { lerpParams(W.tr.from, target, 1, W.cur); W.domeU.uMix.value = back; }
     // set-piece moments
     if (prevPreset === preset && L > prevLevel) {
-      if (preset === 'collapse' && L === 2) { W.collapseFlash = 1.0; G.post?.bloomPulse?.(1.2, 2.5); }
+      if (preset === 'collapse' && L === 2) { W.collapseFlash = 1.0; G.post?.bloomPulse?.(1.0, 1.1); }   // short: the implosion must stay visible
       if (preset === 'collapse' && L === 3) { W.collapseFlash = 0.6; }
       if (preset === 'night' && L === 1) W.conDraw = 0;
     }
@@ -3736,7 +3864,7 @@ const G = window.G = { THREE };
     for (const r of ringsOf(i)) {
       const d = dir < 0 ? -1 : 1;
       if (r.arrow.show > 0.3 && d !== r.arrow.dir && show) { r.arrow.pendingDir = d; r.arrow.flip = 1; try { G.fx?.ringFlash?.(r.i, { color: W.accent.getStyle(), life: 0.4, intensity: 1.2 }); } catch (e) { /* */ } }
-      else r.arrow.dir = d;
+      else { r.arrow.dir = d; r.arrow.pendingDir = null; }
       r.arrow.target = show ? 1 : 0;
       r.u.uArrowCol.value.copy(W.accent).multiplyScalar(1.1);
     }
@@ -3763,7 +3891,7 @@ const G = window.G = { THREE };
       r.gaps = []; r.u.uGapN.value = 0;
       for (const c of r.chunks) { G.layers.arena.remove(c.mesh); c.mesh.geometry.dispose(); }
       r.chunks = [];
-      r.glow.amt = 0; r.arrow.show = 0; r.arrow.target = 0; r.arrow.flip = 0; r.u.uArrowShow.value = 0;
+      r.glow.amt = 0; r.arrow.show = 0; r.arrow.target = 0; r.arrow.flip = 0; r.arrow.pendingDir = null; r.u.uArrowShow.value = 0;
       r.floodAmt = r.floodTarget = 0; r.flood.visible = false; r.u.uFlood.value = 0;
     }
     W.rime = W.rimeTarget = 0;
@@ -3820,7 +3948,20 @@ const G = window.G = { THREE };
       L.rim.color.copy(p.rim).lerp(W.accent, 0.25); L.rim.intensity = p.rimI;
       L.hemi.color.copy(p.hemiS); L.hemi.groundColor.copy(p.hemiG); L.hemi.intensity = p.hemiI;
     }
-    if (G.post) { G.post.base.exposure = p.exposure; G.post.base.bloom = p.bloom; }
+    // readability caps: during play the sky is soft-capped and bloom/exposure are held down, so every in-fight frame
+    // keeps a dark backdrop; cinematics (transitions, deaths) get looser caps for the spectacle; the menu is uncapped
+    {
+      const RD = G.world.readability, st = G.state;
+      const play = st === 'fight' || st === 'practice' || st === 'intro' || st === 'dead' || st === 'paused';
+      const cine = st === 'cinematic' || st === 'victory';
+      const want = play ? RD.ceil : cine ? RD.ceilCine : 10;
+      W.ceil = W.ceil == null ? want : W.ceil + (want - W.ceil) * Math.min(1, (G.rdt || dt) * 2.5);
+      W.domeU.uCeil.value = W.ceil;
+      let ex = p.exposure, bl = p.bloom;
+      if (play) { ex = Math.min(ex, RD.expMax); bl = Math.min(bl, RD.bloomMax); }
+      else if (cine) { ex = Math.min(ex, RD.expMaxCine); bl = Math.min(bl, RD.bloomMaxCine); }
+      if (G.post) { G.post.base.exposure = ex; G.post.base.bloom = bl; }
+    }
     // menu orrery
     const mw = p.menu;
     W.menu.visible = mw > 0.01; W.menu.scale.setScalar(Math.max(0.001, mw));
@@ -3843,7 +3984,7 @@ const G = window.G = { THREE };
       u.uGlowCol.value.copy(r.glow.col); u.uGlow.value = r.glow.amt;
       // arrows (flip: fade out, swap dir, fade in)
       const ar = r.arrow;
-      if (ar.flip > 0) { ar.show = Math.max(0, ar.show - dt * 6); if (ar.show <= 0.01) { ar.dir = ar.pendingDir ?? ar.dir; ar.flip = 0; } }
+      if (ar.flip > 0) { ar.show = Math.max(0, ar.show - dt * 6); if (ar.show <= 0.01) { ar.dir = ar.pendingDir ?? ar.dir; ar.pendingDir = null; ar.flip = 0; } }
       else ar.show += (ar.target - ar.show) * Math.min(1, dt * 6);
       u.uArrowDir.value = ar.dir; u.uArrowShow.value = ar.show;
       // flood
@@ -3907,7 +4048,19 @@ const G = window.G = { THREE };
     meteor: (c) => ready && meteor(c), lightning: (c) => ready && skyBolt(c),
     get sky() { return { preset: W.preset, intensity: W.level, transitioning: !!(W.tr && W.tr.t < 1) }; },
     get rings() { return W.rings ? W.rings.map((r) => r.mesh) : []; },
+    // plain snapshot of every ring's state: flood, inlay arrows, breaks, glow
+    ringState(i) {
+      const snap = (r) => ({ i: r.i, R: r.R, flood: r.floodAmt, floodTarget: r.floodTarget, flooded: r.floodTarget > 0.5,
+        arrowDir: r.arrow.pendingDir != null ? r.arrow.pendingDir : r.arrow.dir, arrowShown: r.arrow.target > 0, arrowShow: r.arrow.show,
+        broken: r.gaps.map(g => ({ center: g.center, width: g.width })), glow: r.glow.amt,
+        glowLeft: r.glow.amt > 0.005 ? (r.glow.decay > 0 ? r.glow.amt / r.glow.decay : Infinity) : 0 });   // seconds until a timed glow fades
+      if (!W.rings) return i == null ? [] : null;
+      if (i == null) return W.rings.map(snap);
+      const r = W.rings[i | 0]; return r ? snap(r) : null;
+    },
     ringTopY: 0,
+    // play readability caps (see update): sky luminance knee (linear, pre-grade), max exposure and bloom strength
+    readability: { ceil: 0.05, ceilCine: 0.09, expMax: 1.0, bloomMax: 0.86, expMaxCine: 1.04, bloomMaxCine: 0.98 },
     _W: W,
   };
 })();
@@ -3984,11 +4137,17 @@ const G = window.G = { THREE };
     void main(){ vUv = uv; vec4 wp = modelMatrix * vec4(position,1.0); vP = wp.xz; gl_Position = projectionMatrix * viewMatrix * wp; }`;
   const TELE_FS = `
     precision highp float;
-    uniform vec3 uColor; uniform float uProgress, uTime, uLethal, uAlpha, uFire, uLive, uMode, uArrow, uWaveR, uWaveW, uSwept;
+    uniform vec3 uColor; uniform float uProgress, uTime, uLethal, uAlpha, uFire, uLive, uMode, uArrow, uWaveR, uWaveW, uSwept, uSoft, uCap;
     uniform vec2 uSize;
     varying vec2 vUv; varying vec2 vP;
     void main(){
       vec3 acc = uColor; vec3 col = acc; float a = 0.0;
+      // the hazard hue at full saturation (max channel 1): live fills and the fire flash are tinted with it and
+      // scaled by uCap (set per frame from the sky's bloom), so bloom never turns a live shape into a white blob
+      // fills use a saturation-boosted accent: pale accents (ice cyan, lavender) otherwise wash toward white over gold
+      float accC = max(acc.r, max(acc.g, acc.b)) - min(acc.r, min(acc.g, acc.b));   // chroma: very pale accents get a stronger push
+      vec3 accS = max(mix(vec3(dot(acc, vec3(0.2126, 0.7152, 0.0722))), acc, clamp(0.5 / max(accC, 0.01), 1.35, 3.0)), vec3(0.0));
+      vec3 tint = accS / max(0.001, max(accS.r, max(accS.g, accS.b)));
       float pulse = 0.5 + 0.5 * sin(uTime * mix(5.0, 19.0, uProgress));
       if (uMode < 0.5 || uMode > 5.5) {
         float dx = min(vUv.x, 1.0 - vUv.x) * uSize.x;
@@ -4018,15 +4177,18 @@ const G = window.G = { THREE };
           if (uSwept > 0.0) sw = step(uSwept, vUv.x);
           if (uSwept < 0.0) sw = step(vUv.x, 1.0 + uSwept);
           // unfilled part shades the gold track in a dark accent tint; the fill is the saturated accent
-          float base = 0.22 + 0.04 * pulse;
+          float base = 0.26 + 0.04 * pulse;
           float fillA = filled * (0.2 + 0.08 * pulse + 0.08 * uLethal * pulse);
           a = base + fillA + front * 0.5 + hatch * filled * 0.2 + chev * 0.22;
-          col = mix(acc * 0.18, acc * 0.95, filled) + acc * front * 0.8 + vec3(chev * 0.25);
-          if (uLive > 0.5) { a = 0.5 + 0.15 * sin(uTime * 30.0 + (vP.x - vP.y) * 2.0); col = mix(acc * 1.15, vec3(1.2), 0.2); }
+          col = mix(accS * 0.12, accS * 0.95, filled) + acc * front * 0.8 + vec3(chev * 0.25);
+          if (uLive > 0.5) {
+            if (uSoft > 0.5) { a = 0.30 + 0.05 * pulse; col = tint * 0.62 * uCap; }     // long-lived hazards: a calm, solid fill
+            else { a = 0.42 + 0.10 * sin(uTime * 30.0 + (vP.x - vP.y) * 2.0); col = mix(tint, vec3(1.0), 0.12) * 0.9 * uCap; }
+          }
           // dark rim behind the bright edge so it reads on gold metal
           col = mix(col, vec3(0.0, 0.0, 0.02), rim * 0.85);
           a = max(a, rim * 0.55);
-          col = mix(col, acc * 1.9 + vec3(0.2), edge);
+          col = mix(col, (acc * 1.9 + vec3(0.2)) * mix(1.0, 0.8 * uCap, uLive), edge);   // live edges are capped too
           a = max(a, edge * (0.75 + 0.25 * pulse));
           a *= sw;
           a *= uAlpha;
@@ -4042,10 +4204,10 @@ const G = window.G = { THREE };
         float front = (1.0 - smoothstep(0.0, 0.04, abs(f - uProgress))) * step(0.02, uProgress);
         float cross = (1.0 - smoothstep(0.02, 0.06, min(abs(vUv.x - 0.5), abs(vUv.y - 0.5)) * uSize.x)) * step(rr, 0.45) * 0.6;
         a = 0.22 + filled * (0.22 + 0.1 * pulse) + front * 0.55 + cross;
-        col = mix(acc * 0.18, acc * 0.95, filled) + acc * front * 0.8;
-        if (uLive > 0.5) { a = 0.8; col = vec3(1.3); }
+        col = mix(accS * 0.12, accS * 0.95, filled) + acc * front * 0.8;
+        if (uLive > 0.5) { a = 0.62; col = mix(tint, vec3(1.0), 0.2) * 0.95 * uCap; }
         col = mix(col, vec3(0.0, 0.0, 0.02), rim * 0.85); a = max(a, rim * 0.55);
-        col = mix(col, acc * 2.2 + vec3(0.25), edge); a = max(a, edge);
+        col = mix(col, (acc * 2.2 + vec3(0.25)) * mix(1.0, 0.8 * uCap, uLive), edge); a = max(a, edge);
         a *= uAlpha;
       } else if (uMode < 2.5) { // wave band
         float rr = length(vP);
@@ -4084,7 +4246,8 @@ const G = window.G = { THREE };
         a = (band * (on * 0.95 + 0.12) + inner * (0.6 + 0.4 * pulse)) * uAlpha;
         col = mix(col, vec3(1.6), inner);
       }
-      a += uFire * 0.6; col = mix(col, vec3(2.0), uFire * 0.7);
+      // fire pop: a quarter-second impact cue, kept near the bloom knee so a big shape flashes its hue, not white
+      a += uFire * 0.38 * (1.0 - 0.5 * uSoft); col = mix(col, mix(tint, vec3(1.0), 0.3) * 1.02 * uCap, uFire * 0.65);
       if (a < 0.004) discard;
       gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
     }`;
@@ -4097,7 +4260,7 @@ const G = window.G = { THREE };
         uniforms: {
           uColor: { value: new T3.Color() }, uProgress: { value: 0 }, uTime: { value: 0 }, uLethal: { value: 0 }, uAlpha: { value: 1 },
           uFire: { value: 0 }, uLive: { value: 0 }, uMode: { value: 0 }, uArrow: { value: 0 }, uWaveR: { value: 0 }, uWaveW: { value: 0.45 },
-          uSwept: { value: 0 }, uSize: { value: new T3.Vector2(1, 1) },
+          uSwept: { value: 0 }, uSize: { value: new T3.Vector2(1, 1) }, uSoft: { value: 0 }, uCap: { value: 1 },
         },
       });
     }
@@ -4108,6 +4271,7 @@ const G = window.G = { THREE };
     if (opts.lethal) m.uniforms.uLethal.value = 1;
     if (opts.arrow) m.uniforms.uArrow.value = opts.arrow;
     if (opts.additive) m.blending = T3.AdditiveBlending;
+    if (opts.soft) m.uniforms.uSoft.value = 1;
     return m;
   }
 
@@ -4185,7 +4349,12 @@ const G = window.G = { THREE };
     return h;
   }
   function addMesh(h, mesh) { h.group.add(mesh); if (mesh.material && mesh.material.uniforms) h.mats.push(mesh.material); return mesh; }
+  // live look: 'flash' (pulsing tinted fill, the default for short hazards) or 'soft' (calm fill; the default for
+  // hazards that stay live 2.5 s or more, e.g. rotors and long customs). Per hazard: o.liveStyle = 'soft' | 'flash'.
   function register(h) {
+    const ls = h.o && h.o.liveStyle;
+    h.liveStyle = ls === 'soft' || ls === 'flash' ? ls : (h.active >= 2.5 && h.active !== Infinity ? 'soft' : 'flash');
+    if (h.liveStyle === 'soft') for (const m of h.mats) if (m.uniforms.uSoft) m.uniforms.uSoft.value = 1;
     const layer = (G.layers && G.layers.fx) || G.scene;
     if (layer && h.group.children.length) layer.add(h.group);
     HZ.active.push(h);
@@ -4238,7 +4407,7 @@ const G = window.G = { THREE };
     h.onFire = () => {
       for (const r of h.rings) fx('ringFlash', r, { color: h.color, a0: h.center - h.width / 2, a1: h.center + h.width / 2, life: 0.5 });
       const R = RINGS();
-      for (const r of h.rings) for (let k = -1; k <= 1; k++) fx('burst', polar(R[r], h.center + k * h.width * 0.3, 0.3), { color: h.color, count: 10, speed: 4, size: 0.5, life: 0.6 });
+      for (const r of h.rings) for (let k = -1; k <= 1; k++) fx('burst', polar(R[r], h.center + k * h.width * 0.3, 0.3), { color: h.color, count: 7, speed: 4, size: 0.5, life: 0.6, flareSize: 1.2 });   // small flares: nine of them bloom into a white slab
       sfx('crack', { vol: h.lethal ? 1 : 0.7 });
       if (h.lethal) cam('shake', 0.5, 0.35);
     };
@@ -4317,7 +4486,7 @@ const G = window.G = { THREE };
     world('ringGlow', h.ring, h.color, h.lethal ? 1 : 0.7, h.warn + h.active);
     h.onFire = () => {
       for (const [a0, a1] of complementArcs(h.gaps)) fx('ringFlash', h.ring, { color: h.color, a0, a1, life: 0.7 });
-      for (let i = 0; i < 10; i++) { const th = i / 10 * TAU; if (!inGaps(th, h.gaps, 0)) fx('burst', polar(R, th, 0.3), { color: h.color, count: 8, speed: 5, size: 0.5, life: 0.7 }); }
+      for (let i = 0; i < 10; i++) { const th = i / 10 * TAU; if (!inGaps(th, h.gaps, 0)) fx('burst', polar(R, th, 0.3), { color: h.color, count: 8, speed: 5, size: 0.5, life: 0.7, flareSize: 1.2 }); }
       sfx(h.lethal ? 'thunder' : 'crack', {});
       cam('shake', h.lethal ? 0.8 : 0.4, 0.4);
       if (h.lethal) fx('flash', h.color, 0.25, 0.25);
@@ -4548,7 +4717,7 @@ const G = window.G = { THREE };
         if (r.blocked) return;    // Aegis holds you up
         const R = RINGS();
         let d = 1;
-        const ok = (k) => k >= 0 && k < R.length && !HZ.gapAt(k, pl.theta);
+        const ok = (k) => k >= 0 && k < R.length && !HZ.gapAt(k, pl.theta) && (!G.player.ringOk || G.player.ringOk(k));
         if (ok(pl.ring + 1)) d = 1; else if (ok(pl.ring - 1)) d = -1; else d = pl.ring < 2 ? 1 : -1;
         try { G.player.forceShift && G.player.forceShift(d, { fall: true }); } catch (e) { logE('forceShift', e); }
         sfx('bump', {});
@@ -4635,8 +4804,16 @@ const G = window.G = { THREE };
   };
   HZ.list = () => HZ.active.filter(h => !h.finished);
 
+  // live-fill brightness cap: brighter skies (more bloom) and LDR targets (lower bloom threshold) get dimmer fills
+  function liveCap() {
+    const bl = (G.post && G.post.base && G.post.base.bloom) || 0.85;
+    let c = clamp(1.05 - (bl - 0.8) * 0.9, 0.7, 1.0);
+    if (G.gfx && G.gfx.hdr === false) c *= 0.88;
+    return c;
+  }
   function updateHazards(dtH, dt) {
     const pl = P();
+    const cap = liveCap();
     const canHit = pl && PLAY(G.state) && pl.alive;
     for (const h of HZ.active.slice()) {
       if (h.dead) continue;
@@ -4659,7 +4836,7 @@ const G = window.G = { THREE };
       // telegraph uniforms
       const prog = h.warn > 0 ? clamp(h.lt / h.warn, 0, 1) : 1;
       for (const m of h.mats) {
-        const u = m.uniforms; u.uTime.value = h.visTime;
+        const u = m.uniforms; u.uTime.value = h.visTime; if (u.uCap) u.uCap.value = cap;
         if (u.uMode.value === 0 || u.uMode.value === 1 || u.uMode.value === 5) { u.uProgress.value = prog; u.uLive.value = (h.state === 'live' && h.kind !== 'sweep' && h.kind !== 'wave' && h.kind !== 'orb' && h.kind !== 'soak') ? 1 : 0; }
         u.uFire.value = h.fireFlash;
       }
@@ -4951,7 +5128,8 @@ const G = window.G = { THREE };
     const src = info.source || 'strike';
     const st = G.player && G.player.stats; if (st && st.damageBySkill) st.damageBySkill[src] = (st.damageBySkill[src] || 0) + amt;
     const crit = !!(behind && info.behindEligible !== false) || !!info.crit;
-    if (!G.settings || G.settings.numbers !== false) fx('number', pos, amt, { crit, color: crit ? '#fff1c2' : '#ffc94d' });
+    // Strike ticks (2+ per second) stay small and short so the big hits (Comet, lances, Nova) read
+    if (!G.settings || G.settings.numbers !== false) fx('number', pos, amt, src === 'strike' ? { crit, color: crit ? '#ffe9a8' : '#e9b850', size: crit ? 0.95 : 0.7, life: 0.7, rise: 1.1 } : { crit, color: crit ? '#fff1c2' : '#ffc94d' });
     b.hitFlash = 1;
     emit('bossDamaged', { amount: amt, source: src, crit, behind, pos });
     return amt;
@@ -4984,8 +5162,10 @@ const G = window.G = { THREE };
     b.invulnerable = true;
     pendingTransition = { from, to };
   }
+  const heroDown = () => { const p = P(); return !!(p && !p.alive) || C.deathT > 0 || G.state === 'dead'; };
   async function doTransition(from, to) {
     const b = C.boss; if (!b) return;
+    if (heroDown()) { pendingTransition = null; return; }      // the hero fell on the threshold frame: the defeat flow wins
     const fc = C.fightCount;
     C.transitioning = true; b.invulnerable = true;
     abortScripts(b);
@@ -4994,14 +5174,21 @@ const G = window.G = { THREE };
     emit('phaseTransition', { from, to });
     const ph = b.def.phases[to] || {};
     if (ph.sky !== false) { const sk = skyFor(b.def, to); world('setSky', sk[0], sk[1], ph.skyDur != null ? ph.skyDur : 2.5); }
-    try { G.audio && G.audio.setIntensity && G.audio.setIntensity(Math.min(3, to)); } catch (e) { }
+    try { G.audio && G.audio.setIntensity && G.audio.setIntensity(musicIntensity(b.def, to)); } catch (e) { }
     let p;
     try { p = b.def.onTransition ? b.def.onTransition(b, from, to) : defaultTransition(b, from, to); } catch (e) { logE('onTransition', e); }
     await raceTimeout(p, 9);
     if (fc !== C.fightCount || C.boss !== b) return;
     await flowWait(0.15);
     if (fc !== C.fightCount || C.boss !== b) return;
-    C.transitioning = false; b.invulnerable = false;
+    C.transitioning = false;
+    if (heroDown()) {
+      // the hero died during the cinematic (e.g. a raid hit queued on the same frame): never resume the fight;
+      // finish the defeat flow here if it did not already run
+      if (G.state !== 'dead' && !(C.deathT > 0)) { C.deathPhase = from; C.deathT = 0.01; }
+      return;
+    }
+    b.invulnerable = false;
     setState(C.practice ? 'practice' : 'fight');
     runPhase(b, to);
   }
@@ -5013,6 +5200,17 @@ const G = window.G = { THREE };
     return [(typeof sk === 'string' && sk) || def.sky || 'night', Math.min(3, i)];
   }
   C.skyFor = skyFor;
+  // music intensity layer (0-3) for phase i: phase.intensity, else def.intensity[i], else spread over the phases so
+  // the last phase always reaches the top layer (3 phases: 0, 2, 3; 4 phases: 0, 1, 2, 3)
+  function musicIntensity(def, i) {
+    const phs = (def && def.phases) || [], ph = phs[i] || {};
+    if (typeof ph.intensity === 'number') return clamp(Math.round(ph.intensity), 0, 3);
+    if (def && Array.isArray(def.intensity) && typeof def.intensity[i] === 'number') return clamp(Math.round(def.intensity[i]), 0, 3);
+    const n = phs.length;
+    if (n <= 1) return 0;
+    return clamp(Math.round(i * 3 / (n - 1)), 0, 3);
+  }
+  C.musicIntensity = musicIntensity;
   function defaultTransition(b) {
     fx('flash', b.def.accent || accentHex(), 0.35, 0.6);
     fx('shockwave', new T3.Vector3(0, 0.3, 0), { color: b.def.accent || accentHex(), radius: 16, life: 1.2 });
@@ -5114,7 +5312,8 @@ const G = window.G = { THREE };
     b.phase = fromPhase; C.startPhase = fromPhase;
     buildRearSigil();
     try { G.player && G.player.reset && G.player.reset({ keepStats, practice, meter: opts.meter }); } catch (e) { logE('player.reset', e); }
-    C.introT = opts.skipIntro || (G.params && (G.params.bot || G.params.skipintro)) ? 0.4 : (practice ? 1.8 : 2.6);
+    const quick = opts.skipIntro === false ? false : !!(opts.skipIntro || (G.params && (G.params.bot || G.params.skipintro)));
+    C.introT = quick ? 0.4 : (practice ? 1.8 : 2.6);
     setState('intro');
     emit('fightStart', { bossIndex: C.bossIndex, practice, fromPhase, name: def.name, title: def.title, accent });
     return true;
@@ -5203,7 +5402,9 @@ const G = window.G = { THREE };
     if (fadeCheck <= 0) {
       fadeCheck = 0.1;
       const pl = P(); let want = false;
-      if (pl && pl.pos && b.root.visible) {
+      // never ghost the boss in its own close-ups: cinematics (transitions, Supernova, death), transitions, death
+      const scripted = (G.cam && G.cam.inCinematic) || C.transitioning || !b.alive || b.dying || G.state === 'cinematic' || G.state === 'victory';
+      if (pl && pl.pos && b.root.visible && !scripted) {
         fadeBox.setFromObject(b.model);
         if (!fadeBox.isEmpty()) {
           // hero on the far side of the boss (screen-wise) and inside its projected box
@@ -5288,7 +5489,7 @@ const G = window.G = { THREE };
     }
     if (!C.boss) { if (HZ.active.length) updateHazards(dt * HZ.speed, dt); return; }
     if (st === 'intro') {
-      C.introT -= rdt;
+      C.introT -= dt;              // game time: fast-forward and pause behave like real play
       if (C.introT <= 0) beginFight();
     }
     if (st === 'fight') C.fightTime += dt;
@@ -5298,6 +5499,7 @@ const G = window.G = { THREE };
       updateAdds(dtH, dt);
       updateBoss(dt);
     }
+    if (pendingTransition && heroDown()) pendingTransition = null;
     if (pendingTransition && PLAY(G.state) && !(P() && P().novaActive)) {
       const p = pendingTransition; pendingTransition = null;
       doTransition(p.from, p.to);
@@ -5336,6 +5538,7 @@ const G = window.G = { THREE };
       if (!C.boss || C.practice) return;
       C.deathPhase = C.boss.phase;
       C.deathT = 1.8;
+      pendingTransition = null;
     });
   };
 
@@ -5349,39 +5552,42 @@ const G = window.G = { THREE };
       name: 'Practice', hpStart: 1.0,
       enter(b) { b.turnRate = 0.3; },
       async script(b) {
+        // lesson lines name the control the player actually has: keys on desktop, buttons on touch
+        const K = (key, btn) => G.isTouch ? btn : key;
+        const say = (t) => b.say(t, 4.4);
         b.loop(async () => {
           await b.wait(12);
-          b.say('Interruptible cast: press ECLIPSE (E) before it ends');
+          say('Gold-framed cast: press ' + K('ECLIPSE (E)', 'the ECLIPSE button') + ' before it ends');
           await b.cast({ name: 'Practice Hymn', dur: 3.5, interruptible: true, onInterrupt: () => b.say('Interrupted! The dummy is staggered: x1.3 damage'), onDone: () => b.say('Cast completed. Next time, Eclipse it.') });
         });
         const R = b.R;
         const lessons = [
           async () => {
-            b.say('WEDGE: Reverse (A/D) or Shift (W/S) out of the shape');
+            say('WEDGE: the fill shows when it fires. ' + K('Reverse (A/D) or Shift (W/S)', 'REVERSE or IN/OUT') + ' out of it');
             const c = b.playerAhead(2.2);
             await G.hz.arc({ rings: [b.playerRing()], center: c, width: 0.9, warn: 2.8, dmg: 15, label: 'Wedge' });
           },
           async () => {
-            b.say('SWEEP: the beam travels the marked arc. Reverse into the open part');
+            say('SWEEP: the beam travels the marked arc. Reverse into the open part');
             const th = b.playerTheta(), d = b.playerDir();
             const from = th - d * 1.6;
             await G.hz.sweep({ rings: [0, 1], from, to: from + d * PI * 1.4, warn: 2.6, dur: 3.2, dmg: 15, label: 'Sweep' });
           },
           async () => {
-            b.say('RING: the whole ring detonates. Shift to another ring');
+            say('RING: the whole ring detonates. Shift to another ring');
             await G.hz.ring({ ring: b.playerRing(), warn: 3.0, dmg: 20, label: 'Ring Blast' });
           },
           async () => {
-            b.say('ROTOR: slices rotate. Match their speed or wait in a gap');
+            say('ROTOR: slices rotate. Match their speed, or ' + K('Eclipse (E)', 'ECLIPSE') + ' to wait in a gap');
             await G.hz.rotor({ rings: [1, 2], slices: [{ center: 0, width: 0.5 }, { center: PI, width: 0.5 }], omega: 0.35, warn: 2.2, dur: 7, dmg: 10, label: 'Rotor' });
           },
           async () => {
-            b.say('WAVE: an outward shockwave. Be inside a gold gap or Shift through it');
+            say('WAVE: an outward shockwave. Be inside a gold gap, or Shift as it crosses you');
             const th = b.playerAhead(2.4);
             await G.hz.wave({ from: 'in', speed: 4.5, gaps: [{ center: th, width: 0.8 }, { center: th + PI, width: 0.8 }], warn: 3.2, dmg: 20, label: 'Wave' });
           },
           async () => {
-            b.say('ORBS: travelling stars. Dodge, or let Aegis (F) reflect them');
+            say('ORBS: travelling stars. Dodge, or ' + K('Aegis (F)', 'AEGIS') + ' just before they hit: a reflected lance');
             const r = b.playerRing();
             for (let i = 0; i < 3; i++) { G.hz.orb({ ring: r, theta: b.playerTheta() + b.playerDir() * (2.4 + i * 0.6), omega: -b.playerDir() * 0.35, life: 9, dmg: 10, label: 'Orb' }); await b.wait(0.4); }
             await b.wait(4);
@@ -5393,25 +5599,33 @@ const G = window.G = { THREE };
             await b.wait(3.6);
           },
           async () => {
-            b.say('SOAK STAR: run through it before its timer ends');
+            say('SOAK STAR: run through it before its timer ends');
             const r = (b.playerRing() + 1) % 3;
             await G.hz.soak({ ring: r, theta: b.playerAhead(4), warn: 7, failDmg: 10, label: 'Soak', onSoak: () => b.say('Soaked!') });
           },
           async () => {
-            b.say('BLOCKER: a pylon on your ring. Strike kills it, or Reverse / Shift around');
+            say('BLOCKER: a pylon on your ring. Strike kills it, or Reverse / Shift around');
             const r = b.playerRing();
             ADDS.spawn({ ring: r, theta: b.playerAhead(3), hp: 160, contactDmg: 10, label: 'Pylon' });
             await b.wait(6);
           },
           async () => {
-            b.say('BROKEN TRACK: running into a gap drops you a ring. Shift around it');
+            say('BROKEN TRACK: running into a gap drops you a ring. Shift around it');
             const r = b.playerRing();
             const h = G.hz.gap({ ring: r, center: b.playerAhead(3.5), width: 0.5, dmg: 10, label: 'Gap' });
             await b.wait(8); h.cancel();
           },
           async () => {
-            b.say('Plant ANCHORS (Q) around the dummy; pass over them to pulse + heal');
+            say('Plant ANCHORS' + K(' (Q)', '') + ' around the dummy; run back over them to pulse and heal');
             await b.wait(4);
+          },
+          async () => {
+            say('COMET: hold ' + K('SPACE', 'COMET') + ', release while BEHIND the dummy (gold sigil) for x1.5');
+            await b.wait(5);
+          },
+          async () => {
+            say('LETHAL: striped shapes hit hard. Leave that ring before the fill completes');
+            await G.hz.ring({ ring: b.playerRing(), warn: 3.2, dmg: 60, lethal: true, label: 'Lethal Ring' });
           },
         ];
         let i = 0;
@@ -5525,7 +5739,7 @@ const G = window.G = { THREE };
 
   // ============================================================ MODEL
   let root, body, legs = [], arms = [], halo, haloBead, headGlint, handStar, capeMesh, capePts = [], capePrev = [];
-  let decal, beacon, ghostDots, ghostFig, adjMarks = [], aegisBubble, coronaSprite, cometLine, cometOrb, novaStar, layerP, layerFx;
+  let pointer = null, decal, beacon, ghostDots, ghostFig, adjMarks = [], aegisBubble, coronaSprite, cometLine, cometOrb, novaStar, layerP, layerFx;
   const goldMat = () => new T3.MeshStandardMaterial({ color: 0xffd98a, metalness: 0.92, roughness: 0.22, emissive: 0x6a4410, emissiveIntensity: 0.7, envMapIntensity: 1.4 });
   function glowTex() {
     if (G.tex && G.tex.glow) return G.tex.glow;
@@ -5650,6 +5864,19 @@ const G = window.G = { THREE };
     const d = new T3.Mesh(g, m); d.renderOrder = 8; d.frustumCulled = false;
     return d;
   }
+  // constant screen-size "you are here" chevron over the knight: readable on a phone at any arena scale
+  function buildPointer() {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+    x.lineJoin = 'round';
+    x.beginPath(); x.moveTo(10, 14); x.lineTo(54, 14); x.lineTo(32, 50); x.closePath();
+    x.lineWidth = 10; x.strokeStyle = 'rgba(6,4,18,0.9)'; x.stroke();
+    const g = x.createLinearGradient(0, 14, 0, 50); g.addColorStop(0, '#fff6d6'); g.addColorStop(1, '#ffb52e');
+    x.fillStyle = g; x.fill();
+    const t = new T3.CanvasTexture(c); t.colorSpace = T3.SRGBColorSpace;
+    const m = new T3.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false, toneMapped: false, fog: false });
+    const sp = new T3.Sprite(m); sp.center.set(0.5, 0); sp.renderOrder = 45; sp.frustumCulled = false;
+    return sp;
+  }
   function buildBeacon() {
     const g = new T3.CylinderGeometry(0.06, 0.32, 3.2, 12, 1, true); g.translate(0, 1.6, 0);
     const m = new T3.ShaderMaterial({
@@ -5753,13 +5980,23 @@ const G = window.G = { THREE };
     M.skid = 1;
     emit('reverse', { dir: S.dir });
   }
+  // ring availability: a boss can switch a ring off (e.g. HELIARCH's Event Horizon breaks the outer ring away);
+  // a Shift toward a disabled ring bumps like a Shift past the inner/outer edge, and forced shifts avoid it
+  const ringOff = [false, false, false];
+  function ringOk(i) { return i >= 0 && i < RINGS().length && !ringOff[i]; }
+  function disableRing(i, off = true) {
+    i = i | 0; if (i < 0 || i >= ringOff.length) return;
+    off = !!off; if (ringOff[i] === off) return;
+    ringOff[i] = off;
+    emit('ringsChanged', { disabled: ringOff.slice() });
+  }
   function doShift(delta) {
     if (!canMove()) return;
     if (M.haltT > 0) endHalt();
     if (M.hop || M.shiftLock > 0) { M.shiftBuf = delta; return; }
     const to = S.ring + delta;
-    if (to < 0 || to >= RINGS().length) {
-      M.bump = 1; M.shiftLock = K.bumpLock; sfx('bump'); emit('bump', { delta });
+    if (!ringOk(to)) {
+      M.bump = 1; M.shiftLock = K.bumpLock; sfx('bump'); emit('bump', { delta, ring: S.ring, disabled: to >= 0 && to < RINGS().length });
       return;
     }
     M.hop = { from: S.ring, to, t: 0, dur: K.shiftDur, fall: false };
@@ -5773,8 +6010,8 @@ const G = window.G = { THREE };
     if (!S.alive) return;
     const n = RINGS().length;
     let to = clamp(S.ring + delta, 0, n - 1);
-    if (to === S.ring) to = clamp(S.ring - delta, 0, n - 1);
-    if (to === S.ring) return;
+    if (to === S.ring || !ringOk(to)) to = clamp(S.ring - delta, 0, n - 1);
+    if (to === S.ring || !ringOk(to)) return;
     const from = M.hop ? (M.hop.t / M.hop.dur < 0.5 ? M.hop.from : M.hop.to) : S.ring;
     M.hop = { from, to, t: 0, dur: opts.fall ? K.fallDur : K.shiftDur, fall: !!opts.fall, forced: true };
     S.ring = from; S.shifting = true;
@@ -5846,7 +6083,7 @@ const G = window.G = { THREE };
       const d = hz && hz.dangerAt ? hz.dangerAt(r, th, tA) : 0;
       if (d > 0.5) danger = true;
       polar(RINGS()[r], th, 0.09, tmpV);
-      const s = 0.75 + 0.5 * (i / N) * (d > 0.5 ? 1.4 : 1);
+      const s = (0.75 + 0.5 * (i / N)) * (d > 0.5 ? 1.45 : 1) * (M.dotK || 1);
       tmpS.set(s, s, s);
       tmpM.compose(tmpV, tmpQ, tmpS);
       ghostDots.setMatrixAt(i, tmpM);
@@ -5859,12 +6096,12 @@ const G = window.G = { THREE };
     ghostFig.rotation.y = root.rotation.y;
     const endDanger = hz && hz.dangerAt ? hz.dangerAt(endR, endTh, K.ghostAhead) > 0.5 : false;
     ghostFig.userData.mat.color.copy(endDanger ? cAcc : cGold);
-    ghostFig.userData.mat.opacity = 0.22 + 0.08 * Math.sin(M.clock * 5);
+    ghostFig.userData.mat.opacity = (G.isTouch ? 0.32 : 0.24) + 0.08 * Math.sin(M.clock * 5);
     // adjacent-ring hints while the current path is dangerous
     let k = 0;
     for (const dr of [-1, 1]) {
       const m = adjMarks[k++]; const rr = endR + dr;
-      if (!danger || rr < 0 || rr > 2) { m.visible = false; continue; }
+      if (!danger || !ringOk(rr)) { m.visible = false; continue; }
       let safe = true;
       if (hz && hz.dangerAt) { let tt = 0, th2 = S.theta; for (let i = 1; i <= 8; i++) { const tA = K.ghostAhead * i / 8; th2 += (velAhead(tt) + velAhead(tA)) * 0.5 * (tA - tt); tt = tA; if (tA > 0.25 && hz.dangerAt(rr, th2, tA) > 0.5) { safe = false; break; } } }
       m.visible = true;
@@ -6010,7 +6247,7 @@ const G = window.G = { THREE };
       fx('burst', a.pos.clone().setY(0.5), { color: GOLD, count: 24, speed: 7, size: 0.5, life: 0.7 });
       fx('burst', a.pos.clone().setY(0.3), { color: acc, count: 14, speed: 5, size: 0.4, life: 0.6 });
       fx('shockwave', a.pos.clone().setY(0.1), { color: acc, radius: 1.8, life: 0.35 });
-      emit('anchorSmashed', { id: a.id });
+      emit('anchorSmashed', { id: a.id, ring: a.ring, theta: a.theta });
     } else fx('burst', a.pos.clone().setY(0.4), { color: GOLD, count: 8, speed: 2, size: 0.3, life: 0.4 });
   }
   function disposeObj(o) {
@@ -6270,7 +6507,7 @@ const G = window.G = { THREE };
         if (b && G.combat) G.combat.dealDamage(dmg, { source: 'nova', ringEligible: false, behindEligible: false, pos: to.clone(), crit: true, force: true });
         try { G.adds && G.adds.killAll && G.adds.killAll('nova'); } catch (e) { logE('nova.adds', e); }
         try { G.hz && G.hz.clear && G.hz.clear(h => h.kind === 'orb'); } catch (e) { logE('nova.orbs', e); }
-        fx('flash', '#fff6dd', 0.8, 0.6);
+        fx('flash', '#fff6dd', 0.4, 0.4);
         fx('shockwave', new T3.Vector3(0, 0.4, 0), { color: GOLD_HOT, radius: 18, life: 1.1 });
         fx('burst', to.clone(), { color: GOLD_HOT, count: 120, speed: 14, size: 1.1, life: 1.2 });
         fx('starFall', to.clone(), GOLD_HOT);
@@ -6279,6 +6516,7 @@ const G = window.G = { THREE };
     }
     if (t >= K.novaDur) {
       M.nova = null; S.novaActive = false; S.novaY = 0; sp.visible = false;
+      S.invuln = false;                         // the 1 s after-glow grace runs on its own timer (M.postNovaT)
       M.postNovaT = K.novaAfterInvuln;
       if (G.hz) G.hz.speed = 1;
       emit('novaEnd', {});
@@ -6324,7 +6562,8 @@ const G = window.G = { THREE };
     S.alive = false; stats.deaths++;
     M.deathT = 0; M.turn = null; M.hop = null; S.shifting = false;
     CD.comet.holding = false; M.aegisT = 0; S.aegisActive = false;
-    if (M.nova) { M.nova = null; S.novaActive = false; if (G.hz) G.hz.speed = 1; }
+    if (M.nova) { M.nova = null; S.novaActive = false; S.invuln = false; S.novaY = 0; if (novaStar) novaStar.visible = false; if (G.hz) G.hz.speed = 1; }
+    M.postNovaT = 0;
     cam('slowMo', 0.3, 1.4);
     fx('burst', S.pos.clone().setY(0.7), { color: GOLD, count: 40, speed: 5, size: 0.6, life: 1.2 });
     sfx('crack', { vol: 0.8 });
@@ -6382,7 +6621,17 @@ const G = window.G = { THREE };
     decal.material.uniforms.uBehind.value = M.glint;
     decal.visible = S.alive;
     beacon.position.set(S.pos.x, 0, S.pos.z);
-    beacon.material.uniforms.uA.value = S.alive ? 0.28 + 0.1 * Math.sin(M.clock * 2) : 0;
+    beacon.material.uniforms.uA.value = S.alive ? (G.isTouch ? 0.4 : 0.28) + 0.1 * Math.sin(M.clock * 2) : 0;
+    if (pointer) {
+      const show = S.alive && (PLAY() || G.state === 'intro') && !S.novaActive && !(G.cam && G.cam.inCinematic);
+      pointer.visible = show;
+      if (show) {
+        pointer.position.set(S.pos.x, S.pos.y + body.position.y + 1.75 * body.scale.y / 1.15 + 0.12 * Math.sin(M.clock * 3.2), S.pos.z);
+        const hurt = M.hurtFlash || 0;
+        pointer.material.color.setRGB(1 + 0.35 * M.glint, 1 - 0.55 * hurt, 1 - 0.65 * hurt);
+        pointer.material.opacity = 0.92;
+      }
+    }
     // cape (verlet chain attached behind the shoulders)
     G.polar(1, M.faceAng, 0, fwd);
     right.set(fwd.z, 0, -fwd.x);
@@ -6498,6 +6747,7 @@ const G = window.G = { THREE };
   function setVisible(v) {
     if (shown === v) return; shown = v;
     [root, capeMesh, decal, beacon, ghostDots, ghostFig].forEach(o => { if (o) o.visible = v; });
+    if (!v && pointer) pointer.visible = false;
     if (!v) adjMarks.forEach(m => m.visible = false);
   }
 
@@ -6507,6 +6757,7 @@ const G = window.G = { THREE };
     S.speedMul = 1; S.halted = false; S.invuln = false; S.iframes = false; S.shifting = false; S.alive = true;
     S.meter = opts.meter != null ? opts.meter : 0; S.empowered = false; S.behind = false; S.constellation = false; S.v = 0; S.y = 0; S.novaY = 0;
     S.novaActive = false; S.aegisActive = false; S.pathDanger = false;
+    if (ringOff.some(Boolean)) { ringOff.fill(false); emit('ringsChanged', { disabled: ringOff.slice() }); }
     Object.assign(M, { turn: null, revLock: 0, revBuf: false, hop: null, shiftLock: 0, shiftBuf: 0, haltT: 0, haltF: 1, hitT: 0, speedT: 0, empT: 0,
       aegisT: 0, aegisAge: 0, aegisEmp: false, postNovaT: 0, strikeT: 0.6, nova: null, deathT: 0, bump: 0, skid: 0, glint: 0, capeInit: false, hurtFlash: 0, eclipseFlash: 0 });
     M.faceAng = S.theta + PI / 2;
@@ -6536,11 +6787,15 @@ const G = window.G = { THREE };
     layerP.add(buildCape());
     decal = buildDecal(); layerP.add(decal);
     beacon = buildBeacon(); layerP.add(beacon);
+    pointer = buildPointer(); layerP.add(pointer);
     buildGhost(); layerP.add(ghostDots); layerP.add(ghostFig); adjMarks.forEach(m => layerP.add(m));
     // readability: phones see the arena smaller, so the knight (visual only, not its hit radius) grows a little
     const fitScale = () => {
       const portrait = innerHeight > innerWidth, k = G.isTouch ? (portrait ? 1.45 : 1.3) : 1.15;
       body.scale.setScalar(k); decal.scale.setScalar(k / 1.15); if (ghostFig) ghostFig.scale.setScalar(k / 1.15);
+      // chevron: ~17 css px tall on touch (15 on desktop) whatever the viewport; 0.767 = view height at 1 unit (FOV 42)
+      if (pointer) { const px = G.isTouch ? 17 : 15; const sc = px / Math.max(240, innerHeight) * 0.767; pointer.scale.set(sc, sc, 1); }
+      M.dotK = G.isTouch ? (portrait ? 1.6 : 1.45) : 1.15;
     };
     fitScale(); try { G.on('resize', fitScale); } catch (e) { }
     buildAegis(); layerP.add(aegisBubble); layerP.add(coronaSprite);
@@ -6564,9 +6819,14 @@ const G = window.G = { THREE };
     K, init, update, reset, state: S, damage, heal: healHp, forceShift, forceReverse, setSpeedMul,
     cooldowns: CD, anchors: anchorsApi, stats, predictTheta, predictRing, velAhead, addMeter, god: false,
     canAct: () => canAct(),
+    disableRing, ringOk,
+    get disabledRings() { return ringOff.slice(); },
+    // highest usable ring index (rings above it are disabled); assigning it disables/enables the outer rings
+    get maxRing() { let m = RINGS().length - 1; while (m > 0 && ringOff[m]) m--; return m; },
+    set maxRing(n) { for (let i = 0; i < ringOff.length; i++) disableRing(i, i > n); },
     anchorAge: (a) => M.clock - a.born,
     // movement introspection for the bot / UI
-    motion: () => ({ turning: !!M.turn, turnLeft: M.turn ? M.turn.dur - M.turn.t : 0, revLock: M.revLock, revBuf: M.revBuf, shiftBuf: M.shiftBuf, hopLeft: M.hop ? M.hop.dur - M.hop.t : 0, hop: M.hop ? { ...M.hop } : null, shiftLock: M.shiftLock, haltT: M.haltT, aegisT: M.aegisT, empT: M.empT, hitT: M.hitT, postNovaT: M.postNovaT }),
+    motion: () => ({ turning: !!M.turn, turnLeft: M.turn ? M.turn.dur - M.turn.t : 0, revLock: M.revLock, revBuf: M.revBuf, shiftBuf: M.shiftBuf, hopLeft: M.hop ? M.hop.dur - M.hop.t : 0, hop: M.hop ? { ...M.hop } : null, shiftLock: M.shiftLock, haltT: M.haltT, aegisT: M.aegisT, empT: M.empT, hitT: M.hitT, postNovaT: M.postNovaT, haltF: M.haltF, speedT: M.speedT }),
   };
 })();
 
@@ -6626,7 +6886,8 @@ const G = window.G = { THREE };
     sfx('uiClick');
     try {
       if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
-      if (fsAvail()) {
+      // iPhone (Safari and Chrome iOS, both WebKit) has no element fullscreen: always explain Add to Home Screen
+      if (fsAvail() && !/iPhone|iPod/.test(navigator.userAgent)) {
         const de = document.documentElement;
         const p = de.requestFullscreen ? de.requestFullscreen({ navigationUI: 'hide' }) : de.webkitRequestFullscreen();
         if (p && p.then) p.then(() => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => { }); } catch (e) { } }).catch(() => fsHint());
@@ -6690,7 +6951,15 @@ const G = window.G = { THREE };
     $('hud').classList.toggle('on', on);
     $('controls').classList.toggle('on', on);
   }
-  const H = { bossF: 1, bossChunk: 1, hpF: 1, hpChunk: 1, chunkHold: 0, hpHold: 0, sayT: 0, bannerT: 0, beginT: 0, castFlashT: 0, lastCast: null };
+  const H = { bossF: 1, bossChunk: 1, hpF: 1, hpChunk: 1, chunkHold: 0, hpHold: 0, sayT: 0, bannerT: 0, beginT: 0, castFlashT: 0, lastCast: null,
+    bannerQ: null, bannerFor: -1, rkKey: '' };
+  // phase banner: shown during the transition cinematic (from phaseTransition), or queued behind the BEGIN flash
+  function showBanner(index, name, hold) {
+    $('phaseK').textContent = 'PHASE ' + (ROMAN[index] || index + 1);
+    $('phaseN').textContent = name || '';
+    const pb = $('phaseBanner'); pb.classList.remove('on'); void pb.offsetWidth; pb.classList.add('on');
+    H.bannerT = hold; H.bannerFor = index;
+  }
   let ticksFor = null;
   function setupBossBar() {
     const c = G.combat, def = c && c.def; if (!def) return;
@@ -6785,10 +7054,23 @@ const G = window.G = { THREE };
       }
     }
     $('tReverse').classList.toggle('ccw', P.dir > 0);
+    // rocker: show which halves cannot move the knight (edge of the arena, or a ring the boss disabled)
+    {
+      const ok = (i) => (G.player.ringOk ? G.player.ringOk(i) : i >= 0 && i <= 2);
+      const st = (i) => i < 0 || i > 2 ? 'edge' : ok(i) ? '' : 'void';
+      const kIn = st(P.ring - 1), kOut = st(P.ring + 1), key = kIn + '|' + kOut;
+      if (key !== H.rkKey) {
+        H.rkKey = key;
+        const ti = $('tIn'), to = $('tOut');
+        ti.classList.toggle('edge', kIn === 'edge'); ti.classList.toggle('void', kIn === 'void');
+        to.classList.toggle('edge', kOut === 'edge'); to.classList.toggle('void', kOut === 'void');
+      }
+    }
     // practice DPS
     if (c.practice) { const d = (c.dps ? c.dps() : 0); const s = 'DPS ' + Math.round(d); const el = $('practiceDps'); if (el._t !== s) { el._t = s; el.textContent = s; } }
     // banners
     if (H.sayT > 0) { H.sayT -= rdt; if (H.sayT <= 0) $('say').classList.remove('on'); }
+    if (H.bannerQ) { H.bannerQ.t -= rdt; if (H.bannerQ.t <= 0) { const q = H.bannerQ; H.bannerQ = null; showBanner(q.index, q.name, q.hold); } }
     if (H.bannerT > 0) { H.bannerT -= rdt; if (H.bannerT <= 0) $('phaseBanner').classList.remove('on'); }
     if (H.beginT > 0) { H.beginT -= rdt; if (H.beginT <= 0) $('beginFlash').classList.remove('on'); }
   }
@@ -6869,8 +7151,8 @@ const G = window.G = { THREE };
   const KN = (x, y, c = '#ffc94d') => `<g transform="translate(${x},${y})"><circle r="4.5" fill="${c}"/><circle r="8" fill="none" stroke="${c}" stroke-width="1" opacity=".6"/></g>`;
   const HOW = [
     { h: 'ORBIT', k: '', p: 'You always run around the boss on one of three brass rings. You never steer: you choose when to turn and when to hop.', s: RINGS3 + KN(100, 63) + '<path d="M120 62 Q140 58 150 52" stroke="#ffc94d" stroke-width="2" fill="none" stroke-dasharray="3 3"/><path d="M146 49 L152 51 L148 56" fill="none" stroke="#ffc94d" stroke-width="2"/>' },
-    { h: 'REVERSE', k: 'A / D', p: 'Flip between clockwise and counter-clockwise. A short skid, then you run the other way. Dodges sweeps and lets you wait for gaps.', s: RINGS3 + KN(100, 63) + '<path d="M118 62 Q132 60 136 56" stroke="#ffc94d" stroke-width="2" fill="none"/><path d="M82 62 Q68 60 64 56" stroke="#fff1c2" stroke-width="2.4" fill="none"/><path d="M68 52 L62 56 L68 60" fill="none" stroke="#fff1c2" stroke-width="2.4"/>' },
-    { h: 'SHIFT', k: 'W / S', p: 'Hop one ring in or out. A tiny window mid-hop is invulnerable. Inner ring hits harder (x1.35), outer is safer (x0.75).', s: RINGS3 + KN(100, 63) + '<path d="M100 58 Q96 52 100 47" stroke="#fff1c2" stroke-width="2.2" fill="none"/><path d="M96 49 L100 45 L104 49" fill="none" stroke="#fff1c2" stroke-width="2.2"/>' + KN(100, 63 - 10, '#fff1c2').replace('r="4.5"', 'r="3"') },
+    { h: 'REVERSE', k: 'A / D', p: (G.isTouch ? 'The big round button (left thumb). ' : '') + 'Flip between clockwise and counter-clockwise. A short skid, then you run the other way. Dodges sweeps and lets you wait for gaps.', s: RINGS3 + KN(100, 63) + '<path d="M118 62 Q132 60 136 56" stroke="#ffc94d" stroke-width="2" fill="none"/><path d="M82 62 Q68 60 64 56" stroke="#fff1c2" stroke-width="2.4" fill="none"/><path d="M68 52 L62 56 L68 60" fill="none" stroke="#fff1c2" stroke-width="2.4"/>' },
+    { h: 'SHIFT', k: 'W / S', p: (G.isTouch ? 'The IN / OUT rocker. ' : '') + 'Hop one ring in or out. A tiny window mid-hop is invulnerable. You deal x1.35 damage from the inner ring and x0.75 from the outer one, which is usually safer.', s: RINGS3 + KN(100, 63) + '<path d="M100 58 Q96 52 100 47" stroke="#fff1c2" stroke-width="2.2" fill="none"/><path d="M96 49 L100 45 L104 49" fill="none" stroke="#fff1c2" stroke-width="2.2"/>' + KN(100, 63 - 10, '#fff1c2').replace('r="4.5"', 'r="3"') },
     { h: 'GHOST TRAIL', k: '', p: 'Gold dots show where you will be in 1.5 s. Dots turn the boss colour where that spot will be dangerous. Gold ghosts on other rings are safe.', s: RINGS3 + KN(70, 59) + '<g fill="#ffc94d">' + [0, 1, 2, 3].map(i => `<circle cx="${82 + i * 9}" cy="${62 - i * 0.4}" r="2"/>`).join('') + '</g><g fill="#5fe3ff">' + [4, 5, 6].map(i => `<circle cx="${82 + i * 9}" cy="${62 - i * 0.6}" r="2.4"/>`).join('') + '</g><path d="M115 52 L150 52 L150 70 L115 70Z" fill="#5fe3ff" opacity=".18"/>' },
     { h: 'BEHIND', k: '', p: 'The boss\'s back is its weak point: x1.5 damage inside the gold rear arc. The HUD shows BEHIND while it holds.', s: RINGS3 + '<path d="M100 36 L76 14 A40 22 0 0 1 124 14 Z" fill="#ffc94d" opacity=".22"/>' + KN(100, 10) + '<circle cx="100" cy="36" r="6" fill="#5fe3ff"/><path d="M100 42 L100 60" stroke="#5fe3ff" stroke-width="1.5" stroke-dasharray="2 2"/>' },
     { h: 'STRIKE', k: 'AUTO', p: 'Every 0.45 s you throw a starlight bolt at the nearest add ahead of you on your ring, otherwise at the boss.', s: RINGS3 + KN(60, 58) + '<path d="M64 54 Q80 30 96 36" stroke="#fff1c2" stroke-width="2" fill="none" stroke-dasharray="1 4"/><circle cx="92" cy="35" r="3" fill="#fff1c2"/>' },
@@ -6879,10 +7161,15 @@ const G = window.G = { THREE };
     { h: 'ECLIPSE', k: 'E', p: 'Halts your orbit for 1.5 s (Reverse or Shift ends it), interrupts casts framed in gold, and empowers your next skill within 6 s.', s: RINGS3 + '<circle cx="100" cy="63" r="8" fill="#05030c" stroke="#fff1c2" stroke-width="2"/><circle cx="100" cy="63" r="12" fill="none" stroke="#ffc94d" stroke-width="1" opacity=".6"/><rect x="70" y="2" width="60" height="6" fill="none" stroke="#fff1c2"/><rect x="70" y="2" width="38" height="6" fill="#ffd36b"/>' },
     { h: 'AEGIS', k: 'F', p: 'Blocks everything for 1 s and reflects each blocked hit as a gold lance (3x its damage). Block in the first 0.3 s for PERFECT (4.5x). Save it for the biggest hit.', s: RINGS3 + KN(100, 63) + '<circle cx="100" cy="60" r="11" fill="#ffc94d" fill-opacity=".15" stroke="#ffd36b" stroke-width="1.6"/><path d="M100 49 L100 40" stroke="#fff1c2" stroke-width="2.5"/>' },
     { h: 'SUPERNOVA', k: 'R', p: 'At a full meter: a 3 s set piece. Hazards slow, you rise and collapse a star into the boss for 900 damage, clearing adds and orbs.', s: RINGS3 + '<g stroke="#fff1c2" stroke-width="1.6"><path d="M100 4V14M100 58V68M70 36H80M120 36H130M80 16L86 22M114 50L120 56M120 16L114 22M86 50L80 56"/></g><circle cx="100" cy="36" r="9" fill="#fff1c2"/>' },
+    { h: 'TELEGRAPHS', k: '', t: 1, p: 'Every threat is drawn in the boss colour. The fill grows toward the moment it fires, so you can read when, not just where. Striped shapes are lethal: get off that ring or into the gold gap.', s: RINGS3 + '<path d="M150 50 A55 23 0 0 1 100 63 L100 73 A80 33 0 0 0 172 55 Z" fill="#5fe3ff" opacity=".22"/><path d="M150 50 A55 23 0 0 1 128 60 L136 70 A80 33 0 0 0 172 55 Z" fill="#5fe3ff" opacity=".6"/><path d="M150 50 A55 23 0 0 1 100 63 L100 73 A80 33 0 0 0 172 55 Z" fill="none" stroke="#bff4ff" stroke-width="1.4"/><g stroke="#5fe3ff" stroke-width="2" opacity=".75"><path d="M22 52 L30 44 M30 56 L40 46 M40 60 L50 50"/></g><path d="M20 40 A80 33 0 0 0 52 66" fill="none" stroke="#ffc94d" stroke-width="3" stroke-dasharray="4 3" opacity=".8"/>' },
+    { h: 'STARS & BREAKS', k: '', t: 1, p: 'A soak star with a ring timer must be touched before it runs out, or everyone takes damage. Broken track drops you a ring: Shift around it. A struck-through IN / OUT means that ring is gone.', s: RINGS3 + '<g transform="translate(150,58)"><circle r="9" fill="none" stroke="#ffd36b" stroke-width="2" stroke-dasharray="40 17"/><path d="M0 -5 L1.5 -1.5 L5 0 L1.5 1.5 L0 5 L-1.5 1.5 L-5 0 L-1.5 -1.5Z" fill="#fff1c2"/></g><path d="M52 50 L60 58" stroke="#05030c" stroke-width="7"/><path d="M50 49 L62 59" stroke="#ff9f6a" stroke-width="1.2" opacity=".8"/>' },
     { h: 'EMPOWERED', k: 'ECLIPSE →', p: 'Anchor becomes a Meridian (pulses on every ring, double heal). Comet is instantly full, x1.5 and pierces adds. Aegis lasts 1.8 s, x1.5. Supernova x1.5.', s: RINGS3 + '<path d="M100 36 L100 2" stroke="#ffd36b" stroke-width="2"/><circle cx="100" cy="20" r="5" fill="#05030c" stroke="#e6dcff" stroke-width="2"/>' },
   ];
   function buildHow() {
-    $('howGrid').innerHTML = HOW.map(c => `<div class="how">${SV(c.s)}<h4>${c.h}${c.k ? `<kbd>${G.isTouch && c.k.length > 2 && c.k !== 'AUTO' && !c.k.includes('→') ? 'BUTTON' : c.k}</kbd>` : ''}</h4><p>${c.p}</p></div>`).join('');
+    // touch: no key names (the buttons carry icons); the auto / combo tags stay
+    const tag = (k) => !k ? '' : G.isTouch ? (k === 'AUTO' || k.includes('→') ? k : '') : k;
+    const txt = (c) => G.isTouch ? c.p.replace(/ \(([A-Z]|SPACE)\)/g, '') : c.p;
+    $('howGrid').innerHTML = HOW.map(c => `<div class="how">${SV(c.s)}<h4>${c.h}${tag(c.k) ? `<kbd>${tag(c.k)}</kbd>` : ''}</h4><p>${txt(c)}</p></div>`).join('');
   }
 
   // ---------------------------------------------------------- settings UI
@@ -6942,6 +7229,7 @@ const G = window.G = { THREE };
       const c = G.combat, def = c.def || {};
       setupBossBar();
       H.lastCast = null; H.castFlashT = 0;
+      H.bannerQ = null; H.bannerFor = -1; H.bannerT = 0; H.rkKey = ''; $('phaseBanner').classList.remove('on');
       hud(true);
       only(null);
       $('introK').textContent = d.practice ? 'TRAINING' : (typeof d.bossIndex === 'number' && d.bossIndex >= 0 ? 'BOSS ' + ROMAN[d.bossIndex] : 'TRIAL');
@@ -6957,13 +7245,21 @@ const G = window.G = { THREE };
       const bf = $('beginFlash'); bf.textContent = G.combat.practice ? 'PRACTICE' : 'BEGIN'; bf.classList.add('on'); H.beginT = 0.9;
       sfx('begin');
     });
+    G.on('phaseTransition', (d) => {
+      const c = G.combat; if (!c || c.practice || !c.def) return;
+      const ph = (c.def.phases || [])[d.to] || {};
+      // shown early in the cinematic, held until a moment after the fight resumes (see phaseStart)
+      H.bannerQ = { t: 0.55, index: d.to, name: ph.name, hold: 12 };
+    });
     G.on('phaseStart', (d) => {
       const c = G.combat; if (!c || c.practice) return;
-      $('phaseK').textContent = 'PHASE ' + (ROMAN[d.index] || d.index + 1);
-      $('phaseN').textContent = d.name || '';
-      const pb = $('phaseBanner'); pb.classList.remove('on'); void pb.offsetWidth; pb.classList.add('on');
-      H.bannerT = d.index === 0 ? 2.0 : 2.8;
       $('timer').classList.toggle('ckpt', !!c.checkpointUsed);
+      if (H.bannerQ && H.bannerQ.index === d.index) { const q = H.bannerQ; H.bannerQ = null; showBanner(q.index, q.name, 1.6); return; }
+      if (H.bannerFor === d.index && H.bannerT > 0) { H.bannerT = Math.min(H.bannerT, 1.6); return; }
+      // fight start / checkpoint: wait for the BEGIN flash to clear so the two never overlap
+      const hold = d.index === 0 ? 2.0 : 2.8;
+      if (H.beginT > 0) H.bannerQ = { t: H.beginT + 0.3, index: d.index, name: d.name, hold };
+      else showBanner(d.index, d.name, hold);
     });
     G.on('say', (d) => { const s = $('say'); s.textContent = d.text || ''; s.classList.add('on'); H.sayT = d.dur || 2.5; });
     G.on('castEnd', (d) => {
@@ -6987,6 +7283,8 @@ const G = window.G = { THREE };
         hud(false);
         // back on the title: calm menu sky, untilted arena with no fight leftovers (glow, flood, rime, gaps)
         try { G.world && G.world.reset && G.world.reset(); G.world && G.world.setSky && G.world.setSky('menu', 0, 1.6); } catch (e) { logE('ui.menuSky', e); }
+        // a ring a boss switched off (HELIARCH's Event Horizon) comes back for the menu too, not only on the next fight
+        try { if (G.player && G.player.disableRing) for (let i = 0; i < 3; i++) G.player.disableRing(i, false); } catch (e) { logE('ui.menuRings', e); }
       }
     });
     // any input skips the intro card
@@ -7060,6 +7358,8 @@ const G = window.G = { THREE };
     update(dt) {
       const rdt = G.rdt || dt || 0;
       if (hudOn) { try { updateHud(rdt); } catch (e) { logE('ui.hud', e); } }
+      // cinematics (transitions, Supernova, deaths): the touch controls step back so the spectacle reads
+      { const cin = G.state === 'cinematic' || G.state === 'victory'; if (cin !== H.cine) { H.cine = cin; $('controls').classList.toggle('cine', cin); $('hud').classList.toggle('cine', cin); } }
     },
   };
 })();
@@ -7244,7 +7544,8 @@ const G = window.G = { THREE };
           float rim = smoothstep(0.04, 0.5, a) * (1.0 - core);
           float flow = 0.55 + 0.45 * sin(vUv.x * 34.0 - uT * (3.0 + uFlow * 6.0));
           float veins = smoothstep(0.82, 1.0, sin(vUv.x * 90.0 + sin(vUv.y * 20.0) * 2.0 - uT * 2.0)) * core * 0.35;
-          vec3 col = mix(uAcc * 1.8 * flow, uAcc * 0.16, core) + uAcc * veins;
+          vec3 hc = uAcc * 1.8 * flow; hc *= min(1.0, 0.9 / max(0.001, max(hc.r, max(hc.g, hc.b))));   // big floor quad: keep it under the bloom knee
+          vec3 col = mix(hc, uAcc * 0.16, core) + uAcc * veins;
           float alpha = (core * 0.5 + rim * (0.55 + 0.35 * uFlow) * flow + veins) * uA;
           if (alpha < 0.004) discard;
           gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
@@ -7278,7 +7579,7 @@ const G = window.G = { THREE };
           float streak = 0.5 + 0.5 * sin(vUv.x * 46.0 - uT * 7.0 + vUv.y * 6.0);
           float ends = smoothstep(0.0, 0.06, vUv.x) * (1.0 - smoothstep(0.94, 1.0, vUv.x));
           float a = up * up * ends * (0.35 + 0.65 * streak) * uA;
-          gl_FragColor = vec4(mix(uC * 1.5, vec3(1.4), up * 0.35), a);
+          gl_FragColor = vec4(mix(uC * 0.72, vec3(0.85), up * 0.3), a * 0.8); // kept below the bloom knee so the wall reads, not whites out
         }`,
     });
   }
@@ -7668,9 +7969,6 @@ const G = window.G = { THREE };
     D.column.visible = cm.uA.value > 0.01;
     if (casting) cm.uC.value.set(casting.name === 'Solstice' ? ICE : casting.name === 'Vesper Bell' ? DUSK : GOLD_HOT);
     D.column.scale.set(0.6 + 0.6 * colOn, 1, 0.6 + 0.6 * colOn);
-    // the framework's occlusion fade also runs during cinematics (ghosting the Warden in its own close-ups):
-    // switch it off while the camera is scripted
-    b.def.fadeOpacity = (G.cam && G.cam.inCinematic) || (G.combat && G.combat.transitioning) || D.death ? 1 : 0.35;
     // snow
     if (D.snow) updateSnow(D, dt);
     // death choreography
@@ -7775,16 +8073,7 @@ const G = window.G = { THREE };
     const pl = G.layers && G.layers.play; if (pl) pl.worldToLocal(tmpV2);
     return tmpV2.clone();
   }
-  // WORKAROUND (framework bug, reported): 07_player.js nova() sets S.invuln = true and updateNova() never clears
-  // it, so after the first Supernova the hero is invulnerable for the rest of the fight. Clear it once the nova
-  // and its 1 s after-glow are over.
-  function fixNovaInvuln() {
-    const ps = PS(); if (!ps || !ps.invuln || ps.novaActive) return;
-    try { const m = G.player.motion(); if (m.postNovaT > 0 || (G.combat && G.combat.transitioning)) return; } catch (e) { return; }
-    ps.invuln = false;
-  }
   function phaseUpdate(b, dt) {
-    fixNovaInvuln();
     faceUpdate(b, dt);
     const D = b.data;
     // tension: last 10% of HP pushes the music to the top layer
@@ -7806,7 +8095,7 @@ const G = window.G = { THREE };
     const warn = k.warn(o.warn || 2.2), dur = k.dur(o.dur || 2.7);
     quickTurn(b, from, 4.0);
     D.handLenT = 2.4; D.poseT.rear = 0.5; D.twistT = -0.35 * s;
-    const h = b.hz.sweep({ rings, from, to, warn, dur, width: 0.24, dmg: 24, label: 'Meridian Sweep' });
+    const h = b.hz.sweep({ rings, from, to, warn, dur, width: 0.24, dmg: 26, label: 'Meridian Sweep' });
     await b.wait(Math.max(0.3, warn - 0.35));
     lockFacing(b, () => h.hazard.beamAt(h.hazard.lt));
     D.poseT.rear = 0; D.twistT = 0.25 * s;
@@ -7833,7 +8122,7 @@ const G = window.G = { THREE };
         const th = b.playerAhead(w);
         last = th; maxW = Math.max(maxW, w);
         const src = from || G.polar(RING(r) * 0.4, th + 0.6, 22);
-        b.hz.bolt({ from: src, ring: r, theta: th, warn: w, radius: 1.05, dmg: 20, label: 'Hour Strike' });
+        b.hz.bolt({ from: src, ring: r, theta: th, warn: w, radius: 1.05, dmg: 22, label: 'Hour Strike' });
         if (o.sky) world('meteor', '#d8f6ff');
       }
       // the hour strikes twice: the echo volley aims at wherever the hero went
@@ -7853,7 +8142,7 @@ const G = window.G = { THREE };
     for (let j = 0; j < lines; j++) {
       const w = k.warn(j === 0 ? 1.8 : 1.6);
       const th = b.playerAhead(w);
-      for (let r = 0; r < 3; r++) b.hz.bolt({ from: G.polar(4, th + 0.5, 24), ring: r, theta: th, warn: w + r * 0.06, radius: 1.1, dmg: 20, label: 'Falling Hours' });
+      for (let r = 0; r < 3; r++) b.hz.bolt({ from: G.polar(4, th + 0.5, 24), ring: r, theta: th, warn: w + r * 0.06, radius: 1.1, dmg: 22, label: 'Falling Hours' });
       world('meteor', '#d8f6ff');
       await b.wait(1.05);
     }
@@ -7872,9 +8161,9 @@ const G = window.G = { THREE };
       if (front && ps.ring <= 1 && !D.faceLock && !D.cutting) { D.cutting = true; try { await shadowCut(b, { free: true }); } finally { D.cutting = false; } return; }
       const w = (b.phase >= 2 ? 1.1 : 1.2) * (D.warnMul || 1);
       const th = b.playerAhead(w), src = crestTip(b);
-      b.hz.bolt({ from: src, ring: ps.ring, theta: th, warn: w, radius: 1.0, dmg: 13, label: 'Hour Tick' });
+      b.hz.bolt({ from: src, ring: ps.ring, theta: th, warn: w, radius: 1.0, dmg: 15, label: 'Hour Tick' });
       // from Dusk on, the tick is doubled onto a neighbouring ring so a blind shift is punished too
-      if (b.phase >= 1 && b.rand() < 0.6) b.hz.bolt({ from: src, ring: adjRing(b, ps.ring), theta: th, warn: w + 0.15, radius: 1.0, dmg: 13, label: 'Hour Tick' });
+      if (b.phase >= 1 && b.rand() < 0.6) b.hz.bolt({ from: src, ring: adjRing(b, ps.ring), theta: th, warn: w + 0.15, radius: 1.0, dmg: 15, label: 'Hour Tick' });
       // and at Midnight a frost orb sometimes runs at the hero
       if (b.phase >= 2 && b.rand() < 0.35) { const dd = b.playerDir(); b.hz.orb({ ring: ps.ring, theta: ps.theta + dd * 2.6, omega: -dd * 0.45, life: 7, radius: 0.55, dmg: 15, label: 'Frost Orb', color: '#9fefff' }); }
       fx('spark', src, ACC);
@@ -7911,7 +8200,7 @@ const G = window.G = { THREE };
     if (o.three) spots.push([adjRing(b, r), b.playerAhead(w + 0.6)]);
     if (o.ring != null) { spots.length = 0; spots.push([o.ring, b.playerAhead(w)], [o.ring, b.playerTheta() - d * 2.1]); }
     D.poseT.slam = 1;
-    for (const [ring, th] of spots) b.hz.bolt({ from: G.polar(2.0, th, 9), ring, theta: th, warn: w, radius: 0.95, dmg: 16, label: 'Pylon Drop' });
+    for (const [ring, th] of spots) b.hz.bolt({ from: G.polar(2.0, th, 9), ring, theta: th, warn: w, radius: 0.95, dmg: 18, label: 'Pylon Drop' });
     await b.wait(w);
     D.poseT.slam = 0;
     for (const [ring, th] of spots) {
@@ -7970,7 +8259,7 @@ const G = window.G = { THREE };
     if (!o.free) lockFacing(b, c);
     D.twistT = -0.55; D.handLenT = 1.6;
     const warn = k.warn(1.5);
-    const h = b.hz.arc({ rings: [0, 1], center: c, width: 1.15, warn, active: 0.25, dmg: 22, label: 'Shadow Cut' });
+    const h = b.hz.arc({ rings: [0, 1], center: c, width: 1.15, warn, active: 0.25, dmg: 24, label: 'Shadow Cut' });
     await b.wait(warn);
     D.twistT = 0.7;
     await b.wait(0.35);
@@ -7994,12 +8283,12 @@ const G = window.G = { THREE };
     try { G.player.anchors.mark(pred, true); } catch (e) { logE('mark', e); }
     D.handLenT = 3.5; D.poseT.slam = 0.6;
     const warn = k.warn(2.4);
-    const h = b.hz.arc({ rings: [0, 1, 2], center: th, width: half * 2, warn, active: 0.3, dmg: 22, label: 'Shadow Grasp' });
+    const h = b.hz.arc({ rings: [0, 1, 2], center: th, width: half * 2, warn, active: 0.3, dmg: 24, label: 'Shadow Grasp' });
     if (!D.said.grasp && A.length) { D.said.grasp = 1; b.say('The shadow reaches for your anchors: pulse them first!', 2.6); }
     await b.wait(warn);
     try { G.player.anchors.smash(pred); } catch (e) { logE('smash', e); }
     D.poseT.slam = 1;
-    for (let r = 0; r < 3; r++) fx('burst', G.polar(RING(r), th, 0.3), { color: ACC, count: 14, speed: 5, size: 0.5, life: 0.6 });
+    for (let r = 0; r < 3; r++) fx('burst', G.polar(RING(r), th, 0.3), { color: ACC, count: 10, speed: 5, size: 0.42, life: 0.6, flareSize: 1.3 });
     cam('shake', 0.4, 0.3);
     await b.wait(0.5);
     D.poseT.slam = 0; D.handLenT = D.look === 1 ? 1.3 : 1;
@@ -8147,7 +8436,7 @@ const G = window.G = { THREE };
     const res = await b.cast({
       name: 'Zenith Hymn', dur: 3.0, interruptible: true,
       onDone: () => {
-        G.player.damage(18, 'Zenith Hymn'); D.emp = 2; D.colBoost = 1;
+        G.player.damage(15, 'Zenith Hymn'); D.emp = 2; D.colBoost = 1;
         fx('flash', GOLD_HOT, 0.3, 0.4); fx('shockwave', V3(0, 0.3, 0), { color: GOLD_HOT, radius: 15, life: 0.9 });
         cam('shake', 0.4, 0.4); b.say('The Warden blazes at zenith: its next strikes quicken!', 2.4);
       },
@@ -8192,7 +8481,7 @@ const G = window.G = { THREE };
         await b.wait(1.0);
         if (b.casting && b.casting.name === 'Solstice') {
           const r = b.playerRing();
-          for (let i = 0; i < 3; i++) { const w = 1.5 + i * 0.5; b.hz.bolt({ from: G.polar(2, b.playerAhead(w), 20), ring: r, theta: b.playerAhead(w), warn: w, radius: 1.0, dmg: 18, label: 'Hour Strike' }); }
+          for (let i = 0; i < 3; i++) { const w = 1.5 + i * 0.5; b.hz.bolt({ from: G.polar(2, b.playerAhead(w), 20), ring: r, theta: b.playerAhead(w), warn: w, radius: 1.0, dmg: 20, label: 'Hour Strike' }); }
         }
       } catch (e) { if (!G.combat.isAbort(e)) logE('solstice.side', e); }
     })();
@@ -8269,7 +8558,7 @@ const G = window.G = { THREE };
       update: phaseUpdate,
       async script(b) {
         await b.wait(1.2);
-        runCycle(b, [meridian, hourStrike, equinox, pylons, (bb) => hourStrike(bb, { volleys: 2 }), meridian, equinox, shadowCut], [0.6, 1.0]);
+        runCycle(b, [meridian, hourStrike, equinox, pylons, (bb) => hourStrike(bb, { volleys: 2 }), meridian, equinox, shadowCut], [0.5, 0.85]);
         fillerLoop(b, [2.8, 4.0]);
       },
     },
@@ -8283,8 +8572,8 @@ const G = window.G = { THREE };
       },
       async script(b) {
         await b.wait(0.8);
-        runCycle(b, [armillary, fallingHours, lengthens, grasp, twinEquinox, (bb) => hourStrike(bb, { sky: true, volleys: 2, plantDur: 3.0 }), pylons, lengthens, equinox, meridian], [0.5, 0.9]);
-        fillerLoop(b, [2.4, 3.4]);
+        runCycle(b, [armillary, fallingHours, lengthens, grasp, twinEquinox, (bb) => hourStrike(bb, { sky: true, volleys: 2, plantDur: 3.0 }), pylons, lengthens, equinox, meridian], [0.35, 0.7]);
+        fillerLoop(b, [2.2, 3.1]);
       },
     },
     {
@@ -8294,8 +8583,8 @@ const G = window.G = { THREE };
       async script(b) {
         await b.wait(0.6);
         runCycle(b, [sweepEquinox, longNight, (bb) => hourStrike(bb, { plantDur: 2.6, n: 4, volleys: 2 }), pylonSpin,
-          (bb) => lengthens(bb, { gapW: 0.76, offLo: 0.1, offHi: 0.4, rest: 2.0 }), fallingHours, twinEquinox, grasp], [0.4, 0.7]);
-        fillerLoop(b, [2.0, 3.0]);
+          (bb) => lengthens(bb, { gapW: 0.76, offLo: 0.1, offHi: 0.4, rest: 2.0 }), fallingHours, twinEquinox, grasp], [0.3, 0.55]);
+        fillerLoop(b, [1.8, 2.7]);
       },
     },
   ];
@@ -8463,7 +8752,6 @@ const G = window.G = { THREE };
   function teardown(b) {
     const D = b.data || {};
     removeSnow(D);
-    if (b.def) b.def.fadeOpacity = 0.35;
     world('setRingRime', 0);
     try { G.world && G.world.reset && G.world.reset(); } catch (e) { logE('teardown.world', e); }
   }
@@ -8472,7 +8760,7 @@ const G = window.G = { THREE };
   G.bosses = G.bosses || [];
   G.bosses[0] = {
     name: 'GNOMON', title: 'the Brass Warden', accent: ACC, sky: 'night', music: 0,
-    maxHp: 18000, parTime: 195, hitRadius: 1.0, hitHeight: 4.6, fadeOpacity: 0.35,
+    maxHp: 18500, parTime: 200, hitRadius: 1.0, hitHeight: 4.6, fadeOpacity: 0.35,
     phases: PHASES,
     build, animate, onTransition, onDeath, teardown,
   };
@@ -9155,9 +9443,6 @@ const G = window.G = { THREE };
   function speedControl(b, dt) {
     const D = b.data, S = P();
     if (!S) return;
-    // framework workaround (07_player.js updateNova never clears S.invuln): without this the hero stays
-    // invulnerable forever after the first Supernova
-    if (S.invuln && !S.novaActive) S.invuln = false;
     D.sirenT = Math.max(0, D.sirenT - dt);
     let m = 1;
     // flood and enthrall do not stack: never slower than 0.6 (0.36 left no way out of a curtain lane)
@@ -9296,6 +9581,13 @@ const G = window.G = { THREE };
       L.follow = () => { const hz = h.hazard; return hz.lt < hz.warn ? from : hz.beamAt(hz.lt) - d * 0.12; };
       h.done.then(() => { if (L.busy === h.id) { L.busy = 0; L.follow = null; L.glow = 0; if (C().boss === b && b.alive) loopIdle(b, L); } });
     }
+    // from Bloom on, the breaching loop scours its ring: anchors on the swept arc are marked, then crushed
+    if (b.phase >= 2) {
+      const span = Math.abs(to - from);
+      const swept = (a) => a.ring === ring && ((((a.theta - from) * d) % TAU + TAU) % TAU) < span;
+      try { G.player.anchors.mark(swept, true); } catch (e) { logE('anchors.mark', e); }
+      h.done.then(() => { if (C().boss !== b || !b.alive) return; try { G.player.anchors.smash((a) => a.warn && swept(a)); } catch (e) { logE('anchors.smash', e); } });
+    }
     return h;
   }
   function loopIdle(b, L) {
@@ -9312,7 +9604,10 @@ const G = window.G = { THREE };
     const D = b.data;
     D.squeezeT = 1;
     const h = G.hz.ring({ ring: 0, warn: o.warn || 2.4, active: 0.4, dmg: o.dmg || 28, label: 'Constrict', gaps: o.gaps });
-    h.done.then(() => { D.squeezeT = 0; });
+    // the coil crushes the inner ring's anchors too (marked for the whole warning)
+    const inner = (a) => a.ring === 0;
+    try { G.player.anchors.mark(inner, true); } catch (e) { logE('anchors.mark', e); }
+    h.done.then(() => { D.squeezeT = 0; if (C().boss !== b || !b.alive) return; try { G.player.anchors.smash((a) => a.warn && inner(a)); } catch (e) { logE('anchors.smash', e); } });
     return h;
   }
 
@@ -9395,6 +9690,10 @@ const G = window.G = { THREE };
       },
       onFire: () => { sfx('rumble', { vol: 0.9 }); cam('shake', 0.35, 0.5); },
     });
+    // the tide washes away anchors left on the outer two rings outside the gaps (marked now; the flood keeps its own)
+    const wash = (a) => a.ring > 0 && !inGap(a.theta, 0);
+    try { if (G.player.anchors.list.some(wash)) { G.player.anchors.mark(wash, true); if (!D.saidWash) { D.saidWash = 1; b.say('The tide takes what you leave on the shore.', 2.2); } } } catch (e) { logE('anchors.mark', e); }
+    h.done.then(() => { if (C().boss !== b || !b.alive) return; try { G.player.anchors.smash((a) => a.warn && wash(a)); } catch (e) { logE('anchors.smash', e); } });
     return h;
   }
 
@@ -9412,7 +9711,7 @@ const G = window.G = { THREE };
     blk.piece = (warn) => {
       const bt0 = blk.now();
       const h = G.hz.custom({
-        warn, active: 7.6, dmg: 18, tick: 1.0, label: 'Coiled Body',
+        warn, active: 7.6, dmg: 20, tick: 1.0, label: 'Coiled Body',
         test: (ring, theta, lt, pad) => ring === 1 && inArcR(1, theta, centerAt(bt0 + lt), w / 2, pad + 0.15),
       });
       blk.pieces.push(h); if (blk.pieces.length > 3) blk.pieces.shift();
@@ -9429,6 +9728,20 @@ const G = window.G = { THREE };
     loopTarget(L, { r: R[1], c: c0, w, A: 0.12, k: 3, yb: 0.42, weave: 0, flow: 1.4 }, { dive: true });
     L.follow = () => centerAt(blk.now());
     return blk;
+  }
+  // the Tide blocker crushes anchors on the middle ring as it slides over them (they are marked ~4 s ahead of it)
+  function coilCrush(b) {
+    const D = b.data, blk = D.blk, A = G.player.anchors && G.player.anchors.list; if (!blk || !A || !A.length || D.dying) return;
+    const bt = blk.now(), c = blk.centerAt(bt);
+    let om = blk.sched[0].om; for (const x of blk.sched) if (x.lt0 <= bt) om = x.om;
+    const sg = om >= 0 ? 1 : -1;
+    for (const a of A.slice()) {
+      if (a.ring !== 1) continue;
+      const da = angDiff(a.theta, c);
+      if (Math.abs(da) < blk.w / 2 + 0.1) { try { G.player.anchors.smash((x) => x === a); } catch (e) { logE('anchors.smash', e); } }
+      else if (!a.warn && da * sg > 0 && da * sg < 1.1) { a.coilMark = true; try { G.player.anchors.mark((x) => x === a, true); } catch (e) { logE('anchors.mark', e); } }
+      else if (a.warn && a.coilMark && !(da * sg > 0 && da * sg < 1.4)) { a.coilMark = false; try { G.player.anchors.mark((x) => x === a, false); } catch (e) { logE('anchors.mark', e); } }   // the coil turned away
+    }
   }
   function blockerVisual(b, dt) {
     const D = b.data, bb = D.blkBand; if (!bb) return;
@@ -9480,7 +9793,7 @@ const G = window.G = { THREE };
       const th = b.playerAhead(Math.min(tArr, 3)) + d * G.OMEGA * Math.max(0, tArr - 3);
       const R = RR()[ring];
       out.push(G.hz.soak({
-        ring, theta: th, warn: tArr + (o.slack || 2.2), radius: 0.8, failDmg: o.failDmg || 15, label: 'Star Seed', color: ACC,
+        ring, theta: th, warn: tArr + (o.slack || 2.2), radius: 0.8, failDmg: o.failDmg || 20, label: 'Star Seed', color: ACC,
         onSoak: () => { fx('burst', G.polar(R, th, 0.9), { color: ROSE, count: 22, speed: 6, size: 0.6, life: 0.7, star: true }); },
         onFail: () => {
           b.say('The seed blooms into wisps.', 1.6);
@@ -9529,10 +9842,14 @@ const G = window.G = { THREE };
         group.add(m);
       },
       onFire: () => {
+        try { G.player.anchors.smash((a) => a.warn && inLane(a)); } catch (e) { logE('anchors.smash', e); }
         sfx('thunder', { vol: 1 }); cam('shake', 0.9, 0.6); fx('flash', ACC, 0.3, 0.3);
         for (let r = 0; r < 3; r++) { fx('burst', G.polar(R[r], th0, 0.4), { color: ACC, count: 22, speed: 7, size: 0.7, life: 0.7 }); fx('shockwave', G.polar(R[r], th0, 0.1), { color: ACC, radius: 2.6, life: 0.5 }); }
       },
     });
+    // anchors in the lane are crushed by the dive (marked for the whole warning)
+    const inLane = (a) => Math.abs(angDiff(a.theta, th0)) * R[a.ring] < hw + 0.3 && Math.abs(angDiff(a.theta, th0)) < PI / 2;
+    try { G.player.anchors.mark(inLane, true); } catch (e) { logE('anchors.mark', e); }
     D.dive = { h, th0, warn, t0: b.clock };
     b.data.jawT = 0.3;
     D.pose = 'dive';
@@ -9563,6 +9880,12 @@ const G = window.G = { THREE };
   }
   const STORM_T = 75;   // Storm phase timer (s) before the Maelstrom enrage
   const otherRing = (r, k) => [0, 1, 2].filter(x => x !== r)[k % 2];
+  // the head turns to gather its tail on the far side of where the hero is heading: a deliberate back window
+  async function tailWatch(b, dur) {
+    const tr = b.turnRate;
+    b.faceTo(wrap(b.playerAhead(2.4) + PI)); b.turnRate = 1.3;
+    try { await b.wait(dur); } finally { b.faceTo(null); b.turnRate = tr; }
+  }
   const phases = [
     // ------------------------------------------------------------------ P1 VEIL
     {
@@ -9575,8 +9898,8 @@ const G = window.G = { THREE };
         let v = 0;
         b.loop(async () => {
           // the veil: curtains on every ring (gaps offset per ring) most of the time
-          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 0.95, 0.24 * (v++ % 2 ? -1 : 1), { n: 2 }), warn: 2.1, dur: 9.0, dmg: 10 });
-          await b.wait(2.1 + 9.0 + 3.6);
+          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 0.95, 0.24 * (v++ % 2 ? -1 : 1), { n: 2 }), warn: 2.1, dur: 9.0, dmg: 12 });
+          await b.wait(2.1 + 9.0 + 2.8);
         });
         b.loop(async () => {
           // bolts, wisps and lashes woven through the veil
@@ -9595,13 +9918,13 @@ const G = window.G = { THREE };
             constrict(b, { warn: 2.5, dmg: 30 });
             await b.wait(0.5);
             await coilLash(b, { ring: 2, warn: 2.0, dur: 2.2, dmg: 26 });
-            b.trackPlayer = false; await b.wait(2.2); b.trackPlayer = true;      // it rests, facing locked: a back window
+            await tailWatch(b, 4.4);      // it turns to gather its tail: a back window
           } else {
             // twin lash: two rings at once, in opposite directions
             const r = b.playerRing(), r2 = otherRing(r, k >> 1);
             coilLash(b, { ring: r, warn: 1.9, dur: 2.3, dmg: 26 });
             await coilLash(b, { ring: r2, dir: -b.playerDir(), from: b.playerTheta() + b.playerDir() * 1.0, warn: 1.9, dur: 2.3, dmg: 26, loop: b.data.loops[1] });
-            await b.wait(0.6);
+            await tailWatch(b, 3.6);
           }
           spawnWisps(b, 2, [0, 2]);
           await b.wait(1.6);
@@ -9616,7 +9939,7 @@ const G = window.G = { THREE };
     {
       name: 'Tide', hpStart: 0.75, sky: ['aurora', 1],
       enter(b) { b.turnRate = 0.42; b.trackPlayer = true; b.facingTarget = null; applyArena(b, 1); },
-      update(b, dt) { speedControl(b, dt); },
+      update(b, dt) { speedControl(b, dt); coilCrush(b); },
       async script(b) {
         startBlocker(b);
         b.loop(async () => { await b.wait(7); if (b.data.blk) b.data.blk.piece(0); });
@@ -9626,7 +9949,7 @@ const G = window.G = { THREE };
         const tide = (o = {}) => {
           const th = b.playerAhead(o.warn || 2.6), d = b.playerDir();
           const g1 = th + d * (1.4 + G.rand() * 0.6), g2 = th + PI + (G.rand() - 0.5) * 1.0;
-          return tidalPull(b, { gaps: [{ center: g1, width: 0.8 }, { center: g2, width: 0.8 }], warn: o.warn || 2.6, speed: o.speed || 5.4, dmg: 34 });
+          return tidalPull(b, { gaps: [{ center: g1, width: 0.8 }, { center: g2, width: 0.8 }], warn: o.warn || 2.6, speed: o.speed || 5.4, dmg: 36 });
         };
         b.loop(async () => {
           tide();
@@ -9639,10 +9962,13 @@ const G = window.G = { THREE };
           spitBolts(b, 3, { t0: 1.4, dt: 0.7, warn: 1.55, dmg: 20 });
           await b.wait(2.4);
           tide({ speed: 6.5, warn: 2.5 });
-          await b.wait(3.2);
-          if (k % 2 === 0) { await coilLash(b, { ring: b.playerRing() === 2 ? 2 : 0, warn: 1.8, dur: 2.2, dmg: 26, loop: b.data.loops[1] }); }
-          else { moonfall(b, 3, { t0: 1.3 }); await b.wait(1.6); spawnWisps(b, 2, [0, 2], { spd: 0.34 }); }
-          await b.wait(1.6);
+          // the shelter is not free: venom lands on the flooded ring ahead of the hero (reverse inside the flood)
+          await b.wait(0.6);
+          spitBolts(b, 2, { ring: 0, t0: 2.4, dt: 1.0, warn: 2.3, dmg: 20 });
+          await b.wait(2.6);
+          if (k % 2 === 0) { await coilLash(b, { ring: b.playerRing() === 2 ? 2 : 0, warn: 1.65, dur: 2.2, dmg: 26, loop: b.data.loops[1] }); }
+          else { moonfall(b, 3, { t0: 1.3 }); await b.wait(1.6); spawnWisps(b, 2, [0, 2], { spd: 0.34 }); await b.wait(0.8); await coilLash(b, { ring: b.playerRing(), warn: 1.65, dur: 2.2, dmg: 26, loop: b.data.loops[1] }); }
+          await b.wait(1.2);
           k++;
         });
         b.loop(async () => { await b.wait(9 + G.rand() * 4); await flipBlocker(b, 1.8); });
@@ -9650,10 +9976,10 @@ const G = window.G = { THREE };
         b.loop(async () => {
           await b.wait(3.0);
           // one veiled ring at a time (outer, then inner): the coil body already holds the middle ring
-          curtains(b, { lanes: curtainLanes(b, [v % 2 ? 0 : 2], 1.0, 0.27 * (v++ % 2 ? -1 : 1), { n: 2, offs: [0, 0, PI / 2] }), warn: 2.0, dur: 9.0, dmg: 12 });
+          curtains(b, { lanes: curtainLanes(b, [v % 2 ? 0 : 2], 1.0, 0.27 * (v++ % 2 ? -1 : 1), { n: 2, offs: [0, 0, PI / 2] }), warn: 2.0, dur: 9.0, dmg: 14 });
           await b.wait(2.0 + 9.0 + 1.5);
         });
-        b.loop(async () => { await b.wait(17); await sirenSong(b); await b.wait(5); });
+        b.loop(async () => { await b.wait(15); await sirenSong(b); await b.wait(4); });
       },
     },
     // ------------------------------------------------------------------ P3 BLOOM
@@ -9671,21 +9997,21 @@ const G = window.G = { THREE };
           await b.wait(2.4);
           const used = seeds.map(s => s.hazard.ring);
           const free = [0, 1, 2].find(r => r !== used[1] && r !== used[2]);
-          coilLash(b, { ring: free != null ? free : otherRing(b.playerRing(), k), warn: 1.8, dur: 2.2, dmg: 26 });
-          await b.wait(5.6);
-          await venomBeam(b, { warn: 2.4, dur: 3.5, dmg: 32 });
+          coilLash(b, { ring: free != null ? free : otherRing(b.playerRing(), k), warn: 1.65, dur: 2.2, dmg: 28 });
+          await b.wait(4.8);
+          await venomBeam(b, { warn: 2.4, dur: 3.5, dmg: 36 });
           await b.wait(1.0);
           // the bloom veil: curtains, wisps, a lash and moonfall through it
-          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 1.0, 0.29 * (k % 2 ? -1 : 1), { n: 2 }), warn: 2.0, dur: 8.5, dmg: 12 });
+          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 1.1, 0.31 * (k % 2 ? -1 : 1), { n: 2 }), warn: 2.0, dur: 9.0, dmg: 15 });
           await b.wait(2.6);
-          spawnWisps(b, 2, null, { spd: 0.34 });
+          spawnWisps(b, 3, null, { spd: 0.34 });
           await b.wait(1.8);
-          await coilLash(b, { ring: b.playerRing(), warn: 1.7, dur: 2.2, dmg: 26, loop: b.data.loops[1] });
+          await coilLash(b, { ring: b.playerRing(), warn: 1.7, dur: 2.2, dmg: 28, loop: b.data.loops[1] });
           await b.wait(0.8);
-          moonfall(b, 3, { t0: 1.3 });
-          await b.wait(3.4);
-          if (k % 2 === 0) { constrict(b, { warn: 2.4, dmg: 30 }); await b.wait(0.4); moonfall(b, 3, { ring: 2, t0: 1.6 }); await b.wait(2.4); b.trackPlayer = false; await b.wait(2.0); b.trackPlayer = true; }
-          else { starSeeds(b, 2, { t0: 2.1, gap: 2.3, slack: 2.0 }); await b.wait(2.5); spitBolts(b, 3, { t0: 1.4, dt: 0.7, dmg: 20 }); await b.wait(3.5); }
+          moonfall(b, 3, { t0: 1.3, dmg: 22 });
+          await b.wait(2.6);
+          if (k % 2 === 0) { constrict(b, { warn: 2.4, dmg: 32 }); await b.wait(0.4); moonfall(b, 3, { ring: 2, t0: 1.6, dmg: 22 }); await b.wait(2.4); await tailWatch(b, 3.6); }
+          else { starSeeds(b, 2, { t0: 2.1, gap: 2.3, slack: 2.0 }); await b.wait(2.5); spitBolts(b, 3, { t0: 1.4, dt: 0.7, dmg: 22 }); await b.wait(3.5); }
           k++;
         });
         b.loop(async () => { await b.wait(16); await sirenSong(b); await b.wait(8); });
@@ -9710,31 +10036,34 @@ const G = window.G = { THREE };
         b.loop(async () => {
           await skyDive(b, { warn: 2.8, dmg: 70 });
           await b.wait(0.6);
-          thunder(b, 3, { warn: 1.45, dmg: 20 });
+          thunder(b, 4, { warn: 1.45, dmg: 22 });
           await b.wait(2.0);
-          await b.wait(1.4);
+          await b.wait(0.8);
           spawnWisps(b, 2, null, { spd: 0.38 });
           await b.wait(1.4);
-          await coilLash(b, { ring: b.playerRing(), warn: 1.6, dur: 2.0, dmg: 28, loop: D.loops[k % 2] });
+          await coilLash(b, { ring: b.playerRing(), warn: 1.6, dur: 2.0, dmg: 30, loop: D.loops[k % 2] });
           await b.wait(0.4);
-          await skyDive(b, { warn: 2.8, dmg: 70 });
+          const dv = skyDive(b, { warn: 2.8, dmg: 70 });
+          await b.wait(0.9);
+          coilLash(b, { ring: b.playerRing(), warn: 1.7, dur: 2.0, dmg: 30, loop: D.loops[(k + 1) % 2] });
+          await dv;
           await b.wait(0.4);
-          thunder(b, 3, { warn: 1.4, dmg: 20 });
+          thunder(b, 3, { warn: 1.4, dmg: 22 });
           await b.wait(2.0);
-          moonfall(b, 3, { t0: 1.2, dt: 0.55, label: 'Storm Lightning' });
+          moonfall(b, 3, { t0: 1.2, dt: 0.55, dmg: 22, label: 'Storm Lightning' });
           await b.wait(1.8);
           k++;
         });
         let v = 0;
         b.loop(async () => {
           await b.wait(0.5);
-          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 0.95, 0.34 * (v % 2 ? -1 : 1), { alt: v++ % 3 === 2, n: 2 }), warn: 1.9, dur: 7.5, dmg: 10 });
-          await b.wait(1.9 + 7.5 + 2.6);
+          curtains(b, { lanes: curtainLanes(b, [0, 1, 2], 1.05, 0.36 * (v % 2 ? -1 : 1), { alt: v++ % 3 === 2, n: 2 }), warn: 1.9, dur: 8.0, dmg: 14 });
+          await b.wait(1.9 + 8.0 + 1.8);
         });
         b.loop(async () => {
-          await b.wait(15);
+          await b.wait(12);
           if (D.stormT > 14) await sirenSong(b, { dur: 3.0 });
-          await b.wait(14);
+          await b.wait(13);
         });
         // the storm timer: at 0:00 the Maelstrom completes and the sky strikes every 5 s
         (async () => {
@@ -9756,21 +10085,6 @@ const G = window.G = { THREE };
       },
     },
   ];
-
-  // framework workaround (06_combat.js doTransition): if the hero died during the transition cinematic,
-  // C.update's defeat flow already set 'dead', but doTransition then forces 'fight' and runs the phase with a
-  // dead hero (fight never ends). Put the state back to 'dead' and do not start the phase script.
-  for (const ph of phases) {
-    const scr = ph.script, ent = ph.enter;
-    ph.enter = function (b) {
-      if (P() && !P().alive) { if (!C().deathT && G.state === 'fight') G.setState('dead'); return; }
-      return ent && ent.call(this, b);
-    };
-    ph.script = async function (b) {
-      if (P() && !P().alive) return;
-      return scr.call(this, b);
-    };
-  }
 
   // ================================================================ STORM HUD (timer chip)
   function stormHud(b, create) {
@@ -10100,7 +10414,7 @@ const G = window.G = { THREE };
   // ================================================================ DEFINITION
   G.bosses[1] = {
     name: 'OUROS', title: 'the Aurora Coil', accent: ACC, sky: 'aurora', music: 1,
-    maxHp: 20500, parTime: 240, hitRadius: 1.5, hitHeight: 3.2, fadeOpacity: 0.32,
+    maxHp: 22000, parTime: 240, hitRadius: 1.5, hitHeight: 3.2, fadeOpacity: 0.32,
     phases,
     build, animate, teardown,
     onTransition: (b, from, to) => transition(b, from, to),
@@ -10129,7 +10443,7 @@ const G = window.G = { THREE };
   const VIOLET_DEEP = '#5a2cc8';
   const HOT_T = '#cdb6ff';                 // Event Horizon telegraph accent: white-hot violet that still reads over the brass
   const HOVER_Y = 3.9, STAR_R = 1.75, MODEL_K = 1.12;
-  const EH_TIME = 48;                      // Event Horizon collapse timer (boss clock seconds)
+  const EH_TIME = 50;                      // Event Horizon collapse timer (boss clock seconds)
   const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
   const lerp = (a, b, t) => a + (b - a) * t;
   const damp = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
@@ -10151,7 +10465,8 @@ const G = window.G = { THREE };
   const starPos = (b) => V3(0, (b && b.data && b.data.hoverY) || HOVER_Y, 0);   // play-local (the boss root sits at the origin)
   // run fn after sec of boss clock unless the phase ends first (b.wait rejects with Abort)
   // per-phase damage scale for ordinary attacks (heavy casts and lethal waves keep their fixed values)
-  const dk = (b, v) => Math.round(v * ((b && b.data && b.data.dmgK) || 1));
+  // (capped: the quick-telegraph attacks never pass 44, the 2.6 s ring detonations never pass 56)
+  const dk = (b, v) => Math.min(Math.round(v * ((b && b.data && b.data.dmgK) || 1)), v >= 26 ? 56 : 44);
   const later = (b, sec, fn) => { b.wait(sec).then(() => { try { fn(); } catch (e) { logE('later', e); } }, () => { }); };
   const SHADER_TAIL = '\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n';
 
@@ -10760,6 +11075,8 @@ const G = window.G = { THREE };
       onFire: () => resolveWell(b, st, crush, label),
     });
     st.h = h;
+    // from Fracture on, the well swallows the anchors left on the inner ring
+    if (D.wellPunish) burnAnchors(b, h, (a) => a.ring === 0);
     h.done.then(() => { if (D.well === st) D.well = null; D.dips[0] = D.dips[1] = D.dips[2] = 0; });
     return h;
   }
@@ -10791,12 +11108,18 @@ const G = window.G = { THREE };
     if (D.wellPunish) later(b, 0.32, () => {
       const P = PS(); if (!P || !P.alive || P.ring !== to) return;
       for (let k = 0; k <= 8; k++) if (G.hz.gapAt(to + 1, P.theta + P.dir * k * 0.15)) return;   // the escape ring must be whole ahead
-      if (to === 0) G.hz.ring({ ring: 0, warn: 1.5, active: 0.4, dmg: dk(b, 22), label: 'Tidal Crush' });
+      if (to === 0) burnAnchors(b, G.hz.ring({ ring: 0, warn: 1.5, active: 0.4, dmg: dk(b, 22), label: 'Tidal Crush' }), (a) => a.ring === 0);
       else G.hz.arc({ rings: [to], center: b.playerAhead(1.55), width: 0.9, warn: 1.55, active: 0.25, dmg: dk(b, 22), label: 'Tidal Shear' });
       D.pulse = Math.max(D.pulse, 0.6);
     });
   }
 
+  // a whole-ring detonation burns the anchors on it: marked for the whole warning, destroyed when it fires
+  function burnAnchors(b, h, pred) {
+    try { G.player.anchors.mark(pred, true); } catch (e) { logE('anchors.mark', e); }
+    if (h && h.done) h.done.then(() => { if (G.combat.boss !== b || !b.alive) return; try { G.player.anchors.smash((a) => a.warn && pred(a)); } catch (e) { logE('anchors.smash', e); } });
+    return h;
+  }
   // ================================================================ ATTACK PRIMITIVES
   const otherRings = (r) => [0, 1, 2].filter(k => k !== r);
   function pairFor(b, r) { if (r === 0 || b.data.twoRings) return [0, 1]; if (r === 2) return [1, 2]; return b.rand() < 0.5 ? [0, 1] : [1, 2]; }
@@ -10810,6 +11133,8 @@ const G = window.G = { THREE };
     const from = th - d * (o.back != null ? o.back : 1.0), to = from + d * span;
     b.data.swellT = 0.4; later(b, (o.warn || 2.0) + 0.3, () => { b.data.swellT = 0; });
     const h = trackFlare(b, G.hz.sweep({ rings, from, to, warn: o.warn || 2.0, dur: o.dur || 2.8, width: 0.24, dmg: dk(b, o.dmg || 24), label: o.label || 'Flare Lash', color: o.color }));
+    // from the second phase the lash scorches the anchors left in its path
+    if (b.phase >= 1) burnAnchors(b, h, (a) => rings.includes(a.ring) && (((d * (a.theta - from)) % TAU) + TAU) % TAU < span);
     if (!b.data.said.lash) { b.data.said.lash = 1; b.say('Burn.', 1.6); }
     if (o.noWait) return h;
     await h;
@@ -10829,11 +11154,13 @@ const G = window.G = { THREE };
       const c = base + i * TAU / n + (i ? b.randRange(-0.2, 0.2) : 0);
       const sg = i % 2 ? 1 : -1;
       hs.push(trackFlare(b, G.hz.sweep({ rings, from: c - sg * 0.95, to: c + sg * 0.95, warn: (o.warn || 1.9) + i * 0.32, dur: 1.4, width: 0.24, dmg: dk(b, o.dmg || 22), label: o.label || 'Solar Flare', color: o.color })));
+      if (b.phase >= 2) burnAnchors(b, hs[i], (a) => rings.includes(a.ring) && Math.abs(angDiff(a.theta, c)) < 1.0);
     }
     world('ringGlow', free, GOLD, 0.45, 2.4);
     if (!b.data.said.flares) { b.data.said.flares = 1; b.say('My flares reach every orbit but one.', 2.6); }
     await hs[hs.length - 1];
     b.data.swellT = 0;
+    if (o.exhale !== false && b.phase >= 1) exhale(b, 2.2);
   }
   // a single prominence: erupts on the inner ring and leaps outward ring by ring
   function prominence(b, c, o = {}) {
@@ -10870,8 +11197,13 @@ const G = window.G = { THREE };
     });
     return last;
   }
-  // the star exhales after a salvo: its facing locks, so the back stays put for a few seconds
-  function exhale(b, dur) { const D = b.data; b.faceTo(b.facing); D.exhaleEnd = b.clock + dur; D.swellT = -0.3; }
+  // the star exhales after a salvo: it turns its mask toward the far side (where the knight is heading, plus half a
+  // turn) and holds it there, so its back comes round to the knight: a deliberate back window
+  function exhale(b, dur) {
+    const D = b.data;
+    b.faceTo(G.wrap(b.playerAhead(1.6) + PI)); b.turnRate = 1.5;
+    D.exhaleEnd = b.clock + dur + 1.4; D.swellT = -0.3;
+  }
   async function prominences(b, o = {}) {
     const n = o.n || 3, c0 = b.playerAhead(o.lead || 2.0) + (o.off || 0);
     let last = null;
@@ -10911,6 +11243,7 @@ const G = window.G = { THREE };
     trackFlare(b, G.hz.sweep({ rings: [other], from: th + d * 2.8, to: th - d * 0.9, warn: 2.3, dur: 2.0, width: 0.24, dmg: dk(b, 22), label: 'Pincer Flare', color: o.color }));
     if (!b.data.said.pincer) { b.data.said.pincer = 1; b.say('Nowhere to run but where I allow.', 2.4); }
     await b.wait(3.1);
+    if (o.exhale !== false && b.phase >= 1) exhale(b, 2.2);
   }
   // Corona Surge: the inner ring detonates. Timed to land just after a pending gravity well
   async function coronaSurge(b, o = {}) {
@@ -10918,6 +11251,7 @@ const G = window.G = { THREE };
     let warn = o.warn || 2.6;
     if (D.well && D.well.h) { const f = D.well.h.fireAt - (G.t || 0); if (f > 0.4 && f < 4) warn = Math.max(warn, f + 1.3); }
     const h = G.hz.ring({ ring: 0, warn, active: 0.4, dmg: dk(b, o.dmg || 32), label: 'Corona Surge', color: o.color });
+    burnAnchors(b, h, (a) => a.ring === 0);
     D.swellT = 0.5; later(b, warn, () => { D.swellT = 0; D.pulse = 1; });
     await h;
   }
@@ -10949,7 +11283,7 @@ const G = window.G = { THREE };
   async function photonSphere(b, o = {}) {
     const r = b.playerRing(), d = b.playerDir(), warn = o.warn || 2.6;
     const gapC = b.playerAhead(warn) - d * 1.0;
-    G.hz.ring({ ring: r, warn, active: 0.4, dmg: dk(b, 26), gaps: [{ center: gapC, width: 0.8 }], label: 'Photon Sphere', color: o.color });
+    burnAnchors(b, G.hz.ring({ ring: r, warn, active: 0.4, dmg: dk(b, 26), gaps: [{ center: gapC, width: 0.8 }], label: 'Photon Sphere', color: o.color }), (a) => a.ring === r && Math.abs(angDiff(a.theta, gapC)) > 0.4);
     const top = starPos(b).add(V3(0, STAR_R + 0.8, 0));
     const maxR = b.data.twoRings ? 1 : 2;
     for (const k of [r - 1, r + 1]) if (k >= 0 && k <= maxR) for (let i = 0; i < 2; i++) {
@@ -11020,8 +11354,9 @@ const G = window.G = { THREE };
       for (const side of [-1, 1]) {
         const th = g.center + side * (g.width / 2 + 0.5);
         if (G.hz.gapAt(g.ring, th)) continue;
-        const fwd = (((th - S.theta) * S.dir) % TAU + TAU) % TAU / om;
-        const back = (((S.theta - th) * S.dir) % TAU + TAU) % TAU / om + 0.6;
+        const aF = (((th - S.theta) * S.dir) % TAU + TAU) % TAU, aG = (((g.center - S.theta) * S.dir) % TAU + TAU) % TAU;
+        const fwd = aF / om + (aG < aF ? 1.4 : 0);                          // the forward route crosses the gap: shift round it
+        const back = (TAU - aF) / om + 0.6 + (aG > aF ? 1.4 : 0);
         const tt = Math.min(fwd, back) + Math.abs(g.ring - S.ring) * 0.7;
         if (tt > 1.2 && tt < bestT) { bestT = tt; best = { g, th }; }
       }
@@ -11261,14 +11596,24 @@ const G = window.G = { THREE };
       await b.wait(b.randRange(rest[0], rest[1]));
     });
   }
+  // filler (every phase, sparser in the Corona): a single sunspot bolt on the knight's path every few seconds, never while a gravity
+  // well, a lethal wave or a cast is pending (so it never fights those answers)
+  function sunspots(b, every) {
+    b.loop(async () => {
+      await b.wait(b.randRange(every[0], every[1]));
+      const D = b.data, S = PS();
+      if (!S || !S.alive || !b.alive || b.casting || D.consumed || D.noWell || D.retro || (D.well && D.well.h && D.well.h.hazard && !D.well.h.hazard.finished)) return;
+      // only where its answer (Reverse, or Shift) agrees with everything live: never with waves, ring blasts or other bolts
+      if (G.hz.active.some(h => !h.finished && (h.kind === 'wave' || h.kind === 'ring' || h.kind === 'bolt' || h.lethal))) return;
+      const w = 1.2;
+      G.hz.bolt({ from: starPos(b).add(V3(0, STAR_R + 0.8, 0)), ring: S.ring, theta: b.playerAhead(w), warn: w, radius: 1.0, dmg: dk(b, 13), label: 'Sunspot', color: D.twoRings ? HOT_T : undefined });
+    });
+  }
   // common per-frame logic
   function phaseTick(b, dt) {
     const D = b.data;
-    // WORKAROUND (07_player.js updateNova): the Supernova sets state.invuln = true and never clears it, which made the
-    // knight immortal for the rest of the fight. Clear it here once the Supernova is over.
-    const S = PS(); if (S && S.invuln && !S.novaActive) S.invuln = false;
     tickSpin(b);
-    if (D.exhaleEnd && b.clock > D.exhaleEnd) { D.exhaleEnd = 0; b.faceTo(null); D.swellT = 0; }
+    if (D.exhaleEnd && b.clock > D.exhaleEnd) { D.exhaleEnd = 0; b.faceTo(null); D.swellT = 0; b.turnRate = D.baseTurn || 0.42; }
     if (D.well && D.well.h && D.well.h.hazard && D.well.h.hazard.finished) D.well = null;
   }
 
@@ -11282,9 +11627,9 @@ const G = window.G = { THREE };
   function snapLook(b) { const D = b.data; for (const k in D.look) D.cur[k] = D.look[k]; }
   function enterPhase(b, i) {
     const D = b.data;
-    b.turnRate = [0.42, 0.46, 0.5, 0.32][i]; b.trackPlayer = true; b.facingTarget = null;
+    b.turnRate = D.baseTurn = [0.42, 0.46, 0.5, 0.32][i]; b.trackPlayer = true; b.facingTarget = null;
     D.exhaleEnd = 0; D.swellT = 0; D.noWell = false; D.retro = false;
-    D.dmgK = [1, 1.1, 1.32, 1.4][i]; D.wellPunish = i >= 1; D.twoRings = i >= 3;
+    D.dmgK = [1.35, 1.75, 2.0, 2.0][i]; D.wellPunish = i >= 1; D.twoRings = i >= 3;
     if (D.spin) endSpin(b);
     world('ringArrows', 'all', 1, false);
     setLook(b, i);
@@ -11311,6 +11656,7 @@ const G = window.G = { THREE };
     const D = b.data;
     const S = PS();
     if (S && S.ring === 2) G.player.forceShift(-1, { fall: true });
+    if (G.player.disableRing) G.player.disableRing(2, true);   // Shift Out from the middle ring now bumps (and still braces)
     D.outer = [];
     const base = (S ? S.theta : 0) + PI;
     for (let k = 0; k < 3; k++) {
@@ -11347,9 +11693,10 @@ const G = window.G = { THREE };
       update: phaseTick,
       async script(b) {
         await b.wait(1.4);
+        sunspots(b, [4.4, 5.8]);
         rotation(b, [
           lashCombo, salvoCombo, solarFlares, surgeLash, pincer, (bb) => salvoCombo(bb, { n: 2 }), (bb) => lashCombo(bb, { surge: true }), solarFlares,
-        ], [0.35, 0.7], coronalMass, 24, 13, { every: [10.5, 13], warn: 2.4, window: 1.2, crush: 28 });
+        ], [0.3, 0.6], coronalMass, 24, 13, { every: [10.5, 13], warn: 2.4, window: 1.2, crush: 28 });
       },
     },
     {
@@ -11367,6 +11714,7 @@ const G = window.G = { THREE };
       },
       async script(b) {
         await b.wait(1.0);
+        sunspots(b, [2.9, 3.9]);
         rotation(b, [
           async (bb) => { fracture(bb, { n: 2 }); await bb.wait(1.4); shardStream(bb, {}); await bb.wait(2.2); },
           spinCombo, salvoCombo, retroCombo,
@@ -11374,7 +11722,7 @@ const G = window.G = { THREE };
           lashCombo,
           async (bb) => { await pincer(bb); shardStream(bb, { n: 3 }); await bb.wait(1.6); },
           async (bb) => { fracture(bb, { n: 1 }); await bb.wait(0.8); await lensing(bb, { n: 5 }); },
-        ], [0.2, 0.5], sunquake, 24, 12, { every: [14, 17.5], warn: 2.4, window: 1.2, crush: 28 });
+        ], [0.1, 0.3], sunquake, 24, 12, { every: [12.5, 15.5], warn: 2.4, window: 1.2, crush: 28 });
       },
     },
     {
@@ -11393,22 +11741,24 @@ const G = window.G = { THREE };
       },
       async script(b) {
         await b.wait(0.8);
+        sunspots(b, [2.5, 3.4]);
         rotation(b, [
           (bb) => accretion(bb, { extra: (x) => lensing(x, { n: 4 }) }),
           (bb) => lashCombo(bb, { surge: true }),
           photonSphere,
-          (bb) => retroCombo(bb, {}),
+          // the heavens turn back while the disk spins: each forced reverse sends the knight into the slices' path
+          (bb) => retroCombo(bb, { extra: (x) => accretion(x, { dur: 8 }) }),
           async (bb) => { shardStream(bb, { n: 3 }); await bb.wait(1.0); await solarFlares(bb); },
           (bb) => spinCombo(bb, {}),
           async (bb) => { fracture(bb, { n: 1 }); await bb.wait(0.6); await salvoCombo(bb, {}); },
           async (bb) => { photonSphere(bb).catch(() => { }); await bb.wait(3.4); await pincer(bb); },
           (bb) => accretion(bb, { dur: 8, extra: async (x) => { await salvoCombo(x, { n: 2 }); shardStream(x, { n: 2 }); } }),
-          pincer,
+          async (bb) => { shardStream(bb, { n: 2, lead: 3.2 }); await bb.wait(0.5); await pincer(bb); },
         ], [0.1, 0.3], collapseCast, 24, 14, { every: [11, 13.5], warn: 2.2, window: 1.2, crush: 28 });
       },
     },
     {
-      name: 'Event Horizon', hpStart: 0.15, sky: false,
+      name: 'Event Horizon', hpStart: 0.12, sky: false,
       enter(b) {
         const D = b.data, retry = D.phaseSeen == null;
         enterPhase(b, 3);
@@ -11430,6 +11780,7 @@ const G = window.G = { THREE };
       async script(b) {
         await b.wait(0.6);
         const W = (o) => ({ color: HOT_T, ...o });
+        sunspots(b, [2.3, 3.3]);
         rotation(b, [
           (bb) => flareLash(bb, W({ rings: [0, 1], span: PI * 1.65, back: 0.7, label: 'White Flare' })),
           async (bb) => { infall(bb, {}).catch(() => { }); await bb.wait(2.0); await lensing(bb, W({ n: 3, lead: 1.5 })); },
@@ -11439,7 +11790,7 @@ const G = window.G = { THREE };
           async (bb) => { shardStream(bb, W({ rings: [0, 1], n: 2, lead: 2.7 })); await bb.wait(1.6); await lensing(bb, W({ n: 3, lead: 1.6 })); },
           (bb) => pincer(bb, W({})),
           (bb) => lensing(bb, W({ n: 5, label: 'Lensed Light' })),
-        ], [0.2, 0.45], null, 0, 0, { every: [6.5, 8], warn: 2.0, window: 1.1, crush: 22, label: 'Event Horizon' });
+        ], [0.05, 0.2], null, 0, 0, { every: [6.5, 8], warn: 2.0, window: 1.1, crush: 22, label: 'Event Horizon' });
       },
     },
   ];
@@ -11456,7 +11807,7 @@ const G = window.G = { THREE };
         'text-shadow:0 0 8px rgba(0,0,0,.95),0 0 12px rgba(167,123,255,.7);padding:5px 10px 6px;border:1px solid rgba(200,170,255,.6);border-radius:3px;' +
         'background:linear-gradient(180deg,rgba(14,6,30,.78),rgba(4,2,12,.7));box-shadow:0 0 18px rgba(167,123,255,.35);min-width:148px;' +
         (touch ? 'right:calc(var(--sar,0px) + 12px);top:calc(var(--sat,0px) + 84px);text-align:right;' : 'left:calc(var(--sal,0px) + 14px);top:calc(var(--sat,0px) + 42px);');
-      el.innerHTML = '<div style="opacity:.85">EVENT HORIZON</div><div class="t" style="font:700 22px system-ui,sans-serif;letter-spacing:.06em;font-variant-numeric:tabular-nums;margin-top:1px">0:48</div>' +
+      el.innerHTML = '<div style="opacity:.85">EVENT HORIZON</div><div class="t" style="font:700 22px system-ui,sans-serif;letter-spacing:.06em;font-variant-numeric:tabular-nums;margin-top:1px">0:50</div>' +
         '<div style="height:4px;margin-top:4px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden"><i style="display:block;height:100%;width:100%;transform-origin:0 50%;background:linear-gradient(90deg,#5a2cc8,#c8a8ff,#ffffff)"></i></div>';
       hud.appendChild(el); D.ehEl = el; D.ehTxt = el.querySelector('.t'); D.ehBar = el.querySelector('i');
     }
@@ -11544,7 +11895,6 @@ const G = window.G = { THREE };
         D.swellT = 0; D.look.collapse = 1; D.look.disk = 1; D.look.mask = 0.5; D.look.corona = 0.5; D.look.heat = 0.4; D.pulse = 2;
         world('setSky', 'collapse', 2, 0.8);
         fx('flash', '#e8dcff', 0.3, 0.7); cam('shake', 1.1, 1.0); sfx('thunder', {}); sfx('gravity', { vol: 1 });
-        post('bloomPulse', 0, 1.1);          // shorten the collapse sky's own 2.5 s bloom set-piece so the implosion stays visible
         fx('shockwave', starPos(b), { color: HOT, radius: 9, life: 0.7 });
         fx('shockwave', V3(0, 0.3, 0), { color: ACC, radius: 16, life: 1.4 });
         for (let k = 0; k < 3; k++) fx('ringFlash', k, { color: HOT, life: 1.0, intensity: 1.6 });
@@ -11719,111 +12069,278 @@ const G = window.G = { THREE };
   const brand = () => { bs |= 0; bs = (bs + 0x6D2B79F5) | 0; let t = Math.imul(bs ^ (bs >>> 15), 1 | bs); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 
   // ================================================================ BOT
+  // A planner that plays like a competent human at level 3 and a hesitant / careless one at levels 1-2.
+  // Every decision tick (reaction time per level) it rolls the hero's real motion rules forward ~4 s for a set of
+  // candidate input plans (keep, reverse now or later, shift now or later, double shifts, reverse+shift, shift and
+  // back, reverse twice to wait in a gap, Eclipse halts), scores each against every hazard's own covers() test at
+  // the hazard-local time of each sample (the same test G.hz.dangerAt and the real hit check use), models hit
+  // i-frames, shift i-frames, tick hazards and soak timers, and commits only the first input of the best plan.
+  // Level differences (SPEC 8.8): reaction time and the chance to overlook a threat (re-rolled every ~2 s per hazard).
   const LV = {
-    1: { react: 0.45, ignore: 0.25, greedAegis: false, ringPref: 0, interruptMiss: 0.3 },
-    2: { react: 0.25, ignore: 0.10, greedAegis: true, ringPref: 1, interruptMiss: 0.1 },
-    3: { react: 0.10, ignore: 0.0, greedAegis: true, ringPref: 2, interruptMiss: 0 },
+    1: { react: 0.45, ignore: 0.25, greedAegis: false, ringPref: 0, interruptMiss: 0.3, reserve: false },
+    2: { react: 0.25, ignore: 0.10, greedAegis: true, ringPref: 1, interruptMiss: 0.1, reserve: true },
+    3: { react: 0.10, ignore: 0.0, greedAegis: true, ringPref: 2, interruptMiss: 0, reserve: true },
   };
-  const B = { level: 0, t: 0, ignored: new Map(), castSeen: new Map(), holdT: 0, lastAct: '', acts: {}, decisions: 0, lastCost: 0 };
-  const H = 1.8, STEP = 0.1, PAD = 0.12;
+  const B = { pending: [], level: 0, t: 0, ign: new Map(), castSeen: new Map(), holdT: 0, lastAct: '', acts: {}, decisions: 0, lastCost: 0, plans: {},
+    intCasts: [], phaseT0: 0, retro: null, smashed: [0, 0, 0], smashT: [-99, -99, -99], lastBest: null };
+  const PAD = 0.12, IGNORE_REROLL = 2.0, HIT_IFR = 0.8;
+  // sample times: fine where inputs land (shift i-frames are 0.14 s wide), coarser further out
+  const TS = (() => { const a = []; let t = 0; while (t < 1.6 - 1e-6) { t += 0.05; a.push(+t.toFixed(3)); } while (t < 3.0 - 1e-6) { t += 0.1; a.push(+t.toFixed(3)); } while (t < 4.0 - 1e-6) { t += 0.2; a.push(+t.toFixed(3)); } return a; })();
+  const H = TS[TS.length - 1];
   const fire = (a) => { try { G.input.fire(a, { source: 'bot' }); B.acts[a] = (B.acts[a] || 0) + 1; B.lastAct = a; } catch (e) { logE('bot.fire', e); } };
+  const fightT = () => (G.combat && G.combat.fightTime) || 0;
 
+  // ---- perception: hazards the bot noticed this moment (each threat re-rolls its "overlooked" chance every ~2 s)
   function hazards() {
     const L = (G.hz && G.hz.active) || [];
-    const out = [];
+    const out = [], now = G.t || 0, p = LV[B.level].ignore;
     for (const h of L) {
       if (h.finished) continue;
-      if (!B.ignored.has(h.id)) B.ignored.set(h.id, h.kind !== 'contact' && h.kind !== 'gap' && brand() < LV[B.level].ignore);
-      if (B.ignored.get(h.id)) continue;
+      if (p > 0 && h.kind !== 'contact' && h.kind !== 'gap') {
+        let e = B.ign.get(h.id);
+        if (!e || now >= e.until) { e = { ign: brand() < p, until: now + IGNORE_REROLL * (0.75 + 0.5 * brand()) }; B.ign.set(h.id, e); }
+        if (e.ign) continue;
+      }
       out.push(h);
     }
-    if (B.ignored.size > 400) { const live = new Set(L.map(h => h.id)); for (const k of B.ignored.keys()) if (!live.has(k)) B.ignored.delete(k); }
+    if (B.ign.size > 300) { const live = new Set(L.map(h => h.id)); for (const k of B.ign.keys()) if (!live.has(k)) B.ign.delete(k); }
     return out;
   }
-  const weightOf = (h) => (h.kind === 'contact' ? ((h.add && h.add.contactDmg) || 20) + 6 : Math.max(10, h.dmg || 0)) * (h.lethal ? 1.6 : 1);
-
-  // ---- path simulation: returns sample arrays for one plan
-  // plan: {rev: t|null, shift: {t, d}|null, halt: t|null}
-  function simulate(plan) {
-    const pl = G.player, S = pl.state;
-    const R = G.RINGS;
-    const samples = [];
-    let th = S.theta, t = 0;
-    let dirAfter = S.dir;
-    const sp0 = (G.OMEGA || 0.6) * (S.speedMul || 1);
-    const velAt = (tt) => {
-      let v = pl.velAhead(tt);
-      if (plan.rev != null && tt >= plan.rev) {
-        const u = (tt - plan.rev) / 0.2;
-        const nd = -dirAtRev;
-        v = u < 1 ? -nd * Math.cos(PI * u) * sp0 : nd * sp0;
-      }
-      if (plan.halt != null && tt >= plan.halt && tt < plan.halt + 1.5) v *= clamp(1 - (tt - plan.halt) / 0.08, 0, 1);
+  const dmgOf = (h) => h.kind === 'contact' ? ((h.add && h.add.contactDmg) || 20) : (h.dmg || 0);
+  // the cost of one hit: its damage, plus the knock-on of contact bounces and falls
+  const costOf = (h) => {
+    const d = dmgOf(h);
+    if (h.kind === 'contact') return d + 6;
+    if (h.kind === 'gap') return d + 10;
+    return Math.max(6, d) * (h.lethal ? 1.15 : 1);
+  };
+  // the gravity well (HELIARCH): its brace state is shown on screen ("SHIFT OUT!"); read it from the boss data
+  function wellInfo(b, sp) {
+    const st = b && b.data && b.data.well;
+    if (!st || st.braced || !st.h || !st.h.hazard || st.h.hazard.finished) return null;
+    const h = st.h.hazard, warn = st.warn || h.warn, win = st.win || 1.2;
+    return { h, braced: false, fireIn: Math.max(0, (warn - h.lt) / sp), openIn: Math.max(0, (warn - win - h.lt) / sp) };
+  }
+  // forced reverses (HELIARCH Retrograde): every ring's inlay arrows show the direction the knight will be forced
+  // into, and all rings glow for the lead time before the flip (the glow fades out exactly at the flip)
+  function retroInfo(S) {
+    const rs = (G.world && G.world.ringState) ? G.world.ringState() : [];
+    if (!(rs.length === 3 && rs.every(r => r.arrowShown) && rs.every(r => r.arrowDir === rs[0].arrowDir))) { B.retro = null; return null; }
+    const want = rs[0].arrowDir;
+    const left = Math.min(...rs.map(r => r.glowLeft));
+    B.retro = { want, left };
+    if (want === S.dir || !(left > 0 && left < 4)) return { want, at: Infinity };
+    return { want, at: Math.max(0.05, left) };
+  }
+  // speed rules the hero can read off the arena: a flooded ring slows to x0.6 (OUROS), a ring-bound haste or
+  // slow (spin-up, flood) stays with its ring, anything else (enthral) follows the hero
+  function speedModel(S, m) {
+    const rs = (G.world && G.world.ringState) ? G.world.ringState() : [];
+    const flooded = [0, 1, 2].map(i => !!(rs[i] && rs[i].flooded));
+    const cur = S.speedMul || 1, until = m.speedT > 0 ? m.speedT : Infinity;
+    const kind = Math.abs(cur - 1) < 1e-3 ? 0 : (cur > 1 || (cur < 1 && flooded[S.ring])) ? 1 : 2;
+    const home = S.ring;
+    return (ring, t) => {
+      let v = 1;
+      if (t < until && (kind === 2 || (kind === 1 && ring === home))) v = cur;
+      if (flooded[ring]) v = Math.min(v, 0.6);
       return v;
     };
-    let dirAtRev = S.dir;
-    if (plan.rev != null) { const v = pl.velAhead(plan.rev); dirAtRev = Math.abs(v) > 0.05 ? Math.sign(v) : S.dir; dirAfter = -dirAtRev; }
-    for (let k = 1; k * STEP <= H + 1e-6; k++) {
-      const t1 = k * STEP;
-      th += (velAt(t) + velAt(t1)) * 0.5 * STEP; t = t1;
-      let ring = pl.predictRing(t1), inv = false;
-      if (plan.shift) {
-        const ts = plan.shift.t;
-        if (t1 >= ts + 0.14) ring = clamp(pl.predictRing(ts) + plan.shift.d, 0, R.length - 1);
-        if (t1 >= ts + 0.06 && t1 <= ts + 0.20) inv = true;
-      }
-      const m = pl.motion();
-      if (m.aegisT > t1 || m.postNovaT > t1 || (m.hitT > t1)) inv = true;
-      samples.push({ t: t1, ring, th, inv });
-    }
-    return { samples, dirEnd: dirAfter, plan };
   }
 
-  function evaluate(sim, hz, soaks, boss) {
-    const hit = new Set();
-    let cost = 0, firstHit = 99, firstHitDmg = 0;
-    const sp = (G.hz && G.hz.speed) || 1;
+  // ---- forward model of the hero's motion (mirrors 07_player.js updateMotion / doReverse / doShift / eclipse)
+  function rollout(events, ctx) {
+    const pl = G.player, S = pl.state, K = pl.K, m = ctx.m;
+    const st = {
+      th: S.theta, ring: m.hop ? m.hop.from : S.ring, dir: S.dir,
+      turn: m.turning ? { t: K.reverseDur - m.turnLeft, dur: K.reverseDur } : null, revLock: m.revLock, revBuf: m.revBuf,
+      hop: m.hop ? { from: m.hop.from, to: m.hop.to, t: m.hop.t, dur: m.hop.dur, forced: !!m.hop.forced } : null,
+      shiftLock: m.shiftLock, shiftBuf: m.shiftBuf, haltT: m.haltT, haltF: m.haltF != null ? m.haltF : 1,
+    };
+    const ringOk = ctx.ringOk;
+    const outT = [];                                  // times an outward shift or outward bump started (gravity brace)
+    let tNow = 0;
+    const endHalt = () => { st.haltT = 0; };
+    const doRev = () => {
+      if (st.haltT > 0) endHalt();
+      if (st.turn || st.revLock > 0) { st.revBuf = true; return; }
+      st.dir = -st.dir; st.turn = { t: 0, dur: K.reverseDur };
+    };
+    const doShift = (d) => {
+      if (st.haltT > 0) endHalt();
+      if (st.hop || st.shiftLock > 0) { st.shiftBuf = d; return; }
+      const to = st.ring + d;
+      if (!ringOk(to)) { st.shiftLock = K.bumpLock; if (d > 0) outT.push(tNow); return; }
+      st.hop = { from: st.ring, to, t: 0, dur: K.shiftDur, forced: false };
+      if (d > 0) outT.push(tNow);
+    };
+    const doHalt = () => { st.haltT = K.eclipseHalt; st.turn = null; };
+    const ev = events.slice().sort((a, c) => a.t - c.t);
+    let ei = 0, prevT = 0;
+    const samples = [];
+    const retro = ctx.retro; let retroDone = !retro || retro.at === Infinity;
+    for (const t1 of TS) {
+      // integrate in <= 0.05 s sub-steps (exactly the sample grid up to 1.6 s)
+      let t = prevT;
+      while (t < t1 - 1e-6) {
+        const dt = Math.min(0.05, t1 - t);
+        tNow = t;
+        while (ei < ev.length && ev[ei].t <= t + 1e-6) {
+          const e = ev[ei++];
+          if (e.a === 'R') doRev(); else if (e.a === 'S') doShift(e.d); else if (e.a === 'H') doHalt();
+        }
+        if (!retroDone && t + 1e-6 >= retro.at) {
+          retroDone = true;
+          if (st.dir !== retro.want) { const old = st.dir; st.dir = -st.dir; st.turn = null; st.revLock = 0.2; st.revBuf = false; st.th -= old * 0.06; }
+        }
+        // timers (same order as updateMotion)
+        if (st.haltT > 0) { st.haltT -= dt; if (st.haltT <= 0) st.haltT = 0; }
+        const hT = st.haltT > 0 ? 0 : 1;
+        st.haltF += (hT - st.haltF) * Math.min(1, dt * (hT ? 7 : 16)); if (Math.abs(st.haltF - hT) < 0.01) st.haltF = hT;
+        if (st.turn) { st.turn.t += dt; if (st.turn.t >= st.turn.dur) { st.turn = null; st.revLock = K.reverseLock; } }
+        else if (st.revLock > 0) { st.revLock -= dt; if (st.revLock <= 0) { st.revLock = 0; if (st.revBuf) { st.revBuf = false; doRev(); } } }
+        if (st.hop) { st.hop.t += dt; if (st.hop.t >= st.hop.dur) { st.ring = st.hop.to; st.hop = null; st.shiftLock = K.shiftLock; } }
+        else if (st.shiftLock > 0) { st.shiftLock -= dt; if (st.shiftLock <= 0) { st.shiftLock = 0; if (st.shiftBuf) { const d = st.shiftBuf; st.shiftBuf = 0; tNow = t + dt; doShift(d); } } }
+        const vr = st.hop ? (st.hop.t / st.hop.dur < 0.5 ? st.hop.from : st.hop.to) : st.ring;
+        const sp = K.omega * ctx.speed(vr, t) * st.haltF;
+        const v = st.turn ? -st.dir * Math.cos(PI * clamp(st.turn.t / st.turn.dur, 0, 1)) * sp : st.dir * sp;
+        st.th += v * dt;
+        t += dt;
+      }
+      prevT = t1;
+      const hop = st.hop, u = hop ? clamp(hop.t / hop.dur, 0, 1) : 0;
+      const ring = hop ? (u < 0.5 ? hop.from : hop.to) : st.ring;
+      const ringF = hop ? hop.from + (hop.to - hop.from) * (u * u * (3 - 2 * u)) : st.ring;
+      // shift i-frames, trimmed by a frame-and-a-half each side: the bot never counts on frame-perfect timing
+      const sInv = !!(hop && !hop.forced && hop.t >= K.shiftIStart + 0.03 && hop.t <= K.shiftIEnd - 0.03);
+      samples.push({ t: t1, ring, ringF, th: st.th, inv: sInv || ctx.aegisT > t1 || ctx.postNovaT > t1, shifting: !!hop, dir: st.dir });
+    }
+    return { samples, outT, end: samples[samples.length - 1] };
+  }
+
+  function evaluate(sim, ctx) {
+    const sp = ctx.sp, S = G.player.state;
+    let cost = 0, dmgSum = 0, firstHit = 99, firstHitDmg = 0, firstCost = 0;
+    let ifr = ctx.hitT;
+    const once = new Set(), nextTick = new Map(), blocked = new Set(), aeg = ctx.aeg;
+    let reward = 0;
+    const well = ctx.well, braced = well && sim.outT.some(t => t >= well.openIn - 0.3 && t <= well.fireIn);
+    let prev = null;
     for (const s of sim.samples) {
-      const tw = s.t < 0.9 ? 1 : 1 - (s.t - 0.9) / (H - 0.9) * 0.55;
-      for (const h of hz) {
-        if (h.soak) continue;
+      const tw = s.t <= 1.2 ? 1 : 1 - (s.t - 1.2) / (H - 1.2) * 0.6;
+      for (const h of ctx.hz) {
+        if (well && h === well.h && braced) continue;
+        if (h.kind === 'contact' ? (s.shifting && h.add && s.ring !== h.add.ring) : (h.kind === 'gap' && s.shifting)) continue;
         const lt = h.lt + s.t * sp;
         let c = false;
-        try { c = h.covers(s.ring, s.th, lt, s.ring, PAD); } catch (e) { c = false; }
-        if (!c) continue;
-        if (s.inv) continue;
-        const tick = h.tick && h.kind !== 'contact';
-        if (hit.has(h.id) && !tick) continue;
-        const w = weightOf(h) * (hit.has(h.id) ? 0.35 : 1);
-        hit.add(h.id);
-        cost += w * tw;
-        if (s.t < firstHit) { firstHit = s.t; firstHitDmg = w; }
+        try { c = h.covers(s.ring, s.th, lt, s.ringF, PAD); } catch (e) { c = false; }
+        // a fast beam can pass between two coarse samples: check the crossing
+        if (!c && h.kind === 'sweep' && prev && prev.ring === s.ring && !s.inv && h.rings.includes(s.ring) && h.live(lt) && s.t > 1.55) {
+          const lt0 = h.lt + prev.t * sp, b0 = h.beamAt(lt0), b1 = h.beamAt(lt);
+          c = Math.sign(angDiff(prev.th, b0)) !== Math.sign(angDiff(s.th, b1)) && Math.abs(angDiff(s.th, b1)) < 1.0;
+        }
+        if (!c || s.inv) continue;
+        // a planned Aegis blocks (and reflects) everything in its window, i-frames or not
+        if (aeg && s.t >= aeg.a0 && s.t <= aeg.a1) {
+          if (!blocked.has(h.id)) { blocked.add(h.id); const d = dmgOf(h), perfect = s.t - aeg.a0 <= 0.3; reward += 2 + Math.max(40, d * (perfect ? 4.5 : 3)) * 0.04; }
+          continue;
+        }
+        if (s.t < ifr) continue;
+        const tick = h.tick > 0 && h.kind !== 'contact';
+        if (tick) { const nt = nextTick.has(h.id) ? nextTick.get(h.id) : (h.nextTick || 0); if (lt < nt) continue; nextTick.set(h.id, lt + h.tick); }
+        else { if (once.has(h.id)) continue; once.add(h.id); }
+        const d = dmgOf(h), w = costOf(h);
+        cost += w * tw; dmgSum += d; ifr = s.t + HIT_IFR;
+        if (s.t < firstHit) { firstHit = s.t; firstHitDmg = d; firstCost = w; }
       }
+      prev = s;
     }
-    // soaks: must reach before the timer runs out
-    for (const h of soaks) {
+    // being pulled in by an unbraced well (the crush on the inner ring is the hazard itself)
+    if (well && !braced && well.fireIn < H) {
+      const s = sim.samples.find(x => x.t >= well.fireIn) || sim.end;
+      if (s.ring > 0) cost += 9;
+    }
+    if (dmgSum >= S.hp && !(G.player.god || (G.combat && G.combat.practice))) cost += 250;
+    // soaks: reach them before their timer runs out; a missed one costs its real damage (and its side effect)
+    for (const h of ctx.soaks) {
       const left = (h.warn - h.lt) / sp;
       let touched = false;
-      for (const s of sim.samples) { if (s.t > left) break; if (!s.inv && h.touches(s.ring, s.th, 0)) { touched = true; break; } }
-      if (touched) { cost -= 4; continue; }
-      const e = sim.samples[sim.samples.length - 1];
-      const om = (G.OMEGA || 0.6) * ((G.player.state.speedMul) || 1);
-      const ringT = Math.abs(e.ring - h.ring) * 0.65;
-      const fwd = posMod((h.theta - e.th) * sim.dirEnd) / om;
-      const back = posMod((e.th - h.theta) * sim.dirEnd) / om + 0.4;
-      const need = H + Math.max(ringT, Math.min(fwd, back));
-      if (need > left - 0.2) cost += (h.failDmg || 20) * 1.4 + 10;
-      else cost += need * 0.8;
+      for (const s of sim.samples) { if (s.t > left) break; if (!s.shifting && h.touches(s.ring, s.th, 0)) { touched = true; break; } }
+      if (touched) { cost -= 1.5; continue; }
+      const e = sim.end;
+      const om = (G.OMEGA || 0.6) * ctx.speed(e.ring, e.t);
+      const ringT = Math.abs(e.ring - h.ring) * 0.7;
+      const fwd = posMod((h.theta - e.th) * e.dir) / om;
+      const back = posMod((e.th - h.theta) * e.dir) / om + 0.45;
+      const need = e.t + Math.max(ringT, Math.min(fwd, back));
+      const fail = (h.failDmg || 0) + 7;            // a missed star also has a side effect (adds, a new crack)
+      if (need > left - 0.15) cost += fail * (left <= H ? 1 : 0.85);
+      else cost += Math.min(fail * 0.4, (need - e.t) * 0.3);
     }
-    // preferences at the end of the horizon
-    const e = sim.samples[sim.samples.length - 1];
-    const lv = LV[B.level];
+    // anchors: running over a ready one pulses it (26 dmg, +5 HP); a marked one is about to be smashed, pulse it first
+    for (const a of ctx.anchors) {
+      const R = G.RINGS[a.ring], contact = (G.player.K.anchorContact || 0.7) / R;
+      for (const s of sim.samples) {
+        if (s.t < (a.cd || 0) || s.shifting) continue;
+        if ((a.meridian || s.ring === a.ring) && Math.abs(angDiff(s.th, a.theta)) < contact) { cost -= a.warn ? 3 : 1.2; break; }
+      }
+    }
+    // preferences at the end of the horizon: inner ring greed (levels 2-3), the boss's back
+    const e = sim.end, lv = LV[B.level];
     if (lv.ringPref >= 1) cost += [-(lv.ringPref === 2 ? 2.2 : 1.2), 0, 1.4][e.ring] || 0;
-    if (boss && boss.alive && G.player.K) {
-      const behind = Math.abs(angDiff(e.th, boss.facing + PI)) < G.player.K.behindHalf * 0.9;
-      if (behind) cost -= (G.player.cooldowns.comet.holding ? 5 : 1.5);
+    const b = ctx.boss;
+    if (b && b.alive && G.player.K) {
+      if (Math.abs(angDiff(e.th, b.facing + PI)) < G.player.K.behindHalf * 0.9) cost -= (G.player.cooldowns.comet.holding ? 5 : 1.5);
     }
-    return { cost, firstHit, firstHitDmg };
+    cost -= reward;
+    return { cost, dmgSum, firstHit, firstHitDmg, firstCost, braced, reward };
+  }
+
+  // ---- Eclipse economy: keep it for the next interruptible cast when one is due (levels 2-3)
+  function eclipseReserved() {
+    if (!LV[B.level].reserve) return false;
+    const now = fightT();
+    const gaps = []; for (let i = 1; i < B.intCasts.length; i++) gaps.push(B.intCasts[i] - B.intCasts[i - 1]);
+    const avg = gaps.length ? clamp(gaps.reduce((a, c) => a + c, 0) / gaps.length, 10, 40) : 22;
+    const last = B.intCasts.length && B.intCasts[B.intCasts.length - 1] >= B.phaseT0 ? B.intCasts[B.intCasts.length - 1] : B.phaseT0;
+    const due = last + avg;
+    const cd = (G.player.K && G.player.K.eclipseCd) || 14;
+    return due - now < cd + 1 && now < due + 14;
+  }
+
+  function plansFor(ctx) {
+    const S = G.player.state, ok = ctx.ringOk, P = [];
+    const add = (name, ev) => P.push({ name, ev });
+    add('keep', []);
+    for (const t of [0, 0.4, 0.8, 1.3, 2.0]) add(t ? 'rev@' + t : 'reverse', [{ t, a: 'R' }]);
+    const r0 = ctx.m.hop ? ctx.m.hop.to : S.ring;
+    for (const d of [-1, 1]) {
+      const nm = d < 0 ? 'in' : 'out';
+      const can1 = ok(r0 + d), can2 = can1 && ok(r0 + 2 * d);
+      if (!can1 && !(d > 0 && ctx.well)) continue;           // an outward bump still braces against the well
+      for (const t of [0, 0.3, 0.6, 1.0, 1.5, 2.2]) add(t ? nm + '@' + t : nm, [{ t, a: 'S', d }]);
+      if (!can1) continue;
+      if (can2) { add(nm + 'x2', [{ t: 0, a: 'S', d }, { t: 0.1, a: 'S', d }]); for (const t of [0.5, 1.0]) add(nm + 'x2@' + t, [{ t, a: 'S', d }, { t: t + 0.1, a: 'S', d }]); }
+      for (const t2 of [0.3, 0.8, 1.4]) add(nm + '+rev@' + t2, [{ t: 0, a: 'S', d }, { t: t2, a: 'R' }]);
+      for (const t2 of [0.25, 0.7, 1.2]) add('rev+' + nm + '@' + t2, [{ t: 0, a: 'R' }, { t: t2, a: 'S', d }]);
+      for (const t2 of [0.8, 1.5]) add(nm + '+back@' + t2, [{ t: 0, a: 'S', d }, { t: t2, a: 'S', d: -d }]);
+    }
+    for (const t2 of [0.6, 1.1, 1.7]) add('rev2@' + t2, [{ t: 0, a: 'R' }, { t: t2, a: 'R' }]);
+    if (ctx.haltOk) {
+      add('halt', [{ t: 0, a: 'H' }]);
+      add('halt+rev', [{ t: 0, a: 'H' }, { t: 0.9, a: 'R' }]);
+      for (const d of [-1, 1]) if (ok(r0 + d)) add('halt+' + (d < 0 ? 'in' : 'out'), [{ t: 0, a: 'H' }, { t: 0.9, a: 'S', d }]);
+    }
+    return P;
+  }
+  const ACT_COST = { R: 0.5, S: 0.7, H: 0 };
+  function pressAll(evs, m) {
+    for (const e of evs) {
+      if (e.a === 'R') { if (!m.revBuf) fire('reverse'); }
+      else if (e.a === 'S') { if (m.shiftBuf !== e.d) fire(e.d < 0 ? 'shiftIn' : 'shiftOut'); }
+      else if (e.a === 'H') { if (G.player.cooldowns.eclipse.t <= 0) fire('eclipse'); }
+      else if (e.a === 'A') { if (G.player.cooldowns.aegis.t <= 0) fire('aegis'); }
+    }
   }
 
   function decide() {
@@ -11831,56 +12348,80 @@ const G = window.G = { THREE };
     if (!S.alive || S.novaActive) return;
     const lv = LV[B.level];
     B.decisions++;
-    const hz = hazards();
-    const soaks = hz.filter(h => h.soak && !h.finished);
+    const sp = (G.hz && G.hz.speed) || 1;
+    const all = hazards();
     const m = pl.motion();
-    // ---- build candidate plans
-    const revT = m.turning ? m.turnLeft + 0.15 : m.revLock;
-    const shT = m.hopLeft > 0 ? m.hopLeft + 0.35 : m.shiftLock;
-    const base = S.halted ? 0 : 0;
-    const plans = [{ name: 'keep' }];
-    plans.push({ name: 'reverse', rev: Math.max(0, revT) + base });
-    if (S.ring > 0 || (m.hopLeft > 0)) plans.push({ name: 'shiftIn', shift: { t: Math.max(0, shT), d: -1 } });
-    if (S.ring < 2 || (m.hopLeft > 0)) plans.push({ name: 'shiftOut', shift: { t: Math.max(0, shT), d: 1 } });
-    if (S.ring > 0) plans.push({ name: 'shiftIn+rev', shift: { t: Math.max(0, shT), d: -1 }, rev: Math.max(0.3, revT) });
-    if (S.ring < 2) plans.push({ name: 'shiftOut+rev', shift: { t: Math.max(0, shT), d: 1 }, rev: Math.max(0.3, revT) });
+    const ringOk = (i) => (pl.ringOk ? pl.ringOk(i) : i >= 0 && i <= 2);
+    // hazards that can matter inside the horizon (live now or going live before it ends)
+    const hz = [], soaks = [];
+    for (const h of all) {
+      if (h.soak) { soaks.push(h); continue; }
+      if (h.kind !== 'contact' && h.kind !== 'gap' && h.kind !== 'orb' && h.lt + H * sp < h.warn) continue;
+      hz.push(h);
+    }
     const eclipseReady = CD.eclipse.t <= 0;
     const castInt = !!(b && b.casting && b.casting.interruptible);
-    if (eclipseReady && !castInt && !S.halted) plans.push({ name: 'halt', halt: 0 });
-    // filter invalid shifts from the predicted ring
-    const sims = plans.map(p => {
-      if (p.shift) { const r0 = pl.predictRing(p.shift.t); const r1 = r0 + p.shift.d; if (r1 < 0 || r1 > 2) return null; }
-      const sim = simulate(p); const ev = evaluate(sim, hz, soaks, b);
-      const act = { keep: 0, reverse: 1.2, shiftIn: 1.6, shiftOut: 1.6, 'shiftIn+rev': 3.0, 'shiftOut+rev': 3.0, halt: 9 }[p.name] || 0;
-      return { p, sim, ev, cost: ev.cost + act };
-    }).filter(Boolean);
-    sims.sort((a, c) => a.cost - c.cost);
-    const keep = sims.find(s => s.p.name === 'keep');
-    let best = sims[0];
-    if (keep && best !== keep && keep.cost - best.cost < 1.0) best = keep;
-    B.lastCost = best.cost;
+    const reserved = eclipseReserved();
+    const ctx = {
+      m, sp, hz, soaks, boss: b, ringOk, speed: speedModel(S, m), retro: retroInfo(S), well: wellInfo(b, sp),
+      aegisT: m.aegisT, postNovaT: m.postNovaT, hitT: m.hitT,
+      anchors: pl.anchors.list.filter(a => a.ring != null),
+      haltOk: eclipseReady && !castInt && !S.halted,
+    };
+    const haltCost = reserved ? 30 : 6;
+    let best = null, keep = null;
+    if (B.debug) B.dbg = [];
+    for (const p of plansFor(ctx)) {
+      const sim = rollout(p.ev, ctx);
+      const ev = evaluate(sim, ctx);
+      let c = ev.cost;
+      for (const e of p.ev) c += e.a === 'H' ? haltCost : ACT_COST[e.a];
+      const first = p.ev.length ? Math.min(...p.ev.map(e => e.t)) : Infinity;
+      if (first < Infinity) c += 0.2 * first;           // among equal answers, act sooner rather than later
+      const r = { p, sim, ev, cost: c, now: first <= 1e-6, first };
+      if (p.name === 'keep') keep = r;
+      if (!best || c < best.cost) best = r;
+      if (B.debug) (B.dbg = B.dbg || []).push({ n: p.name, c: +c.toFixed(1), dmg: ev.dmgSum, fh: ev.firstHit, s: sim.samples.filter((x, i) => i % 3 === 0).map(x => x.t + ':' + x.ring + (x.shifting ? 's' : '') + (x.inv ? 'i' : '') + '@' + x.th.toFixed(2)).join(' ') });
+    }
+    // do not twitch: pressing something before the next look must beat doing nothing by a margin
+    if (best !== keep && keep && best.first <= lv.react + 0.02 && keep.cost - best.cost < 0.8) best = keep;
+    // ---- greedy Aegis (levels 2-3): take a big hit on purpose inside a perfect Aegis for the reflect
+    const aegisReady = CD.aegis.t <= 0 && m.aegisT <= 0;
+    let aegisPlan = null;
+    if (aegisReady && lv.greedAegis) {
+      for (const base of keep && keep !== best ? [best, keep] : [best]) {
+        if (!(base.ev.firstHit < 2.5) || base.ev.firstHitDmg < 15) continue;
+        const ta = Math.max(0, base.ev.firstHit - 0.2), dur = (G.player.K && G.player.K.aegisDur) || 1.0;
+        const ev = evaluate(base.sim, { ...ctx, aeg: { a0: ta, a1: ta + dur } });
+        let c = ev.cost; for (const e of base.p.ev) c += e.a === 'H' ? haltCost : ACT_COST[e.a];
+        c += 2;                                            // the cooldown has value too
+        if (ev.reward > 0 && c < best.cost && (!aegisPlan || c < aegisPlan.cost)) aegisPlan = { base, ta, cost: c };
+      }
+    }
+    if (aegisPlan) {
+      best = { ...aegisPlan.base, cost: aegisPlan.cost, aegisAt: aegisPlan.ta };
+      B.plans['aegis'] = (B.plans['aegis'] || 0) + 1;
+    }
+    // an input planned for a moment before the next decision tick is pressed on time (a human times it too)
+    B.pending = [];
+    if (!best.now && best.first <= lv.react + 0.02) B.pending.push({ at: (G.t || 0) + best.first, ev: best.p.ev.filter(e => e.t === best.first) });
+    B.lastCost = best.cost; B.lastBest = best.p.name;
+    B.plans[best.p.name.split('@')[0]] = (B.plans[best.p.name.split('@')[0]] || 0) + 1;
     // ---- interrupt (priority)
     if (castInt && eclipseReady) {
       const cs = b.casting;
       if (!B.castSeen.has(cs)) B.castSeen.set(cs, brand() < lv.interruptMiss);
       if (!B.castSeen.get(cs) && cs.progress > (B.level === 3 ? 0.08 : 0.25) && cs.progress < 0.97) { fire('eclipse'); return; }
     }
-    // ---- aegis: unavoidable hit within 0.35 s, or (greedy) a big hit about to land on the current path
-    const aegisReady = CD.aegis.t <= 0 && m.aegisT <= 0;
+    // ---- aegis: a planned greedy block, or an unavoidable hit within 0.35 s
     if (aegisReady) {
-      const unavoidable = best.ev.firstHit <= 0.35 && best.ev.cost > 8;
-      const greedy = lv.greedAegis && keep && keep.ev.firstHit <= 0.3 && keep.ev.firstHit >= 0.05 && keep.ev.firstHitDmg >= 15;
-      if (unavoidable || greedy) { fire('aegis'); if (greedy && !unavoidable) return; }
+      if (best.aegisAt != null) {
+        if (best.aegisAt <= 1e-6) fire('aegis');
+        else if (best.aegisAt <= lv.react + 0.02) B.pending.push({ at: (G.t || 0) + best.aegisAt, ev: [{ t: best.aegisAt, a: 'A' }] });
+      } else if (best.ev.firstHit <= 0.35 && best.ev.firstCost >= 8) fire('aegis');
     }
-    // ---- movement
-    const n = best.p.name;
-    if (n !== 'keep') {
-      // only commit the first step now; a delayed second step is re-decided next tick
-      if (n === 'reverse') { if (!m.revBuf) fire('reverse'); }
-      else if (n === 'shiftIn' || n === 'shiftIn+rev') { if (!m.shiftBuf) fire('shiftIn'); }
-      else if (n === 'shiftOut' || n === 'shiftOut+rev') { if (!m.shiftBuf) fire('shiftOut'); }
-      else if (n === 'halt') fire('eclipse');
-    }
+    // ---- movement: commit the plan's inputs that are due now; later ones are re-planned next tick
+    if (best.now) pressAll(best.p.ev.filter(e => e.t <= 1e-6), m);
     // ---- supernova
     if (CD.nova.ready && b && b.alive && !b.invulnerable && !(G.combat.transitioning)) { fire('nova'); return; }
     // ---- comet: charge whenever ready, release from behind at full charge
@@ -11889,30 +12430,46 @@ const G = window.G = { THREE };
     else if (!cm.holding && cm.t <= 0 && b && b.alive) { fire('cometDown'); B.holdT = 0; }
     else if (cm.holding) {
       const fullish = cm.charge >= 0.95;
-      if ((S.behind && fullish) || (B.holdT > 9 && fullish) || (S.behind && B.holdT > 0.6 && Math.abs(angDiff(S.theta, b.facing + PI)) > G.player.K.behindHalf * 0.8 && cm.charge > 0.6)) fire('cometUp');
+      if ((S.behind && fullish) || (B.holdT > 9 && fullish) || (S.behind && B.holdT > 0.6 && b && Math.abs(angDiff(S.theta, b.facing + PI)) > G.player.K.behindHalf * 0.8 && cm.charge > 0.6)) fire('cometUp');
     }
-    // ---- anchors: spread around the boss, plant on safe ground
-    const A = pl.anchors.list;
-    if (CD.anchor.charges > 0 && best.ev.cost < 6) {
-      const oldest = A.length ? A[0] : null;
+    // ---- anchors: spread around the boss on safe ground; marked ones are as good as gone; avoid rings the boss
+    // just smashed anchors on
+    const A = pl.anchors.list.filter(a => !a.warn);
+    if (CD.anchor.charges > 0 && best.ev.dmgSum === 0 && !S.shifting && ringOk(S.ring)) {
+      const ringBad = B.smashed[S.ring] >= 1 && fightT() - B.smashT[S.ring] < 30 && [0, 1, 2].some(r => r !== S.ring && ringOk(r) && !(B.smashed[r] >= 1 && fightT() - B.smashT[r] < 30));
+      const all3 = pl.anchors.list;
+      const oldest = all3.length ? all3[0] : null;
       const far = A.every(a => Math.abs(angDiff(a.theta, S.theta)) > 1.75);
-      const stale = A.length >= 3 && oldest && G.player.anchorAge(oldest) > 22;
-      if ((A.length < 3 && far) || (stale && far)) fire('anchor');
+      const stale = all3.length >= 3 && oldest && (oldest.warn || G.player.anchorAge(oldest) > 22);
+      if (!ringBad && ((A.length < 3 && far && (all3.length < 3 || stale || A.length < all3.length)) || (stale && far))) fire('anchor');
     }
   }
 
   const bot = G.bot = {
     get level() { return B.level; },
     set(level) { B.level = clamp(level | 0, 0, 3); B.t = 0; },
-    stats: () => ({ level: B.level, decisions: B.decisions, acts: { ...B.acts }, lastCost: B.lastCost }),
+    _B: B,
+    stats: () => ({ level: B.level, decisions: B.decisions, acts: { ...B.acts }, lastCost: B.lastCost, lastPlan: B.lastBest, plans: { ...B.plans } }),
     init() {
       const lvl = G.params && G.params.bot ? G.params.bot | 0 : 0;
       if (lvl) bot.set(lvl);
+      // what a player remembers between moments: when interruptible casts come, where anchors get smashed
+      G.on('castStart', (d) => { if (d && d.interruptible) B.intCasts.push(fightT()); });
+      G.on('phaseStart', () => { B.phaseT0 = fightT(); });
+      G.on('fightStart', () => { B.pending = []; B.intCasts.length = 0; B.phaseT0 = 0; B.retro = null; B.ign.clear(); B.castSeen = new Map(); B.smashed = [0, 0, 0]; B.smashT = [-99, -99, -99]; });
+      G.on('anchorSmashed', (d) => { if (d && d.ring != null) { B.smashed[d.ring]++; B.smashT[d.ring] = fightT(); } });
     },
     update(dt) {
       if (!B.level || !PLAY()) return;
       const cm = G.player && G.player.cooldowns && G.player.cooldowns.comet;
       if (cm && cm.holding) B.holdT += dt;
+      if (B.pending && B.pending.length) {
+        for (let i = B.pending.length - 1; i >= 0; i--) {
+          const pe = B.pending[i]; if ((G.t || 0) < pe.at - 1e-6) continue;
+          B.pending.splice(i, 1);
+          try { if (G.player.state.alive && !G.player.state.novaActive) pressAll(pe.ev, G.player.motion()); } catch (e) { logE('bot.pending', e); }
+        }
+      }
       B.t -= dt;
       if (B.t > 0) return;
       B.t = LV[B.level].react;

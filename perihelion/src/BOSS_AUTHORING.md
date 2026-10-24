@@ -55,7 +55,8 @@ fight starts, so a missing file just shows "Being forged".
 | `name`, `title` | boss card / HP bar / results text |
 | `accent` | threat colour. At fight start it is copied to `G.colors.accent` and `G.world.setAccent`; every telegraph, cast ring and add defaults to it |
 | `sky` | default sky preset: `'night'`, `'aurora'`, `'collapse'` (or `'menu'`) |
-| `music` | track key: `0`, `1`, `2` (boss motifs), `'practice'`, `'menu'`. Default = boss index. Intensity layers follow the phase index automatically |
+| `music` | track key: `0`, `1`, `2` (boss motifs), `'practice'`, `'menu'`. Default = boss index. Intensity layers (0-3) follow the phase: `phase.intensity`, else `def.intensity[i]`, else `round(i * 3 / (phases - 1))`, so the last phase always reaches 3 (`G.combat.musicIntensity(def, i)`) |
+| `intensity` | optional array of music intensity per phase, e.g. `[0, 2, 3]` |
 | `maxHp` | boss HP |
 | `phases` | array, see below; `hpStart` must descend (1.0, 0.6, 0.3 ...) |
 | `build(b)` | create the model and set `b.model = group` (it is parented to `b.root` for you). Store refs in `b.data` |
@@ -66,11 +67,11 @@ fight starts, so a missing file just shows "Being forged".
 | `hitRadius`, `hitHeight` | where strikes and damage numbers land: `b.hitPoint(theta)` is `G.polar(hitRadius, theta, hitHeight)`. Defaults are 1.1 and 2.0 |
 | `parTime` | seconds for an S grade (defaults are 200, 255 and 285 by index). S also needs at most 120 damage taken and no checkpoint |
 | `facingOffset` | added to the root's y rotation |
-| `fadeOpacity` | model opacity while the hero is hidden behind it (default 0.35). The framework makes the model's materials transparent for this |
+| `fadeOpacity` | model opacity while the hero is hidden behind it (default 0.35). The framework makes the model's materials transparent for this. The fade is skipped automatically during cinematics, transitions, the intro, death and victory, so there is no need to toggle it |
 | `noSigil` | hide the rear sigil |
 | `infinite` | practice-dummy mode (HP never drops). Do not use for real bosses |
 
-Each phase is `{ name, hpStart, enter?(b), update?(b, dt), script?(b), sky?, skyDur? }`:
+Each phase is `{ name, hpStart, enter?(b), update?(b, dt), script?(b), sky?, skyDur?, intensity? }`:
 
 - **`hpStart`** is a fraction of maxHp. When damage would push HP below the *next* phase's `hpStart * maxHp`, HP is
   clamped there and the transition starts. Damage never skips a phase.
@@ -98,6 +99,11 @@ Each phase is `{ name, hpStart, enter?(b), update?(b, dt), script?(b), sky?, sky
 7. a 0.15 s pause;
 8. state returns to `'fight'`;
 9. `phaseStart {index, name}`, then `enter`, then `script`.
+
+If the hero is dead when the transition starts, or dies during the cinematic (e.g. to raid damage fired from
+`onTransition`), the fight is **not** resumed: it ends in `'dead'` as normal, and a transition queued by damage is
+dropped when the hero dies. The phase banner ("PHASE II / name") appears 0.55 s into the cinematic and stays up
+until 1.6 s after the fight resumes; at fight start and after a retry it waits until the BEGIN flash is gone.
 
 **Death:** abort, clear hazards, kill adds, then the `'cinematic'` state. `bossDefeated` fires, `onDeath` is
 awaited (11 s cap), and then the results and victory screen show.
@@ -207,6 +213,11 @@ phases: [{
 | `label` | shown on death and in logs |
 | `color` | telegraph colour |
 | `tick` | seconds; repeat damage while inside |
+| `liveStyle` | how the live (damaging) fill is drawn: `'flash'` (a brighter shimmer, for short strikes) or `'soft'` (a calm tinted fill). Default: `'soft'` when `active` is 2.5 s or more and finite, otherwise `'flash'` |
+
+Live fills are drawn in the hazard's hue at full saturation, never white, and their brightness is scaled down
+per frame by the sky's bloom (`uCap`, about 0.7-1; times 0.88 on LDR devices). Very pale accents will still look
+pale; a saturated `color` reads best on bright skies.
 
 A `warn` above 0.2 emits `telegraph {lethal, kind, warn}` and plays the warning tone. Orbs, gaps and add contact
 do not emit it.
@@ -357,6 +368,16 @@ const cog = b.adds.spawn({
   `applied: false` during the 0.8 s hit i-frames, Shift i-frames, Supernova and transitions. In practice mode it
   shows "HIT" and returns `applied: true` but takes no HP.
 - `G.player.forceShift(delta, {fall})` and `G.player.forceReverse()` move the hero by force. Use them sparingly.
+  `forceShift` never lands on a disabled ring.
+- **Disabled rings:** `G.player.disableRing(i, off = true)` makes ring `i` unreachable: a Shift onto it bumps
+  (`bump {delta, ring, disabled: true}`), `hz.gap` falls avoid it, and the rocker shows that direction struck through.
+  `G.player.ringOk(i)`, `G.player.disabledRings` (array of 3 booleans) and `G.player.maxRing` (getter/setter:
+  disables every ring above it) also exist. `ringsChanged` is emitted. Every fight start and retry re-enables all
+  rings, so a boss only has to call it at the moment the ring breaks (Event Horizon does this).
+- `anchorSmashed {id, ring, theta}` is emitted when an anchor is smashed.
+- `G.player.motion()` also returns `haltF` (halt progress) and `speedT` (time left on `setSpeedMul`).
+- Supernova clears `state.invuln` when it ends (the 1 s post-nova grace has its own timer), and dying mid-nova
+  clears it too. Bosses need no invuln workaround.
 - `G.player.setSpeedMul(m, dur)` slows or hastes the hero.
 - `G.player.anchors.list`, `.smash(a => pred)` and `.mark(pred, on)` work on anchor objects, which have `ring`,
   `theta` and `pos`. `mark` shows a warning ring, then you call smash, e.g. a slam that destroys anchors in a wedge.
@@ -391,6 +412,10 @@ All of these are safe to call at any time, and an unknown name is ignored. Posit
 - `meteor(color)` and `lightning(color)` are sky events.
 - `setRingBroken` is driven by `hz.gap`; do not call it.
 - `reset()` runs at every fight start and on menu; it clears glow, arrows, flood, rime, tilt and breaks.
+- `G.world.ringState(i?)` returns a snapshot (one ring, or all three):
+  `{i, R, flood, floodTarget, flooded, arrowDir, arrowShown, arrowShow, broken, glow, glowLeft}`. `glowLeft` is the
+  seconds left on a timed `ringGlow`. The bot uses it to predict a Retrograde flip; bosses can use it for checks.
+- The collapse level-2 set-piece bloom pulse is `(1.0, 1.1)`; it used to be `(1.2, 2.5)`.
 
 **Fx (`G.fx`)**
 
@@ -400,7 +425,7 @@ All of these are safe to call at any time, and an unknown name is ignored. Posit
 | `lance(from, to, o)` (alias `beam`) | `color, width, life, intensity, travel, tail, flare, onEnd` |
 | `shockwave(pos, o)` (alias `ring`) | `color, radius, life, thickness, r0, lift, intensity` |
 | `ringFlash(ringIndex, o)` | `color, a0, a1, life, intensity`; the whole ring if `a0`/`a1` are omitted |
-| `flash(css, amt, dur)` | screen flash, amount capped at 0.55 |
+| `flash(css, amt, dur)` | screen flash through `G.post.flash`: capped at 0.55, and at 0.4 in play (section 9, Post) |
 | `number(pos, amount, o)` | `text, crit, color, size, life, rise`; `text(pos, str, o)` too |
 | `spark(pos, color, o)` | |
 | `starFall(pos, color, o)` | `dx, height, dz, dur, width, count, radius` |
@@ -417,6 +442,39 @@ All of these are safe to call at any time, and an unknown name is ignored. Posit
 - `setTint(r, g, b)`, `setDesat(v)`, `setGrade([sr, sg, sb], [hr, hg, hb])`, `setVignette(v)`. All of these are
   restored by `G.post.reset()`, which runs at every fight start and quit.
 - `setExposure` and `setBloom` are overwritten every frame by the sky, so use a sky level or `bloomPulse` instead.
+- **Caps in play** (state `fight` or `practice`):
+  - a bright flash (luminance over 0.3) is capped at `G.post.PLAY_FLASH_MAX` (0.4), and above 0.2 its duration is
+    shortened so the time spent above 0.2 stays under about 0.3 s;
+  - `bloomPulse` is capped at `PLAY_BLOOM_MAX` (0.45) and `PLAY_BLOOM_DUR` (0.9 s).
+  - Cinematics, the intro and victory have looser caps: a bright flash above 0.3 stays there at most about 0.45 s,
+    and `bloomPulse` is capped at `CINE_BLOOM_MAX` (0.6) and `CINE_BLOOM_DUR` (1.2 s).
+- **Readability layer** (visual pass). These apply on top of whatever a boss does, so author for the look you want
+  and let them keep the frame readable:
+  - Big glows bloom. A flare (every `fx('burst')` adds one, default size now capped at 2.4) or a large additive
+    plane with colour above ~1 turns into a white slab once several overlap. For impacts that hit many places at
+    once pass `flareSize: ~1.2` and keep big custom planes (walls, blades, floor hands) below a max channel of ~0.9.
+    The bloom input is NaN/Inf-guarded and clamped to 40, so one broken pixel no longer becomes a glowing square.
+  - Very pale accents (ice, lavender) are pushed further toward their hue in telegraph fills (stronger the paler they
+    are), so a live fill reads as the hazard colour rather than white.
+  - Sky ceiling: the baked sky's luminance goes through a soft knee (`G.world.readability.ceil`, 0.05 in play,
+    `ceilCine` 0.09 in cinematics, off in the menu). Bright nebulae and auroras keep their shape and hue but stay
+    dark behind the rings. Saturated reds count through their max channel.
+  - Exposure and bloom from the sky level are capped: `expMax` 1.0 / `bloomMax` 0.86 in play, `expMaxCine` 1.04 /
+    `bloomMaxCine` 0.98 in cinematics.
+  - Auto exposure (darken only): the frame after bloom is reduced to one adapted average luminance (about 0.45 s
+    time constant). The grade scales the frame down when that average exceeds `G.post.ae.play` (0.12) or `ae.cine`
+    (0.15), to at most `ae.min` (0.08). A hugely over-bright frame (a star filling a close-up) also sheds up to 80%
+    of its bloom. `G.post.aeRead()` returns `{m, avg}`. Tests should set `G.post.ae.snap = true` before rendering a
+    screenshot so adaptation is instant.
+  - Anti-whiteout: a coarse bloom mip acts as a local average of over-bright areas and compresses blown-out regions
+    (`G.post.antiWhite`).
+  - The grade pass and the sky add a 1-LSB triangular dither, so 8-bit targets (safe level 2+) do not band.
+  - Rime (`setRingRime`) is capped so the brass still reads gold.
+  - Telegraph fills use a saturation-boosted accent (`accS` in the shader), so pale accents (ice cyan, lavender) do
+    not wash toward white over gold.
+  - During cinematics the touch controls dim to 32% and the key hints and chips hide.
+- Pulses decay in the simulation step (`stepPost`), including in fast-forward and when no frame renders.
+  `G.post.pulses` returns `{flash, bloomAdd, fade}` for tests.
 
 **Audio (`G.audio`)**
 - `sfx(name, {vol, pitch, delay, pos, gap, force})`. Boss-relevant names:
@@ -485,7 +543,7 @@ const { launch } = require(process.env.HARNESS);
   await page.goto(url('perihelion') + '?debug=1&seed=1&quality=low');
   await page.waitForFunction(() => window.G && G.booted);
   const r = await page.evaluate(async () => {
-    __game.startFight(1);              // 1-based boss number; opts {fromPhase: 0-based, skipIntro: true by default}
+    __game.startFight(1);              // 1-based boss number; opts {fromPhase: 0-based, skipIntro}; skipIntro defaults to true with the bot or ?skipintro, and an explicit false always plays the full intro
     __game.bot(3);                     // 1 sloppy .. 3 near perfect; 0 = off
     let s;
     for (let i = 0; i < 40; i++) {     // up to 400 s of game time
@@ -512,6 +570,36 @@ const { launch } = require(process.env.HARNESS);
 - `?seed=N` makes the fight deterministic.
 - `?skipintro=1`.
 - `?debug=1&testboss=1` adds a reference boss (`G.bosses.test` in `12_bot.js`) that uses every primitive.
+- The intro runs on sim time, so it also plays out in fast-forward (about 2.6 s).
+
+**How the bot plays** (`12_bot.js`):
+- **Levels:**
+  - 1: reacts in 0.45 s, ignores 25% of hazards, no Eclipse reserve;
+  - 2: 0.25 s, 10%, keeps Eclipse in reserve;
+  - 3: 0.1 s, 0%, keeps Eclipse in reserve.
+  The "ignored" choice is re-rolled per hazard about every 2 s, so a level-1 bot notices a hazard late instead of never.
+- **Planning:**
+  - About 45 candidate input plans (keep, reverse at t, in/out at t, double shifts, shift+reverse, reverse+shift,
+    shift and back, halts, a bump outward against a well) are rolled out over a 4 s horizon.
+  - Each rollout mirrors the hero's movement: reverse and shift locks, buffered inputs, shift i-frames (trimmed by
+    0.03 s on each side) and the 0.8 s hit i-frames.
+  - Delayed inputs are queued and pressed on time.
+- **What the bot predicts:**
+  - ring-bound or global `setSpeedMul`;
+  - flooded rings (0.6x);
+  - Retrograde flips, from `ringState().glowLeft` when all three rings show matching arrows;
+  - gravity-well pull from `b.data.well`;
+  - rotors and sweeps crossing the hero between samples;
+  - tick hazards.
+- **Costs:**
+  - A hit costs its damage, with a floor of 6 (contact +6, gap +10, lethal x1.15).
+  - A missed soak costs its fail damage +7.
+  - Predicted damage that reaches current HP costs +250.
+  - The bot prefers unmarked anchors, and avoids rings that had an anchor smashed in the last 30 s.
+- **Actions:** levels 2-3 raise Aegis for a hit of 15 or more that they cannot dodge. They keep Eclipse for
+  interruptible casts (the expected gap is learned from cast history).
+- **Debug:** `G.bot.stats` includes `lastPlan` and `plans`. In debug builds, `G.bot._B.debug = true` collects plan
+  dumps in `G.bot._B.dbg`.
 
 What to check:
 - `G.log.count === 0`.
@@ -556,6 +644,7 @@ What to check:
   expecting raw values.
 - **Practice mode:** the hero takes no HP damage (only a "HIT" number), so test damage on a real boss index.
 - **The boss model fades to 35% opacity** when the hero is behind it on screen, and its materials are switched to
-  transparent for that. Do not rely on `transparent: false` sorting for model parts.
+  transparent for that. Do not rely on `transparent: false` sorting for model parts. The fade is off during
+  cinematics, transitions and death, so there is no need to change `fadeOpacity` yourself.
 - **`b.cast({telegraph})` handles are not cancelled when the cast completes.** Cancel them in `onDone` if they
   should stop.

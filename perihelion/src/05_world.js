@@ -277,7 +277,7 @@
         gRing_frost = 0.;
         if (uRime > .001) {
           float n = rn(vRingPos.xz * 6.) * .55 + rn(vRingPos.xz * 23.) * .3 + rn(vRingPos.xz * 61.) * .15;
-          gRing_frost = clamp((uRime * 1.05 - .42 + abs(gRing_ac) * .5 - vRingPos.y * 2. - n * .85) * 2.2, 0., 1.) * .62;
+          gRing_frost = clamp((uRime * 1.05 - .42 + abs(gRing_ac) * .5 - vRingPos.y * 2. - n * .85) * 2.2, 0., 1.) * .46;   // capped: the brass must still read gold under the rime
         }`)
         .replace('#include <map_fragment>', `#include <map_fragment>
         { float rr0 = length(vRingPos.xz);
@@ -285,7 +285,7 @@
           float pat = rn(vRingPos.xz * .55) * .6 + rn(vRingPos.xz * 1.7) * .4;
           diffuseColor.rgb *= mix(vec3(.84, .8, .74), vec3(1.08, 1.04, .98), pat);
           diffuseColor.rgb *= .94 + .1 * rn(vec2(rr0 * 55., 1.7)); }
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.34, .46, .58), gRing_frost * .7);`)
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.26, .36, .48), gRing_frost * .7);`)
         .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         roughnessFactor *= .78 + .44 * rn(vec2(length(vRingPos.xz) * 38., 3.1)) * (.6 + .4 * rn(vRingPos.xz * .9));
         roughnessFactor = mix(roughnessFactor, .5, gRing_frost);`)
@@ -345,7 +345,18 @@
               vec3 c = mix(uC2, uC1, n) * (.18 + .55 * n * n) + uC1 * pow(n2, 5.) * 1.1 + uC1 * rim * .5;
               gl_FragColor = vec4(c * edge * uA * .52, 1.); }` }));
       flood.position.y = 0.012; flood.visible = false; flood.renderOrder = 2; arena.add(flood);
-      W.rings.push({ i, R, mesh, mat, u: mat.userData.u, halo, flood, gaps: [], chunks: [], glow: { col: new C('#ffffff'), amt: 0, decay: 0, hold: 0 }, arrow: { dir: 1, show: 0, target: 0, flip: 0 }, floodAmt: 0, floodTarget: 0 });
+      const rs = { i, R, mesh, mat, u: mat.userData.u, halo, flood, gaps: [], chunks: [], glow: { col: new C('#ffffff'), amt: 0, decay: 0, hold: 0 }, arrow: { dir: 1, show: 0, target: 0, flip: 0 }, floodAmt: 0, floodTarget: 0 };
+      W.rings.push(rs);
+      // read-only ring state on the exposed mesh (G.world.rings[i].flood etc.) for tests, the bot and bosses
+      Object.defineProperties(mesh, {
+        flood: { get: () => rs.floodAmt, configurable: true },          // current flood level 0..1
+        floodTarget: { get: () => rs.floodTarget, configurable: true },
+        flooded: { get: () => rs.floodTarget > 0.5, configurable: true },
+        arrowDir: { get: () => (rs.arrow.pendingDir != null ? rs.arrow.pendingDir : rs.arrow.dir), configurable: true },   // the direction the chevrons point (+1 ccw)
+        arrowShown: { get: () => rs.arrow.target > 0, configurable: true },
+        broken: { get: () => rs.gaps.map(g => ({ center: g.center, width: g.width })), configurable: true },
+        glowAmt: { get: () => rs.glow.amt, configurable: true },
+      });
     });
   }
 
@@ -514,7 +525,9 @@
           // storm clouds: heavy dark masses with lit edges
           if (uStorm > .001) { float cl = fbm(d * 2.6 + vec3(0., 0., 4.)); float m = smoothstep(.36, .56, cl);
             col = mix(col, col * .18 + vec3(.015, .02, .035), uStorm * m) + vec3(.15, .3, .3) * uStorm * smoothstep(.6, .62, cl) * (1. - smoothstep(.62, .7, cl)) * .3; }
-          gl_FragColor = vec4(col * uGain, 1.);
+          col *= uGain;
+          { vec2 fc = gl_FragCoord.xy; col += (fract(52.9829189 * fract(dot(fc, vec2(.06711056, .00583715)))) - .5) * (1. / 255.); }   // 8-bit cubes: dither
+          gl_FragColor = vec4(max(col, vec3(0.)), 1.);
         }`,
     });
     W.bakeScene.add(new T.Mesh(new T.SphereGeometry(50, 64, 32), W.bakeMat));
@@ -525,12 +538,13 @@
       uTime: { value: 0 }, uStars: { value: 1 }, uPix: { value: 0.0008 }, uStarTint: { value: new C('#ffffff') },
       uHole: { value: 0 }, uHoleDir: { value: new V(0.3, -0.6, -0.7).normalize() }, uHoleR: { value: 0.11 },
       uFlash: { value: 0 }, uFlashCol: { value: new C('#cfe6ff') }, uDim: { value: 0 }, uTwinkle: { value: 1 },
+      uDither: { value: 1 }, uCeil: { value: 10 },   // soft luminance ceiling of the baked sky (play readability; set per frame in update)
     };
     const dome = new T.Mesh(new T.SphereGeometry(SKY_R, 64, 32), new T.ShaderMaterial({
       side: T.BackSide, depthWrite: false, depthTest: false, uniforms: W.domeU,
       vertexShader: 'varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
       fragmentShader: /* glsl */`
-        uniform samplerCube uCubeA, uCubeB; uniform float uMix, uTime, uStars, uPix, uHole, uHoleR, uFlash, uDim, uTwinkle;
+        uniform samplerCube uCubeA, uCubeB; uniform float uMix, uTime, uStars, uPix, uHole, uHoleR, uFlash, uDim, uTwinkle, uCeil, uDither;
         uniform vec3 uHoleDir, uFlashCol, uStarTint; varying vec3 vDir;
         float h13(vec3 p){ p = fract(p * .1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
         vec3 h33(vec3 p){ p = fract(p * vec3(.1031, .1030, .0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
@@ -556,6 +570,9 @@
             pring = (exp(-pow((a - uHoleR * 1.12) / (uHoleR * .05), 2.)) * 1.2 + exp(-pow((a - uHoleR * 1.3) / (uHoleR * .25), 2.)) * .25) * uHole;
           }
           vec3 col = mix(textureCube(uCubeA, dl).rgb, textureCube(uCubeB, dl).rgb, uMix);
+          // soft knee on the nebula/aurora luminance: bright skies keep their hue and structure but stay dark enough
+          // behind the play area that gold rings, the knight and the accent telegraphs pop
+          { float l = max(dot(col, vec3(.2126, .7152, .0722)), .5 * max(col.r, max(col.g, col.b))); col *= uCeil * (1. - exp(-l / uCeil)) / max(l, 1e-5); }
           vec3 st = starLayer(dl, 70., .16, .0008, 1.9) + starLayer(dl, 180., .22, .00058, 1.15) + starLayer(dl, 420., .3, .00045, .7);
           col += min(st * uStars * uStarTint, vec3(.8));
           col *= 1. + uFlash * 3.;
@@ -563,6 +580,9 @@
           col = mix(col, vec3(0.), shadow);
           col += vec3(1.1, .9, .7) * pring * .6;
           col *= 1. - uDim;
+          // triangular dither at the step of an 8-bit linear target (safe level 2+ / no float targets): no sky banding
+          { vec2 fc = gl_FragCoord.xy + fract(uTime * 7.13) * 41.; float n = fract(52.9829189 * fract(dot(fc, vec2(.06711056, .00583715)))) + fract(52.9829189 * fract(dot(fc.yx + 17.3, vec2(.06711056, .00583715)))) - 1.;
+            col += n * uDither * (.6 / 255.) * step(.0005, col.r + col.g + col.b); col = max(col, vec3(0.)); }
           gl_FragColor = vec4(col, 1.);
           ${SHADER_TAIL}
         }`,
@@ -950,7 +970,7 @@
     if (dur === 0) { lerpParams(W.tr.from, target, 1, W.cur); W.domeU.uMix.value = back; }
     // set-piece moments
     if (prevPreset === preset && L > prevLevel) {
-      if (preset === 'collapse' && L === 2) { W.collapseFlash = 1.0; G.post?.bloomPulse?.(1.2, 2.5); }
+      if (preset === 'collapse' && L === 2) { W.collapseFlash = 1.0; G.post?.bloomPulse?.(1.0, 1.1); }   // short: the implosion must stay visible
       if (preset === 'collapse' && L === 3) { W.collapseFlash = 0.6; }
       if (preset === 'night' && L === 1) W.conDraw = 0;
     }
@@ -1022,7 +1042,7 @@
     for (const r of ringsOf(i)) {
       const d = dir < 0 ? -1 : 1;
       if (r.arrow.show > 0.3 && d !== r.arrow.dir && show) { r.arrow.pendingDir = d; r.arrow.flip = 1; try { G.fx?.ringFlash?.(r.i, { color: W.accent.getStyle(), life: 0.4, intensity: 1.2 }); } catch (e) { /* */ } }
-      else r.arrow.dir = d;
+      else { r.arrow.dir = d; r.arrow.pendingDir = null; }
       r.arrow.target = show ? 1 : 0;
       r.u.uArrowCol.value.copy(W.accent).multiplyScalar(1.1);
     }
@@ -1049,7 +1069,7 @@
       r.gaps = []; r.u.uGapN.value = 0;
       for (const c of r.chunks) { G.layers.arena.remove(c.mesh); c.mesh.geometry.dispose(); }
       r.chunks = [];
-      r.glow.amt = 0; r.arrow.show = 0; r.arrow.target = 0; r.arrow.flip = 0; r.u.uArrowShow.value = 0;
+      r.glow.amt = 0; r.arrow.show = 0; r.arrow.target = 0; r.arrow.flip = 0; r.arrow.pendingDir = null; r.u.uArrowShow.value = 0;
       r.floodAmt = r.floodTarget = 0; r.flood.visible = false; r.u.uFlood.value = 0;
     }
     W.rime = W.rimeTarget = 0;
@@ -1106,7 +1126,20 @@
       L.rim.color.copy(p.rim).lerp(W.accent, 0.25); L.rim.intensity = p.rimI;
       L.hemi.color.copy(p.hemiS); L.hemi.groundColor.copy(p.hemiG); L.hemi.intensity = p.hemiI;
     }
-    if (G.post) { G.post.base.exposure = p.exposure; G.post.base.bloom = p.bloom; }
+    // readability caps: during play the sky is soft-capped and bloom/exposure are held down, so every in-fight frame
+    // keeps a dark backdrop; cinematics (transitions, deaths) get looser caps for the spectacle; the menu is uncapped
+    {
+      const RD = G.world.readability, st = G.state;
+      const play = st === 'fight' || st === 'practice' || st === 'intro' || st === 'dead' || st === 'paused';
+      const cine = st === 'cinematic' || st === 'victory';
+      const want = play ? RD.ceil : cine ? RD.ceilCine : 10;
+      W.ceil = W.ceil == null ? want : W.ceil + (want - W.ceil) * Math.min(1, (G.rdt || dt) * 2.5);
+      W.domeU.uCeil.value = W.ceil;
+      let ex = p.exposure, bl = p.bloom;
+      if (play) { ex = Math.min(ex, RD.expMax); bl = Math.min(bl, RD.bloomMax); }
+      else if (cine) { ex = Math.min(ex, RD.expMaxCine); bl = Math.min(bl, RD.bloomMaxCine); }
+      if (G.post) { G.post.base.exposure = ex; G.post.base.bloom = bl; }
+    }
     // menu orrery
     const mw = p.menu;
     W.menu.visible = mw > 0.01; W.menu.scale.setScalar(Math.max(0.001, mw));
@@ -1129,7 +1162,7 @@
       u.uGlowCol.value.copy(r.glow.col); u.uGlow.value = r.glow.amt;
       // arrows (flip: fade out, swap dir, fade in)
       const ar = r.arrow;
-      if (ar.flip > 0) { ar.show = Math.max(0, ar.show - dt * 6); if (ar.show <= 0.01) { ar.dir = ar.pendingDir ?? ar.dir; ar.flip = 0; } }
+      if (ar.flip > 0) { ar.show = Math.max(0, ar.show - dt * 6); if (ar.show <= 0.01) { ar.dir = ar.pendingDir ?? ar.dir; ar.pendingDir = null; ar.flip = 0; } }
       else ar.show += (ar.target - ar.show) * Math.min(1, dt * 6);
       u.uArrowDir.value = ar.dir; u.uArrowShow.value = ar.show;
       // flood
@@ -1193,7 +1226,19 @@
     meteor: (c) => ready && meteor(c), lightning: (c) => ready && skyBolt(c),
     get sky() { return { preset: W.preset, intensity: W.level, transitioning: !!(W.tr && W.tr.t < 1) }; },
     get rings() { return W.rings ? W.rings.map((r) => r.mesh) : []; },
+    // plain snapshot of every ring's state: flood, inlay arrows, breaks, glow
+    ringState(i) {
+      const snap = (r) => ({ i: r.i, R: r.R, flood: r.floodAmt, floodTarget: r.floodTarget, flooded: r.floodTarget > 0.5,
+        arrowDir: r.arrow.pendingDir != null ? r.arrow.pendingDir : r.arrow.dir, arrowShown: r.arrow.target > 0, arrowShow: r.arrow.show,
+        broken: r.gaps.map(g => ({ center: g.center, width: g.width })), glow: r.glow.amt,
+        glowLeft: r.glow.amt > 0.005 ? (r.glow.decay > 0 ? r.glow.amt / r.glow.decay : Infinity) : 0 });   // seconds until a timed glow fades
+      if (!W.rings) return i == null ? [] : null;
+      if (i == null) return W.rings.map(snap);
+      const r = W.rings[i | 0]; return r ? snap(r) : null;
+    },
     ringTopY: 0,
+    // play readability caps (see update): sky luminance knee (linear, pre-grade), max exposure and bloom strength
+    readability: { ceil: 0.05, ceilCine: 0.09, expMax: 1.0, bloomMax: 0.86, expMaxCine: 1.04, bloomMaxCine: 0.98 },
     _W: W,
   };
 })();

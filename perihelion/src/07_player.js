@@ -67,7 +67,7 @@
 
   // ============================================================ MODEL
   let root, body, legs = [], arms = [], halo, haloBead, headGlint, handStar, capeMesh, capePts = [], capePrev = [];
-  let decal, beacon, ghostDots, ghostFig, adjMarks = [], aegisBubble, coronaSprite, cometLine, cometOrb, novaStar, layerP, layerFx;
+  let pointer = null, decal, beacon, ghostDots, ghostFig, adjMarks = [], aegisBubble, coronaSprite, cometLine, cometOrb, novaStar, layerP, layerFx;
   const goldMat = () => new T3.MeshStandardMaterial({ color: 0xffd98a, metalness: 0.92, roughness: 0.22, emissive: 0x6a4410, emissiveIntensity: 0.7, envMapIntensity: 1.4 });
   function glowTex() {
     if (G.tex && G.tex.glow) return G.tex.glow;
@@ -192,6 +192,19 @@
     const d = new T3.Mesh(g, m); d.renderOrder = 8; d.frustumCulled = false;
     return d;
   }
+  // constant screen-size "you are here" chevron over the knight: readable on a phone at any arena scale
+  function buildPointer() {
+    const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+    x.lineJoin = 'round';
+    x.beginPath(); x.moveTo(10, 14); x.lineTo(54, 14); x.lineTo(32, 50); x.closePath();
+    x.lineWidth = 10; x.strokeStyle = 'rgba(6,4,18,0.9)'; x.stroke();
+    const g = x.createLinearGradient(0, 14, 0, 50); g.addColorStop(0, '#fff6d6'); g.addColorStop(1, '#ffb52e');
+    x.fillStyle = g; x.fill();
+    const t = new T3.CanvasTexture(c); t.colorSpace = T3.SRGBColorSpace;
+    const m = new T3.SpriteMaterial({ map: t, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false, toneMapped: false, fog: false });
+    const sp = new T3.Sprite(m); sp.center.set(0.5, 0); sp.renderOrder = 45; sp.frustumCulled = false;
+    return sp;
+  }
   function buildBeacon() {
     const g = new T3.CylinderGeometry(0.06, 0.32, 3.2, 12, 1, true); g.translate(0, 1.6, 0);
     const m = new T3.ShaderMaterial({
@@ -295,13 +308,23 @@
     M.skid = 1;
     emit('reverse', { dir: S.dir });
   }
+  // ring availability: a boss can switch a ring off (e.g. HELIARCH's Event Horizon breaks the outer ring away);
+  // a Shift toward a disabled ring bumps like a Shift past the inner/outer edge, and forced shifts avoid it
+  const ringOff = [false, false, false];
+  function ringOk(i) { return i >= 0 && i < RINGS().length && !ringOff[i]; }
+  function disableRing(i, off = true) {
+    i = i | 0; if (i < 0 || i >= ringOff.length) return;
+    off = !!off; if (ringOff[i] === off) return;
+    ringOff[i] = off;
+    emit('ringsChanged', { disabled: ringOff.slice() });
+  }
   function doShift(delta) {
     if (!canMove()) return;
     if (M.haltT > 0) endHalt();
     if (M.hop || M.shiftLock > 0) { M.shiftBuf = delta; return; }
     const to = S.ring + delta;
-    if (to < 0 || to >= RINGS().length) {
-      M.bump = 1; M.shiftLock = K.bumpLock; sfx('bump'); emit('bump', { delta });
+    if (!ringOk(to)) {
+      M.bump = 1; M.shiftLock = K.bumpLock; sfx('bump'); emit('bump', { delta, ring: S.ring, disabled: to >= 0 && to < RINGS().length });
       return;
     }
     M.hop = { from: S.ring, to, t: 0, dur: K.shiftDur, fall: false };
@@ -315,8 +338,8 @@
     if (!S.alive) return;
     const n = RINGS().length;
     let to = clamp(S.ring + delta, 0, n - 1);
-    if (to === S.ring) to = clamp(S.ring - delta, 0, n - 1);
-    if (to === S.ring) return;
+    if (to === S.ring || !ringOk(to)) to = clamp(S.ring - delta, 0, n - 1);
+    if (to === S.ring || !ringOk(to)) return;
     const from = M.hop ? (M.hop.t / M.hop.dur < 0.5 ? M.hop.from : M.hop.to) : S.ring;
     M.hop = { from, to, t: 0, dur: opts.fall ? K.fallDur : K.shiftDur, fall: !!opts.fall, forced: true };
     S.ring = from; S.shifting = true;
@@ -388,7 +411,7 @@
       const d = hz && hz.dangerAt ? hz.dangerAt(r, th, tA) : 0;
       if (d > 0.5) danger = true;
       polar(RINGS()[r], th, 0.09, tmpV);
-      const s = 0.75 + 0.5 * (i / N) * (d > 0.5 ? 1.4 : 1);
+      const s = (0.75 + 0.5 * (i / N)) * (d > 0.5 ? 1.45 : 1) * (M.dotK || 1);
       tmpS.set(s, s, s);
       tmpM.compose(tmpV, tmpQ, tmpS);
       ghostDots.setMatrixAt(i, tmpM);
@@ -401,12 +424,12 @@
     ghostFig.rotation.y = root.rotation.y;
     const endDanger = hz && hz.dangerAt ? hz.dangerAt(endR, endTh, K.ghostAhead) > 0.5 : false;
     ghostFig.userData.mat.color.copy(endDanger ? cAcc : cGold);
-    ghostFig.userData.mat.opacity = 0.22 + 0.08 * Math.sin(M.clock * 5);
+    ghostFig.userData.mat.opacity = (G.isTouch ? 0.32 : 0.24) + 0.08 * Math.sin(M.clock * 5);
     // adjacent-ring hints while the current path is dangerous
     let k = 0;
     for (const dr of [-1, 1]) {
       const m = adjMarks[k++]; const rr = endR + dr;
-      if (!danger || rr < 0 || rr > 2) { m.visible = false; continue; }
+      if (!danger || !ringOk(rr)) { m.visible = false; continue; }
       let safe = true;
       if (hz && hz.dangerAt) { let tt = 0, th2 = S.theta; for (let i = 1; i <= 8; i++) { const tA = K.ghostAhead * i / 8; th2 += (velAhead(tt) + velAhead(tA)) * 0.5 * (tA - tt); tt = tA; if (tA > 0.25 && hz.dangerAt(rr, th2, tA) > 0.5) { safe = false; break; } } }
       m.visible = true;
@@ -552,7 +575,7 @@
       fx('burst', a.pos.clone().setY(0.5), { color: GOLD, count: 24, speed: 7, size: 0.5, life: 0.7 });
       fx('burst', a.pos.clone().setY(0.3), { color: acc, count: 14, speed: 5, size: 0.4, life: 0.6 });
       fx('shockwave', a.pos.clone().setY(0.1), { color: acc, radius: 1.8, life: 0.35 });
-      emit('anchorSmashed', { id: a.id });
+      emit('anchorSmashed', { id: a.id, ring: a.ring, theta: a.theta });
     } else fx('burst', a.pos.clone().setY(0.4), { color: GOLD, count: 8, speed: 2, size: 0.3, life: 0.4 });
   }
   function disposeObj(o) {
@@ -812,7 +835,7 @@
         if (b && G.combat) G.combat.dealDamage(dmg, { source: 'nova', ringEligible: false, behindEligible: false, pos: to.clone(), crit: true, force: true });
         try { G.adds && G.adds.killAll && G.adds.killAll('nova'); } catch (e) { logE('nova.adds', e); }
         try { G.hz && G.hz.clear && G.hz.clear(h => h.kind === 'orb'); } catch (e) { logE('nova.orbs', e); }
-        fx('flash', '#fff6dd', 0.8, 0.6);
+        fx('flash', '#fff6dd', 0.4, 0.4);
         fx('shockwave', new T3.Vector3(0, 0.4, 0), { color: GOLD_HOT, radius: 18, life: 1.1 });
         fx('burst', to.clone(), { color: GOLD_HOT, count: 120, speed: 14, size: 1.1, life: 1.2 });
         fx('starFall', to.clone(), GOLD_HOT);
@@ -821,6 +844,7 @@
     }
     if (t >= K.novaDur) {
       M.nova = null; S.novaActive = false; S.novaY = 0; sp.visible = false;
+      S.invuln = false;                         // the 1 s after-glow grace runs on its own timer (M.postNovaT)
       M.postNovaT = K.novaAfterInvuln;
       if (G.hz) G.hz.speed = 1;
       emit('novaEnd', {});
@@ -866,7 +890,8 @@
     S.alive = false; stats.deaths++;
     M.deathT = 0; M.turn = null; M.hop = null; S.shifting = false;
     CD.comet.holding = false; M.aegisT = 0; S.aegisActive = false;
-    if (M.nova) { M.nova = null; S.novaActive = false; if (G.hz) G.hz.speed = 1; }
+    if (M.nova) { M.nova = null; S.novaActive = false; S.invuln = false; S.novaY = 0; if (novaStar) novaStar.visible = false; if (G.hz) G.hz.speed = 1; }
+    M.postNovaT = 0;
     cam('slowMo', 0.3, 1.4);
     fx('burst', S.pos.clone().setY(0.7), { color: GOLD, count: 40, speed: 5, size: 0.6, life: 1.2 });
     sfx('crack', { vol: 0.8 });
@@ -924,7 +949,17 @@
     decal.material.uniforms.uBehind.value = M.glint;
     decal.visible = S.alive;
     beacon.position.set(S.pos.x, 0, S.pos.z);
-    beacon.material.uniforms.uA.value = S.alive ? 0.28 + 0.1 * Math.sin(M.clock * 2) : 0;
+    beacon.material.uniforms.uA.value = S.alive ? (G.isTouch ? 0.4 : 0.28) + 0.1 * Math.sin(M.clock * 2) : 0;
+    if (pointer) {
+      const show = S.alive && (PLAY() || G.state === 'intro') && !S.novaActive && !(G.cam && G.cam.inCinematic);
+      pointer.visible = show;
+      if (show) {
+        pointer.position.set(S.pos.x, S.pos.y + body.position.y + 1.75 * body.scale.y / 1.15 + 0.12 * Math.sin(M.clock * 3.2), S.pos.z);
+        const hurt = M.hurtFlash || 0;
+        pointer.material.color.setRGB(1 + 0.35 * M.glint, 1 - 0.55 * hurt, 1 - 0.65 * hurt);
+        pointer.material.opacity = 0.92;
+      }
+    }
     // cape (verlet chain attached behind the shoulders)
     G.polar(1, M.faceAng, 0, fwd);
     right.set(fwd.z, 0, -fwd.x);
@@ -1040,6 +1075,7 @@
   function setVisible(v) {
     if (shown === v) return; shown = v;
     [root, capeMesh, decal, beacon, ghostDots, ghostFig].forEach(o => { if (o) o.visible = v; });
+    if (!v && pointer) pointer.visible = false;
     if (!v) adjMarks.forEach(m => m.visible = false);
   }
 
@@ -1049,6 +1085,7 @@
     S.speedMul = 1; S.halted = false; S.invuln = false; S.iframes = false; S.shifting = false; S.alive = true;
     S.meter = opts.meter != null ? opts.meter : 0; S.empowered = false; S.behind = false; S.constellation = false; S.v = 0; S.y = 0; S.novaY = 0;
     S.novaActive = false; S.aegisActive = false; S.pathDanger = false;
+    if (ringOff.some(Boolean)) { ringOff.fill(false); emit('ringsChanged', { disabled: ringOff.slice() }); }
     Object.assign(M, { turn: null, revLock: 0, revBuf: false, hop: null, shiftLock: 0, shiftBuf: 0, haltT: 0, haltF: 1, hitT: 0, speedT: 0, empT: 0,
       aegisT: 0, aegisAge: 0, aegisEmp: false, postNovaT: 0, strikeT: 0.6, nova: null, deathT: 0, bump: 0, skid: 0, glint: 0, capeInit: false, hurtFlash: 0, eclipseFlash: 0 });
     M.faceAng = S.theta + PI / 2;
@@ -1078,11 +1115,15 @@
     layerP.add(buildCape());
     decal = buildDecal(); layerP.add(decal);
     beacon = buildBeacon(); layerP.add(beacon);
+    pointer = buildPointer(); layerP.add(pointer);
     buildGhost(); layerP.add(ghostDots); layerP.add(ghostFig); adjMarks.forEach(m => layerP.add(m));
     // readability: phones see the arena smaller, so the knight (visual only, not its hit radius) grows a little
     const fitScale = () => {
       const portrait = innerHeight > innerWidth, k = G.isTouch ? (portrait ? 1.45 : 1.3) : 1.15;
       body.scale.setScalar(k); decal.scale.setScalar(k / 1.15); if (ghostFig) ghostFig.scale.setScalar(k / 1.15);
+      // chevron: ~17 css px tall on touch (15 on desktop) whatever the viewport; 0.767 = view height at 1 unit (FOV 42)
+      if (pointer) { const px = G.isTouch ? 17 : 15; const sc = px / Math.max(240, innerHeight) * 0.767; pointer.scale.set(sc, sc, 1); }
+      M.dotK = G.isTouch ? (portrait ? 1.6 : 1.45) : 1.15;
     };
     fitScale(); try { G.on('resize', fitScale); } catch (e) { }
     buildAegis(); layerP.add(aegisBubble); layerP.add(coronaSprite);
@@ -1106,8 +1147,13 @@
     K, init, update, reset, state: S, damage, heal: healHp, forceShift, forceReverse, setSpeedMul,
     cooldowns: CD, anchors: anchorsApi, stats, predictTheta, predictRing, velAhead, addMeter, god: false,
     canAct: () => canAct(),
+    disableRing, ringOk,
+    get disabledRings() { return ringOff.slice(); },
+    // highest usable ring index (rings above it are disabled); assigning it disables/enables the outer rings
+    get maxRing() { let m = RINGS().length - 1; while (m > 0 && ringOff[m]) m--; return m; },
+    set maxRing(n) { for (let i = 0; i < ringOff.length; i++) disableRing(i, i > n); },
     anchorAge: (a) => M.clock - a.born,
     // movement introspection for the bot / UI
-    motion: () => ({ turning: !!M.turn, turnLeft: M.turn ? M.turn.dur - M.turn.t : 0, revLock: M.revLock, revBuf: M.revBuf, shiftBuf: M.shiftBuf, hopLeft: M.hop ? M.hop.dur - M.hop.t : 0, hop: M.hop ? { ...M.hop } : null, shiftLock: M.shiftLock, haltT: M.haltT, aegisT: M.aegisT, empT: M.empT, hitT: M.hitT, postNovaT: M.postNovaT }),
+    motion: () => ({ turning: !!M.turn, turnLeft: M.turn ? M.turn.dur - M.turn.t : 0, revLock: M.revLock, revBuf: M.revBuf, shiftBuf: M.shiftBuf, hopLeft: M.hop ? M.hop.dur - M.hop.t : 0, hop: M.hop ? { ...M.hop } : null, shiftLock: M.shiftLock, haltT: M.haltT, aegisT: M.aegisT, empT: M.empT, hitT: M.hitT, postNovaT: M.postNovaT, haltF: M.haltF, speedT: M.speedT }),
   };
 })();

@@ -53,7 +53,8 @@
     sfx('uiClick');
     try {
       if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
-      if (fsAvail()) {
+      // iPhone (Safari and Chrome iOS, both WebKit) has no element fullscreen: always explain Add to Home Screen
+      if (fsAvail() && !/iPhone|iPod/.test(navigator.userAgent)) {
         const de = document.documentElement;
         const p = de.requestFullscreen ? de.requestFullscreen({ navigationUI: 'hide' }) : de.webkitRequestFullscreen();
         if (p && p.then) p.then(() => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => { }); } catch (e) { } }).catch(() => fsHint());
@@ -117,7 +118,15 @@
     $('hud').classList.toggle('on', on);
     $('controls').classList.toggle('on', on);
   }
-  const H = { bossF: 1, bossChunk: 1, hpF: 1, hpChunk: 1, chunkHold: 0, hpHold: 0, sayT: 0, bannerT: 0, beginT: 0, castFlashT: 0, lastCast: null };
+  const H = { bossF: 1, bossChunk: 1, hpF: 1, hpChunk: 1, chunkHold: 0, hpHold: 0, sayT: 0, bannerT: 0, beginT: 0, castFlashT: 0, lastCast: null,
+    bannerQ: null, bannerFor: -1, rkKey: '' };
+  // phase banner: shown during the transition cinematic (from phaseTransition), or queued behind the BEGIN flash
+  function showBanner(index, name, hold) {
+    $('phaseK').textContent = 'PHASE ' + (ROMAN[index] || index + 1);
+    $('phaseN').textContent = name || '';
+    const pb = $('phaseBanner'); pb.classList.remove('on'); void pb.offsetWidth; pb.classList.add('on');
+    H.bannerT = hold; H.bannerFor = index;
+  }
   let ticksFor = null;
   function setupBossBar() {
     const c = G.combat, def = c && c.def; if (!def) return;
@@ -212,10 +221,23 @@
       }
     }
     $('tReverse').classList.toggle('ccw', P.dir > 0);
+    // rocker: show which halves cannot move the knight (edge of the arena, or a ring the boss disabled)
+    {
+      const ok = (i) => (G.player.ringOk ? G.player.ringOk(i) : i >= 0 && i <= 2);
+      const st = (i) => i < 0 || i > 2 ? 'edge' : ok(i) ? '' : 'void';
+      const kIn = st(P.ring - 1), kOut = st(P.ring + 1), key = kIn + '|' + kOut;
+      if (key !== H.rkKey) {
+        H.rkKey = key;
+        const ti = $('tIn'), to = $('tOut');
+        ti.classList.toggle('edge', kIn === 'edge'); ti.classList.toggle('void', kIn === 'void');
+        to.classList.toggle('edge', kOut === 'edge'); to.classList.toggle('void', kOut === 'void');
+      }
+    }
     // practice DPS
     if (c.practice) { const d = (c.dps ? c.dps() : 0); const s = 'DPS ' + Math.round(d); const el = $('practiceDps'); if (el._t !== s) { el._t = s; el.textContent = s; } }
     // banners
     if (H.sayT > 0) { H.sayT -= rdt; if (H.sayT <= 0) $('say').classList.remove('on'); }
+    if (H.bannerQ) { H.bannerQ.t -= rdt; if (H.bannerQ.t <= 0) { const q = H.bannerQ; H.bannerQ = null; showBanner(q.index, q.name, q.hold); } }
     if (H.bannerT > 0) { H.bannerT -= rdt; if (H.bannerT <= 0) $('phaseBanner').classList.remove('on'); }
     if (H.beginT > 0) { H.beginT -= rdt; if (H.beginT <= 0) $('beginFlash').classList.remove('on'); }
   }
@@ -296,8 +318,8 @@
   const KN = (x, y, c = '#ffc94d') => `<g transform="translate(${x},${y})"><circle r="4.5" fill="${c}"/><circle r="8" fill="none" stroke="${c}" stroke-width="1" opacity=".6"/></g>`;
   const HOW = [
     { h: 'ORBIT', k: '', p: 'You always run around the boss on one of three brass rings. You never steer: you choose when to turn and when to hop.', s: RINGS3 + KN(100, 63) + '<path d="M120 62 Q140 58 150 52" stroke="#ffc94d" stroke-width="2" fill="none" stroke-dasharray="3 3"/><path d="M146 49 L152 51 L148 56" fill="none" stroke="#ffc94d" stroke-width="2"/>' },
-    { h: 'REVERSE', k: 'A / D', p: 'Flip between clockwise and counter-clockwise. A short skid, then you run the other way. Dodges sweeps and lets you wait for gaps.', s: RINGS3 + KN(100, 63) + '<path d="M118 62 Q132 60 136 56" stroke="#ffc94d" stroke-width="2" fill="none"/><path d="M82 62 Q68 60 64 56" stroke="#fff1c2" stroke-width="2.4" fill="none"/><path d="M68 52 L62 56 L68 60" fill="none" stroke="#fff1c2" stroke-width="2.4"/>' },
-    { h: 'SHIFT', k: 'W / S', p: 'Hop one ring in or out. A tiny window mid-hop is invulnerable. Inner ring hits harder (x1.35), outer is safer (x0.75).', s: RINGS3 + KN(100, 63) + '<path d="M100 58 Q96 52 100 47" stroke="#fff1c2" stroke-width="2.2" fill="none"/><path d="M96 49 L100 45 L104 49" fill="none" stroke="#fff1c2" stroke-width="2.2"/>' + KN(100, 63 - 10, '#fff1c2').replace('r="4.5"', 'r="3"') },
+    { h: 'REVERSE', k: 'A / D', p: (G.isTouch ? 'The big round button (left thumb). ' : '') + 'Flip between clockwise and counter-clockwise. A short skid, then you run the other way. Dodges sweeps and lets you wait for gaps.', s: RINGS3 + KN(100, 63) + '<path d="M118 62 Q132 60 136 56" stroke="#ffc94d" stroke-width="2" fill="none"/><path d="M82 62 Q68 60 64 56" stroke="#fff1c2" stroke-width="2.4" fill="none"/><path d="M68 52 L62 56 L68 60" fill="none" stroke="#fff1c2" stroke-width="2.4"/>' },
+    { h: 'SHIFT', k: 'W / S', p: (G.isTouch ? 'The IN / OUT rocker. ' : '') + 'Hop one ring in or out. A tiny window mid-hop is invulnerable. You deal x1.35 damage from the inner ring and x0.75 from the outer one, which is usually safer.', s: RINGS3 + KN(100, 63) + '<path d="M100 58 Q96 52 100 47" stroke="#fff1c2" stroke-width="2.2" fill="none"/><path d="M96 49 L100 45 L104 49" fill="none" stroke="#fff1c2" stroke-width="2.2"/>' + KN(100, 63 - 10, '#fff1c2').replace('r="4.5"', 'r="3"') },
     { h: 'GHOST TRAIL', k: '', p: 'Gold dots show where you will be in 1.5 s. Dots turn the boss colour where that spot will be dangerous. Gold ghosts on other rings are safe.', s: RINGS3 + KN(70, 59) + '<g fill="#ffc94d">' + [0, 1, 2, 3].map(i => `<circle cx="${82 + i * 9}" cy="${62 - i * 0.4}" r="2"/>`).join('') + '</g><g fill="#5fe3ff">' + [4, 5, 6].map(i => `<circle cx="${82 + i * 9}" cy="${62 - i * 0.6}" r="2.4"/>`).join('') + '</g><path d="M115 52 L150 52 L150 70 L115 70Z" fill="#5fe3ff" opacity=".18"/>' },
     { h: 'BEHIND', k: '', p: 'The boss\'s back is its weak point: x1.5 damage inside the gold rear arc. The HUD shows BEHIND while it holds.', s: RINGS3 + '<path d="M100 36 L76 14 A40 22 0 0 1 124 14 Z" fill="#ffc94d" opacity=".22"/>' + KN(100, 10) + '<circle cx="100" cy="36" r="6" fill="#5fe3ff"/><path d="M100 42 L100 60" stroke="#5fe3ff" stroke-width="1.5" stroke-dasharray="2 2"/>' },
     { h: 'STRIKE', k: 'AUTO', p: 'Every 0.45 s you throw a starlight bolt at the nearest add ahead of you on your ring, otherwise at the boss.', s: RINGS3 + KN(60, 58) + '<path d="M64 54 Q80 30 96 36" stroke="#fff1c2" stroke-width="2" fill="none" stroke-dasharray="1 4"/><circle cx="92" cy="35" r="3" fill="#fff1c2"/>' },
@@ -306,10 +328,15 @@
     { h: 'ECLIPSE', k: 'E', p: 'Halts your orbit for 1.5 s (Reverse or Shift ends it), interrupts casts framed in gold, and empowers your next skill within 6 s.', s: RINGS3 + '<circle cx="100" cy="63" r="8" fill="#05030c" stroke="#fff1c2" stroke-width="2"/><circle cx="100" cy="63" r="12" fill="none" stroke="#ffc94d" stroke-width="1" opacity=".6"/><rect x="70" y="2" width="60" height="6" fill="none" stroke="#fff1c2"/><rect x="70" y="2" width="38" height="6" fill="#ffd36b"/>' },
     { h: 'AEGIS', k: 'F', p: 'Blocks everything for 1 s and reflects each blocked hit as a gold lance (3x its damage). Block in the first 0.3 s for PERFECT (4.5x). Save it for the biggest hit.', s: RINGS3 + KN(100, 63) + '<circle cx="100" cy="60" r="11" fill="#ffc94d" fill-opacity=".15" stroke="#ffd36b" stroke-width="1.6"/><path d="M100 49 L100 40" stroke="#fff1c2" stroke-width="2.5"/>' },
     { h: 'SUPERNOVA', k: 'R', p: 'At a full meter: a 3 s set piece. Hazards slow, you rise and collapse a star into the boss for 900 damage, clearing adds and orbs.', s: RINGS3 + '<g stroke="#fff1c2" stroke-width="1.6"><path d="M100 4V14M100 58V68M70 36H80M120 36H130M80 16L86 22M114 50L120 56M120 16L114 22M86 50L80 56"/></g><circle cx="100" cy="36" r="9" fill="#fff1c2"/>' },
+    { h: 'TELEGRAPHS', k: '', t: 1, p: 'Every threat is drawn in the boss colour. The fill grows toward the moment it fires, so you can read when, not just where. Striped shapes are lethal: get off that ring or into the gold gap.', s: RINGS3 + '<path d="M150 50 A55 23 0 0 1 100 63 L100 73 A80 33 0 0 0 172 55 Z" fill="#5fe3ff" opacity=".22"/><path d="M150 50 A55 23 0 0 1 128 60 L136 70 A80 33 0 0 0 172 55 Z" fill="#5fe3ff" opacity=".6"/><path d="M150 50 A55 23 0 0 1 100 63 L100 73 A80 33 0 0 0 172 55 Z" fill="none" stroke="#bff4ff" stroke-width="1.4"/><g stroke="#5fe3ff" stroke-width="2" opacity=".75"><path d="M22 52 L30 44 M30 56 L40 46 M40 60 L50 50"/></g><path d="M20 40 A80 33 0 0 0 52 66" fill="none" stroke="#ffc94d" stroke-width="3" stroke-dasharray="4 3" opacity=".8"/>' },
+    { h: 'STARS & BREAKS', k: '', t: 1, p: 'A soak star with a ring timer must be touched before it runs out, or everyone takes damage. Broken track drops you a ring: Shift around it. A struck-through IN / OUT means that ring is gone.', s: RINGS3 + '<g transform="translate(150,58)"><circle r="9" fill="none" stroke="#ffd36b" stroke-width="2" stroke-dasharray="40 17"/><path d="M0 -5 L1.5 -1.5 L5 0 L1.5 1.5 L0 5 L-1.5 1.5 L-5 0 L-1.5 -1.5Z" fill="#fff1c2"/></g><path d="M52 50 L60 58" stroke="#05030c" stroke-width="7"/><path d="M50 49 L62 59" stroke="#ff9f6a" stroke-width="1.2" opacity=".8"/>' },
     { h: 'EMPOWERED', k: 'ECLIPSE →', p: 'Anchor becomes a Meridian (pulses on every ring, double heal). Comet is instantly full, x1.5 and pierces adds. Aegis lasts 1.8 s, x1.5. Supernova x1.5.', s: RINGS3 + '<path d="M100 36 L100 2" stroke="#ffd36b" stroke-width="2"/><circle cx="100" cy="20" r="5" fill="#05030c" stroke="#e6dcff" stroke-width="2"/>' },
   ];
   function buildHow() {
-    $('howGrid').innerHTML = HOW.map(c => `<div class="how">${SV(c.s)}<h4>${c.h}${c.k ? `<kbd>${G.isTouch && c.k.length > 2 && c.k !== 'AUTO' && !c.k.includes('→') ? 'BUTTON' : c.k}</kbd>` : ''}</h4><p>${c.p}</p></div>`).join('');
+    // touch: no key names (the buttons carry icons); the auto / combo tags stay
+    const tag = (k) => !k ? '' : G.isTouch ? (k === 'AUTO' || k.includes('→') ? k : '') : k;
+    const txt = (c) => G.isTouch ? c.p.replace(/ \(([A-Z]|SPACE)\)/g, '') : c.p;
+    $('howGrid').innerHTML = HOW.map(c => `<div class="how">${SV(c.s)}<h4>${c.h}${tag(c.k) ? `<kbd>${tag(c.k)}</kbd>` : ''}</h4><p>${txt(c)}</p></div>`).join('');
   }
 
   // ---------------------------------------------------------- settings UI
@@ -369,6 +396,7 @@
       const c = G.combat, def = c.def || {};
       setupBossBar();
       H.lastCast = null; H.castFlashT = 0;
+      H.bannerQ = null; H.bannerFor = -1; H.bannerT = 0; H.rkKey = ''; $('phaseBanner').classList.remove('on');
       hud(true);
       only(null);
       $('introK').textContent = d.practice ? 'TRAINING' : (typeof d.bossIndex === 'number' && d.bossIndex >= 0 ? 'BOSS ' + ROMAN[d.bossIndex] : 'TRIAL');
@@ -384,13 +412,21 @@
       const bf = $('beginFlash'); bf.textContent = G.combat.practice ? 'PRACTICE' : 'BEGIN'; bf.classList.add('on'); H.beginT = 0.9;
       sfx('begin');
     });
+    G.on('phaseTransition', (d) => {
+      const c = G.combat; if (!c || c.practice || !c.def) return;
+      const ph = (c.def.phases || [])[d.to] || {};
+      // shown early in the cinematic, held until a moment after the fight resumes (see phaseStart)
+      H.bannerQ = { t: 0.55, index: d.to, name: ph.name, hold: 12 };
+    });
     G.on('phaseStart', (d) => {
       const c = G.combat; if (!c || c.practice) return;
-      $('phaseK').textContent = 'PHASE ' + (ROMAN[d.index] || d.index + 1);
-      $('phaseN').textContent = d.name || '';
-      const pb = $('phaseBanner'); pb.classList.remove('on'); void pb.offsetWidth; pb.classList.add('on');
-      H.bannerT = d.index === 0 ? 2.0 : 2.8;
       $('timer').classList.toggle('ckpt', !!c.checkpointUsed);
+      if (H.bannerQ && H.bannerQ.index === d.index) { const q = H.bannerQ; H.bannerQ = null; showBanner(q.index, q.name, 1.6); return; }
+      if (H.bannerFor === d.index && H.bannerT > 0) { H.bannerT = Math.min(H.bannerT, 1.6); return; }
+      // fight start / checkpoint: wait for the BEGIN flash to clear so the two never overlap
+      const hold = d.index === 0 ? 2.0 : 2.8;
+      if (H.beginT > 0) H.bannerQ = { t: H.beginT + 0.3, index: d.index, name: d.name, hold };
+      else showBanner(d.index, d.name, hold);
     });
     G.on('say', (d) => { const s = $('say'); s.textContent = d.text || ''; s.classList.add('on'); H.sayT = d.dur || 2.5; });
     G.on('castEnd', (d) => {
@@ -414,6 +450,8 @@
         hud(false);
         // back on the title: calm menu sky, untilted arena with no fight leftovers (glow, flood, rime, gaps)
         try { G.world && G.world.reset && G.world.reset(); G.world && G.world.setSky && G.world.setSky('menu', 0, 1.6); } catch (e) { logE('ui.menuSky', e); }
+        // a ring a boss switched off (HELIARCH's Event Horizon) comes back for the menu too, not only on the next fight
+        try { if (G.player && G.player.disableRing) for (let i = 0; i < 3; i++) G.player.disableRing(i, false); } catch (e) { logE('ui.menuRings', e); }
       }
     });
     // any input skips the intro card
@@ -487,6 +525,8 @@
     update(dt) {
       const rdt = G.rdt || dt || 0;
       if (hudOn) { try { updateHud(rdt); } catch (e) { logE('ui.hud', e); } }
+      // cinematics (transitions, Supernova, deaths): the touch controls step back so the spectacle reads
+      { const cin = G.state === 'cinematic' || G.state === 'victory'; if (cin !== H.cine) { H.cine = cin; $('controls').classList.toggle('cine', cin); $('hud').classList.toggle('cine', cin); } }
     },
   };
 })();

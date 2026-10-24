@@ -22,111 +22,278 @@
   const brand = () => { bs |= 0; bs = (bs + 0x6D2B79F5) | 0; let t = Math.imul(bs ^ (bs >>> 15), 1 | bs); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 
   // ================================================================ BOT
+  // A planner that plays like a competent human at level 3 and a hesitant / careless one at levels 1-2.
+  // Every decision tick (reaction time per level) it rolls the hero's real motion rules forward ~4 s for a set of
+  // candidate input plans (keep, reverse now or later, shift now or later, double shifts, reverse+shift, shift and
+  // back, reverse twice to wait in a gap, Eclipse halts), scores each against every hazard's own covers() test at
+  // the hazard-local time of each sample (the same test G.hz.dangerAt and the real hit check use), models hit
+  // i-frames, shift i-frames, tick hazards and soak timers, and commits only the first input of the best plan.
+  // Level differences (SPEC 8.8): reaction time and the chance to overlook a threat (re-rolled every ~2 s per hazard).
   const LV = {
-    1: { react: 0.45, ignore: 0.25, greedAegis: false, ringPref: 0, interruptMiss: 0.3 },
-    2: { react: 0.25, ignore: 0.10, greedAegis: true, ringPref: 1, interruptMiss: 0.1 },
-    3: { react: 0.10, ignore: 0.0, greedAegis: true, ringPref: 2, interruptMiss: 0 },
+    1: { react: 0.45, ignore: 0.25, greedAegis: false, ringPref: 0, interruptMiss: 0.3, reserve: false },
+    2: { react: 0.25, ignore: 0.10, greedAegis: true, ringPref: 1, interruptMiss: 0.1, reserve: true },
+    3: { react: 0.10, ignore: 0.0, greedAegis: true, ringPref: 2, interruptMiss: 0, reserve: true },
   };
-  const B = { level: 0, t: 0, ignored: new Map(), castSeen: new Map(), holdT: 0, lastAct: '', acts: {}, decisions: 0, lastCost: 0 };
-  const H = 1.8, STEP = 0.1, PAD = 0.12;
+  const B = { pending: [], level: 0, t: 0, ign: new Map(), castSeen: new Map(), holdT: 0, lastAct: '', acts: {}, decisions: 0, lastCost: 0, plans: {},
+    intCasts: [], phaseT0: 0, retro: null, smashed: [0, 0, 0], smashT: [-99, -99, -99], lastBest: null };
+  const PAD = 0.12, IGNORE_REROLL = 2.0, HIT_IFR = 0.8;
+  // sample times: fine where inputs land (shift i-frames are 0.14 s wide), coarser further out
+  const TS = (() => { const a = []; let t = 0; while (t < 1.6 - 1e-6) { t += 0.05; a.push(+t.toFixed(3)); } while (t < 3.0 - 1e-6) { t += 0.1; a.push(+t.toFixed(3)); } while (t < 4.0 - 1e-6) { t += 0.2; a.push(+t.toFixed(3)); } return a; })();
+  const H = TS[TS.length - 1];
   const fire = (a) => { try { G.input.fire(a, { source: 'bot' }); B.acts[a] = (B.acts[a] || 0) + 1; B.lastAct = a; } catch (e) { logE('bot.fire', e); } };
+  const fightT = () => (G.combat && G.combat.fightTime) || 0;
 
+  // ---- perception: hazards the bot noticed this moment (each threat re-rolls its "overlooked" chance every ~2 s)
   function hazards() {
     const L = (G.hz && G.hz.active) || [];
-    const out = [];
+    const out = [], now = G.t || 0, p = LV[B.level].ignore;
     for (const h of L) {
       if (h.finished) continue;
-      if (!B.ignored.has(h.id)) B.ignored.set(h.id, h.kind !== 'contact' && h.kind !== 'gap' && brand() < LV[B.level].ignore);
-      if (B.ignored.get(h.id)) continue;
+      if (p > 0 && h.kind !== 'contact' && h.kind !== 'gap') {
+        let e = B.ign.get(h.id);
+        if (!e || now >= e.until) { e = { ign: brand() < p, until: now + IGNORE_REROLL * (0.75 + 0.5 * brand()) }; B.ign.set(h.id, e); }
+        if (e.ign) continue;
+      }
       out.push(h);
     }
-    if (B.ignored.size > 400) { const live = new Set(L.map(h => h.id)); for (const k of B.ignored.keys()) if (!live.has(k)) B.ignored.delete(k); }
+    if (B.ign.size > 300) { const live = new Set(L.map(h => h.id)); for (const k of B.ign.keys()) if (!live.has(k)) B.ign.delete(k); }
     return out;
   }
-  const weightOf = (h) => (h.kind === 'contact' ? ((h.add && h.add.contactDmg) || 20) + 6 : Math.max(10, h.dmg || 0)) * (h.lethal ? 1.6 : 1);
-
-  // ---- path simulation: returns sample arrays for one plan
-  // plan: {rev: t|null, shift: {t, d}|null, halt: t|null}
-  function simulate(plan) {
-    const pl = G.player, S = pl.state;
-    const R = G.RINGS;
-    const samples = [];
-    let th = S.theta, t = 0;
-    let dirAfter = S.dir;
-    const sp0 = (G.OMEGA || 0.6) * (S.speedMul || 1);
-    const velAt = (tt) => {
-      let v = pl.velAhead(tt);
-      if (plan.rev != null && tt >= plan.rev) {
-        const u = (tt - plan.rev) / 0.2;
-        const nd = -dirAtRev;
-        v = u < 1 ? -nd * Math.cos(PI * u) * sp0 : nd * sp0;
-      }
-      if (plan.halt != null && tt >= plan.halt && tt < plan.halt + 1.5) v *= clamp(1 - (tt - plan.halt) / 0.08, 0, 1);
+  const dmgOf = (h) => h.kind === 'contact' ? ((h.add && h.add.contactDmg) || 20) : (h.dmg || 0);
+  // the cost of one hit: its damage, plus the knock-on of contact bounces and falls
+  const costOf = (h) => {
+    const d = dmgOf(h);
+    if (h.kind === 'contact') return d + 6;
+    if (h.kind === 'gap') return d + 10;
+    return Math.max(6, d) * (h.lethal ? 1.15 : 1);
+  };
+  // the gravity well (HELIARCH): its brace state is shown on screen ("SHIFT OUT!"); read it from the boss data
+  function wellInfo(b, sp) {
+    const st = b && b.data && b.data.well;
+    if (!st || st.braced || !st.h || !st.h.hazard || st.h.hazard.finished) return null;
+    const h = st.h.hazard, warn = st.warn || h.warn, win = st.win || 1.2;
+    return { h, braced: false, fireIn: Math.max(0, (warn - h.lt) / sp), openIn: Math.max(0, (warn - win - h.lt) / sp) };
+  }
+  // forced reverses (HELIARCH Retrograde): every ring's inlay arrows show the direction the knight will be forced
+  // into, and all rings glow for the lead time before the flip (the glow fades out exactly at the flip)
+  function retroInfo(S) {
+    const rs = (G.world && G.world.ringState) ? G.world.ringState() : [];
+    if (!(rs.length === 3 && rs.every(r => r.arrowShown) && rs.every(r => r.arrowDir === rs[0].arrowDir))) { B.retro = null; return null; }
+    const want = rs[0].arrowDir;
+    const left = Math.min(...rs.map(r => r.glowLeft));
+    B.retro = { want, left };
+    if (want === S.dir || !(left > 0 && left < 4)) return { want, at: Infinity };
+    return { want, at: Math.max(0.05, left) };
+  }
+  // speed rules the hero can read off the arena: a flooded ring slows to x0.6 (OUROS), a ring-bound haste or
+  // slow (spin-up, flood) stays with its ring, anything else (enthral) follows the hero
+  function speedModel(S, m) {
+    const rs = (G.world && G.world.ringState) ? G.world.ringState() : [];
+    const flooded = [0, 1, 2].map(i => !!(rs[i] && rs[i].flooded));
+    const cur = S.speedMul || 1, until = m.speedT > 0 ? m.speedT : Infinity;
+    const kind = Math.abs(cur - 1) < 1e-3 ? 0 : (cur > 1 || (cur < 1 && flooded[S.ring])) ? 1 : 2;
+    const home = S.ring;
+    return (ring, t) => {
+      let v = 1;
+      if (t < until && (kind === 2 || (kind === 1 && ring === home))) v = cur;
+      if (flooded[ring]) v = Math.min(v, 0.6);
       return v;
     };
-    let dirAtRev = S.dir;
-    if (plan.rev != null) { const v = pl.velAhead(plan.rev); dirAtRev = Math.abs(v) > 0.05 ? Math.sign(v) : S.dir; dirAfter = -dirAtRev; }
-    for (let k = 1; k * STEP <= H + 1e-6; k++) {
-      const t1 = k * STEP;
-      th += (velAt(t) + velAt(t1)) * 0.5 * STEP; t = t1;
-      let ring = pl.predictRing(t1), inv = false;
-      if (plan.shift) {
-        const ts = plan.shift.t;
-        if (t1 >= ts + 0.14) ring = clamp(pl.predictRing(ts) + plan.shift.d, 0, R.length - 1);
-        if (t1 >= ts + 0.06 && t1 <= ts + 0.20) inv = true;
-      }
-      const m = pl.motion();
-      if (m.aegisT > t1 || m.postNovaT > t1 || (m.hitT > t1)) inv = true;
-      samples.push({ t: t1, ring, th, inv });
-    }
-    return { samples, dirEnd: dirAfter, plan };
   }
 
-  function evaluate(sim, hz, soaks, boss) {
-    const hit = new Set();
-    let cost = 0, firstHit = 99, firstHitDmg = 0;
-    const sp = (G.hz && G.hz.speed) || 1;
+  // ---- forward model of the hero's motion (mirrors 07_player.js updateMotion / doReverse / doShift / eclipse)
+  function rollout(events, ctx) {
+    const pl = G.player, S = pl.state, K = pl.K, m = ctx.m;
+    const st = {
+      th: S.theta, ring: m.hop ? m.hop.from : S.ring, dir: S.dir,
+      turn: m.turning ? { t: K.reverseDur - m.turnLeft, dur: K.reverseDur } : null, revLock: m.revLock, revBuf: m.revBuf,
+      hop: m.hop ? { from: m.hop.from, to: m.hop.to, t: m.hop.t, dur: m.hop.dur, forced: !!m.hop.forced } : null,
+      shiftLock: m.shiftLock, shiftBuf: m.shiftBuf, haltT: m.haltT, haltF: m.haltF != null ? m.haltF : 1,
+    };
+    const ringOk = ctx.ringOk;
+    const outT = [];                                  // times an outward shift or outward bump started (gravity brace)
+    let tNow = 0;
+    const endHalt = () => { st.haltT = 0; };
+    const doRev = () => {
+      if (st.haltT > 0) endHalt();
+      if (st.turn || st.revLock > 0) { st.revBuf = true; return; }
+      st.dir = -st.dir; st.turn = { t: 0, dur: K.reverseDur };
+    };
+    const doShift = (d) => {
+      if (st.haltT > 0) endHalt();
+      if (st.hop || st.shiftLock > 0) { st.shiftBuf = d; return; }
+      const to = st.ring + d;
+      if (!ringOk(to)) { st.shiftLock = K.bumpLock; if (d > 0) outT.push(tNow); return; }
+      st.hop = { from: st.ring, to, t: 0, dur: K.shiftDur, forced: false };
+      if (d > 0) outT.push(tNow);
+    };
+    const doHalt = () => { st.haltT = K.eclipseHalt; st.turn = null; };
+    const ev = events.slice().sort((a, c) => a.t - c.t);
+    let ei = 0, prevT = 0;
+    const samples = [];
+    const retro = ctx.retro; let retroDone = !retro || retro.at === Infinity;
+    for (const t1 of TS) {
+      // integrate in <= 0.05 s sub-steps (exactly the sample grid up to 1.6 s)
+      let t = prevT;
+      while (t < t1 - 1e-6) {
+        const dt = Math.min(0.05, t1 - t);
+        tNow = t;
+        while (ei < ev.length && ev[ei].t <= t + 1e-6) {
+          const e = ev[ei++];
+          if (e.a === 'R') doRev(); else if (e.a === 'S') doShift(e.d); else if (e.a === 'H') doHalt();
+        }
+        if (!retroDone && t + 1e-6 >= retro.at) {
+          retroDone = true;
+          if (st.dir !== retro.want) { const old = st.dir; st.dir = -st.dir; st.turn = null; st.revLock = 0.2; st.revBuf = false; st.th -= old * 0.06; }
+        }
+        // timers (same order as updateMotion)
+        if (st.haltT > 0) { st.haltT -= dt; if (st.haltT <= 0) st.haltT = 0; }
+        const hT = st.haltT > 0 ? 0 : 1;
+        st.haltF += (hT - st.haltF) * Math.min(1, dt * (hT ? 7 : 16)); if (Math.abs(st.haltF - hT) < 0.01) st.haltF = hT;
+        if (st.turn) { st.turn.t += dt; if (st.turn.t >= st.turn.dur) { st.turn = null; st.revLock = K.reverseLock; } }
+        else if (st.revLock > 0) { st.revLock -= dt; if (st.revLock <= 0) { st.revLock = 0; if (st.revBuf) { st.revBuf = false; doRev(); } } }
+        if (st.hop) { st.hop.t += dt; if (st.hop.t >= st.hop.dur) { st.ring = st.hop.to; st.hop = null; st.shiftLock = K.shiftLock; } }
+        else if (st.shiftLock > 0) { st.shiftLock -= dt; if (st.shiftLock <= 0) { st.shiftLock = 0; if (st.shiftBuf) { const d = st.shiftBuf; st.shiftBuf = 0; tNow = t + dt; doShift(d); } } }
+        const vr = st.hop ? (st.hop.t / st.hop.dur < 0.5 ? st.hop.from : st.hop.to) : st.ring;
+        const sp = K.omega * ctx.speed(vr, t) * st.haltF;
+        const v = st.turn ? -st.dir * Math.cos(PI * clamp(st.turn.t / st.turn.dur, 0, 1)) * sp : st.dir * sp;
+        st.th += v * dt;
+        t += dt;
+      }
+      prevT = t1;
+      const hop = st.hop, u = hop ? clamp(hop.t / hop.dur, 0, 1) : 0;
+      const ring = hop ? (u < 0.5 ? hop.from : hop.to) : st.ring;
+      const ringF = hop ? hop.from + (hop.to - hop.from) * (u * u * (3 - 2 * u)) : st.ring;
+      // shift i-frames, trimmed by a frame-and-a-half each side: the bot never counts on frame-perfect timing
+      const sInv = !!(hop && !hop.forced && hop.t >= K.shiftIStart + 0.03 && hop.t <= K.shiftIEnd - 0.03);
+      samples.push({ t: t1, ring, ringF, th: st.th, inv: sInv || ctx.aegisT > t1 || ctx.postNovaT > t1, shifting: !!hop, dir: st.dir });
+    }
+    return { samples, outT, end: samples[samples.length - 1] };
+  }
+
+  function evaluate(sim, ctx) {
+    const sp = ctx.sp, S = G.player.state;
+    let cost = 0, dmgSum = 0, firstHit = 99, firstHitDmg = 0, firstCost = 0;
+    let ifr = ctx.hitT;
+    const once = new Set(), nextTick = new Map(), blocked = new Set(), aeg = ctx.aeg;
+    let reward = 0;
+    const well = ctx.well, braced = well && sim.outT.some(t => t >= well.openIn - 0.3 && t <= well.fireIn);
+    let prev = null;
     for (const s of sim.samples) {
-      const tw = s.t < 0.9 ? 1 : 1 - (s.t - 0.9) / (H - 0.9) * 0.55;
-      for (const h of hz) {
-        if (h.soak) continue;
+      const tw = s.t <= 1.2 ? 1 : 1 - (s.t - 1.2) / (H - 1.2) * 0.6;
+      for (const h of ctx.hz) {
+        if (well && h === well.h && braced) continue;
+        if (h.kind === 'contact' ? (s.shifting && h.add && s.ring !== h.add.ring) : (h.kind === 'gap' && s.shifting)) continue;
         const lt = h.lt + s.t * sp;
         let c = false;
-        try { c = h.covers(s.ring, s.th, lt, s.ring, PAD); } catch (e) { c = false; }
-        if (!c) continue;
-        if (s.inv) continue;
-        const tick = h.tick && h.kind !== 'contact';
-        if (hit.has(h.id) && !tick) continue;
-        const w = weightOf(h) * (hit.has(h.id) ? 0.35 : 1);
-        hit.add(h.id);
-        cost += w * tw;
-        if (s.t < firstHit) { firstHit = s.t; firstHitDmg = w; }
+        try { c = h.covers(s.ring, s.th, lt, s.ringF, PAD); } catch (e) { c = false; }
+        // a fast beam can pass between two coarse samples: check the crossing
+        if (!c && h.kind === 'sweep' && prev && prev.ring === s.ring && !s.inv && h.rings.includes(s.ring) && h.live(lt) && s.t > 1.55) {
+          const lt0 = h.lt + prev.t * sp, b0 = h.beamAt(lt0), b1 = h.beamAt(lt);
+          c = Math.sign(angDiff(prev.th, b0)) !== Math.sign(angDiff(s.th, b1)) && Math.abs(angDiff(s.th, b1)) < 1.0;
+        }
+        if (!c || s.inv) continue;
+        // a planned Aegis blocks (and reflects) everything in its window, i-frames or not
+        if (aeg && s.t >= aeg.a0 && s.t <= aeg.a1) {
+          if (!blocked.has(h.id)) { blocked.add(h.id); const d = dmgOf(h), perfect = s.t - aeg.a0 <= 0.3; reward += 2 + Math.max(40, d * (perfect ? 4.5 : 3)) * 0.04; }
+          continue;
+        }
+        if (s.t < ifr) continue;
+        const tick = h.tick > 0 && h.kind !== 'contact';
+        if (tick) { const nt = nextTick.has(h.id) ? nextTick.get(h.id) : (h.nextTick || 0); if (lt < nt) continue; nextTick.set(h.id, lt + h.tick); }
+        else { if (once.has(h.id)) continue; once.add(h.id); }
+        const d = dmgOf(h), w = costOf(h);
+        cost += w * tw; dmgSum += d; ifr = s.t + HIT_IFR;
+        if (s.t < firstHit) { firstHit = s.t; firstHitDmg = d; firstCost = w; }
       }
+      prev = s;
     }
-    // soaks: must reach before the timer runs out
-    for (const h of soaks) {
+    // being pulled in by an unbraced well (the crush on the inner ring is the hazard itself)
+    if (well && !braced && well.fireIn < H) {
+      const s = sim.samples.find(x => x.t >= well.fireIn) || sim.end;
+      if (s.ring > 0) cost += 9;
+    }
+    if (dmgSum >= S.hp && !(G.player.god || (G.combat && G.combat.practice))) cost += 250;
+    // soaks: reach them before their timer runs out; a missed one costs its real damage (and its side effect)
+    for (const h of ctx.soaks) {
       const left = (h.warn - h.lt) / sp;
       let touched = false;
-      for (const s of sim.samples) { if (s.t > left) break; if (!s.inv && h.touches(s.ring, s.th, 0)) { touched = true; break; } }
-      if (touched) { cost -= 4; continue; }
-      const e = sim.samples[sim.samples.length - 1];
-      const om = (G.OMEGA || 0.6) * ((G.player.state.speedMul) || 1);
-      const ringT = Math.abs(e.ring - h.ring) * 0.65;
-      const fwd = posMod((h.theta - e.th) * sim.dirEnd) / om;
-      const back = posMod((e.th - h.theta) * sim.dirEnd) / om + 0.4;
-      const need = H + Math.max(ringT, Math.min(fwd, back));
-      if (need > left - 0.2) cost += (h.failDmg || 20) * 1.4 + 10;
-      else cost += need * 0.8;
+      for (const s of sim.samples) { if (s.t > left) break; if (!s.shifting && h.touches(s.ring, s.th, 0)) { touched = true; break; } }
+      if (touched) { cost -= 1.5; continue; }
+      const e = sim.end;
+      const om = (G.OMEGA || 0.6) * ctx.speed(e.ring, e.t);
+      const ringT = Math.abs(e.ring - h.ring) * 0.7;
+      const fwd = posMod((h.theta - e.th) * e.dir) / om;
+      const back = posMod((e.th - h.theta) * e.dir) / om + 0.45;
+      const need = e.t + Math.max(ringT, Math.min(fwd, back));
+      const fail = (h.failDmg || 0) + 7;            // a missed star also has a side effect (adds, a new crack)
+      if (need > left - 0.15) cost += fail * (left <= H ? 1 : 0.85);
+      else cost += Math.min(fail * 0.4, (need - e.t) * 0.3);
     }
-    // preferences at the end of the horizon
-    const e = sim.samples[sim.samples.length - 1];
-    const lv = LV[B.level];
+    // anchors: running over a ready one pulses it (26 dmg, +5 HP); a marked one is about to be smashed, pulse it first
+    for (const a of ctx.anchors) {
+      const R = G.RINGS[a.ring], contact = (G.player.K.anchorContact || 0.7) / R;
+      for (const s of sim.samples) {
+        if (s.t < (a.cd || 0) || s.shifting) continue;
+        if ((a.meridian || s.ring === a.ring) && Math.abs(angDiff(s.th, a.theta)) < contact) { cost -= a.warn ? 3 : 1.2; break; }
+      }
+    }
+    // preferences at the end of the horizon: inner ring greed (levels 2-3), the boss's back
+    const e = sim.end, lv = LV[B.level];
     if (lv.ringPref >= 1) cost += [-(lv.ringPref === 2 ? 2.2 : 1.2), 0, 1.4][e.ring] || 0;
-    if (boss && boss.alive && G.player.K) {
-      const behind = Math.abs(angDiff(e.th, boss.facing + PI)) < G.player.K.behindHalf * 0.9;
-      if (behind) cost -= (G.player.cooldowns.comet.holding ? 5 : 1.5);
+    const b = ctx.boss;
+    if (b && b.alive && G.player.K) {
+      if (Math.abs(angDiff(e.th, b.facing + PI)) < G.player.K.behindHalf * 0.9) cost -= (G.player.cooldowns.comet.holding ? 5 : 1.5);
     }
-    return { cost, firstHit, firstHitDmg };
+    cost -= reward;
+    return { cost, dmgSum, firstHit, firstHitDmg, firstCost, braced, reward };
+  }
+
+  // ---- Eclipse economy: keep it for the next interruptible cast when one is due (levels 2-3)
+  function eclipseReserved() {
+    if (!LV[B.level].reserve) return false;
+    const now = fightT();
+    const gaps = []; for (let i = 1; i < B.intCasts.length; i++) gaps.push(B.intCasts[i] - B.intCasts[i - 1]);
+    const avg = gaps.length ? clamp(gaps.reduce((a, c) => a + c, 0) / gaps.length, 10, 40) : 22;
+    const last = B.intCasts.length && B.intCasts[B.intCasts.length - 1] >= B.phaseT0 ? B.intCasts[B.intCasts.length - 1] : B.phaseT0;
+    const due = last + avg;
+    const cd = (G.player.K && G.player.K.eclipseCd) || 14;
+    return due - now < cd + 1 && now < due + 14;
+  }
+
+  function plansFor(ctx) {
+    const S = G.player.state, ok = ctx.ringOk, P = [];
+    const add = (name, ev) => P.push({ name, ev });
+    add('keep', []);
+    for (const t of [0, 0.4, 0.8, 1.3, 2.0]) add(t ? 'rev@' + t : 'reverse', [{ t, a: 'R' }]);
+    const r0 = ctx.m.hop ? ctx.m.hop.to : S.ring;
+    for (const d of [-1, 1]) {
+      const nm = d < 0 ? 'in' : 'out';
+      const can1 = ok(r0 + d), can2 = can1 && ok(r0 + 2 * d);
+      if (!can1 && !(d > 0 && ctx.well)) continue;           // an outward bump still braces against the well
+      for (const t of [0, 0.3, 0.6, 1.0, 1.5, 2.2]) add(t ? nm + '@' + t : nm, [{ t, a: 'S', d }]);
+      if (!can1) continue;
+      if (can2) { add(nm + 'x2', [{ t: 0, a: 'S', d }, { t: 0.1, a: 'S', d }]); for (const t of [0.5, 1.0]) add(nm + 'x2@' + t, [{ t, a: 'S', d }, { t: t + 0.1, a: 'S', d }]); }
+      for (const t2 of [0.3, 0.8, 1.4]) add(nm + '+rev@' + t2, [{ t: 0, a: 'S', d }, { t: t2, a: 'R' }]);
+      for (const t2 of [0.25, 0.7, 1.2]) add('rev+' + nm + '@' + t2, [{ t: 0, a: 'R' }, { t: t2, a: 'S', d }]);
+      for (const t2 of [0.8, 1.5]) add(nm + '+back@' + t2, [{ t: 0, a: 'S', d }, { t: t2, a: 'S', d: -d }]);
+    }
+    for (const t2 of [0.6, 1.1, 1.7]) add('rev2@' + t2, [{ t: 0, a: 'R' }, { t: t2, a: 'R' }]);
+    if (ctx.haltOk) {
+      add('halt', [{ t: 0, a: 'H' }]);
+      add('halt+rev', [{ t: 0, a: 'H' }, { t: 0.9, a: 'R' }]);
+      for (const d of [-1, 1]) if (ok(r0 + d)) add('halt+' + (d < 0 ? 'in' : 'out'), [{ t: 0, a: 'H' }, { t: 0.9, a: 'S', d }]);
+    }
+    return P;
+  }
+  const ACT_COST = { R: 0.5, S: 0.7, H: 0 };
+  function pressAll(evs, m) {
+    for (const e of evs) {
+      if (e.a === 'R') { if (!m.revBuf) fire('reverse'); }
+      else if (e.a === 'S') { if (m.shiftBuf !== e.d) fire(e.d < 0 ? 'shiftIn' : 'shiftOut'); }
+      else if (e.a === 'H') { if (G.player.cooldowns.eclipse.t <= 0) fire('eclipse'); }
+      else if (e.a === 'A') { if (G.player.cooldowns.aegis.t <= 0) fire('aegis'); }
+    }
   }
 
   function decide() {
@@ -134,56 +301,80 @@
     if (!S.alive || S.novaActive) return;
     const lv = LV[B.level];
     B.decisions++;
-    const hz = hazards();
-    const soaks = hz.filter(h => h.soak && !h.finished);
+    const sp = (G.hz && G.hz.speed) || 1;
+    const all = hazards();
     const m = pl.motion();
-    // ---- build candidate plans
-    const revT = m.turning ? m.turnLeft + 0.15 : m.revLock;
-    const shT = m.hopLeft > 0 ? m.hopLeft + 0.35 : m.shiftLock;
-    const base = S.halted ? 0 : 0;
-    const plans = [{ name: 'keep' }];
-    plans.push({ name: 'reverse', rev: Math.max(0, revT) + base });
-    if (S.ring > 0 || (m.hopLeft > 0)) plans.push({ name: 'shiftIn', shift: { t: Math.max(0, shT), d: -1 } });
-    if (S.ring < 2 || (m.hopLeft > 0)) plans.push({ name: 'shiftOut', shift: { t: Math.max(0, shT), d: 1 } });
-    if (S.ring > 0) plans.push({ name: 'shiftIn+rev', shift: { t: Math.max(0, shT), d: -1 }, rev: Math.max(0.3, revT) });
-    if (S.ring < 2) plans.push({ name: 'shiftOut+rev', shift: { t: Math.max(0, shT), d: 1 }, rev: Math.max(0.3, revT) });
+    const ringOk = (i) => (pl.ringOk ? pl.ringOk(i) : i >= 0 && i <= 2);
+    // hazards that can matter inside the horizon (live now or going live before it ends)
+    const hz = [], soaks = [];
+    for (const h of all) {
+      if (h.soak) { soaks.push(h); continue; }
+      if (h.kind !== 'contact' && h.kind !== 'gap' && h.kind !== 'orb' && h.lt + H * sp < h.warn) continue;
+      hz.push(h);
+    }
     const eclipseReady = CD.eclipse.t <= 0;
     const castInt = !!(b && b.casting && b.casting.interruptible);
-    if (eclipseReady && !castInt && !S.halted) plans.push({ name: 'halt', halt: 0 });
-    // filter invalid shifts from the predicted ring
-    const sims = plans.map(p => {
-      if (p.shift) { const r0 = pl.predictRing(p.shift.t); const r1 = r0 + p.shift.d; if (r1 < 0 || r1 > 2) return null; }
-      const sim = simulate(p); const ev = evaluate(sim, hz, soaks, b);
-      const act = { keep: 0, reverse: 1.2, shiftIn: 1.6, shiftOut: 1.6, 'shiftIn+rev': 3.0, 'shiftOut+rev': 3.0, halt: 9 }[p.name] || 0;
-      return { p, sim, ev, cost: ev.cost + act };
-    }).filter(Boolean);
-    sims.sort((a, c) => a.cost - c.cost);
-    const keep = sims.find(s => s.p.name === 'keep');
-    let best = sims[0];
-    if (keep && best !== keep && keep.cost - best.cost < 1.0) best = keep;
-    B.lastCost = best.cost;
+    const reserved = eclipseReserved();
+    const ctx = {
+      m, sp, hz, soaks, boss: b, ringOk, speed: speedModel(S, m), retro: retroInfo(S), well: wellInfo(b, sp),
+      aegisT: m.aegisT, postNovaT: m.postNovaT, hitT: m.hitT,
+      anchors: pl.anchors.list.filter(a => a.ring != null),
+      haltOk: eclipseReady && !castInt && !S.halted,
+    };
+    const haltCost = reserved ? 30 : 6;
+    let best = null, keep = null;
+    if (B.debug) B.dbg = [];
+    for (const p of plansFor(ctx)) {
+      const sim = rollout(p.ev, ctx);
+      const ev = evaluate(sim, ctx);
+      let c = ev.cost;
+      for (const e of p.ev) c += e.a === 'H' ? haltCost : ACT_COST[e.a];
+      const first = p.ev.length ? Math.min(...p.ev.map(e => e.t)) : Infinity;
+      if (first < Infinity) c += 0.2 * first;           // among equal answers, act sooner rather than later
+      const r = { p, sim, ev, cost: c, now: first <= 1e-6, first };
+      if (p.name === 'keep') keep = r;
+      if (!best || c < best.cost) best = r;
+      if (B.debug) (B.dbg = B.dbg || []).push({ n: p.name, c: +c.toFixed(1), dmg: ev.dmgSum, fh: ev.firstHit, s: sim.samples.filter((x, i) => i % 3 === 0).map(x => x.t + ':' + x.ring + (x.shifting ? 's' : '') + (x.inv ? 'i' : '') + '@' + x.th.toFixed(2)).join(' ') });
+    }
+    // do not twitch: pressing something before the next look must beat doing nothing by a margin
+    if (best !== keep && keep && best.first <= lv.react + 0.02 && keep.cost - best.cost < 0.8) best = keep;
+    // ---- greedy Aegis (levels 2-3): take a big hit on purpose inside a perfect Aegis for the reflect
+    const aegisReady = CD.aegis.t <= 0 && m.aegisT <= 0;
+    let aegisPlan = null;
+    if (aegisReady && lv.greedAegis) {
+      for (const base of keep && keep !== best ? [best, keep] : [best]) {
+        if (!(base.ev.firstHit < 2.5) || base.ev.firstHitDmg < 15) continue;
+        const ta = Math.max(0, base.ev.firstHit - 0.2), dur = (G.player.K && G.player.K.aegisDur) || 1.0;
+        const ev = evaluate(base.sim, { ...ctx, aeg: { a0: ta, a1: ta + dur } });
+        let c = ev.cost; for (const e of base.p.ev) c += e.a === 'H' ? haltCost : ACT_COST[e.a];
+        c += 2;                                            // the cooldown has value too
+        if (ev.reward > 0 && c < best.cost && (!aegisPlan || c < aegisPlan.cost)) aegisPlan = { base, ta, cost: c };
+      }
+    }
+    if (aegisPlan) {
+      best = { ...aegisPlan.base, cost: aegisPlan.cost, aegisAt: aegisPlan.ta };
+      B.plans['aegis'] = (B.plans['aegis'] || 0) + 1;
+    }
+    // an input planned for a moment before the next decision tick is pressed on time (a human times it too)
+    B.pending = [];
+    if (!best.now && best.first <= lv.react + 0.02) B.pending.push({ at: (G.t || 0) + best.first, ev: best.p.ev.filter(e => e.t === best.first) });
+    B.lastCost = best.cost; B.lastBest = best.p.name;
+    B.plans[best.p.name.split('@')[0]] = (B.plans[best.p.name.split('@')[0]] || 0) + 1;
     // ---- interrupt (priority)
     if (castInt && eclipseReady) {
       const cs = b.casting;
       if (!B.castSeen.has(cs)) B.castSeen.set(cs, brand() < lv.interruptMiss);
       if (!B.castSeen.get(cs) && cs.progress > (B.level === 3 ? 0.08 : 0.25) && cs.progress < 0.97) { fire('eclipse'); return; }
     }
-    // ---- aegis: unavoidable hit within 0.35 s, or (greedy) a big hit about to land on the current path
-    const aegisReady = CD.aegis.t <= 0 && m.aegisT <= 0;
+    // ---- aegis: a planned greedy block, or an unavoidable hit within 0.35 s
     if (aegisReady) {
-      const unavoidable = best.ev.firstHit <= 0.35 && best.ev.cost > 8;
-      const greedy = lv.greedAegis && keep && keep.ev.firstHit <= 0.3 && keep.ev.firstHit >= 0.05 && keep.ev.firstHitDmg >= 15;
-      if (unavoidable || greedy) { fire('aegis'); if (greedy && !unavoidable) return; }
+      if (best.aegisAt != null) {
+        if (best.aegisAt <= 1e-6) fire('aegis');
+        else if (best.aegisAt <= lv.react + 0.02) B.pending.push({ at: (G.t || 0) + best.aegisAt, ev: [{ t: best.aegisAt, a: 'A' }] });
+      } else if (best.ev.firstHit <= 0.35 && best.ev.firstCost >= 8) fire('aegis');
     }
-    // ---- movement
-    const n = best.p.name;
-    if (n !== 'keep') {
-      // only commit the first step now; a delayed second step is re-decided next tick
-      if (n === 'reverse') { if (!m.revBuf) fire('reverse'); }
-      else if (n === 'shiftIn' || n === 'shiftIn+rev') { if (!m.shiftBuf) fire('shiftIn'); }
-      else if (n === 'shiftOut' || n === 'shiftOut+rev') { if (!m.shiftBuf) fire('shiftOut'); }
-      else if (n === 'halt') fire('eclipse');
-    }
+    // ---- movement: commit the plan's inputs that are due now; later ones are re-planned next tick
+    if (best.now) pressAll(best.p.ev.filter(e => e.t <= 1e-6), m);
     // ---- supernova
     if (CD.nova.ready && b && b.alive && !b.invulnerable && !(G.combat.transitioning)) { fire('nova'); return; }
     // ---- comet: charge whenever ready, release from behind at full charge
@@ -192,30 +383,46 @@
     else if (!cm.holding && cm.t <= 0 && b && b.alive) { fire('cometDown'); B.holdT = 0; }
     else if (cm.holding) {
       const fullish = cm.charge >= 0.95;
-      if ((S.behind && fullish) || (B.holdT > 9 && fullish) || (S.behind && B.holdT > 0.6 && Math.abs(angDiff(S.theta, b.facing + PI)) > G.player.K.behindHalf * 0.8 && cm.charge > 0.6)) fire('cometUp');
+      if ((S.behind && fullish) || (B.holdT > 9 && fullish) || (S.behind && B.holdT > 0.6 && b && Math.abs(angDiff(S.theta, b.facing + PI)) > G.player.K.behindHalf * 0.8 && cm.charge > 0.6)) fire('cometUp');
     }
-    // ---- anchors: spread around the boss, plant on safe ground
-    const A = pl.anchors.list;
-    if (CD.anchor.charges > 0 && best.ev.cost < 6) {
-      const oldest = A.length ? A[0] : null;
+    // ---- anchors: spread around the boss on safe ground; marked ones are as good as gone; avoid rings the boss
+    // just smashed anchors on
+    const A = pl.anchors.list.filter(a => !a.warn);
+    if (CD.anchor.charges > 0 && best.ev.dmgSum === 0 && !S.shifting && ringOk(S.ring)) {
+      const ringBad = B.smashed[S.ring] >= 1 && fightT() - B.smashT[S.ring] < 30 && [0, 1, 2].some(r => r !== S.ring && ringOk(r) && !(B.smashed[r] >= 1 && fightT() - B.smashT[r] < 30));
+      const all3 = pl.anchors.list;
+      const oldest = all3.length ? all3[0] : null;
       const far = A.every(a => Math.abs(angDiff(a.theta, S.theta)) > 1.75);
-      const stale = A.length >= 3 && oldest && G.player.anchorAge(oldest) > 22;
-      if ((A.length < 3 && far) || (stale && far)) fire('anchor');
+      const stale = all3.length >= 3 && oldest && (oldest.warn || G.player.anchorAge(oldest) > 22);
+      if (!ringBad && ((A.length < 3 && far && (all3.length < 3 || stale || A.length < all3.length)) || (stale && far))) fire('anchor');
     }
   }
 
   const bot = G.bot = {
     get level() { return B.level; },
     set(level) { B.level = clamp(level | 0, 0, 3); B.t = 0; },
-    stats: () => ({ level: B.level, decisions: B.decisions, acts: { ...B.acts }, lastCost: B.lastCost }),
+    _B: B,
+    stats: () => ({ level: B.level, decisions: B.decisions, acts: { ...B.acts }, lastCost: B.lastCost, lastPlan: B.lastBest, plans: { ...B.plans } }),
     init() {
       const lvl = G.params && G.params.bot ? G.params.bot | 0 : 0;
       if (lvl) bot.set(lvl);
+      // what a player remembers between moments: when interruptible casts come, where anchors get smashed
+      G.on('castStart', (d) => { if (d && d.interruptible) B.intCasts.push(fightT()); });
+      G.on('phaseStart', () => { B.phaseT0 = fightT(); });
+      G.on('fightStart', () => { B.pending = []; B.intCasts.length = 0; B.phaseT0 = 0; B.retro = null; B.ign.clear(); B.castSeen = new Map(); B.smashed = [0, 0, 0]; B.smashT = [-99, -99, -99]; });
+      G.on('anchorSmashed', (d) => { if (d && d.ring != null) { B.smashed[d.ring]++; B.smashT[d.ring] = fightT(); } });
     },
     update(dt) {
       if (!B.level || !PLAY()) return;
       const cm = G.player && G.player.cooldowns && G.player.cooldowns.comet;
       if (cm && cm.holding) B.holdT += dt;
+      if (B.pending && B.pending.length) {
+        for (let i = B.pending.length - 1; i >= 0; i--) {
+          const pe = B.pending[i]; if ((G.t || 0) < pe.at - 1e-6) continue;
+          B.pending.splice(i, 1);
+          try { if (G.player.state.alive && !G.player.state.novaActive) pressAll(pe.ev, G.player.motion()); } catch (e) { logE('bot.pending', e); }
+        }
+      }
       B.t -= dt;
       if (B.t > 0) return;
       B.t = LV[B.level].react;
