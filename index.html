@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0e14">
+<title>Fun Stuff</title>
+<style>
+  :root {
+    --bg: #0d0e14;
+    --card: #171925;
+    --card-hover: #1f2232;
+    --line: #2a2d40;
+    --ink: #eef0f8;
+    --dim: #9aa0b8;
+    --accent: #7dd3fc;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: max(24px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+  }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 2rem; margin: 8px 0 4px; letter-spacing: -0.02em; }
+  .sub { color: var(--dim); margin: 0 0 28px; }
+  h2 {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--accent);
+    margin: 32px 0 12px;
+  }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  @media (min-width: 620px) { ul { grid-template-columns: 1fr 1fr; } }
+  a.card {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    color: inherit;
+    text-decoration: none;
+    height: 100%;
+    transition: background .15s, border-color .15s;
+  }
+  a.card:hover, a.card:focus-visible { background: var(--card-hover); border-color: var(--accent); outline: none; }
+  .icon { font-size: 1.6rem; width: 2rem; text-align: center; flex: none; }
+  .name { font-weight: 650; display: block; }
+  .desc { color: var(--dim); font-size: .9rem; display: block; }
+  footer { color: var(--dim); font-size: .8rem; margin-top: 40px; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Fun Stuff</h1>
+  <p class="sub">Games, puzzles and odds and ends.</p>
+
+  <h2>Raid games</h2>
+  <ul>
+    <li><a class="card" href="raid/"><span class="icon">⏳</span><span><span class="name">Shatterclock</span><span class="desc">Time-bending Chronoblade vs three bosses</span></span></a></li>
+    <li><a class="card" href="prismfall/"><span class="icon">🔷</span><span><span class="name">Prismfall</span><span class="desc">Prismatic bullet-hell raid, three bosses</span></span></a></li>
+    <li><a class="card" href="kart-raid/"><span class="icon">🏎️</span><span><span class="name">Driftbreaker</span><span class="desc">Drift-charged kart boss rush (play in landscape)</span></span></a></li>
+    <li><a class="card" href="perihelion/"><span class="icon">🪐</span><span><span class="name">Perihelion</span><span class="desc">Orbit raid with no direct movement</span></span></a></li>
+  </ul>
+
+  <h2>Other games</h2>
+  <ul>
+    <li><a class="card" href="ascent.html"><span class="icon">⛰️</span><span><span class="name">Ascent</span><span class="desc">Low-poly 3D endless vertical jumper</span></span></a></li>
+    <li><a class="card" href="vc-game.html"><span class="icon">🚀</span><span><span class="name">Interstellar Venture Round</span><span class="desc">Allocate 1,000 credits like a space VC</span></span></a></li>
+    <li><a class="card" href="one-phone/"><span class="icon">📱</span><span><span class="name">One Phone</span><span class="desc">Five pass-and-play party games</span></span></a></li>
+    <li><a class="card" href="pink-or-purple.html"><span class="icon">🎨</span><span><span class="name">Pink or Purple</span><span class="desc">Tiny color guessing toy</span></span></a></li>
+  </ul>
+
+  <h2>Puzzles</h2>
+  <ul>
+    <li><a class="card" href="tray-table/"><span class="icon">✈️</span><span><span class="name">Tray Table</span><span class="desc">50 quick timed puzzles, works offline</span></span></a></li>
+    <li><a class="card" href="window-seat/"><span class="icon">🪟</span><span><span class="name">Window Seat</span><span class="desc">30 harder puzzles, works offline</span></span></a></li>
+  </ul>
+
+  <h2>Chinese practice</h2>
+  <ul>
+    <li><a class="card" href="chinese/"><span class="icon">中</span><span><span class="name">Practice hub</span><span class="desc">All Chinese practice in one place</span></span></a></li>
+    <li><a class="card" href="chinese/sentence-flashcards.html"><span class="icon">句</span><span><span class="name">Sentence flashcards</span><span class="desc">300 sentences, both directions</span></span></a></li>
+    <li><a class="card" href="chinese/vocab.html"><span class="icon">詞</span><span><span class="name">Vocab</span><span class="desc">573 studied cards, both directions</span></span></a></li>
+    <li><a class="card" href="chinese/chinese-sentence-builder.html"><span class="icon">組</span><span><span class="name">Sentence builder</span><span class="desc">Arrange the phrase cards</span></span></a></li>
+  </ul>
+
+  <h2>Tools &amp; other</h2>
+  <ul>
+    <li><a class="card" href="cube.html"><span class="icon">🧊</span><span><span class="name">Cube Algorithm Tracker</span><span class="desc">Track Rubik's cube algorithms</span></span></a></li>
+    <li><a class="card" href="black-mage-field-guide.html"><span class="icon">🔥</span><span><span class="name">Black Mage Field Guide</span><span class="desc">FFXIV Black Mage at level 100</span></span></a></li>
+    <li><a class="card" href="ff-items.html"><span class="icon">💰</span><span><span class="name">FFXIV Prices</span><span class="desc">Sortable item price table</span></span></a></li>
+    <li><a class="card" href="brett.html"><span class="icon">👋</span><span><span class="name">Come Back Soon, Brett!</span><span class="desc">A dramatization of actual events</span></span></a></li>
+  </ul>
+
+  <footer>thatcsguy / fun-stuff</footer>
+</main>
+</body>
+</html>
