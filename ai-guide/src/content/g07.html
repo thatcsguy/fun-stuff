@@ -1,0 +1,127 @@
+<section class="group" id="g7" data-num="7">
+  <header class="ghead">
+    <h2><span class="gn">7</span>Retrieval and RAG</h2>
+    <p class="glead">Retrieval is how the right text reaches a model when everything cannot fit in its context. Coding agents made a distinctive choice here, and it explains much of what you watch them do in a session.</p>
+  </header>
+
+  <article class="topic" id="t7-1" data-num="7.1">
+    <h3><span class="tn">7.1</span>Embeddings and vector search</h3>
+    <p class="tl">An embedding turns text into a point in space where nearby means "about the same thing", which is powerful and blind in predictable ways.</p>
+    <p>An <strong>embedding model</strong> reads a piece of text and outputs a fixed-length list of numbers, a vector, usually with hundreds to a few thousand dimensions.
+    It is trained so that texts that belong together (a question and its answer, a sentence and its paraphrase) land close, and unrelated texts land far apart.
+    Nothing in a single dimension means anything readable; only distances between vectors carry meaning.</p>
+    <p><strong>Cosine similarity</strong> measures the angle between two vectors and ignores their length.
+    Pointing the same way scores near 1, unrelated text scores near 0.
+    Search means ranking stored vectors by that score against the query's vector.</p>
+    <p><strong>Vector search</strong> works in two phases.
+    Ahead of time you embed every document and store the vectors; at query time you embed the query and look for its nearest neighbors.
+    Exact search over millions of vectors is slow, so vector databases use approximate nearest neighbor indexes (HNSW, a navigable graph, is common) that trade a little recall for a lot of speed.</p>
+    <p>What cosine similarity misses:</p>
+    <ul>
+      <li><strong>Exact strings.</strong> <code>getUserById</code> and <code>getUserByEmail</code>, two error codes, or two version numbers embed almost identically.</li>
+      <li><strong>Negation.</strong> "Supports streaming" and "does not support streaming" sit close together, because they are about the same thing.</li>
+      <li><strong>Similar is not relevant.</strong> A question tends to retrieve other questions, and a passage that mentions a topic can outrank the one that answers it.</li>
+      <li><strong>Averaging.</strong> A chunk about three subjects becomes one vector that represents none of them well.</li>
+      <li><strong>Your jargon.</strong> A general-purpose model has never seen your internal service names and places them more or less at random.</li>
+    </ul>
+    <p>Scores are relative, not calibrated.
+    A similarity of 0.8 does not mean "relevant", and a threshold tuned for one embedding model means nothing for another.</p>
+    <aside class="key"><p>Embeddings capture "about the same topic", not "contains the answer" or "matches this exact string". Treat vector search as a recall step that needs a second, sharper check (see <a class="xref" href="#t7-2">7.2</a>).</p></aside>
+  </article>
+
+  <article class="topic" id="t7-2" data-num="7.2">
+    <h3><span class="tn">7.2</span>Chunking, hybrid search and reranking</h3>
+    <p class="tl">RAG quality comes mostly from unglamorous plumbing: how you split documents, how you combine keyword and vector search, and a second-pass reranker.</p>
+    <p><strong>RAG</strong> (retrieval-augmented generation) means: find relevant text, paste it into the prompt, and have the model answer from it.
+    The model never sees your index, only what you put in its context.
+    So every failure upstream of the prompt shows up as a confident answer built on the wrong passage.</p>
+    <p><strong>Chunking</strong> splits documents into pieces small enough to embed and to fit several into a prompt.
+    Small chunks are precise but lose context ("it was deprecated" – what was?); large chunks keep context but dilute the vector and waste tokens.
+    Common practice:</p>
+    <ul>
+      <li>Split on structure (headings, paragraphs, whole functions for code), not fixed character counts.</li>
+      <li>Allow a small overlap so a sentence cut at a boundary survives in one piece somewhere.</li>
+      <li>Store metadata with each chunk (file path, title, section heading) and include it in the text you embed.</li>
+      <li>Some pipelines prepend a one-line, model-written description of where the chunk sits in its document before embedding it.</li>
+    </ul>
+    <p><strong>Hybrid search</strong> runs a keyword search beside the vector search.
+    The usual keyword method, BM25, scores documents by how often the query terms appear, weighted by how rare those terms are, so it nails <code>ERR_CONN_RESET</code> where embeddings blur it.
+    The two ranked lists are merged, often with reciprocal rank fusion: each document gets the sum of 1/(k + rank) across lists, which avoids comparing scores on different scales.</p>
+    <p><strong>Reranking</strong> is the second stage.
+    Retrieve wide and cheap (say fifty to a hundred candidates), then score each one with a <strong>cross-encoder</strong>, a model that reads the query and the chunk together and outputs one relevance score.
+    Reading both at once makes it far more accurate than comparing two independently made vectors, but too slow to run over the whole corpus; an LLM can play this role too.</p>
+    <p>Measure retrieval separately from generation.
+    For a set of real questions, check whether the right chunk appears in the top few results (see <a class="xref" href="#t6-1">6.1</a>).
+    Most RAG bugs are retrieval bugs, and no prompt fixes a passage that was never retrieved.</p>
+    <aside class="key"><p>The working pattern is two stages: cheap, wide recall (keyword plus vector), then expensive, narrow precision (rerank). When answers are wrong, check what was retrieved before touching the prompt.</p></aside>
+  </article>
+
+  <article class="topic" id="t7-3" data-num="7.3">
+    <h3><span class="tn">7.3</span>Agentic search versus RAG</h3>
+    <p class="tl">Coding agents usually skip the vector index and search the repo the way you do (grep, glob, open the file) because code rewards exactness, freshness and following references.</p>
+    <p>There are two ways to get the right code into context.
+    <strong>Pipeline RAG</strong> indexes the repo once, embeds your question, pulls the top few chunks and answers in one shot.
+    <strong>Agentic search</strong> gives the model search tools and lets its loop (see <a class="xref" href="#t4-1">4.1</a>) decide each next query from what the last one returned.</p>
+    <pre class="diag">PIPELINE RAG (one shot)
+question -&gt; embed -&gt; top-k chunks
+         -&gt; prompt -&gt; answer
+
+AGENTIC SEARCH (loop)
+question -&gt; model picks a tool
+   grep "loadConfig"   -&gt; 6 hits
+   read src/config.ts  -&gt; imports env.ts
+   grep "ENV_PREFIX"   -&gt; 2 hits
+   read tests/config.test.ts
+   enough? no -&gt; search again
+           yes -&gt; answer or edit</pre>
+    <p>Why the loop wins for code:</p>
+    <ul>
+      <li><strong>Exactness.</strong> Code is made of identifiers. Grep for a symbol returns every call site; top-k returns "some similar chunks", and a rename needs all of them.</li>
+      <li><strong>Freshness.</strong> The repo changes with every edit, including the agent's own. An index goes stale; grep reads the disk as it is now.</li>
+      <li><strong>Multi-hop structure.</strong> Understanding code means following definition, callers, tests and config. Each hop depends on what the previous read revealed, which one-shot retrieval cannot plan.</li>
+      <li><strong>Whole files.</strong> Reading a file gives imports and surrounding code; chunks cut functions at arbitrary boundaries.</li>
+      <li><strong>No infrastructure.</strong> Nothing to build, store, secure or keep in sync, and it works on any checkout instantly.</li>
+    </ul>
+    <p>In effect the model is both the query planner and the reranker: it reads the grep hits and decides which file deserves a full read.
+    That only works because models became good at writing searches and judging results, which is a fairly recent shift.</p>
+    <p>The costs are real.
+    Agentic search takes more turns, more latency and more tokens, and whole-file reads fill the context (see <a class="xref" href="#t4-3">4.3</a>).
+    It is weakest when you do not know the words, as in "where do we handle users getting logged out unexpectedly", which is exactly where embeddings help; some editors keep a semantic index and combine both.</p>
+    <aside class="why"><p>When an agent opens a task with a burst of search and read calls before changing anything, that is retrieval happening inside the loop. Naming the exact function, file or error string in your prompt shortcuts it: you have handed over the grep term.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Find where configuration is loaded in this repository. Before each search or file read, state in one line what you expect to find and why. At the end, list every search and read you made and say which ones turned out to be unnecessary.</pre></aside>
+    <aside class="key"><p>For code, exact search plus reading is the retrieval system, with the model choosing each next query. Vector search earns its place when you do not know the words, not when you do.</p></aside>
+  </article>
+
+  <article class="topic" id="t7-4" data-num="7.4">
+    <h3><span class="tn">7.4</span>When RAG is the wrong tool</h3>
+    <p class="tl">RAG answers "find the passage that says X"; it fails on questions that need the whole corpus, exact computation, or text that would fit in the prompt anyway.</p>
+    <p>RAG rests on one assumption: the answer lives in a handful of chunks.
+    When that is false, the model answers fluently from a partial view, and better prompting does not help.
+    Ask whether a careful human would answer the question by finding one or two passages.</p>
+    <table>
+      <thead><tr><th>Question shape</th><th>Better tool</th></tr></thead>
+      <tbody>
+        <tr><td>"Main themes across 400 tickets"</td><td>Run the model over every item, then combine (map-reduce)</td></tr>
+        <tr><td>"How many contracts auto-renew?"</td><td>Extract fields into a table, then count</td></tr>
+        <tr><td>Data already in a database</td><td>Let the model write a query via a tool</td></tr>
+        <tr><td>Corpus fits in context</td><td>Include it all, with prompt caching</td></tr>
+        <tr><td>Lookup by ID or exact name</td><td>Direct lookup or grep</td></tr>
+        <tr><td>Data that changes hourly</td><td>Call the live API</td></tr>
+        <tr><td>"Write in our house style"</td><td>Examples in the prompt, or fine-tuning</td></tr>
+      </tbody>
+    </table>
+    <p>Aggregate questions are the classic trap.
+    Top-k retrieval sees a sample, so "how many" and "what are all the" questions come back plausibly wrong.
+    The fix is to touch every document, usually with a cheap model doing per-document extraction, and do the arithmetic in code.</p>
+    <p>Small corpora are the other trap.
+    If a few hundred pages fit comfortably in context, a retrieval pipeline adds failure modes for no gain; prompt caching (see <a class="xref" href="#t2-3">2.3</a>) makes the repeated cost of a large stable prefix much smaller.
+    The trade-offs are covered in <a class="xref" href="#t2-5">2.5</a>.</p>
+    <p>Comparisons need wholes, not fragments.
+    Checking two long documents clause by clause, or reviewing a design end to end, goes wrong when each side arrives as disconnected chunks.
+    Give the model both documents, or have it walk through them section by section.</p>
+    <p>RAG also widens your attack surface.
+    Anything retrieved is text the model reads as context, so a poisoned wiki page or a hostile ticket can carry instructions (see <a class="xref" href="#t10-1">10.1</a>).
+    And RAG supplies facts, not behavior: it will not make a model follow a format or tone (see <a class="xref" href="#t8-2">8.2</a>).</p>
+    <aside class="key"><p>If the question needs every document, exact counting, or one specific record, top-k retrieval is the wrong shape. Reach for map-reduce, a query, a lookup, or simply a bigger prompt.</p></aside>
+  </article>
+</section>

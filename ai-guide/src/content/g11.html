@@ -1,0 +1,92 @@
+<section class="group" id="g11" data-num="11">
+  <header class="ghead">
+    <h2><span class="gn">11</span>Landscape and history</h2>
+    <p class="glead">A short map of how we got here, who builds these models, how to read their announcements, and where things might go next, with the speculation marked as such.</p>
+  </header>
+
+  <article class="topic" id="t11-1" data-num="11.1">
+    <h3><span class="tn">11.1</span>Timeline, 2017 to now</h3>
+    <p class="tl">The core architecture has barely changed since 2017; the big steps came from scale, post-training, reasoning, and putting models in a loop with tools.</p>
+    <p>This list keeps to milestones that are widely agreed on. Dates are the year of public release or publication. The last rows are recent, so treat their framing as rough.</p>
+    <table>
+      <thead><tr><th>Year</th><th>Milestone</th><th>Why it mattered</th></tr></thead>
+      <tbody>
+        <tr><td>2017</td><td>Transformer paper, "Attention Is All You Need"</td><td>The architecture nearly every current model uses</td></tr>
+        <tr><td>2018</td><td>GPT-1 and BERT</td><td>Pretrain on raw text, then adapt: the new default recipe</td></tr>
+        <tr><td>2019</td><td>GPT-2, released in stages</td><td>Fluent text at scale; first public debate on release risk</td></tr>
+        <tr><td>2020</td><td>GPT-3; scaling laws paper</td><td>Few-shot learning from prompts alone; bigger reliably meant better</td></tr>
+        <tr><td>2021</td><td>Codex and GitHub Copilot preview</td><td>Code models reach working engineers</td></tr>
+        <tr><td>2022</td><td>InstructGPT; Chinchilla; ChatGPT</td><td>RLHF makes models usable; data matters as much as size; mass adoption</td></tr>
+        <tr><td>2023</td><td>GPT-4, Claude, Llama</td><td>Strong general models; open weights go mainstream</td></tr>
+        <tr><td>2024</td><td>Reasoning models; computer use; MCP</td><td>Thinking before answering; agents operate software and connect to tools</td></tr>
+        <tr><td>2025</td><td>Open-weight reasoning models; agentic coding CLIs such as Claude Code</td><td>Reasoning spreads to open weights; agents work in your terminal</td></tr>
+        <tr><td>2026 (roughly)</td><td>Longer-running, multi-agent work</td><td>Agents trusted with bigger tasks for longer stretches</td></tr>
+      </tbody>
+    </table>
+    <p>Two threads run through the whole table. First, the transformer itself changed little; most progress came from more compute, more and better data, and better training after pretraining. Second, the unit of use shifted from a single completion to a chat, and then to a loop of model plus tools, which is what you run every day (see <a class="xref" href="#t4-1">4.1</a>).</p>
+    <p>Many important steps are missing here because they are harder to date: instruction tuning, longer context windows, cheaper inference, and mixture-of-experts architectures that activate only part of the model per token.</p>
+    <aside class="key"><p>Think of the history as three jumps: scale (2018 to 2020), post-training into assistants (2022), and models acting in loops with tools (2024 onward).</p></aside>
+  </article>
+
+  <article class="topic" id="t11-2" data-num="11.2">
+    <h3><span class="tn">11.2</span>Labs and the open-weight ecosystem</h3>
+    <p class="tl">A handful of well-funded labs train the frontier closed models, while open-weight releases trail somewhat behind and let anyone run, inspect and fine-tune a model.</p>
+    <p><strong>Frontier labs</strong> train the largest models and mostly serve them through APIs and their own apps. The best known as of late 2026 are Anthropic (Claude), OpenAI (GPT and the o-series reasoning models), and Google DeepMind (Gemini). Meta, xAI and several Chinese labs, among them DeepSeek, Alibaba's Qwen team and Moonshot, also train large models.</p>
+    <p>Rankings among them change every few months, and differ by task. A model that leads on coding benchmarks may trail on writing or long documents. Pick by testing on your own work (see <a class="xref" href="#t6-1">6.1</a>), not by headlines.</p>
+    <p><strong>Closed versus open weights.</strong> A closed model is available only as a service: you send tokens, you get tokens back. An <strong>open-weight</strong> model publishes the trained parameters, so you can download and run it yourself, quantize it, or fine-tune it (see <a class="xref" href="#t9-2">9.2</a>).</p>
+    <p>"Open weights" is not the same as open source. Most releases do not include the training data or full training code, and licenses vary: some are permissive, others restrict commercial use above a size or forbid certain uses. Read the license before you build on one.</p>
+    <p>Notable open-weight families include Meta's Llama, Mistral's models, Alibaba's Qwen, DeepSeek's models, and Google's Gemma. The open ecosystem around them is large:</p>
+    <ul>
+      <li><strong>Model hubs</strong> such as Hugging Face host weights and fine-tunes.</li>
+      <li><strong>Local runners</strong> such as llama.cpp and Ollama run quantized models on a laptop.</li>
+      <li><strong>Serving engines</strong> such as vLLM run them efficiently on GPUs.</li>
+      <li><strong>Community fine-tunes and distillations</strong> adapt base models to narrow jobs (see <a class="xref" href="#t8-3">8.3</a>).</li>
+    </ul>
+    <p>The gap between the best open and best closed models has generally been months rather than years, though it varies. Open weights win on privacy, cost control and customization; closed frontier models usually win on raw capability and on the harness and tooling built around them.</p>
+    <aside class="key"><p>Choose a model for a specific job by testing it there. Choose open weights when you need control over where it runs or what it learns, not because of a leaderboard.</p></aside>
+  </article>
+
+  <article class="topic" id="t11-3" data-num="11.3">
+    <h3><span class="tn">11.3</span>Reading a model card or launch post</h3>
+    <p class="tl">A launch post is marketing written with real data; read it for what was measured, how, and against whom, and treat everything else as a claim to check.</p>
+    <p>A <strong>launch post</strong> announces a model and highlights its wins. A <strong>model card</strong> or <strong>system card</strong> is the longer technical document: intended uses, evaluation results, safety testing, and known limits. The card is usually more useful and more honest about weaknesses.</p>
+    <p>Questions to ask of any benchmark table:</p>
+    <ul>
+      <li><strong>Which comparison models?</strong> Are the competitors the latest versions, or ones from months ago?</li>
+      <li><strong>Same settings?</strong> Number of attempts, thinking budget, tools allowed, and prompt format all move scores. Footnotes often hide a different setup per row.</li>
+      <li><strong>Pass@1 or best of several?</strong> Best-of-k numbers look much better than what you get in one try (see <a class="xref" href="#t6-4">6.4</a>).</li>
+      <li><strong>Which harness?</strong> Agentic coding scores depend heavily on the scaffold around the model, not only the model.</li>
+      <li><strong>Contamination?</strong> Older public benchmarks may have leaked into training data. Newer or held-out sets are more trustworthy.</li>
+      <li><strong>Saturated?</strong> When every model scores near the top, small differences mean little (see <a class="xref" href="#t6-3">6.3</a>).</li>
+    </ul>
+    <p>Beyond the numbers, look for:</p>
+    <ul>
+      <li><strong>Known limitations</strong> and failure cases. Their absence is a signal too.</li>
+      <li><strong>Safety evaluations</strong>: which risk areas were tested, by whom, and what the model did. Many cards also report agentic risks such as reward hacking or overreaching on permissions, which matter to anyone running agents.</li>
+      <li><strong>What changed for users</strong>: pricing, context, rate limits, and deprecation of older models.</li>
+    </ul>
+    <p>Language to be wary of: "state of the art" without saying on what, "approaches human level", and charts with truncated axes. Prefer independent evaluations and your own tests once the model is out.</p>
+    <aside class="key"><p>Benchmark tables tell you a model is in the running. Only your own tasks tell you whether it is better for you.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">I will paste a model launch post. List each quantitative claim, the setup it was measured under, what it is compared against, and what is missing that I would need to trust it. End with three tasks I should test myself.</pre></aside>
+  </article>
+
+  <article class="topic" id="t11-4" data-num="11.4">
+    <h3><span class="tn">11.4</span>Where it is heading (speculation)</h3>
+    <p class="tl">Speculation, clearly labeled: expect agents to run longer with less supervision, and expect the harness and its safety layer to matter more, not less.</p>
+    <p><strong>Everything in this topic is opinion and extrapolation, not established fact.</strong> Forecasts in this field have been wrong in both directions. Treat these as trends worth watching, held loosely.</p>
+    <p><strong>Longer autonomous runs.</strong> The length of task an agent can finish without help has been growing. A plausible next step is agents that work for hours or days on a goal, checkpointing and resuming (see <a class="xref" href="#t5-2">5.2</a>), with humans reviewing results rather than each step.</p>
+    <p><strong>The harness as product.</strong> Models from different labs may keep converging on raw capability. If so, differences that matter to you may increasingly sit in the loop: context management, memory, tools, permissions, and how well multi-agent work is coordinated.</p>
+    <p><strong>More reasoning per answer.</strong> Spending more compute at answer time, rather than only on bigger models, has been a productive direction. It may continue, with models deciding for themselves how long to think.</p>
+    <p><strong>Cheaper small models.</strong> Distillation and better training will likely keep pushing yesterday's frontier capability into models you can run cheaply or locally.</p>
+    <p><strong>Security as the bottleneck.</strong> As agents get more access, prompt injection and over-broad permissions (see <a class="xref" href="#t10-1">10.1</a>) may limit adoption more than capability does. Expect more sandboxing, scoped credentials, and audit logs as defaults.</p>
+    <p><strong>Open questions</strong> no one can answer confidently yet:</p>
+    <ul>
+      <li>Whether scaling keeps paying off at the same rate, or flattens.</li>
+      <li>How fast interpretability and alignment keep pace with capability.</li>
+      <li>How regulation will shape release practices across countries.</li>
+      <li>How software engineering work itself reorganizes around agents.</li>
+    </ul>
+    <p>A useful habit for your own work: build workflows that would still be fine if models got much better next year, and also if they stayed as they are. Good tests, clear specs and narrow permissions pay off either way.</p>
+    <aside class="key"><p>Bet on what is robust: verification, clear task specs and enforced permissions help whether models leap forward or plateau.</p></aside>
+  </article>
+</section>

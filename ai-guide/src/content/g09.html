@@ -1,0 +1,131 @@
+<section class="group" id="g9" data-num="9">
+  <header class="ghead">
+    <h2><span class="gn">9</span>Inference, serving and cost</h2>
+    <p class="glead">Every response is generated one token at a time on shared hardware. That one fact explains why output costs more, why a huge context is slow to start, and what your usage limits are counting.</p>
+  </header>
+
+  <article class="topic" id="t9-1" data-num="9.1">
+    <h3><span class="tn">9.1</span>KV cache and batching</h3>
+    <p class="tl">Generation produces one token per full pass through the model while rereading a growing cache of past tokens, which makes output slower and pricier than input and makes batching essential.</p>
+    <p>Serving a request has two phases.
+    <strong>Prefill</strong> processes the whole prompt in one parallel pass, which GPUs do efficiently.
+    <strong>Decode</strong> then produces the response one token at a time, each needing its own pass through the entire model.</p>
+    <pre class="diag">prefill: [t1 t2 ... tN]  one pass
+         -&gt; KV cache for N tokens
+
+decode:  weights + cache -&gt; tN+1
+         weights + cache -&gt; tN+2
+         ... one pass per token</pre>
+    <p>In attention (see <a class="xref" href="#t1-1">1.1</a>), each new token looks back at every earlier token through two vectors per token per layer, called keys and values.
+    Recomputing those every step would be enormous waste, so they are stored: the <strong>KV cache</strong>.
+    It grows linearly with context length and can reach gigabytes for one long request; prompt caching (see <a class="xref" href="#t2-3">2.3</a>) is essentially keeping this prefill result around for the next request with the same prefix.</p>
+    <p><strong>Why output costs more.</strong> A decode step does little arithmetic, but it must read all the model's weights and the request's KV cache from GPU memory to produce one token.
+    It is limited by memory bandwidth, not compute, and it occupies a slot on the GPU for the whole response.
+    Input tokens are processed in bulk during prefill, so per token they are much cheaper; providers typically price output at a multiple of input.</p>
+    <p><strong>Batching</strong> is the fix for that idle compute.
+    The server runs many users' requests in the same decode step, so the weights are read once and used for every sequence in the batch.
+    <strong>Continuous batching</strong> lets requests join and leave at every step instead of waiting for the slowest one to finish.</p>
+    <p>This is the <strong>latency versus throughput</strong> trade-off.
+    Bigger batches raise total tokens per second across all users, but each step does more work, so each user's stream gets a little slower.
+    The ceiling is GPU memory for KV caches: long contexts mean fewer requests fit at once, which is one reason very long contexts are priced or limited differently.</p>
+    <p><strong>Speculative decoding</strong> is one more speed trick.
+    A small draft model guesses several tokens ahead, the big model checks them all in one pass, and the matching prefix is kept.
+    The output matches the big model alone, only faster.</p>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Explain the prefill and decode phases of transformer inference and why decode is limited by memory bandwidth. Then estimate, showing your assumptions, the KV cache size for a model with 60 layers, 8 key-value heads of dimension 128, 16-bit precision, at 100,000 tokens of context.</pre></aside>
+    <aside class="key"><p>Input is processed in parallel; output is produced one memory-bound pass per token. That asymmetry sets prices, and batching many users together is what makes serving affordable at all.</p></aside>
+  </article>
+
+  <article class="topic" id="t9-2" data-num="9.2">
+    <h3><span class="tn">9.2</span>Quantization and open-weight models</h3>
+    <p class="tl">Quantization stores weights in fewer bits so a model fits in less memory and runs faster at some cost in quality; it is what makes running a capable model on your own machine possible.</p>
+    <p><strong>Open-weight</strong> models publish their weights for download; well-known families include Llama, Qwen, Mistral, DeepSeek, Gemma and gpt-oss.
+    Open weights is not the same as open source: training data and code are usually not released, and licenses range from permissive to restrictive.</p>
+    <p>The memory you need starts with simple arithmetic: parameters times bytes per parameter.</p>
+    <pre><code>weights ~ params x bits / 8
+ 7B at 16-bit  ~ 14 GB
+ 7B at  4-bit  ~ 4 GB
+70B at 16-bit  ~ 140 GB
+70B at  4-bit  ~ 35-40 GB
+plus KV cache and runtime overhead</code></pre>
+    <p><strong>Quantization</strong> stores each weight in fewer bits, commonly 8 or 4.
+    Weights are grouped, each group shares a scale factor, and each weight becomes a small integer times that scale.
+    Because decoding is limited by how many bytes must be read per token (see <a class="xref" href="#t9-1">9.1</a>), smaller weights also mean faster generation.</p>
+    <p>Quality loss, roughly: 8-bit is usually close to lossless, 4-bit costs a little on everyday chat and more on long reasoning, math and code, and below 4 bits quality drops faster.
+    Larger models tolerate quantization better than small ones.
+    A 4-bit large model often beats a 16-bit small model that uses the same memory.</p>
+    <p>To run a model locally you need:</p>
+    <ul>
+      <li><strong>Memory</strong> for weights plus KV cache: GPU memory, or the unified memory on Apple Silicon Macs, which is why they are popular for this.</li>
+      <li><strong>A runtime</strong>: llama.cpp (which uses the GGUF file format), Ollama and LM Studio as friendlier wrappers, MLX on Macs, vLLM for serving on GPUs.</li>
+      <li><strong>Patience on CPU</strong>: it works without a GPU, but slowly.</li>
+    </ul>
+    <p><strong>Mixture-of-experts</strong> models activate only some of their parameters for each token, so they generate faster than their total size suggests.
+    All the weights must still sit in memory, so they need the RAM of a big model and run at the speed of a smaller one.</p>
+    <p>Set expectations accordingly.
+    As of late 2026, local models on a laptop are good for autocomplete, summaries, private data and offline use, but they trail frontier hosted models on long agentic coding tasks.
+    The harness matters too: a strong model in a weak loop still does poorly.</p>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">I have a machine with [X] GB of RAM and [Y] GB of GPU memory, and I want to run an open-weight model locally for offline coding help. Tell me which model sizes and quantization levels would fit with room for context, which runtime to use, and what quality to expect compared with a frontier hosted model.</pre></aside>
+    <aside class="key"><p>Memory needed is roughly parameters times bits divided by eight, plus the KV cache. Quantization to 4 bits cuts that about fourfold for a modest quality cost.</p></aside>
+  </article>
+
+  <article class="topic" id="t9-3" data-num="9.3">
+    <h3><span class="tn">9.3</span>Pricing math and rate limits</h3>
+    <p class="tl">A session's cost is mostly the context re-sent on every turn, not the words you type; rate limits count requests and tokens per time window.</p>
+    <p>APIs bill per token, in four categories that behave differently:</p>
+    <ul>
+      <li><strong>Input</strong>: everything sent on a call, including system prompt, tool definitions, instruction files, conversation history and every tool result so far.</li>
+      <li><strong>Cached input</strong>: the part of the input whose prefix matches a recent call, read from cache at a fraction of the input price. On some APIs, writing to the cache costs a little more than ordinary input.</li>
+      <li><strong>Output</strong>: the reply, including tool-call arguments, priced at a multiple of input (see <a class="xref" href="#t9-1">9.1</a>).</li>
+      <li><strong>Thinking</strong>: extended reasoning (see <a class="xref" href="#t1-3">1.3</a>), usually billed as output even when you only see a summary of it.</li>
+    </ul>
+    <p>An agent loop makes a fresh API call each turn carrying the whole history (see <a class="xref" href="#t4-1">4.1</a>).
+    Without caching, total input over a session grows roughly with the square of the number of turns.
+    With caching, most of each turn is a cheap cache read and only the new tail is full price.</p>
+    <pre><code>turn cost ~
+    cache-read rate  x prior context
+  + input rate       x new tail
+  + cache-write rate x newly cached part
+  + output rate      x reply + thinking</code></pre>
+    <p>Consequences you can act on:</p>
+    <ul>
+      <li>A large file read early is paid again, at the cache rate, on every later turn until the context is compacted or cleared.</li>
+      <li>The cache breaks when the prefix changes (a different system prompt, tool set or model) or when it expires, typically after minutes of inactivity.</li>
+      <li>Subagents explore in their own context, so their file reads do not ride along on every parent turn; each still pays its own system prompt and tools (see <a class="xref" href="#t4-6">4.6</a>).</li>
+    </ul>
+    <p><strong>Rate limits</strong> on APIs usually measure requests per minute and tokens per minute, often with input and output tokens counted separately, per organization and tier.
+    Exceeding one returns an HTTP 429 error, often with a header saying when to retry, and well-behaved clients back off and retry (see <a class="xref" href="#t4-9">4.9</a>).
+    Subscription plans instead tend to meter usage over rolling windows of a few hours, sometimes with weekly caps; the exact accounting is not published in detail and changes.</p>
+    <p>Under either scheme, larger model tiers, long contexts, heavy thinking and parallel agents all spend the budget faster.</p>
+    <aside class="why"><p>Hitting a usage limit sooner on a long session, or with several agents running in parallel, is this arithmetic: every turn re-sends the context, and every agent carries its own. Compacting, or starting a fresh session for an unrelated task, shrinks what each later turn carries.</p></aside>
+    <aside class="key"><p>Cost per turn scales with how much context you carry, not how much you type. Keep the prefix stable for caching and keep bulky exploration out of the main thread.</p></aside>
+  </article>
+
+  <article class="topic" id="t9-4" data-num="9.4">
+    <h3><span class="tn">9.4</span>Streaming and latency</h3>
+    <p class="tl">Latency has two parts: time to first token, set mostly by queueing and prompt length, and tokens per second, set by decode speed; streaming hides the second but not the first.</p>
+    <p><strong>Streaming</strong> sends tokens to the client as they are generated, usually as server-sent events (a long-lived HTTP response delivering small messages), instead of one response at the end.
+    Total time is unchanged, but you start reading almost immediately.
+    The stream carries start and stop events, text fragments, and tool-call arguments arriving as partial JSON.</p>
+    <p><strong>Time to first token</strong> (TTFT) adds up three things: network, time queued for a slot on busy hardware, and prefill of any uncached prompt (see <a class="xref" href="#t9-1">9.1</a>).
+    Prefill grows with prompt length, so a huge uncached context can take many seconds before anything appears.
+    A cached prefix skips most of that work, which is the main reason caching improves speed as well as cost.</p>
+    <p>With extended thinking, the first visible answer token also waits for the thinking to finish, though the thinking itself may stream.
+    After that, <strong>decode speed</strong> takes over: tokens per second for your stream, set by model size, hardware and how loaded the batch is.
+    Roughly, total time is TTFT plus output tokens divided by decode speed.</p>
+    <p>Agents multiply this.
+    Each tool call is a full round trip: the model emits the call, the harness runs it, the result goes back, and the next response pays a new TTFT.
+    A thirty-step task pays thirty of them.</p>
+    <p>Ways harnesses and you reduce it:</p>
+    <ul>
+      <li>Several independent tool calls emitted in one turn and run in parallel.</li>
+      <li>A stable prefix so each turn hits the cache.</li>
+      <li>A smaller, faster model for simple subtasks.</li>
+      <li>Shorter outputs, since output time is linear in length.</li>
+    </ul>
+    <p>Two practical notes for your own code.
+    Partial JSON is not valid until it completes, so either parse incrementally or wait for the end of a structured block (see <a class="xref" href="#t3-2">3.2</a>).
+    Long non-streaming requests risk HTTP timeouts, and some SDKs warn or refuse when a large output is requested without streaming.</p>
+    <aside class="why"><p>The pause before the first words when you resume a long session, or return after a break long enough for the cache to expire, is prefill: the whole context being processed before anything can stream. Turns in an active session usually start faster because the prefix is already cached.</p></aside>
+    <aside class="key"><p>TTFT is about the input and the queue; tokens per second is about the model and the hardware. Streaming improves how the wait feels, and caching improves the wait itself.</p></aside>
+  </article>
+</section>

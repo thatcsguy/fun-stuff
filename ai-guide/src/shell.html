@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="A field guide to how AI models, agents and harnesses actually work, written for a software engineer. One page, works offline.">
+<title>AI Field Guide</title>
+<style>
+:root{
+  --bg:#0f1115;--panel:#171a21;--panel2:#1d2129;--ink:#e6e4df;--ink2:#c9c7c1;--mute:#8d93a0;--line:#2a2f3a;
+  --acc:#7fb0ff;--acc2:#1a2a47;--key:#f2c75c;--keybg:#2a2412;--why:#6fd39a;--whybg:#13271d;--try:#c79bff;--trybg:#241a33;
+  --code:#13161c;--sel:#2b3650;--shadow:0 10px 30px rgba(0,0,0,.5);
+  --fs:17px;
+}
+:root[data-theme="light"]{
+  --bg:#f7f5f0;--panel:#ffffff;--panel2:#f1eee7;--ink:#1c1e24;--ink2:#2f323a;--mute:#6a6f7a;--line:#dcd8cf;
+  --acc:#2a66d8;--acc2:#e4ecfb;--key:#8a6400;--keybg:#fff4d1;--why:#1f7a47;--whybg:#e3f4ea;--try:#6b3fbf;--trybg:#efe6fb;
+  --code:#f1eee7;--sel:#dbe6fb;--shadow:0 10px 30px rgba(0,0,0,.15);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:var(--fs)/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;padding-bottom:env(safe-area-inset-bottom);-webkit-text-size-adjust:100%}
+a{color:var(--acc);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font:inherit;color:inherit;cursor:pointer}
+code,pre,kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
+.top .row{display:flex;align-items:center;gap:8px;max-width:720px;margin:0 auto;padding:8px 12px;min-height:52px}
+.ib{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-width:42px;height:42px;font-size:19px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center}
+.ib:active{background:var(--panel2)}
+.where{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.where b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.where small{color:var(--mute);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prog{height:3px;background:var(--line)}
+.prog i{display:block;height:100%;width:0;background:var(--acc);transition:width .15s linear}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;opacity:0;pointer-events:none;transition:opacity .2s}
+.drawer{position:fixed;top:0;left:0;bottom:0;width:min(86vw,360px);background:var(--panel);z-index:31;transform:translateX(-102%);transition:transform .22s ease;display:flex;flex-direction:column;box-shadow:var(--shadow);padding-top:env(safe-area-inset-top)}
+body.nav .scrim{opacity:1;pointer-events:auto}
+body.nav .drawer{transform:none}
+.dhead{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.dhead b{flex:1;font-size:16px}
+.dbody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 0 20px}
+.dfoot{border-top:1px solid var(--line);padding:10px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--mute)}
+.dfoot .ib{min-width:38px;height:36px;font-size:15px}
+.dg{border-bottom:1px solid var(--line)}
+.dg>button{width:100%;text-align:left;background:none;border:0;padding:10px 12px;display:flex;align-items:center;gap:10px;font-size:15px}
+.dg>button .n{color:var(--mute);font-variant-numeric:tabular-nums;min-width:22px;font-size:13px}
+.dg>button .ch{margin-left:auto;color:var(--mute);transition:transform .2s;font-size:12px}
+.dg.open>button .ch{transform:rotate(90deg)}
+.dg.cur>button{color:var(--acc)}
+.dg ul{list-style:none;margin:0;padding:0 0 6px;display:none}
+.dg.open ul{display:block}
+.dg li a{display:block;padding:7px 12px 7px 44px;color:var(--ink2);font-size:14px;line-height:1.3}
+.dg li a .n{color:var(--mute);font-size:12px;margin-right:6px;font-variant-numeric:tabular-nums}
+.dg li.cur a{background:var(--sel);color:var(--ink);border-radius:0 8px 8px 0}
+.dg li.read a .n::after{content:" ✓";color:var(--why)}
+
+/* page */
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 60px}
+.hero{padding:18px 0 6px}
+.hero h1{font-size:32px;line-height:1.1;margin:0 0 6px;letter-spacing:-.02em}
+.hero .sub{color:var(--mute);margin:0 0 14px;font-size:15px}
+.intro{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:10px 0 20px}
+.intro h2{font-size:18px;margin:0 0 8px}
+.intro p{margin:8px 0}
+.legend{display:grid;gap:8px;margin:10px 0 4px}
+.legend div{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:var(--ink2)}
+.legend i{flex:none;width:14px;height:14px;border-radius:4px;margin-top:4px}
+.ovw{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:6px}
+.ovw li a{display:flex;gap:10px;align-items:baseline;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--ink)}
+.ovw li a:hover{text-decoration:none;border-color:var(--acc)}
+.ovw .n{color:var(--mute);font-size:13px;min-width:22px;font-variant-numeric:tabular-nums}
+.ovw small{color:var(--mute);font-size:12px;margin-left:auto;white-space:nowrap}
+
+.group{margin-top:34px;scroll-margin-top:64px}
+.ghead{padding:0 0 4px;border-bottom:2px solid var(--line);margin-bottom:8px}
+.ghead h2{font-size:26px;line-height:1.15;margin:0 0 6px;letter-spacing:-.015em}
+.gn{display:inline-block;color:var(--acc);margin-right:8px;font-variant-numeric:tabular-nums}
+.glead{color:var(--ink2);margin:0 0 10px;font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.chips a{font-size:13px;color:var(--ink2);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 10px;max-width:100%;line-height:1.3}
+.chips a:hover{text-decoration:none;border-color:var(--acc);color:var(--acc)}
+.chips a .n{color:var(--mute);margin-right:4px}
+.gnav{display:flex;gap:8px;margin:16px 0 0;flex-wrap:wrap}
+.gnav a{flex:1 1 140px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--ink);min-height:54px}
+.gnav a:hover{text-decoration:none;border-color:var(--acc)}
+.gnav a small{color:var(--mute);font-size:12px}
+.gnav a.next{text-align:right;align-items:flex-end}
+.gnav a.top{flex:0 0 auto;align-items:center;justify-content:center;color:var(--mute)}
+
+.topic{margin:22px 0 0;scroll-margin-top:62px;padding-top:6px}
+.topic h3{font-size:21px;line-height:1.2;margin:0 0 6px;letter-spacing:-.01em}
+.tn{color:var(--acc);margin-right:8px;font-variant-numeric:tabular-nums;font-size:17px}
+.topic p{margin:0 0 12px}
+.tl{font-weight:600;color:var(--ink2)}
+.topic ul,.topic ol{margin:0 0 12px;padding-left:22px}
+.topic li{margin:4px 0}
+.topic code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:.88em}
+.topic pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 12px;overflow-x:auto;font-size:13px;line-height:1.45;-webkit-overflow-scrolling:touch}
+.topic pre code{background:none;border:0;padding:0;font-size:inherit}
+.topic pre.diag{color:var(--ink2);font-size:12.5px}
+.topic table{border-collapse:collapse;width:100%;margin:0 0 12px;font-size:14px;display:block;overflow-x:auto}
+.topic th,.topic td{text-align:left;border-bottom:1px solid var(--line);padding:6px 8px;vertical-align:top}
+.topic th{color:var(--mute);font-weight:600;font-size:13px}
+.topic a.xref{border-bottom:1px dotted var(--acc)}
+aside{border-radius:12px;padding:10px 14px;margin:0 0 14px;border:1px solid var(--line);border-left-width:4px;font-size:15px}
+aside p{margin:0}
+aside p+p{margin-top:8px}
+aside.key{background:var(--keybg);border-left-color:var(--key)}
+aside.key::before,aside.why::before{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:4px}
+aside.key::before{content:"Remember";color:var(--key)}
+aside.why{background:var(--whybg);border-left-color:var(--why)}
+aside.why::before{content:"Why you see this";color:var(--why)}
+aside.try{background:var(--trybg);border-left-color:var(--try);position:relative}
+aside.try .tryl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--try);margin:0 0 6px}
+aside.try pre.prompt{white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:14.5px;line-height:1.5;background:var(--code);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0;color:var(--ink)}
+aside.try .copy{position:absolute;top:8px;right:10px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:12px;color:var(--ink2)}
+aside.try .copy.ok{color:var(--why);border-color:var(--why)}
+.topic:not(:first-of-type)::before{content:"";display:block;height:1px;background:var(--line);margin:0 0 20px}
+
+.toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow);z-index:25;display:flex;gap:10px;align-items:center;font-size:14px;opacity:0;pointer-events:none;transition:all .25s;max-width:92vw}
+.toast.show{opacity:1;pointer-events:auto;transform:translateX(-50%)}
+.toast button{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:6px 12px;font-size:14px;font-weight:600}
+.toast .x{background:none;color:var(--mute);padding:4px 6px;font-weight:400}
+.end{margin:40px 0 0;padding:18px;border:1px dashed var(--line);border-radius:14px;color:var(--mute);text-align:center;font-size:14px}
+@media (min-width:760px){.drawer{width:340px}}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="row">
+    <button class="ib" id="menu" aria-label="Open contents" aria-controls="drawer" aria-expanded="false">☰</button>
+    <div class="where"><b id="wg">AI Field Guide</b><small id="wt">Start here</small></div>
+    <button class="ib" id="up" aria-label="Back to top" title="Back to top">↑</button>
+  </div>
+  <div class="prog"><i id="prog"></i></div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<nav class="drawer" id="drawer" aria-label="Contents">
+  <div class="dhead"><b>Contents</b><button class="ib" id="close" aria-label="Close contents">✕</button></div>
+  <div class="dbody" id="dbody"></div>
+  <div class="dfoot">
+    <button class="ib" id="fontdn" aria-label="Smaller text">A−</button>
+    <button class="ib" id="fontup" aria-label="Larger text">A+</button>
+    <button class="ib" id="theme" aria-label="Toggle light and dark">◐</button>
+    <button class="ib" id="collapse" aria-label="Collapse all groups" title="Collapse all">⇅</button>
+    <span id="readcount"></span>
+  </div>
+</nav>
+
+<main class="wrap">
+  <header class="hero" id="start">
+    <h1>AI Field Guide</h1>
+    <p class="sub">How models, agents and the harnesses around them actually work. Written for an engineer who uses them every day.</p>
+  </header>
+
+  <section class="intro">
+    <h2>How to read this</h2>
+    <p>Eleven groups, each split into short topics that stand on their own. Read in order for a narrative from tokens to agents, or open the contents (☰) and jump to whatever you are curious about. Each group ends with a link to the next one, and the chips under a group title let you skip within it.</p>
+    <p>Depth is deliberately medium: enough mechanism to reason about what you see when you run an agent, not enough to implement one from a paper. Numbers that go stale (prices, context sizes, benchmark scores) are left out on purpose.</p>
+    <div class="legend">
+      <div><i style="background:var(--key)"></i><span><b>Remember</b> marks the one thing to keep from a topic.</span></div>
+      <div><i style="background:var(--why)"></i><span><b>Why you see this</b> ties a mechanism to something you have run into using Claude Code.</span></div>
+      <div><i style="background:var(--try)"></i><span><b>Try it in Claude</b> is an optional prompt you can copy and paste later to dig deeper. Nothing depends on doing it.</span></div>
+    </div>
+    <p>Your place is saved on this device, so closing the tab and coming back later picks up where you were.</p>
+    <ul class="ovw" id="ovw"></ul>
+  </section>
+
+<!--CONTENT-->
+
+  <div class="end">That is the end. The contents menu (☰) remembers which topics you have opened.</div>
+</main>
+
+<div class="toast" id="toast"><span id="toastmsg"></span><button id="toastgo">Resume</button><button class="x" id="toastx">✕</button></div>
+
+<script>
+(function(){
+var TOC=<!--TOC-->;
+var LS='aiguide.';
+function get(k,d){try{var v=localStorage.getItem(LS+k);return v==null?d:JSON.parse(v)}catch(e){return d}}
+function set(k,v){try{localStorage.setItem(LS+k,JSON.stringify(v))}catch(e){}}
+var $=function(s,r){return (r||document).querySelector(s)};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+
+/* theme + font */
+var root=document.documentElement;
+var theme=get('theme','dark');root.setAttribute('data-theme',theme);
+$('#theme').onclick=function(){theme=theme==='dark'?'light':'dark';root.setAttribute('data-theme',theme);set('theme',theme);
+  $('meta[name=theme-color]').setAttribute('content',theme==='dark'?'#0f1115':'#f7f5f0')};
+var fs=get('fs',17);function applyFs(){root.style.setProperty('--fs',fs+'px')}applyFs();
+$('#fontup').onclick=function(){fs=Math.min(22,fs+1);applyFs();set('fs',fs)};
+$('#fontdn').onclick=function(){fs=Math.max(14,fs-1);applyFs();set('fs',fs)};
+
+/* build drawer + overview + group chips + group nav */
+var read=get('read',{});
+var dbody=$('#dbody'),ovw=$('#ovw');
+TOC.forEach(function(g,gi){
+  var dg=document.createElement('div');dg.className='dg';dg.id='d'+g.id;
+  var b=document.createElement('button');b.innerHTML='<span class="n">'+g.n+'</span><span>'+esc(g.t)+'</span><span class="ch">▶</span>';
+  b.onclick=function(){dg.classList.toggle('open')};
+  var ul=document.createElement('ul');
+  g.topics.forEach(function(t){
+    var li=document.createElement('li');li.id='d'+t.id;if(read[t.id])li.classList.add('read');
+    var a=document.createElement('a');a.href='#'+t.id;a.innerHTML='<span class="n">'+t.n+'</span>'+esc(t.t);a.title=t.l;
+    a.onclick=function(){closeNav()};li.appendChild(a);ul.appendChild(li);
+  });
+  dg.appendChild(b);dg.appendChild(ul);dbody.appendChild(dg);
+  var li=document.createElement('li');li.innerHTML='<a href="#'+g.id+'"><span class="n">'+g.n+'</span><span>'+esc(g.t)+'</span><small>'+g.topics.length+' topics</small></a>';ovw.appendChild(li);
+  var sec=document.getElementById(g.id);if(!sec)return;
+  var head=$('.ghead',sec);
+  var chips=document.createElement('div');chips.className='chips';
+  g.topics.forEach(function(t){var a=document.createElement('a');a.href='#'+t.id;a.innerHTML='<span class="n">'+t.n+'</span>'+esc(t.t);chips.appendChild(a)});
+  head.appendChild(chips);
+  var nav=document.createElement('div');nav.className='gnav';var h='';
+  if(gi>0)h+='<a href="#'+TOC[gi-1].id+'"><small>Previous</small>'+TOC[gi-1].n+'. '+esc(TOC[gi-1].t)+'</a>';
+  h+='<a class="top" href="#start" title="Back to top">↑</a>';
+  if(gi<TOC.length-1)h+='<a class="next" href="#'+TOC[gi+1].id+'"><small>Next</small>'+TOC[gi+1].n+'. '+esc(TOC[gi+1].t)+'</a>';
+  nav.innerHTML=h;sec.appendChild(nav);
+});
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function updateCount(){var n=Object.keys(read).length,tot=0;TOC.forEach(function(g){tot+=g.topics.length});$('#readcount').textContent=n?n+' / '+tot+' opened':''}
+updateCount();
+
+/* drawer open/close */
+function openNav(){document.body.classList.add('nav');$('#menu').setAttribute('aria-expanded','true');
+  var cur=$('.dg.cur');if(cur){cur.classList.add('open');var li=$('li.cur',cur);if(li)li.scrollIntoView({block:'center'})}}
+function closeNav(){document.body.classList.remove('nav');$('#menu').setAttribute('aria-expanded','false')}
+$('#menu').onclick=function(){document.body.classList.contains('nav')?closeNav():openNav()};
+$('#close').onclick=closeNav;$('#scrim').onclick=closeNav;
+$('#collapse').onclick=function(){$$('.dg.open').forEach(function(d){d.classList.remove('open')})};
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeNav()});
+$('#up').onclick=function(){window.scrollTo({top:0,behavior:'smooth'})};
+
+/* copy buttons */
+$$('aside.try').forEach(function(a){
+  var pre=$('pre.prompt',a);if(!pre)return;
+  var b=document.createElement('button');b.className='copy';b.textContent='Copy';a.appendChild(b);
+  b.onclick=function(){
+    var txt=pre.textContent.trim();
+    function done(ok){b.textContent=ok?'Copied':'Select & copy';b.classList.toggle('ok',ok);setTimeout(function(){b.textContent='Copy';b.classList.remove('ok')},1800);
+      if(!ok){var r=document.createRange();r.selectNodeContents(pre);var s=getSelection();s.removeAllRanges();s.addRange(r)}}
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(function(){done(true)},function(){done(false)})}else done(false);
+  };
+});
+
+/* scrollspy: current group/topic, read marks, progress, position save */
+var topics=$$('.topic'),groups=$$('.group');
+var byId={};TOC.forEach(function(g){g.topics.forEach(function(t){byId[t.id]={g:g,t:t}})});
+var curT=null,ticking=false,readTimer=0;
+function topEdge(){return $('.top').getBoundingClientRect().height+8}
+function spy(){
+  ticking=false;
+  var y=window.scrollY,h=document.documentElement.scrollHeight-innerHeight;
+  $('#prog').style.width=(h>0?Math.min(100,100*y/h):0)+'%';
+  var edge=topEdge(),best=null;
+  for(var i=0;i<topics.length;i++){var r=topics[i].getBoundingClientRect();if(r.top<=edge+40)best=topics[i];else break}
+  var id=best?best.id:null;
+  if(id!==curT){
+    curT=id;
+    $$('.dg.cur,.dg li.cur').forEach(function(e){e.classList.remove('cur')});
+    if(id&&byId[id]){
+      var m=byId[id];$('#wg').textContent=m.g.n+'. '+m.g.t;$('#wt').textContent=m.t.n+' '+m.t.t;
+      var dl=document.getElementById('d'+id);if(dl){dl.classList.add('cur');dl.parentNode.parentNode.classList.add('cur')}
+      clearTimeout(readTimer);readTimer=setTimeout(function(){if(curT===id&&!read[id]){read[id]=1;set('read',read);if(dl)dl.classList.add('read');updateCount()}},2500);
+    }else{$('#wg').textContent='AI Field Guide';$('#wt').textContent='Start here'}
+  }
+  if(y>200)set('pos',{id:curT,y:y,t:Date.now()});else if(y<50)set('pos',null);
+}
+window.addEventListener('scroll',function(){if(!ticking){ticking=true;requestAnimationFrame(spy)}},{passive:true});
+window.addEventListener('resize',spy);
+
+/* resume */
+var toast=$('#toast');
+function showToast(msg,go){$('#toastmsg').textContent=msg;toast.classList.add('show');$('#toastgo').onclick=function(){go();toast.classList.remove('show')};
+  $('#toastx').onclick=function(){toast.classList.remove('show')};setTimeout(function(){toast.classList.remove('show')},12000)}
+var pos=get('pos',null);
+if(pos&&pos.id&&!location.hash&&byId[pos.id]){
+  showToast('Resume at '+byId[pos.id].t.n+' '+byId[pos.id].t.t+'?',function(){
+    var el=document.getElementById(pos.id);if(el){el.scrollIntoView({block:'start'})}});
+}
+spy();
+})();
+</script>
+</body>
+</html>

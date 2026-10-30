@@ -1,0 +1,101 @@
+<section class="group" id="g5" data-num="5">
+  <header class="ghead">
+    <h2><span class="gn">5</span>Multi-agent and product patterns</h2>
+    <p class="glead">Once one agent loop works, the questions become structural: how to split work, how to survive long runs, where people should step in, and when to skip the agent altogether.</p>
+  </header>
+
+  <article class="topic" id="t5-1" data-num="5.1">
+    <h3><span class="tn">5.1</span>Orchestrator and workers</h3>
+    <p class="tl">One agent plans and delegates, workers run in fresh contexts, and everything crosses the boundary as a written brief and a written summary, which is both the benefit and the cost.</p>
+    <p>An <strong>orchestrator</strong> is an agent whose main tool is "start another agent". It writes a brief, a <strong>worker</strong> (often called a subagent) runs its own loop in a clean context window, and only the worker's final message comes back. The worker's file reads, dead ends and long tool outputs never enter the orchestrator's context.</p>
+    <pre class="diag">          orchestrator
+         /     |      \
+     brief   brief   brief
+       |       |       |
+    worker  worker  worker
+       |       |       |
+    summary summary summary
+         \     |      /
+          merge + check</pre>
+    <p>Three common shapes:</p>
+    <ul>
+      <li><strong>Pipeline.</strong> Stages in sequence: research, then plan, then implement, then test. Each stage gets a clean context and a focused prompt.</li>
+      <li><strong>Fan-out and merge.</strong> Split independent work (one worker per module, per file, per question) and run in parallel. The orchestrator merges and resolves conflicts.</li>
+      <li><strong>Parallel review.</strong> Several reviewers look at the same change through different lenses (correctness, security, performance). A final step deduplicates findings and ideally verifies each one, because reviewers produce plausible false positives.</li>
+    </ul>
+    <p>Now the honest part: the <strong>handoff tax</strong>. The worker knows only what the brief says. Anything the orchestrator learned and did not write down is lost, so thin briefs produce workers that redo exploration or make wrong assumptions.
+    In the other direction, the summary is lossy compression. The orchestrator cannot see what the worker skipped, misread or quietly gave up on, and a confident summary reads the same as a correct one.</p>
+    <p>Costs multiply too. Each worker rereads files and rebuilds context, so total tokens can be several times a single-agent run. Parallelism pays when the subtasks are genuinely independent, each needs a lot of reading, and the results are easy to check. It hurts when workers need each other's decisions, or when merging is harder than doing the work.</p>
+    <p>Practical habits: put file paths, constraints and the definition of done in the brief; ask workers for evidence (paths, line numbers, command output) rather than conclusions; and spot-check before trusting a merged result.</p>
+    <aside class="why"><p>When a Claude Code subagent returns a tidy paragraph and the main session then rereads the same files, that is the handoff tax: the summary was not enough to act on. A more specific brief or a request for exact paths often fixes it.</p></aside>
+    <aside class="key"><p>Subagents buy clean context and parallelism at the price of lossy briefs and summaries. Split only where the pieces are independent and the results are checkable.</p></aside>
+  </article>
+
+  <article class="topic" id="t5-2" data-num="5.2">
+    <h3><span class="tn">5.2</span>Long-running agents</h3>
+    <p class="tl">A long task outlives any one context window or process, so the agent's real memory has to live on disk: progress files, commits and checkable state.</p>
+    <p>Agents running for hours hit three walls. The context window fills and gets compacted (summarized, see <a class="xref" href="#t4-3">4.3</a>), losing detail. The process stops: a crash, a closed laptop, a rate or usage limit. And small errors compound over many steps. Each wall has the same answer: do not keep important state only in the conversation.</p>
+    <p>Patterns that work:</p>
+    <ul>
+      <li><strong>A progress file.</strong> A plain markdown or JSON file listing the plan, what is done, what is next and any decisions made. The agent updates it after each step and reads it first on resume. It is short, so it survives compaction cheaply.</li>
+      <li><strong>Git as checkpoints.</strong> Commit after each verified step. Commits are durable, diffable and easy to roll back, and the log doubles as a history the next session can read.</li>
+      <li><strong>Small, idempotent steps.</strong> Design each step so running it twice is safe (check whether the output exists before creating it). Then "resume" can simply mean "rerun from the last unfinished item".</li>
+      <li><strong>Verify on resume.</strong> A fresh session should check reality (run the tests, list the files) instead of trusting the notes. Notes can claim work that was never finished.</li>
+      <li><strong>External ground truth.</strong> A test suite or checklist that defines done lets any session, including a brand new one, tell where things stand.</li>
+    </ul>
+    <p>Most harnesses can also resume a saved conversation. That helps, but a resumed transcript is a large, partly stale context. A fresh session that reads a good progress file is often sharper than an old one dragged back to life.</p>
+    <p>For production systems, the same idea is called durable execution: workflow engines record each step's result so a restarted job continues where it stopped instead of starting over. If you build agent features at work, treat each model call and tool call as a step that might need replaying.</p>
+    <aside class="why"><p>If you have hit a usage limit halfway through a refactor, or watched a session compact and then forget a decision you made an hour earlier, you have seen why state in the chat is fragile. Asking the agent to keep a progress file and commit as it goes turns those events into a short pause.</p></aside>
+    <aside class="key"><p>Treat the context window as scratch space. Plans, progress and decisions go in files and commits, and every resume starts by checking reality.</p></aside>
+  </article>
+
+  <article class="topic" id="t5-3" data-num="5.3">
+    <h3><span class="tn">5.3</span>Human in the loop</h3>
+    <p class="tl">Put approval at the points where a mistake is expensive or cannot be undone, not on every step, or people stop reading what they approve.</p>
+    <p>Approval has a cost that is easy to miss: attention. If an agent asks permission for every file read, you will click yes reflexively within minutes, and the one prompt that mattered gets the same reflex. This is <strong>approval fatigue</strong>, and it turns a safety mechanism into a ritual.</p>
+    <p>A useful way to decide where humans belong is to sort actions by reversibility and blast radius:</p>
+    <table>
+      <tr><th>Action</th><th>Example</th><th>Check</th></tr>
+      <tr><td>Read-only</td><td>read, grep, list</td><td>none</td></tr>
+      <tr><td>Local, reversible</td><td>edit files under git</td><td>review the diff</td></tr>
+      <tr><td>Shared or external</td><td>push, send, deploy</td><td>approve each</td></tr>
+      <tr><td>Destructive</td><td>delete data, pay</td><td>approve, or forbid</td></tr>
+    </table>
+    <p>Patterns that protect without stalling:</p>
+    <ul>
+      <li><strong>Approve plans, not keystrokes.</strong> Review the approach once up front, then let the agent execute. A bad plan is cheap to reject; a bad plan half implemented is not.</li>
+      <li><strong>Review outcomes at the end.</strong> For local work under version control, one review of the final diff is usually worth more than twenty approvals of individual edits.</li>
+      <li><strong>Batch questions.</strong> An agent that collects its open questions and asks them together costs you one interruption, not five.</li>
+      <li><strong>Keep working while waiting.</strong> In async setups, the agent can continue on reversible work and park only the step that needs a decision.</li>
+      <li><strong>Enforce, do not only ask.</strong> A sandbox or deny rule stops an action even if you approve carelessly; a prompt saying "ask before deleting" only asks the model to remember (see <a class="xref" href="#t4-5">4.5</a>).</li>
+    </ul>
+    <p>When you design an AI feature for other people, the same rule applies: make the confirmation show exactly what will happen (the recipient, the amount, the rows affected) so the human is checking facts rather than trusting a summary.</p>
+    <aside class="why"><p>Claude Code's permission prompts, allow rules and plan-first workflows are this trade-off made concrete. Allowing safe commands broadly and keeping prompts for pushes and deletes is what keeps the remaining prompts worth reading.</p></aside>
+    <aside class="key"><p>Spend human attention where mistakes are irreversible or leave your machine. Everywhere else, use version control and a final review instead of step-by-step approval.</p></aside>
+  </article>
+
+  <article class="topic" id="t5-4" data-num="5.4">
+    <h3><span class="tn">5.4</span>When not to use an agent</h3>
+    <p class="tl">If you can write the steps down in advance, write code; reach for a model only where judgment is needed, and for an agent only where the path is unknown.</p>
+    <p>An agent is a model choosing its next step in a loop. That flexibility is useful when the path is unknown and expensive when it is not: you pay in latency, tokens, run-to-run variation and harder debugging. A useful ladder, from cheapest to most flexible:</p>
+    <ol>
+      <li><strong>Plain code.</strong> Deterministic, fast, testable, free to run.</li>
+      <li><strong>One model call.</strong> Classify, extract, summarize or rewrite a single input. No loop.</li>
+      <li><strong>A fixed workflow.</strong> Several model calls wired together by your code in a set order, maybe with a branch. You own the control flow.</li>
+      <li><strong>An agent.</strong> The model owns the control flow and decides which tools to call and when to stop.</li>
+    </ol>
+    <p>Climb only as far as the task forces you. Concrete signs that plain code wins:</p>
+    <ul>
+      <li>You could draw the process as a flowchart before seeing the input.</li>
+      <li>The correct output is defined by a rule (a format conversion, a migration, a lint fix with a known pattern).</li>
+      <li>It runs often, at volume, or under a latency budget.</li>
+      <li>You need identical results every time, or an audit trail a reviewer can follow.</li>
+      <li>A wrong answer is costly and hard to detect.</li>
+    </ul>
+    <p>Signs a single call or fixed workflow is enough: the input is self-contained, the steps are known, and only one step needs judgment (reading messy text, choosing a category). Keep the model in that one step and let code do the rest.</p>
+    <p>Signs an agent earns its cost: you cannot know in advance which files, pages or commands matter; the task needs exploring, trying and checking; and the result can be verified (tests pass, the page renders). Debugging an unfamiliar codebase is the classic case.</p>
+    <p>The best move is often a mix: <strong>use the agent to write the code</strong>. Ask it to explore once and produce a script, review the script, then run the script a thousand times. You get the agent's flexibility once and code's reliability forever.</p>
+    <aside class="key"><p>Agents are for unknown paths. Known paths belong in code, and judgment on a single input belongs in a single call.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Here is a task I was going to give an agent: [describe it]. Tell me which parts are deterministic and should be plain code, which need one model call, and which genuinely need an agent loop. Then sketch the resulting design.</pre></aside>
+  </article>
+</section>
