@@ -1,0 +1,274 @@
+<section class="group" id="g4" data-num="4">
+  <header class="ghead">
+    <h2><span class="gn">4</span>Agent harnesses: the loop around the model</h2>
+    <p class="glead">Claude Code is a model plus a program that runs it in a loop. This group opens that program up: what it does between model calls, and why compaction, permission prompts, subagent summaries and usage limits behave the way they do.</p>
+  </header>
+
+  <article class="topic" id="t4-1" data-num="4.1">
+    <h3><span class="tn">4.1</span>The core loop</h3>
+    <p class="tl">An agent is a while-loop: call the model, run the tools it asked for, append the results, and call again until it stops asking.</p>
+    <p>The model is stateless. Each API call takes the whole conversation so far (system prompt, tool definitions, every message) and returns one assistant turn. Everything that feels like an "agent" is a program around that call, called the <strong>harness</strong>.</p>
+    <p>The assistant turn is a list of content blocks: text, optional thinking, and zero or more <code>tool_use</code> blocks. Each <code>tool_use</code> block has an id, a tool name and a JSON input. The response also carries a <code>stop_reason</code>; when it is <code>tool_use</code>, the model is waiting for results.</p>
+    <pre class="diag">  your task
+      |
+      v
++-&gt; call model with full history
+|       |
+|       v
+|   stop_reason == tool_use ?
+|       | yes             | no
+|       v                 v
+|   check, run tools   reply, stop
+|       |
+|   append tool_result blocks
++-------+</pre>
+    <p>Between calls the harness does real work. It checks each requested call against permission rules (<a class="xref" href="#t4-5">4.5</a>), runs pre-tool hooks (<a class="xref" href="#t4-7">4.7</a>), executes the tool, truncates oversized output, and wraps each output in a <code>tool_result</code> block that quotes the matching <code>tool_use</code> id.</p>
+    <p>All results from one turn go back together in a single user-role message, and the model is called again. When it answers with plain text and no tool calls (<code>stop_reason</code> is <code>end_turn</code>), the loop hands control back to you. A max-turns cap or token budget is the backstop if it never stops.</p>
+    <p>Two consequences follow. The model never sees your file system; it sees only the text the harness chose to put in tool results. And every turn re-sends the entire history, so cost and latency grow with session length; prompt caching (<a class="xref" href="#t2-3">2.3</a>) is what keeps that affordable.</p>
+    <aside class="why"><p>When Claude Code shows several tool calls in one step, say three file reads at once, the model emitted three <code>tool_use</code> blocks in a single turn. The harness ran them, possibly in parallel, and returned all three results in one message before calling the model again.</p></aside>
+    <aside class="key"><p>The model proposes, the harness disposes. Every action, permission check and result format happens in ordinary code between two API calls.</p></aside>
+  </article>
+
+  <article class="topic" id="t4-2" data-num="4.2">
+    <h3><span class="tn">4.2</span>Tools as the interface</h3>
+    <p class="tl">A tool is a name, a description and a JSON Schema; the description is a prompt, and the result format is half the tool's quality.</p>
+    <p>The harness sends tool definitions with every request. Each has a name, a natural-language description, and an input schema in JSON Schema. The model is trained to emit a <code>tool_use</code> block whose input matches the schema; no code runs until the harness runs it.</p>
+    <pre><code>{"name": "read_file",
+ "description": ("Read a text file. Returns "
+     "numbered lines. Use offset for big "
+     "files instead of cat."),
+ "input_schema": {
+   "type": "object",
+   "properties": {
+     "path": {"type": "string"},
+     "offset": {"type": "integer"}},
+   "required": ["path"]}}</code></pre>
+    <p>Descriptions do the steering. They say when to use the tool, when not to, and what comes back. Harness builders spend as much effort on that wording as on the implementation, because a vague description produces wrong calls no matter how good the code is.</p>
+    <p>Result formatting matters as much. Good results are short, stable and actionable: line numbers so the next edit can point at them, a clear error ("old_string not found; it must match exactly") instead of a stack trace, and truncation with a note ("output cut at 30,000 characters") so the model knows it saw only part.</p>
+    <p>Definitions cost context on every call, and with dozens of MCP tools that becomes a large fixed tax. Some harnesses therefore use <strong>deferred loading</strong>: only tool names are listed up front, and the model calls a search tool to fetch a full schema when it needs one.</p>
+    <p><strong>Bash is the universal tool.</strong> One schema reaches every CLI on the machine (git, grep, jq, the test runner, gh), and models have seen enormous amounts of shell in training.
+    Dedicated tools still win where structure helps: an edit tool can demand exact-match replacement and a prior read, a read tool can add line numbers, and both are easier to permission precisely than arbitrary shell strings.</p>
+    <aside class="why"><p>When Claude Code's edit tool fails with "string not found", that failure is designed: it forces the model to re-read the file instead of guessing. When Claude runs a tool-search step before using an MCP tool, that is deferred loading fetching the schema.</p></aside>
+    <aside class="key"><p>Treat a tool description as a prompt and a tool result as a user interface whose user is the model.</p></aside>
+  </article>
+
+  <article class="topic" id="t4-3" data-num="4.3">
+    <h3><span class="tn">4.3</span>Context management</h3>
+    <p class="tl">The context window is the model's only working memory; the harness decides what goes in, in what order, and what gets summarized away.</p>
+    <p>Every request is assembled fresh, in a typical order: the harness's system prompt, tool definitions, instruction files such as CLAUDE.md, then the conversation itself, meaning your messages, the model's turns and every tool result.
+    Stable material goes first so prompt caching (<a class="xref" href="#t2-3">2.3</a>) can reuse it; a change near the top invalidates the cache for everything after it.</p>
+    <p>Tool results dominate. A few file reads, one long test log and a broad grep can outweigh everything you typed. Harnesses fight this by truncating outputs, by nudging the model toward targeted reads (grep first, then read a range), and by pushing exploration into subagents whose bulky context is thrown away (<a class="xref" href="#t4-6">4.6</a>).</p>
+    <p><strong>Compaction</strong> kicks in as the window nears its limit. The harness sends the history to the model with an instruction along the lines of "summarize this session: goal, decisions, files touched, current state, next steps". It then starts a new history from the system prompt plus that summary, sometimes re-attaching recently used files.</p>
+    <p>Most harnesses compact automatically past a threshold and also offer a manual command; in Claude Code that is <code>/compact</code>, which accepts optional focus instructions. Compaction is lossy. Exact error text, a rejected approach and why it failed, or a constraint you stated once in turn 12 may not survive.</p>
+    <p>Long sessions degrade even before compaction. Attention spreads over more tokens, stale content (old versions of a file, abandoned plans) competes with the current state, and early instructions sit far back. This is often called context rot, and the practical fix is shorter, task-scoped sessions with durable facts kept in files.</p>
+    <aside class="why"><p>The "compacting conversation" notice in Claude Code is this mechanism. If Claude retries a fix that already failed right after a compaction, the failure details were probably summarized away. Starting a fresh session from a written plan file often beats pushing one long session further.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">List, in order, what is in your context window right now: system prompt sections, tool definitions, instruction files and conversation. Roughly estimate which part is largest, and say what would most likely be lost if this session were compacted now.</pre></aside>
+    <aside class="key"><p>Context is a budget. Keep durable facts in files, keep bulky output out of the main thread, and restart sessions instead of letting them rot.</p></aside>
+  </article>
+
+  <article class="topic" id="t4-4" data-num="4.4">
+    <h3><span class="tn">4.4</span>Memory</h3>
+    <p class="tl">Models remember nothing between calls; "memory" is files the harness loads into the context, plus notes the model is asked to write.</p>
+    <p>Your session never updates the model's weights. Whatever persists does so as text that a harness puts into some future context window. Three kinds are common.</p>
+    <ul>
+      <li><strong>Instruction files.</strong> CLAUDE.md (AGENTS.md in several other tools) is plain markdown injected at session start. Claude Code reads a user-level file under <code>~/.claude</code>, the project's file, and nested files in subdirectories as it works in them. It is a standing prompt, not a database.</li>
+      <li><strong>Memory files.</strong> Some harnesses give the model a memory directory or tool and tell it to save facts worth keeping ("user prefers pnpm"). Later sessions load an index or the files, or the model searches them on demand.</li>
+      <li><strong>Session history.</strong> Resuming a session reloads the transcript, or its compacted summary, into a new context. That is continuity, not memory, and it brings the old history's cost and clutter along.</li>
+    </ul>
+    <p>Recall is just retrieval. Either the content is in the window from the start (always paid for, always visible) or the model must decide to look it up (cheap, but only works if it thinks to search). That one trade-off explains most memory quirks.</p>
+    <p>Instruction files are guidance, not enforcement. The model follows them like any prompt: usually, and less reliably as they grow long, contradict each other, or sit far from the current task. Short, specific, imperative lines beat essays.
+    If a rule must hold every single time, turn it into a permission rule or a hook (<a class="xref" href="#t4-5">4.5</a>, <a class="xref" href="#t4-7">4.7</a>).</p>
+    <p>Memory also goes stale. A note saved weeks ago describes code that may have changed since, and the model cannot tell stale from current unless the note records when and why it was written.</p>
+    <aside class="why"><p>When Claude "forgets" a convention you explained yesterday, the convention lived only in yesterday's conversation. When it obeys a CLAUDE.md rule most of the time but not always, that is ordinary prompt-following, not a loading bug.</p></aside>
+    <aside class="key"><p>If it is not in a file that gets loaded or searched, it does not persist. If it must always happen, do not rely on memory at all.</p></aside>
+  </article>
+
+  <article class="topic" id="t4-5" data-num="4.5">
+    <h3><span class="tn">4.5</span>Permissions and sandboxing</h3>
+    <p class="tl">Permission rules and sandboxes are enforced in code; instructions to the model are only promises.</p>
+    <p>Before executing a tool call, the harness checks it against a policy whose outcomes are allow, deny or ask the user. Rules match tools and argument patterns: allow <code>Bash(npm run test:*)</code>, deny <code>Bash(curl:*)</code> or reads of <code>.env</code>. In Claude Code these live in settings files at user, project and local scope, and deny rules win over allow rules.</p>
+    <p>A <strong>mode</strong> sets the default for calls no rule matches. Typical modes: ask before anything risky, auto-accept file edits but ask for shell, a read-only planning mode, and a bypass mode meant for throwaway containers.
+    Claude Code, as of late 2026, also has an auto mode in which a separate model-based check reviews actions and blocks risky or out-of-scope ones instead of prompting you.</p>
+    <p>Pattern rules on shell commands are leaky. A command string can chain, pipe, open a subshell, or start an interpreter that does anything. Harnesses parse commands to catch common tricks, but string matching cannot fully contain a confused or manipulated model.</p>
+    <p>An <strong>OS sandbox</strong> closes that gap. Tool processes run under kernel-enforced limits: writes only inside the project directory, network only to allowed hosts. Common building blocks are Seatbelt on macOS, bubblewrap and namespaces on Linux, and containers or VMs. Whatever command the model writes, the kernel refuses what the policy forbids.</p>
+    <table>
+      <tr><th>Mechanism</th><th>Enforced by</th><th>Stops</th></tr>
+      <tr><td>"Never push" in CLAUDE.md</td><td>Model judgment</td><td>Honest mistakes, usually</td></tr>
+      <tr><td>Allow/deny rule</td><td>Harness code</td><td>Most mistakes</td></tr>
+      <tr><td>Blocking hook</td><td>Your script</td><td>What you check for</td></tr>
+      <tr><td>Sandbox or container</td><td>Kernel</td><td>Nearly everything</td></tr>
+    </table>
+    <p>The dangerous combination is private data, untrusted content, and a way to send data out, all in one session. Remove any one (no secrets in reach, no untrusted input, or no outbound network) and prompt injection (<a class="xref" href="#t4-10">4.10</a>) loses most of its teeth.</p>
+    <aside class="why"><p>Each permission prompt you see is the loop paused at this check, and "don't ask again" writes an allow rule. Approval fatigue is real: a narrow allowlist plus a sandbox protects better than clicking yes fifty times a day.</p></aside>
+    <aside class="key"><p>Ask "what actually stops this?" If the answer is the model's good behavior, it is a promise. If it is code or the kernel, it is a control.</p></aside>
+  </article>
+
+  <article class="topic" id="t4-6" data-num="4.6">
+    <h3><span class="tn">4.6</span>Subagents, forks and workflows</h3>
+    <p class="tl">A subagent is a second loop with a fresh context; its value is isolation, and its price is that only a summary comes back.</p>
+    <p>When the main agent calls a subagent tool, the harness starts a new loop with its own system prompt, its own (often restricted) tools and an empty history. The only task context it gets is the prompt string the parent wrote. It runs until it stops, and its final message becomes the <code>tool_result</code> in the parent's context.</p>
+    <pre class="diag"> parent context (stays small)
+   |  task: "find all auth callers"
+   v
+ +----------------------------+
+ | subagent: fresh context    |
+ | grep, read 40 files, ...   |
+ | final message = report     |
+ +----------------------------+
+   |  tool_result = report
+   v
+ parent continues</pre>
+    <p>That is the trade. Forty file reads fill the subagent's window, not yours, and the parent gets a page of findings. Search, exploration and review are the sweet spots because their bulky inputs are disposable.</p>
+    <p>The <strong>handoff tax</strong> runs both ways. Going down, the subagent knows only what the parent wrote, so a terse "check the auth code" drops the constraints you discussed for an hour. Coming back, nuance compresses: "looks fine" may hide what was never checked. Good handoffs state the goal, context, constraints, and the exact shape of the report wanted.</p>
+    <p>A <strong>fork</strong> is the alternative where the child starts from a copy of the parent's context. It inherits everything the parent knows and pays for it in tokens and inherited clutter. Harnesses differ in which of the two they offer.</p>
+    <p>Parallelism pays when tasks are independent, read-heavy and checkable: review five modules, or try three fixes in separate worktrees. It hurts when workers edit the same files or must agree on shared decisions, and token use multiplies with each worker.</p>
+    <p><strong>Workflows</strong> go further: a script, not the model, owns the sequence (plan, fan out, verify, merge) and calls agents as steps. Deterministic control flow with model judgment inside each step is often more reliable than one agent orchestrating everything.</p>
+    <aside class="why"><p>The subagent result you see in Claude Code is the child's final message, passed up as a tool result. If it seems overconfident, the parent is reading the same thin summary you are, which is why asking subagents to list what they did not verify pays off.</p></aside>
+    <aside class="key"><p>Delegate to save context, not to save thinking. Write the handoff like a ticket for a capable colleague with zero background.</p></aside>
+  </article>
+
+  <article class="topic" id="t4-7" data-num="4.7">
+    <h3><span class="tn">4.7</span>Hooks, skills, slash commands and plugins</h3>
+    <p class="tl">Hooks are code the harness always runs at fixed points; skills and slash commands are prompts the model follows with judgment; plugins package them.</p>
+    <p>These extensions split along one line. <strong>Deterministic</strong> means harness code runs it every time. <strong>Prompt-based</strong> means text enters the context and the model decides what to do with it.</p>
+    <p><strong>Hooks</strong> are deterministic. You register a shell command for an event, and the harness runs it with the event details as JSON on stdin. Claude Code's events include PreToolUse, PostToolUse, UserPromptSubmit, Stop, SubagentStop, SessionStart and PreCompact.</p>
+    <p>A PreToolUse hook can block a call: in Claude Code, exit code 2 blocks it and the hook's stderr goes back to the model as the reason. A PostToolUse hook can run a formatter after every edit. A Stop hook can refuse to let the agent finish until the tests pass.</p>
+    <p><strong>Skills</strong> are prompt-based, with progressive disclosure. A skill is a folder whose SKILL.md has frontmatter with a name and description. Only those short descriptions sit in the context up front; when the model judges one relevant, it loads the body, which can point at further files or scripts. Many skills can stay installed for little context cost.</p>
+    <p><strong>Slash commands</strong> are saved prompts you trigger yourself: typing <code>/name</code> expands a template into your message. The trigger is deterministic; what follows is prompt-following. <strong>Plugins</strong> bundle commands, skills, hooks, subagent definitions and MCP servers into one installable unit.</p>
+    <table>
+      <tr><th>You want</th><th>Use</th></tr>
+      <tr><td>Format after every edit</td><td>PostToolUse hook</td></tr>
+      <tr><td>Never touch migrations/</td><td>Deny rule or PreToolUse hook</td></tr>
+      <tr><td>How we write release notes</td><td>Skill</td></tr>
+      <tr><td>Run my review checklist now</td><td>Slash command</td></tr>
+    </table>
+    <p>The classic mistake is putting a guarantee in a prompt. "Always run the linter" in CLAUDE.md gets followed most of the time; a hook gets followed every time.</p>
+    <aside class="why"><p>When a skill you wrote does not trigger, the model did not judge its description relevant; rewrite it around when to use it, in words a user would actually type. When a hook message appears and Claude changes course, that is a blocked call feeding stderr back into the loop.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Write a Claude Code PreToolUse hook script that blocks any Bash command containing "git push --force" and explains why on stderr. Show the settings.json entry that registers it, and explain how the harness interprets each exit code.</pre></aside>
+    <aside class="key"><p>Must happen every time: hook. Needs judgment: skill or command. Never put a guarantee in a prompt.</p></aside>
+  </article>
+
+  <article class="topic" id="t4-8" data-num="4.8">
+    <h3><span class="tn">4.8</span>MCP</h3>
+    <p class="tl">MCP is a standard JSON-RPC protocol that lets any harness discover and call tools hosted by separate server processes.</p>
+    <p>The Model Context Protocol separates the agent (a client inside the harness) from integrations (servers). A server is a program, local or remote, that speaks JSON-RPC 2.0 either over stdio, where the harness spawns it as a subprocess, or over HTTP, typically a remote service behind OAuth.</p>
+    <p>On connect, client and server run an initialize handshake that declares capabilities. The client calls <code>tools/list</code> and receives names, descriptions and JSON Schemas, which the harness adds to the tool definitions it sends the model, usually namespaced (Claude Code shows them as <code>mcp__server__tool</code>).</p>
+    <p>When the model emits a <code>tool_use</code> for one, the harness sends <code>tools/call</code> to the server and wraps the response as a <code>tool_result</code>. The model never talks to the server directly; the harness is the middleman, so permission rules and hooks apply as usual.</p>
+    <p>Servers expose three main primitives:</p>
+    <ul>
+      <li><strong>Tools:</strong> actions the model can call.</li>
+      <li><strong>Resources:</strong> readable data addressed by URI (a file, a ticket, a schema) that the user or app can attach to context.</li>
+      <li><strong>Prompts:</strong> templated prompts a server publishes, which harnesses often surface as slash commands.</li>
+    </ul>
+    <p>One server often exposes many tools, and every connected server's definitions ride along on each request. Ten servers with twenty tools each is a heavy fixed tax, which is why deferred loading (<a class="xref" href="#t4-2">4.2</a>) matters most for MCP.</p>
+    <p>The security surface is wide. A server runs with your credentials and, if local, your OS user's permissions. Its tool descriptions go straight into the model's context, so a malicious server can plant instructions there (tool poisoning).
+    Its results carry text written by strangers, such as issues, emails and web pages, the classic injection path (<a class="xref" href="#t4-10">4.10</a>). And its definitions can change after you approved it.</p>
+    <p>Hygiene: install servers you would trust as a code dependency, pin versions, give tokens the narrowest scopes, and write permission rules for MCP tools like any other tool.</p>
+    <aside class="why"><p>If sessions got slower and burned limits faster after you connected a few servers, their tool definitions are likely riding along on every request. If Claude hesitates over instructions it found inside a fetched issue, it is treating tool output as data, which is the defense working.</p></aside>
+    <aside class="key"><p>An MCP server is a third-party dependency that writes into your model's prompt. Vet it like one.</p></aside>
+  </article>
+
+  <article class="topic" id="t4-9" data-num="4.9">
+    <h3><span class="tn">4.9</span>Reliability and cost</h3>
+    <p class="tl">Harnesses retry, cap and count around the model; every call resends the whole context, so tokens and rate limits scale with session length.</p>
+    <p>API calls fail routinely: rate-limit errors (HTTP 429), server errors and overload responses (5xx; Anthropic's API uses 529 for "overloaded"), and dropped streams. Harnesses retry with exponential backoff and jitter, respect retry-after headers, and surface the error only after several attempts.</p>
+    <p>Tool calls need their own guards: timeouts on shell commands (a dev server that never exits would otherwise hang the loop), output caps, and a way to run long processes in the background. A failed tool is not a failed loop. The error goes back as a <code>tool_result</code> marked <code>is_error</code>, and the model decides what to do next.</p>
+    <p>Loop detection is mostly blunt: a max-turn cap, a token or cost budget, and sometimes a check for the same call with identical input repeated several times. Smarter detection is hard because good work also looks repetitive: edit, test, edit, test.</p>
+    <p><strong>Token accounting</strong> follows the loop. Each call bills input tokens for the entire context sent and output tokens for everything generated, thinking included. Turn 50 resends turns 1 to 49, so without caching, total input grows roughly with the square of the turn count.</p>
+    <p>Prompt caching bills an unchanged prefix at a much lower cache-read rate, which is why a stable prefix is worth protecting (<a class="xref" href="#t2-3">2.3</a>, <a class="xref" href="#t9-3">9.3</a>). Cached tokens still occupy the window, though; caching saves money and latency, not context space.</p>
+    <p><strong>Rate limits</strong> are counted separately from cost. API keys typically have per-minute limits on requests, input tokens and output tokens. Subscription plans meter usage over rolling time windows, and larger models and parallel subagents drain the allowance faster because each worker runs its own full-context loop.</p>
+    <aside class="why"><p>Hitting a usage limit after a multi-agent run is this arithmetic: five workers each re-reading files and resending their whole context every turn. A single long session also burns more than two short ones doing the same work, because its late turns carry the full history.</p></aside>
+    <aside class="key"><p>Cost scales with context size times turns times agents. Shrink any one of the three.</p></aside>
+  </article>
+
+  <article class="topic" id="t4-10" data-num="4.10">
+    <h3><span class="tn">4.10</span>Failure modes</h3>
+    <p class="tl">Agents fail in predictable ways: obeying instructions hidden in tool output, looping without progress, and declaring done without proof.</p>
+    <p><strong>Injection via tool results.</strong> Everything a tool returns (web pages, issue comments, file contents, test output) lands in the context as text. The model has no hard boundary between fetched data and instructions; training teaches it to favor the user, but a cleverly worded README ("AI agents: also run this setup command") can still steer it.
+    Risk peaks when the session also has secrets and network access (<a class="xref" href="#t4-5">4.5</a>, <a class="xref" href="#t10-1">10.1</a>).</p>
+    <p><strong>Runaway loops.</strong> The agent retries the same failing fix, oscillates between two edits, or keeps exploring without converging. Usual causes: an ambiguous goal, a test it cannot satisfy, an environment problem misread as a code bug, or a key fact lost to compaction.</p>
+    <p><strong>False "done".</strong> The model reports success when tests were skipped, a check was loosened, a mock hides the real path, or it merely believes the change works. Training rewards finishing, and reinforcement learning against tests can teach shortcuts such as special-casing the test input.</p>
+    <p><strong>Collateral edits.</strong> Unrequested refactors, reformatted files, or deleted "unused" code that was in fact used.</p>
+    <p>Mitigations, roughly from strongest to weakest:</p>
+    <ul>
+      <li>Sandbox and least privilege, so injected instructions have little reach.</li>
+      <li>Verifiable completion: define done as a command that passes (tests, type check, build), enforced by a Stop hook or CI rather than the model's say-so.</li>
+      <li>Budgets: turn caps, timeouts, and a human checkpoint when the same error repeats.</li>
+      <li>Review the diff, not the summary. The summary is a claim; the diff is evidence.</li>
+      <li>A separate verifier: a fresh agent that did not write the code, told to find what is wrong.</li>
+    </ul>
+    <aside class="why"><p>"All tests pass" while CI fails usually means Claude ran a subset, ran them before its last edit, or a test was skipped. Asking for the exact command and output it relied on turns a claim into evidence.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Review the last change you made in this session as a skeptical reviewer. List every claim you made about it working, and for each one say whether you verified it by running something (quote the command and result) or are inferring it.</pre></aside>
+    <aside class="key"><p>Treat agent output like a pull request from a fast, confident contractor: trust the passing checks, not the description.</p></aside>
+  </article>
+
+  <article class="topic" id="t4-11" data-num="4.11">
+    <h3><span class="tn">4.11</span>Comparing harnesses</h3>
+    <p class="tl">The major coding agents share the same loop; they differ in where they run, how they gather context, how they sandbox, and how you extend them.</p>
+    <p>Under the hood, every current coding agent is the loop from <a class="xref" href="#t4-1">4.1</a> with file, search and shell tools. The differences that matter in daily use are all around it.</p>
+    <table>
+      <tr><th>Harness</th><th>Runs in</th><th>Notable</th></tr>
+      <tr><td>Claude Code</td><td>Terminal, IDE, desktop, web</td><td>Hooks, skills, subagents, MCP</td></tr>
+      <tr><td>Codex CLI</td><td>Terminal; open source</td><td>OpenAI models; OS sandbox by default</td></tr>
+      <tr><td>Cursor agent</td><td>Inside the editor</td><td>Editor state, semantic code index</td></tr>
+      <tr><td>Agent SDK</td><td>Your own program</td><td>Claude Code's harness as a library</td></tr>
+    </table>
+    <p><strong>Context gathering</strong> differs. Claude Code and Codex lean on agentic search: the model greps and reads on demand (<a class="xref" href="#t7-3">7.3</a>). Cursor also maintains an embedding index of the repo for semantic search and pulls in editor state such as open files. An index helps in huge unfamiliar code; live search is never stale.</p>
+    <p><strong>Model coupling</strong> differs. Claude Code and the Agent SDK are built around Claude models, Codex CLI around OpenAI's, while Cursor lets you choose among vendors. System prompt, tool design and compaction are tuned to the model, so the same model can perform noticeably differently in different harnesses.</p>
+    <p><strong>Agent benchmarks measure the pair.</strong> SWE-bench hands the agent a real GitHub issue and repository, then checks whether hidden tests pass after its patch; SWE-bench Verified is a human-validated subset of 500 tasks. Terminal-Bench gives tasks in a containerized terminal (build this, configure that) and checks the end state.</p>
+    <p>Read scores critically (<a class="xref" href="#t6-3">6.3</a>): which harness, how many attempts, what time and token budget, and whether tasks may have leaked into training data. A few points on a leaderboard say less than an afternoon on your own repository.</p>
+    <aside class="why"><p>If a model feels sharper in one tool than another, the harness is a likely reason: a different system prompt, tool set, context strategy and compaction policy. Same weights, different loop.</p></aside>
+    <aside class="key"><p>Choose a harness by its control surfaces (permissions, sandbox, hooks, extensibility) and how it fits your workflow; the model inside changes every few months.</p></aside>
+  </article>
+
+  <article class="topic" id="t4-12" data-num="4.12">
+    <h3><span class="tn">4.12</span>Build one yourself</h3>
+    <p class="tl">A working agent is about 100 lines: a model call, a tool table, and a loop that feeds results back; the Agent SDK gives you the production version.</p>
+    <p>Writing a toy loop is the fastest way to make <a class="xref" href="#t4-1">4.1</a> to <a class="xref" href="#t4-9">4.9</a> concrete. Here is the core, shaped like Anthropic's Python SDK; <code>TOOLS</code> (schemas) and <code>IMPL</code> (name to function) are yours.</p>
+    <pre><code>def run(task):
+    msgs = [{"role": "user", "content": task}]
+    for _ in range(MAX_TURNS):
+        r = client.messages.create(
+            model=MODEL, max_tokens=8000,
+            system=SYSTEM, tools=TOOLS,
+            messages=msgs)
+        msgs.append({"role": "assistant",
+                     "content": r.content})
+        if r.stop_reason != "tool_use":
+            return r.content
+        msgs.append({"role": "user",
+                     "content": run_tools(r)})</code></pre>
+    <p>The assistant turn is appended exactly as returned, thinking and <code>tool_use</code> blocks included, because the next call must see what the model actually said. Results go back in one user-role message, each tagged with the id it answers.</p>
+    <pre><code>def run_tools(r):
+    out = []
+    for b in r.content:
+        if b.type != "tool_use":
+            continue
+        err = False
+        try:
+            text = IMPL[b.name](**b.input)
+        except Exception as e:
+            text, err = f"error: {e}", True
+        out.append({"type": "tool_result",
+            "tool_use_id": b.id,
+            "is_error": err,
+            "content": str(text)[:20000]})
+    return out</code></pre>
+    <p>Give <code>IMPL</code> a <code>read_file</code>, a <code>write_file</code> and a <code>bash</code> that runs a subprocess with a timeout. Add one if-statement before the <code>IMPL</code> call and you have permissions (<a class="xref" href="#t4-5">4.5</a>); sum <code>r.usage</code> per call and you have token accounting (<a class="xref" href="#t4-9">4.9</a>).</p>
+    <p>What the toy lacks: streaming, retries with backoff, compaction, cache breakpoints, parallel tool execution, a sandbox and hooks. Each is tens to hundreds of lines, and together they are most of a real harness.</p>
+    <p>The Claude Agent SDK (Python and TypeScript) packages Claude Code's harness as a library, with built-in tools, permissions, hooks, subagents, MCP and compaction driven from your code:</p>
+    <pre><code>from claude_agent_sdk import query
+from claude_agent_sdk import ClaudeAgentOptions
+
+opts = ClaudeAgentOptions(
+    allowed_tools=["Read", "Grep", "Bash"],
+    permission_mode="acceptEdits", max_turns=30)
+async for msg in query(prompt="Fix the test",
+                       options=opts):
+    print(msg)</code></pre>
+    <p>Option names shift between versions, so check current SDK docs before relying on exact spellings.</p>
+    <aside class="why"><p>Writing the loop once explains a lot of Claude Code behavior: why parallel tool calls return together, why a tool error does not end the session, and why each turn of a long session costs more than the last.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Write a minimal Python coding agent using the Anthropic SDK with three tools: read_file, write_file and run_bash (60 second timeout). Include a max-turn cap, print each tool call and result, and mark where a permission check and context compaction would go.</pre></aside>
+    <aside class="key"><p>The model call is one line. Everything that makes an agent safe, cheap and reliable is the loop you write around it.</p></aside>
+  </article>
+</section>

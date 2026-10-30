@@ -1,0 +1,154 @@
+<section class="group" id="g2" data-num="2">
+  <header class="ghead">
+    <h2><span class="gn">2</span>Prompting and context engineering</h2>
+    <p class="glead">The model knows only its context window. What goes in, in what order, and what stays stable between calls decides quality, speed and cost, in a chat or inside an agent.</p>
+  </header>
+
+  <article class="topic" id="t2-1" data-num="2.1">
+    <h3><span class="tn">2.1</span>System prompts and the instruction hierarchy</h3>
+    <p class="tl">Models are trained to weight the system prompt above the user, and the user above documents and tool results, but that ranking is a learned tendency, not an enforced rule.</p>
+    <p>A chat API request has three kinds of content.
+    The <strong>system prompt</strong> sets role, rules and background for the whole conversation.
+    Then come alternating <strong>user</strong> and <strong>assistant</strong> turns; in Anthropic's Messages API, tool results come back inside user turns (see <a class="xref" href="#t3-1">3.1</a>).</p>
+    <p>Underneath, it is all one token sequence with special tokens marking where each role starts, and nothing in the architecture makes the system prompt special.
+    Training does: the model learns an <strong>instruction hierarchy</strong>, roughly system over user over third-party content.
+    Fetched web pages, file contents and tool output are meant to be treated as data, not commands.</p>
+    <p>Because the hierarchy is learned, it is a strong tendency with exceptions.
+    A well-crafted instruction hidden in a web page can still be followed, which is the whole problem of prompt injection (see <a class="xref" href="#t10-1">10.1</a>).
+    Anything that must hold no matter what belongs in code outside the model: permission checks, sandboxes, validation (see <a class="xref" href="#t4-5">4.5</a>).</p>
+    <p>What belongs in a system prompt:</p>
+    <ul>
+      <li>Who the model is serving and what the job is.</li>
+      <li>Stable rules and constraints, each with its reason.</li>
+      <li>How to use the tools, and when not to.</li>
+      <li>Output format, ideally with a short example.</li>
+    </ul>
+    <p>Some habits work better with current models.
+    Explain why a rule exists, since a reason generalizes to cases the rule did not name.
+    Skip the shouting: capitals and repeated "MUST" helped older models but tend to cause overcorrection in newer ones.</p>
+    <p>Say what to do rather than only what not to do.
+    Keep examples varied, because the model copies them closely, including their quirks.</p>
+    <aside class="why"><p>CLAUDE.md and similar instruction files are injected into the context by the harness, early in the conversation.
+    That is why they are followed by default, why a direct request later in the session can override them, and why rules can seem to fade once a long session buries them under newer tokens.</p></aside>
+    <aside class="key"><p>The hierarchy shapes behavior; it does not enforce it.
+    Put preferences in prompts and guarantees in code.</p></aside>
+  </article>
+
+  <article class="topic" id="t2-2" data-num="2.2">
+    <h3><span class="tn">2.2</span>Context engineering: what to include and in what order</h3>
+    <p class="tl">Give the model everything the task needs and nothing it does not, with stable material first and the actual request last.</p>
+    <p><strong>Context engineering</strong> is the broader form of prompt writing: deciding everything that enters the window, including system prompt, tool definitions, instruction files, retrieved documents, history and tool results.
+    The model knows nothing outside it, so a missing fact becomes a guess (see <a class="xref" href="#t1-4">1.4</a>).</p>
+    <p>More is not better.
+    Irrelevant text costs tokens, slows every call, and competes for attention with what matters; quality on many tasks drops as context grows, an effect often called <strong>context rot</strong>.
+    Aim for the smallest set of high-signal tokens that makes the right answer likely.</p>
+    <p>A practical order, top to bottom:</p>
+    <ol>
+      <li><strong>Stable instructions</strong>: role, rules, tool definitions. They rarely change, so they cache well (see <a class="xref" href="#t2-3">2.3</a>).</li>
+      <li><strong>Reference material</strong>: docs, specs, relevant files, each wrapped in clear delimiters such as XML-style tags naming the source.</li>
+      <li><strong>History</strong>: prior turns and tool results, trimmed or summarized when stale.</li>
+      <li><strong>The request</strong>: the specific task, last. With long documents, a question placed after them tends to get better answers than one placed before.</li>
+    </ol>
+    <p>In the request itself, include what a capable new teammate would need: the goal and why it matters, constraints, what "done" looks like and how to check it.
+    If format matters, show an example.
+    Name things precisely: a file path or function name beats "the auth code".</p>
+    <p>For agents, prefer <strong>just-in-time context</strong>.
+    Give the model tools to fetch what it needs (search, read a file, list a directory) instead of preloading everything, so it pulls in the three relevant files rather than carrying the whole repo (see <a class="xref" href="#t7-3">7.3</a>).</p>
+    <aside class="why"><p>Watching Claude Code grep and read a few files before editing is this principle at work.
+    When a long session is compacted, the harness is doing context engineering for you: replacing a pile of old tool output with a summary so the window holds signal again (see <a class="xref" href="#t4-3">4.3</a>).</p></aside>
+    <aside class="key"><p>Every token should earn its place.
+    Stable first, request last, references clearly labeled.</p></aside>
+  </article>
+
+  <article class="topic" id="t2-3" data-num="2.3">
+    <h3><span class="tn">2.3</span>Prompt caching</h3>
+    <p class="tl">Providers can skip reprocessing a prompt prefix they have seen recently, which makes repeated calls much cheaper and faster, but only if that prefix is exactly identical.</p>
+    <p>When a model reads your prompt, each layer computes keys and values for every token (the KV cache, see <a class="xref" href="#t9-1">9.1</a>).
+    Because attention only looks backward, a token's keys and values depend only on the tokens before it.
+    So if a new request starts with exactly the same tokens as an earlier one, that work can be reused.</p>
+    <p><strong>Prompt caching</strong> stores those computed states for a prefix and reuses them on a match. The rules follow from the mechanism:</p>
+    <ul>
+      <li><strong>Prefix only.</strong> Matching runs from the first token forward and stops at the first difference. Everything after a change is recomputed, even if it is identical.</li>
+      <li><strong>Exact.</strong> One changed character, a reordered tool list or a timestamp in the system prompt breaks the match from that point on.</li>
+      <li><strong>Per model.</strong> Cached states belong to one model; switching models starts cold.</li>
+      <li><strong>Short-lived.</strong> Entries expire after a few minutes unused, with longer-lived options on some providers; each hit refreshes the timer.</li>
+    </ul>
+    <p>Some providers cache automatically; Anthropic's API lets you mark cache breakpoints explicitly.
+    Either way, cached input is billed at a fraction of the normal input price, writing to the cache can cost a little more, and time to first token drops.</p>
+    <pre class="diag">turn 9:  [tools][system][m1 .. m8]
+turn 10: [tools][system][m1 .. m8][m9]
+         \_______ cache hit ______/ new
+
+system prompt edited mid-session:
+         [tools][SYSTEM*][m1 .. m9]
+         \hit_/ \__ all recomputed __/</pre>
+    <p>This is why order matters (see <a class="xref" href="#t2-2">2.2</a>): stable parts first, conversation append-only.
+    An agent loop suits caching well, since each turn resends the previous prompt plus a little more.</p>
+    <aside class="why"><p>Come back to a Claude Code session after a long break and the first reply can be slower and cost more of your limit, because the cache expired.
+    Switching models, changing the set of available tools, or compacting history also invalidates large parts of the prefix.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Explain how prompt caching interacts with an agent loop that resends the full conversation every turn. For each of these, say whether it causes a cache miss and how much of the prompt it invalidates: editing the system prompt, adding a tool, appending a message, and summarizing old messages.</pre></aside>
+    <aside class="key"><p>Stable first, append only, nothing volatile near the top.
+    A cache hit makes a long context cheap; a miss makes you pay for all of it again.</p></aside>
+  </article>
+
+  <article class="topic" id="t2-4" data-num="2.4">
+    <h3><span class="tn">2.4</span>Decomposition and chain of thought</h3>
+    <p class="tl">Hard tasks go better broken into steps, either inside one response (reasoning before answering) or across several calls with checks in between.</p>
+    <p><strong>Chain of thought</strong> means having the model reason through intermediate steps before committing to an answer.
+    It works for the mechanical reason in <a class="xref" href="#t1-3">1.3</a>: each written step becomes context later tokens can use, which gives more computation per problem.
+    With reasoning models that think by default, "think step by step" adds less; a clear goal and room to think matter more.</p>
+    <p><strong>Decomposition</strong> moves the steps out of one response and into separate stages. Common shapes:</p>
+    <ul>
+      <li><strong>Plan, then execute</strong>: one pass writes a plan you can review; later passes carry it out.</li>
+      <li><strong>Prompt chaining</strong>: the output of one step (extract the API surface) becomes the input of the next (write the migration).</li>
+      <li><strong>Generate, then verify</strong>: a separate call, ideally with fresh context, checks the result against the requirements or runs the tests.</li>
+      <li><strong>Fan-out</strong>: independent parts processed in parallel, then merged (see <a class="xref" href="#t5-1">5.1</a>).</li>
+    </ul>
+    <p>Splitting helps because each stage gets a focused context with only what it needs.
+    You can inspect and correct between stages instead of finding a bad assumption at the end, and cheap stages can run on a smaller model.
+    A verifier that did not write the code is also less likely to share the author's blind spots.</p>
+    <p>Splitting hurts because every handoff compresses information, and the next stage cannot ask what the previous one meant.
+    More stages also mean more latency and more total tokens.
+    If a task is small enough for one strong model to hold all of it, one call is usually better.</p>
+    <p>A useful test: split where you would want to review the work anyway, or where the steps genuinely need different context.
+    Do not split just because the task is long.</p>
+    <aside class="why"><p>Plan mode, to-do lists and subagents in Claude Code are decomposition built into the harness.
+    A subagent's summary is a handoff: focused and cheap for the main context, but anything it left out is gone (see <a class="xref" href="#t4-6">4.6</a>).</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Before changing any code for this task, write a numbered plan listing each file you will touch, what changes in it, and how you will verify the change. Stop after the plan and wait for my approval.</pre></aside>
+    <aside class="key"><p>Split where review points or context boundaries fall naturally.
+    Each split buys focus and a checkpoint, and costs a lossy handoff.</p></aside>
+  </article>
+
+  <article class="topic" id="t2-5" data-num="2.5">
+    <h3><span class="tn">2.5</span>Long context versus retrieval</h3>
+    <p class="tl">You can put everything in the window and let attention find what matters, or select the relevant pieces first; each fails differently, and good systems usually combine them.</p>
+    <p>Context windows now hold hundreds of thousands of tokens, enough for a sizable codebase or a stack of documents.
+    That raises a design question: load it all, or retrieve only the relevant parts?</p>
+    <p><strong>Long context</strong> is simple and sees everything at once.
+    The model can connect a detail in one file to a detail in another without anyone predicting that link in advance.
+    The costs: every call pays for every token (caching softens this, see <a class="xref" href="#t2-3">2.3</a>), time to first token grows, and quality degrades with length, especially when many scattered facts must be combined rather than one fact found.</p>
+    <p><strong>Retrieval</strong> picks a small set of pieces first, using keyword search, embedding similarity (see <a class="xref" href="#t7-1">7.1</a>) or an agent searching with tools.
+    It scales to any corpus size, stays current as files change, and keeps each call small.
+    Its failure is silent: if the retriever misses the relevant piece, the model answers confidently from what it was given (see <a class="xref" href="#t1-4">1.4</a>).</p>
+    <table>
+      <tr><th></th><th>Long context</th><th>Retrieval</th></tr>
+      <tr><td>Setup</td><td>None</td><td>Index or search tools</td></tr>
+      <tr><td>Cost per call</td><td>High</td><td>Low</td></tr>
+      <tr><td>Cross-document links</td><td>Good</td><td>Only if retrieved</td></tr>
+      <tr><td>Corpus size</td><td>Bounded by window</td><td>Unbounded</td></tr>
+      <tr><td>Typical failure</td><td>Diluted attention</td><td>Missed piece</td></tr>
+    </table>
+    <p>Rules of thumb:</p>
+    <ul>
+      <li>Small, stable corpus queried many times: put it in context and cache it.</li>
+      <li>Large or fast-changing corpus: retrieve.</li>
+      <li>Often best: retrieve to find the relevant files, then load those files whole rather than as fragments.</li>
+    </ul>
+    <p>Coding agents mostly take the agentic route: grep, glob and read on demand, then keep the important files in context.
+    Exact-match search works well on code because identifiers are precise (see <a class="xref" href="#t7-3">7.3</a>).</p>
+    <aside class="why"><p>Long Claude Code sessions lose sharpness partly for the long-context reason: old file reads and tool output dilute attention even though they still fit.
+    Starting a fresh session with a short handoff note often beats pushing on in a full window.</p></aside>
+    <aside class="key"><p>Fitting in the window is not the same as being used well.
+    Retrieve to narrow, then give the model whole, relevant pieces.</p></aside>
+  </article>
+</section>

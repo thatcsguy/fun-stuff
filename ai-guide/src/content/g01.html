@@ -1,0 +1,168 @@
+<section class="group" id="g1" data-num="1">
+  <header class="ghead">
+    <h2><span class="gn">1</span>How models work</h2>
+    <p class="glead">What actually happens between your prompt and the reply. Most quirks you meet in an agent, from invented flags to slow long sessions, trace back to the few mechanisms in this group.</p>
+  </header>
+
+  <article class="topic" id="t1-1" data-num="1.1">
+    <h3><span class="tn">1.1</span>Tokens and transformers in one page</h3>
+    <p class="tl">A model is a function that reads a sequence of tokens and outputs a probability for every possible next token; chat, tools and agents are all built by calling it in a loop.</p>
+    <p>Before the model sees your text, a tokenizer cuts it into <strong>tokens</strong>: common words, word pieces, punctuation, runs of spaces.
+    Each token is an integer id from a fixed vocabulary, typically tens of thousands to a couple hundred thousand entries (see <a class="xref" href="#t1-6">1.6</a>).</p>
+    <p>Each id is looked up in a table to get an <strong>embedding</strong>, a vector of a few thousand numbers.
+    The vectors then pass through a stack of identical <strong>transformer layers</strong>, often dozens of them.
+    Each layer has two parts: attention, which moves information between positions, and a feed-forward network, which transforms each position on its own and is where much of the stored knowledge appears to live.</p>
+    <p><strong>Attention</strong> is the part worth an intuition.
+    At every position the layer computes a query ("what am I looking for") and compares it with a key ("what do I contain") at every earlier position; the match scores become weights for blending those positions' values into the current one.
+    That is how a closing brace finds its opening brace, or a variable use finds its declaration three files back, and each layer runs many of these "heads" in parallel, each learning different relationships.</p>
+    <p>After the last layer, the vector at the final position is turned into a probability distribution over the whole vocabulary.
+    One token is picked from it (sampling, shaped by settings like temperature), appended to the sequence, and the model runs again.
+    Text generation is this loop, one token per step.</p>
+    <p>Three consequences follow.
+    First, the model has no memory between calls: the <strong>context window</strong>, the tokens you send, is all it knows beyond what is frozen in its weights.
+    Second, comparing every position with every earlier one makes long inputs expensive, so servers keep each token's keys and values in a <strong>KV cache</strong> and a new token only attends to stored work (see <a class="xref" href="#t9-1">9.1</a>).</p>
+    <p>Third, the weights do not change while you use the model.
+    Nothing you say in a session teaches it anything permanently; anything that persists has to be written somewhere and fed back in as context.</p>
+    <aside class="why"><p>Claude Code streams replies token by token because that is literally how they are produced.
+    And every turn, the harness sends the entire conversation again, because the model keeps nothing between calls; that is a large part of why long sessions get slower and use more of your limit.</p></aside>
+    <aside class="key"><p>Tokens in, one next-token distribution out, repeated.
+    Everything the model "knows" in a session is either in its frozen weights or in the context window.</p></aside>
+  </article>
+
+  <article class="topic" id="t1-2" data-num="1.2">
+    <h3><span class="tn">1.2</span>The training pipeline: pretraining, SFT, RLHF/RLAIF</h3>
+    <p class="tl">A chat model is a next-token predictor trained on a huge text corpus, then reshaped into an assistant by example conversations and reinforcement learning; each stage leaves visible fingerprints.</p>
+    <p><strong>Pretraining</strong> is next-token prediction on an enormous corpus: web pages, books, papers and a great deal of source code.
+    For each position the weights are nudged to make the actual next token more likely.
+    To predict well the model has to pick up grammar, facts, coding idioms and some reasoning patterns, because all of them help predict text.</p>
+    <p>The result is a <strong>base model</strong>.
+    It continues documents rather than answering questions: give it the start of a README and it writes more README; give it a question and it may write five more questions.
+    Its knowledge stops at the <strong>training cutoff</strong>, when the data was collected.</p>
+    <p><strong>Supervised fine-tuning (SFT)</strong> trains on curated conversations: a prompt and an ideal response, wrapped in special tokens that mark who is speaking.
+    This teaches the assistant format: answer the question, follow instructions, call tools with the right syntax, stop when done.</p>
+    <p><strong>Reinforcement learning</strong> comes next, in several flavors:</p>
+    <ul>
+      <li><strong>RLHF</strong> (from human feedback): people compare pairs of responses, a separate reward model learns to predict their preferences, and the chat model is optimized to score well against it.</li>
+      <li><strong>RLAIF</strong> (from AI feedback): a model judges responses against written principles, which scales far better than human raters. Anthropic's constitutional AI is the best-known version (see <a class="xref" href="#t10-3">10.3</a>).</li>
+      <li><strong>RL on verifiable tasks</strong>: the model attempts problems whose results can be checked automatically, such as code that must pass tests. As of late 2026 this, often in multi-step tool-using environments, is a major driver of gains in coding and agent work.</li>
+    </ul>
+    <p>Each stage leaves fingerprints.
+    Preference training rewards answers people like, which can drift into <strong>sycophancy</strong>: agreeing too fast, praising a shaky idea.
+    Rewarding passing tests can teach shortcuts such as special-casing a test or declaring success early, which labs now actively train against (see <a class="xref" href="#t8-4">8.4</a>).</p>
+    <aside class="why"><p>When an agent says "you're right" and abandons a correct position the moment you push back, that is preference training showing through.
+    When it edits a test so the test passes instead of fixing the code, that is a reward-hacking habit.
+    Both are reasons to ask for evidence rather than agreement.</p></aside>
+    <aside class="key"><p>Pretraining gives knowledge and fluency; SFT gives the assistant format; RL gives judgment, tool skill and some bad habits.
+    The chat persona is a learned layer on top of a document predictor.</p></aside>
+  </article>
+
+  <article class="topic" id="t1-3" data-num="1.3">
+    <h3><span class="tn">1.3</span>Reasoning and extended thinking</h3>
+    <p class="tl">Thinking is the model writing tokens before its answer; because later tokens can attend to them, it buys more computation per problem at the cost of time and output tokens.</p>
+    <p>Each forward pass does a fixed amount of computation to produce one token.
+    A problem with ten dependent steps cannot be solved reliably inside one token's worth of work.
+    But if the model writes the steps out, each one becomes part of the context, and the next token can attend to it (see <a class="xref" href="#t1-1">1.1</a>).</p>
+    <p>So written reasoning acts as both a scratchpad and extra serial compute.
+    This is why "think step by step" helped even early models (see <a class="xref" href="#t2-4">2.4</a>).
+    <strong>Reasoning models</strong> go further: they are trained with reinforcement learning to produce long, useful reasoning before answering, including checking their work, backtracking and trying alternatives.</p>
+    <p><strong>Extended thinking</strong> in an API exposes that behavior as a separate part of the response. Mechanically:</p>
+    <ul>
+      <li>The model emits a thinking block, then the final answer. Both are ordinary generated tokens.</li>
+      <li>Thinking tokens are billed as output and count toward limits, though you may not see all of them; some products show a summary instead of the raw text.</li>
+      <li>You steer how much it thinks with a budget or an effort setting. More helps on hard problems and wastes time on easy ones.</li>
+      <li>In agent loops, models can think between tool calls ("interleaved thinking"), reasoning about a result before choosing the next action.</li>
+    </ul>
+    <p>Two cautions.
+    The visible reasoning is not guaranteed to be a faithful record of how the answer was reached; research has found cases where the stated reasoning leaves out what actually drove the result.
+    And thinking adds no knowledge: it can catch a logic slip, not supply a fact the model never learned.</p>
+    <aside class="why"><p>Raising the effort level or asking an agent to think harder produces a longer pause before visible output and draws down more of your usage, because those hidden tokens are real generated output.
+    On a rename or a typo fix, that spend buys nothing.</p></aside>
+    <aside class="key"><p>Thinking trades latency and output tokens for accuracy on multi-step problems.
+    Spend it on design, debugging and planning, not on mechanical edits.</p></aside>
+  </article>
+
+  <article class="topic" id="t1-4" data-num="1.4">
+    <h3><span class="tn">1.4</span>Hallucination and structural weaknesses</h3>
+    <p class="tl">The model always produces a fluent, likely-looking continuation and nothing in that process checks it against reality, so hallucination is the default when knowledge runs thin, not a malfunction.</p>
+    <p>Recall the mechanism: the model outputs a probability distribution and a token is picked from it (see <a class="xref" href="#t1-1">1.1</a>).
+    There is no database lookup and no separate "do I actually know this" step.
+    When the weights strongly encode a fact, the likely continuation is the true one; when they do not, it is something that <em>looks</em> like the true one.</p>
+    <p>That is exactly what happens with rare facts: a flag of a niche CLI, a function signature that changed between library versions, a package name, a citation.
+    The model has seen thousands of similar things, so it produces a confident, well-formed, wrong one.
+    Some research also argues that training and benchmarks reward guessing over "I don't know", since a guess sometimes scores and an abstention never does.</p>
+    <p>Other weaknesses are structural too:</p>
+    <ul>
+      <li><strong>Character-level tasks</strong>: the model sees tokens, not letters, so counting characters or reversing strings is error-prone (see <a class="xref" href="#t1-6">1.6</a>).</li>
+      <li><strong>Exact arithmetic</strong> on long numbers, done "in its head" instead of with a tool.</li>
+      <li><strong>Stale knowledge</strong>: events after the training cutoff are unknown, and the model may not notice that they are.</li>
+      <li><strong>Long-context recall</strong>: details buried in a very long context tend to be used less reliably (see <a class="xref" href="#t2-5">2.5</a>).</li>
+      <li><strong>Self-reports</strong>: "all tests pass" is also a generated sentence and can be wrong in the same way.</li>
+    </ul>
+    <p>The fixes all work by changing what is in context or by checking outside the model.
+    Ground it: have it read the real file, docs or <code>--help</code> output before using an API.
+    Verify: run the code, the tests, the type checker. And say explicitly that "I'm not sure" is an acceptable answer.</p>
+    <aside class="why"><p>An agent that invents a method on your class usually stops once it has grepped for the class definition.
+    The model did not get smarter mid-session; the real definition is now in context and outweighs the guess.
+    Agents that run the tests catch much of the rest.</p></aside>
+    <aside class="key"><p>Fluency is not evidence.
+    Trust what the model read or ran in this session over what it recalls from training.</p></aside>
+  </article>
+
+  <article class="topic" id="t1-5" data-num="1.5">
+    <h3><span class="tn">1.5</span>Scaling laws and model tiers</h3>
+    <p class="tl">Bigger models trained with more data and compute get predictably better, which is why labs ship a family of sizes and why choosing a tier is a real cost and quality decision.</p>
+    <p><strong>Scaling laws</strong> are empirical curves showing that a model's prediction error falls smoothly as parameters, training data and compute grow together.
+    Work around 2020 established the pattern; a 2022 result, usually called Chinchilla, showed many models had been too large for their data, and that parameters and training tokens should grow roughly in step.</p>
+    <p>The curves are smooth for average loss but not for specific skills.
+    A capability like multi-step code repair can look absent at one scale and fairly solid at the next, because it needs several sub-skills to work at once.
+    So what the next model will be able to do is hard to predict even when its loss is not.</p>
+    <p>As of late 2026 there are three axes of scale, not one: pretraining compute, reinforcement learning compute (see <a class="xref" href="#t1-2">1.2</a>), and inference-time compute, meaning how long the model thinks per problem (see <a class="xref" href="#t1-3">1.3</a>).
+    Much recent progress on coding agents has come from the last two.</p>
+    <p>Labs turn this into <strong>tiers</strong>: a large, slow, expensive flagship, a mid-size workhorse and a small fast model.
+    Anthropic's Opus, Sonnet and Haiku follow this shape.
+    Small models are often trained partly to imitate larger ones (distillation, see <a class="xref" href="#t8-3">8.3</a>).</p>
+    <table>
+      <tr><th>Tier</th><th>Good for</th><th>Tradeoff</th></tr>
+      <tr><td>Large</td><td>Ambiguous design, hard bugs, long plans</td><td>Slow, costly, eats limits</td></tr>
+      <tr><td>Mid</td><td>Most coding and agent work</td><td>Misses some subtle cases</td></tr>
+      <tr><td>Small</td><td>Search, triage, extraction, summaries</td><td>Weaker multi-step judgment</td></tr>
+    </table>
+    <p>Two rules of thumb.
+    A new generation's mid tier often matches the previous generation's flagship, so model names age fast.
+    And the right tier depends on what a mistake costs: a cheap model that needs three retries and your review time is not cheap.</p>
+    <aside class="why"><p>Usage limits drain faster on larger models, which is why switching to a smaller one stretches a session.
+    Harnesses also commonly let you give subagents doing search or summarization a smaller model while the main loop keeps the large one.</p></aside>
+    <aside class="key"><p>Match the tier to the difficulty of the decisions, not the size of the task.
+    Routine, well-specified work rarely needs the flagship.</p></aside>
+  </article>
+
+  <article class="topic" id="t1-6" data-num="1.6">
+    <h3><span class="tn">1.6</span>Tokenization in practice (code, JSON, Chinese, cost)</h3>
+    <p class="tl">Models read text in subword chunks whose size depends heavily on the kind of text, so the same content can cost very different amounts as code, JSON, English or Chinese.</p>
+    <p>Most current tokenizers use a variant of <strong>byte-pair encoding (BPE)</strong>.
+    Start from raw bytes and repeatedly merge the most frequent adjacent pair into a new token until the vocabulary reaches its target size.
+    Frequent strings end up as single tokens; rare ones split into pieces, down to single bytes if needed, so any input can be encoded.</p>
+    <p>For English prose a common rule of thumb is roughly four characters, or three quarters of a word, per token. Other content varies widely:</p>
+    <ul>
+      <li><strong>Code</strong>: keywords and common names are usually one token. Long or unusual identifiers split into several. Modern tokenizers merge runs of spaces, so indentation is cheaper than it once was.</li>
+      <li><strong>JSON</strong>: every quote, brace, colon and repeated key is paid for in every record. A thousand rows as JSON objects can cost far more than the same data as CSV, and pretty-printing adds more.</li>
+      <li><strong>Chinese</strong>: each character is three bytes in UTF-8. A tokenizer with good Chinese coverage maps common characters or words to one token; a weaker one falls back to bytes and spends two or three per character. The same meaning can cost more than English on one model and about the same on another.</li>
+      <li><strong>Hashes, base64, UUIDs, minified code</strong>: high-entropy strings tokenize badly, often a token every few characters.</li>
+    </ul>
+    <pre><code>getUserAccountBalance
+-&gt; get|User|Account|Balance
+9f3a1c07e2
+-&gt; 9|f|3|a|1|c|07|e|2
+(illustrative; real splits vary)</code></pre>
+    <p>This matters three ways.
+    Cost and rate limits are counted in tokens, not characters; context windows are measured in tokens, so token-heavy content crowds out conversation.
+    And character-level work like counting letters is hard because the model never sees the letters (see <a class="xref" href="#t1-4">1.4</a>).</p>
+    <p>Different model families, and sometimes different generations from one lab, use different tokenizers, so counts are not portable.
+    Use the provider's token-counting endpoint or reported usage rather than guessing.</p>
+    <aside class="why"><p>One tool call that dumps a large JSON response or a minified bundle into context can eat more of the window than an hour of conversation.
+    That is why harnesses truncate long tool output, and why asking an agent to <code>jq</code> or <code>grep</code> first is cheaper than reading the whole thing.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Show how a typical BPE tokenizer would likely split these and roughly how many tokens each costs: the identifier getUserAccountBalanceV2, a 3-row table written as JSON objects versus as CSV, and the sentence 我们明天发布新版本. Explain which is cheapest per unit of information and why.</pre></aside>
+    <aside class="key"><p>Tokens are the unit of cost, speed and memory.
+    Structured and high-entropy data is the expensive kind; reshape or filter it before feeding it in.</p></aside>
+  </article>
+</section>

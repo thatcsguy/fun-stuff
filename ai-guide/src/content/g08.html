@@ -1,0 +1,119 @@
+<section class="group" id="g8" data-num="8">
+  <header class="ghead">
+    <h2><span class="gn">8</span>Fine-tuning and customization</h2>
+    <p class="glead">Fine-tuning changes the weights; nearly everything else in this guide changes the input. Knowing what each can and cannot do saves you from training a model to fix a retrieval problem.</p>
+  </header>
+
+  <article class="topic" id="t8-1" data-num="8.1">
+    <h3><span class="tn">8.1</span>What fine-tuning changes</h3>
+    <p class="tl">Fine-tuning nudges a model's behavior with examples; it is good at style, format and narrow skills, and unreliable for teaching new facts.</p>
+    <p><strong>Fine-tuning</strong> means continuing to train an already trained model on your own examples.
+    In <strong>supervised fine-tuning</strong> (SFT) each example is an input and the output you want, and training adjusts the weights so those output tokens become more probable.
+    It is the same next-token objective as pretraining (see <a class="xref" href="#t1-2">1.2</a>), on a small, targeted dataset.</p>
+    <p><strong>Full fine-tuning</strong> updates every weight.
+    That needs memory for the weights, their gradients and the optimizer's running statistics, several times the size of the model itself.
+    It also produces a complete new copy of the model for every variant you train.</p>
+    <p><strong>LoRA</strong> (low-rank adaptation) freezes the original weights and learns a small correction for selected weight matrices, usually in the attention layers.
+    The correction is the product of two thin matrices, so it holds a tiny fraction of the parameters.</p>
+    <pre><code>W   : d x d    frozen original
+A   : r x d    trained, r small (8-64)
+B   : d x r    trained, starts at zero
+W'  = W + scale * (B @ A)</code></pre>
+    <p>Because B starts at zero, training begins from exactly the original model.
+    The adapter file is megabytes rather than gigabytes, one base model can serve many adapters swapped per request, and an adapter can be merged into the weights for deployment.
+    <strong>QLoRA</strong> goes further and keeps the frozen base in 4-bit form (see <a class="xref" href="#t9-2">9.2</a>) while training, so it fits on much smaller GPUs.</p>
+    <p>Why a low-rank update is enough is an empirical finding, not a guarantee: the change needed for a narrow task seems to live in a small subspace.
+    For broad new capability, full fine-tuning or more pretraining still does better.</p>
+    <p><strong>Style versus facts.</strong> Fine-tuning reliably teaches form: tone, output structure, when to call a tool, domain shorthand.
+    Teaching facts is shaky; the model learns to sound like it knows them while recall stays patchy, and research suggests training on facts the model did not already know can increase hallucination.
+    Facts that change belong in the prompt or in retrieval.</p>
+    <p>Risks: regressions on general ability, weakened safety behavior, and sensitivity to data quality, where a few hundred clean examples often beat thousands of noisy ones.
+    Hosted fine-tuning of frontier closed models is limited and varies by vendor; most hands-on fine-tuning happens on open-weight models.</p>
+    <aside class="key"><p>Fine-tuning changes how a model responds, not reliably what it knows. LoRA makes it cheap by training a small add-on instead of the whole model.</p></aside>
+  </article>
+
+  <article class="topic" id="t8-2" data-num="8.2">
+    <h3><span class="tn">8.2</span>Prompt versus RAG versus fine-tune</h3>
+    <p class="tl">Start with the prompt, add retrieval when the problem is missing knowledge, and fine-tune only for behavior you cannot prompt into place at the cost or speed you need.</p>
+    <table>
+      <thead><tr><th>Approach</th><th>Changes</th><th>Good for</th><th>Iteration</th></tr></thead>
+      <tbody>
+        <tr><td>Prompt</td><td>Input</td><td>Instructions, examples, format</td><td>Minutes</td></tr>
+        <tr><td>RAG</td><td>Input, fetched</td><td>Private or changing facts, citations</td><td>Days to build</td></tr>
+        <tr><td>Fine-tune</td><td>Weights</td><td>Consistent style, narrow task, smaller model</td><td>Days to weeks, plus data</td></tr>
+      </tbody>
+    </table>
+    <p>Diagnose the failure before picking a fix.</p>
+    <ol>
+      <li><strong>Does it lack information?</strong> Put the information in context: directly in the prompt if it is small and stable, through retrieval if it is large or changing.</li>
+      <li><strong>Does it ignore the pattern?</strong> Write clearer instructions, add a few worked examples, or constrain the output with a schema (see <a class="xref" href="#t3-2">3.2</a>). Most problems end here.</li>
+      <li><strong>Still failing, or too slow or costly at volume?</strong> Now fine-tuning is worth it, especially to make a small model do one job well (see <a class="xref" href="#t8-3">8.3</a>). You will need hundreds of good examples and an eval set (see <a class="xref" href="#t6-1">6.1</a>).</li>
+    </ol>
+    <p>The options combine.
+    A common production shape is a fine-tuned model for format and tone, fed facts by retrieval.
+    Fine-tuning for facts and prompting for format is the combination that usually disappoints.</p>
+    <p>Fine-tuning has a hidden cost: you now own a model version.
+    When the vendor ships a better base model, a prompt moves to it in minutes, while a fine-tune has to be retrained and re-evaluated.
+    With frontier models improving quickly, that maintenance often outweighs the gain.</p>
+    <p>Prompting also has a cost that grows quietly.
+    Long instructions are re-sent on every call, so a large, stable prompt should sit at the front where prompt caching can reuse it (see <a class="xref" href="#t2-3">2.3</a>).
+    At very high volume, distilling that behavior into a smaller model can become cheaper than paying for the prompt each time.</p>
+    <aside class="why"><p>Writing a CLAUDE.md file or a skill is the prompt row of this table: instructions placed into context at the right moment. That is why an edit takes effect on the next session with no training, and why a bloated instruction file costs tokens on every turn.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">I want a model to do the following task: [describe it]. Before recommending prompting, retrieval or fine-tuning, ask me up to five questions about my data, volume, latency needs and current failure cases. Then recommend one approach and say what evidence would change your mind.</pre></aside>
+    <aside class="key"><p>Missing knowledge is a context problem; ignored instructions are a prompting problem; only consistent behavior at scale is a fine-tuning problem.</p></aside>
+  </article>
+
+  <article class="topic" id="t8-3" data-num="8.3">
+    <h3><span class="tn">8.3</span>Distillation and small models</h3>
+    <p class="tl">Distillation trains a small model to imitate a large one, which is how small models get much of a big model's skill on the tasks they were trained for.</p>
+    <p>In <strong>distillation</strong> a large <em>teacher</em> model produces the training signal for a smaller <em>student</em>.
+    The classic version trains the student to match the teacher's full probability distribution over answers, not just the single right one.
+    That distribution carries extra information, such as which wrong answers were nearly right, so the student learns more per example than from plain labels.</p>
+    <p>With language models you will see two flavours:</p>
+    <ul>
+      <li><strong>Logit distillation</strong> matches the teacher's probabilities for every next token. It needs those probabilities, so in practice it needs the teacher's weights.</li>
+      <li><strong>Data distillation</strong> generates many outputs from the teacher, including step-by-step reasoning, and fine-tunes the student on them with ordinary SFT (see <a class="xref" href="#t8-1">8.1</a>). This works through a public API, which is why many vendors' terms forbid using outputs to train competing models.</li>
+    </ul>
+    <p>Reasoning made this prominent.
+    In early 2025 DeepSeek released small open models fine-tuned on reasoning traces from its large R1 model, and they gained a great deal on math and code benchmarks.
+    Labs rarely detail how their smaller tiers are made, but distillation from larger models is a standard, publicly described technique.</p>
+    <p>Why small models matter:</p>
+    <ul>
+      <li>Lower latency and cost per token, because there are fewer weights to read for each token (see <a class="xref" href="#t9-1">9.1</a>).</li>
+      <li>They can run on your own hardware (see <a class="xref" href="#t9-2">9.2</a>).</li>
+      <li>High-volume narrow work suits them: classification, extraction, routing, autocomplete, summarizing tool output.</li>
+    </ul>
+    <p>What is lost is breadth.
+    A student matches its teacher on the kind of data it was trained on, and falls off on long-tail knowledge and unfamiliar inputs.
+    Small models also struggle more on long agent tasks, because a slightly higher error rate per step compounds over dozens of steps.</p>
+    <p>A practical pattern: prototype with the big model, use it to label or generate a dataset, check that data against an eval set, then train a small model for the narrow production task.
+    The cheaper everyday version is routing: many harnesses let you run subagents or background jobs on a smaller tier while the main loop uses a larger one.</p>
+    <aside class="key"><p>A small model can match a large one on a narrow task it was distilled for; it does not inherit the large one's generality. Use it where the job is narrow and the volume is high.</p></aside>
+  </article>
+
+  <article class="topic" id="t8-4" data-num="8.4">
+    <h3><span class="tn">8.4</span>Preference tuning: RLHF and DPO</h3>
+    <p class="tl">RLHF and DPO both teach a model which of two responses is better; RLHF goes through a learned reward model and reinforcement learning, while DPO trains on the preference pairs directly.</p>
+    <p>SFT shows the model one good answer.
+    But qualities like helpful, honest or appropriately brief are easier to judge by comparison than to demonstrate.
+    So the data becomes <strong>preferences</strong>: a prompt, two responses, and a label saying which is better, from human raters or from a model judging against written principles (RLAIF, see <a class="xref" href="#t1-2">1.2</a>).</p>
+    <p><strong>RLHF</strong> (reinforcement learning from human feedback) uses that data in two steps:</p>
+    <ol>
+      <li>Train a <strong>reward model</strong>: a language model with a single-number output, trained so the preferred response scores higher.</li>
+      <li>Optimize the main model with reinforcement learning (classically PPO) to produce responses the reward model scores highly, with a penalty for drifting far from the starting model.</li>
+    </ol>
+    <p>That drift penalty matters because the reward model is only an approximation.
+    Pushed hard, the policy finds what the reward model overrates, such as length, confident tone or agreement with the user; this is <strong>reward hacking</strong>.
+    Sycophancy is widely thought to come partly from this pressure.</p>
+    <p><strong>DPO</strong> (direct preference optimization, 2023) showed that the best policy under that same penalised objective can be written in terms of the model's own probabilities.
+    So you can skip the reward model and the RL loop and train on the pairs with a simple loss: raise the probability of the chosen response relative to the rejected one, both measured against a frozen reference copy.
+    It is cheaper and more stable, and became popular for open models.</p>
+    <p>The trade-off is that DPO is <em>offline</em>: it learns only from a fixed set of pairs.
+    RL samples fresh responses during training and can explore beyond the dataset.
+    The recent wave of reasoning models leaned heavily on RL with <strong>verifiable rewards</strong> (tests pass, the math checks out) rather than learned preferences.</p>
+    <p>You will see many variants named in abstracts, such as IPO, KTO, ORPO and GRPO.
+    When reading one, ask four questions: where the preference or reward signal comes from, whether training is online or offline, what the reference model is, and how the result was evaluated.
+    Many papers report win rates judged by another model, which has its own biases (see <a class="xref" href="#t6-2">6.2</a>).</p>
+    <aside class="key"><p>Preference tuning optimizes for "what raters prefer", which is close to but not the same as "what is correct". RLHF learns a reward model and runs RL; DPO folds the same goal into one direct loss.</p></aside>
+  </article>
+</section>

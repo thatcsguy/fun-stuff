@@ -1,0 +1,108 @@
+<section class="group" id="g6" data-num="6">
+  <header class="ghead">
+    <h2><span class="gn">6</span>Evals</h2>
+    <p class="glead">Evals are the test suite for anything with a model in it. Without them every prompt tweak or model upgrade is a guess; with even a small set, you can ship AI features with the confidence you expect from ordinary code.</p>
+  </header>
+
+  <article class="topic" id="t6-1" data-num="6.1">
+    <h3><span class="tn">6.1</span>Why vibes fail: building a small eval set</h3>
+    <p class="tl">Trying a few prompts by hand tells you almost nothing; thirty real examples with checkable expectations, run on every change, tell you a lot.</p>
+    <p>"Vibes" testing means trying three or four inputs, liking the answers, and shipping. It fails for predictable reasons. You test the cases you were already thinking about. Outputs vary between runs, so one good answer proves little. And a change that fixes one case often breaks another you did not retry.</p>
+    <p>An <strong>eval</strong> is just a fixed set of inputs, a way to judge each output, and a score. You do not need a framework to start. Here is how to build a first set of about 30 examples in an afternoon:</p>
+    <ol>
+      <li><strong>Pull real inputs.</strong> Logs, support tickets, actual user requests. Real inputs are messier than the ones you would invent.</li>
+      <li><strong>Add every failure you have seen.</strong> Each bug report becomes a test case, like a regression test.</li>
+      <li><strong>Cover the edges on purpose.</strong> Empty input, very long input, wrong language, ambiguous requests, inputs where the right answer is "I can't do that".</li>
+      <li><strong>Write down what good means</strong> for each case, as specifically as you can: an exact value, a field that must be present, a phrase that must not appear.</li>
+    </ol>
+    <pre><code>{"id": "refund-07",
+ "input": "charged twice for order 4411",
+ "expect": {"intent": "refund",
+            "order_id": "4411"},
+ "tags": ["billing", "regression"]}</code></pre>
+    <p>Prefer checks in code wherever possible: exact match, JSON validity, a regex, a unit test on generated code. Use a model as the grader only for qualities code cannot check (see <a class="xref" href="#t6-2">6.2</a>). Tag cases by category so a score drop points at a cause.</p>
+    <p>Then use it like a test suite. Keep the file in the repo, run it on every prompt change and every model upgrade, and look at the failing cases rather than only the score. Because outputs vary, run each case a few times when the score is close; a difference of one or two cases out of 30 is often noise.</p>
+    <p>Thirty examples will not give statistically tight numbers. They will catch regressions, show you which categories are weak, and turn "it feels better" into "it now passes 26 instead of 21, and here are the five that still fail".</p>
+    <aside class="key"><p>An eval set is a regression suite for prompts. Start with 30 real cases, check them in code where you can, and read the failures, not just the score.</p></aside>
+  </article>
+
+  <article class="topic" id="t6-2" data-num="6.2">
+    <h3><span class="tn">6.2</span>LLM as judge</h3>
+    <p class="tl">Using a model to grade outputs scales well, but judges have known biases, so give them narrow rubrics and check them against your own judgment.</p>
+    <p>Some qualities cannot be checked with code: is the summary faithful, is the tone right, does the answer address the question. An <strong>LLM judge</strong> is a second model call that reads the input, the output and a rubric, and returns a grade. It is cheap and fast compared with human review, and it is biased in ways that are well documented:</p>
+    <ul>
+      <li><strong>Position bias.</strong> When comparing two answers side by side, judges tend to favor one slot (often the first) regardless of content. Fix: run every comparison twice with the order swapped, and count it as a win only if both runs agree.</li>
+      <li><strong>Verbosity bias.</strong> Longer, more detailed-looking answers get higher scores even when they are not better. Fix: tell the judge length is not a virtue, and track output length next to the score so you notice if it creeps up.</li>
+      <li><strong>Self-preference.</strong> Models tend to rate text from their own model family more highly, partly because it matches their own style. Fix: when comparing models, use a judge from a different family, or at least be suspicious when the judge's sibling wins.</li>
+      <li><strong>Leniency.</strong> Asked "is this good, 1 to 10?", judges cluster at the high end. Vague scales produce mush.</li>
+    </ul>
+    <p>Practices that make judges reliable enough to use:</p>
+    <ul>
+      <li><strong>Binary, specific criteria.</strong> "Does the answer state the refund amount? yes/no" beats "rate helpfulness 1 to 10". Several narrow checks beat one broad score.</li>
+      <li><strong>Reason first, verdict last.</strong> Ask for a short justification before the grade, for the field-order reason in <a class="xref" href="#t3-2">3.2</a>.</li>
+      <li><strong>Give a reference answer</strong> when one exists. Comparing against a known good answer is much easier than judging from scratch.</li>
+      <li><strong>Calibrate.</strong> Hand-grade 20 or so outputs yourself, run the judge on the same ones, and look at the disagreements. If the judge disagrees with you often, fix the rubric before trusting any number it produces.</li>
+    </ul>
+    <p>Treat the judge as code you wrote: it has bugs, it needs tests, and its prompt should be versioned with everything else.</p>
+    <aside class="why"><p>If you have asked Claude to review its own work and got back "this looks good", you have seen self-preference and leniency together. A separate reviewer with a specific checklist, or a test that runs, catches more.</p></aside>
+    <aside class="key"><p>A judge is only as good as its rubric. Use yes/no criteria, swap positions, watch length, avoid same-family judging, and validate against your own grades.</p></aside>
+  </article>
+
+  <article class="topic" id="t6-3" data-num="6.3">
+    <h3><span class="tn">6.3</span>Reading benchmarks critically</h3>
+    <p class="tl">A benchmark score measures one model, in one setup, on one task distribution; before it informs your choice, check how it was run and whether it resembles your work.</p>
+    <p>Launch posts lead with benchmark tables. They are useful signals and easy to over-read. When you see a number, run through these questions.</p>
+    <ul>
+      <li><strong>What does it actually test?</strong> A coding benchmark built from small bug fixes in popular Python repositories says little about large refactors in your private TypeScript monorepo. Read what the tasks are, not just the name.</li>
+      <li><strong>Who ran it, and with what setup?</strong> Agent benchmarks measure the model plus the harness: its tools, prompts, retries and time limits. The same model can score very differently in different scaffolds, so cross-lab comparisons are only fair with the same setup. Self-reported numbers deserve more caution than independent ones.</li>
+      <li><strong>How many tries?</strong> pass@1 (first attempt) and best-of-several are different numbers (see <a class="xref" href="#t6-4">6.4</a>). So is a score with extra thinking or test-time compute. Footnotes often hide this.</li>
+      <li><strong>Is the gap bigger than the noise?</strong> On a few hundred tasks, a one or two point difference can come from run-to-run variation alone. Error bars are rarely shown; assume they exist.</li>
+      <li><strong>Could it be contaminated?</strong> If the test questions were public before the training data was collected, the model may have seen them. Newer benchmarks and held-out sets exist partly for this reason.</li>
+      <li><strong>Is it saturated?</strong> When top models all score near the ceiling, the remaining errors are often ambiguous or mislabeled tasks, and differences mean little. That is why cleaned subsets (such as human-verified variants) and harder successors keep appearing.</li>
+      <li><strong>What is missing?</strong> Labs choose which benchmarks to show. A table without the obvious comparison model or task is information too.</li>
+    </ul>
+    <p>Benchmarks are best for coarse questions: is this model roughly in the top tier for coding, did agentic performance jump between versions. For the actual decision, whether to switch models for your feature, your own eval set (see <a class="xref" href="#t6-1">6.1</a>) is the benchmark that matters, because it is built from your distribution.</p>
+    <aside class="key"><p>Treat benchmark numbers as coarse rankings with hidden error bars and setup choices. Your own small eval decides what to ship.</p></aside>
+  </article>
+
+  <article class="topic" id="t6-4" data-num="6.4">
+    <h3><span class="tn">6.4</span>Evaluating agents</h3>
+    <p class="tl">Agent evals check the final state of a real environment over several trials, and also look at the path taken, because a right answer reached badly is a future failure.</p>
+    <p>A chat eval compares one output to an expectation. An agent run is dozens of steps with tool calls, side effects and many valid paths, and two runs on the same task can go quite differently. That changes what you measure.</p>
+    <p><strong>Grade the outcome by state, not by text.</strong> Do not ask "did the agent say it fixed the bug". Run the hidden tests, diff the database, check the file exists. Coding benchmarks work this way: the agent edits a repository, then a test suite decides. Agents that claim success without achieving it are common enough that text-based grading is close to useless.</p>
+    <p><strong>Run multiple trials.</strong> Because runs vary, one attempt per task is a coin flip. Two summary numbers matter:</p>
+    <ul>
+      <li><strong>pass@k:</strong> the chance that at least one of k attempts succeeds. Good for "can it ever do this", and relevant when you can cheaply check and retry, like generating candidate patches against a test suite.</li>
+      <li><strong>pass^k</strong> (all k succeed): the chance it succeeds every time. This is the number that matters for an unattended agent, and it falls fast: a task solved 80% of the time is solved all of 5 times only about a third of the time.</li>
+    </ul>
+    <p>If you run n attempts and c pass, the usual estimate of pass@k is <code>1 - C(n-c, k) / C(n, k)</code>, where C is "n choose k". For quick work, just report pass rate over n trials with n stated.</p>
+    <p><strong>Grade the trajectory too.</strong> The trajectory is the full sequence of tool calls. Useful checks on it:</p>
+    <ul>
+      <li>Did it stay within bounds (no edits outside the target directory, no network when forbidden)?</li>
+      <li>How many steps, tokens and minutes did it take? Cost is a metric.</li>
+      <li>Did it verify its work (run tests) before declaring done?</li>
+      <li>Did it loop, repeat failing commands, or abandon the task quietly?</li>
+    </ul>
+    <p>Practicalities: give each trial a fresh, isolated environment (a container or a clean git checkout), log full transcripts, and read some of them. Transcripts reveal failure patterns, such as misreading a tool's output, that no aggregate score shows.</p>
+    <aside class="why"><p>When an agent reports "all tests pass" and you find it never ran them, or edited a test to make it pass, that is exactly what state-based grading and trajectory checks exist to catch.</p></aside>
+    <aside class="key"><p>For agents, check the world, not the claim; run several trials; report reliability (pass^k) as well as capability (pass@k); and read transcripts.</p></aside>
+  </article>
+
+  <article class="topic" id="t6-5" data-num="6.5">
+    <h3><span class="tn">6.5</span>Evals for your own skills and prompts</h3>
+    <p class="tl">A skill or CLAUDE.md rule is a prompt you ship to yourself, so give it a tiny eval: a dozen test requests, a run with and without it, and a note of what changed.</p>
+    <p>Skills and instruction files usually get tested once and then fail quietly: they do not trigger, trigger when they should not, or break after a later edit. A lightweight loop catches most of this in under an hour.</p>
+    <ol>
+      <li><strong>Write 10 to 20 test requests.</strong> Include requests that should use the skill, phrased several different ways, and near-misses that should <em>not</em> use it. Triggering is decided mostly by the skill's description, so this tests the description as much as the body.</li>
+      <li><strong>Write what good looks like</strong> for each: "uses the skill", "output has a changelog section", "does not touch package.json". Make as many of these checkable by a script as you can.</li>
+      <li><strong>Run a baseline.</strong> Run each request in a fresh session without the skill, then with it. Fresh sessions matter: a session that already discussed the topic will not show you cold behavior. Subagents or headless runs are a convenient way to get clean contexts.</li>
+      <li><strong>Compare and read.</strong> Score each case, then read the transcripts of the failures. Did it not trigger? Trigger and ignore a step? Follow the step and still get it wrong?</li>
+      <li><strong>Change one thing, rerun.</strong> Edit the description or the instructions, rerun the whole set, and keep a short log: date, change, score, notable failures.</li>
+    </ol>
+    <p>Two common findings. Skills that do not trigger usually have descriptions that say what the skill is rather than when to use it; listing the situations and phrasings that should invoke it helps. Skills that trigger but underperform are often too long or bury the critical step; moving it to the top, or into a script the skill runs, helps more than adding emphasis.</p>
+    <p>Rerun the set when you upgrade models. Instructions tuned to compensate for an older model's habits can become unnecessary, or start to over-steer a newer one.</p>
+    <aside class="why"><p>If a skill you wrote fires only when you name it explicitly, or a CLAUDE.md rule gets followed some days and not others, that is the gap a small set of fresh-session test requests makes visible.</p></aside>
+    <aside class="key"><p>Test skills and prompts like code: a small fixed set of requests, including ones that should not trigger, run fresh before and after each change.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Here is a skill I wrote: [paste SKILL.md]. Write 12 test requests: 8 that should trigger it, phrased differently, and 4 near-misses that should not. For each, state what a correct response must and must not do, in a form a script could check.</pre></aside>
+  </article>
+</section>

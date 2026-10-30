@@ -1,0 +1,79 @@
+<section class="group" id="g3" data-num="3">
+  <header class="ghead">
+    <h2><span class="gn">3</span>Tool use under the hood</h2>
+    <p class="glead">Every agent you use is built on one small API trick: the model writes a structured request, your code runs it, and the result goes back as text. Knowing the exact shapes makes agent behavior much less mysterious.</p>
+  </header>
+
+  <article class="topic" id="t3-1" data-num="3.1">
+    <h3><span class="tn">3.1</span>How function calling works at the API level</h3>
+    <p class="tl">The model never runs anything: it emits a request block, stops, and waits for your code to send the result back in the next message.</p>
+    <p>You send the API a list of tools alongside the messages. Each tool has a <code>name</code>, a plain-language <code>description</code>, and an <code>input_schema</code> (a JSON Schema for its arguments). These definitions are rendered into the prompt, so they cost tokens on every call, just like the system prompt.</p>
+    <p>When the model decides a tool would help, it generates a <code>tool_use</code> block instead of (or after) ordinary text, and the response comes back with <code>stop_reason: "tool_use"</code>. Generation has ended. Nothing has executed yet.</p>
+    <pre><code>// assistant message (from the API)
+{"type": "tool_use",
+ "id": "toolu_01A",
+ "name": "read_file",
+ "input": {"path": "src/app.ts"}}
+
+// next user message (from your code)
+{"type": "tool_result",
+ "tool_use_id": "toolu_01A",
+ "content": "export function main() {..."}</code></pre>
+    <p>Your code (the harness) parses the block, runs the real function, and appends a <code>tool_result</code> block in a new <strong>user</strong> message. The <code>tool_use_id</code> pairs the result with its request. Then you call the API again with the whole conversation.
+    Repeat until the model answers with no tool call. That is the entire agent loop (see <a class="xref" href="#t4-1">4.1</a>).</p>
+    <p>A few details matter in practice:</p>
+    <ul>
+      <li><strong>Parallel calls.</strong> The model can emit several <code>tool_use</code> blocks in one turn. You return all the results together in the next user message, one block per id.</li>
+      <li><strong>Errors are just results.</strong> If the call fails, you send the error text back, usually with an <code>is_error</code> flag. The model reads it and tries something else. There is no exception path.</li>
+      <li><strong>The model only sees the description.</strong> It picks tools and fills arguments from the name, description and schema. A vague description produces wrong calls, which is why tool design is prompt design (see <a class="xref" href="#t4-2">4.2</a>).</li>
+      <li><strong>The "call" is still sampled text.</strong> The model was trained to produce these blocks; the API parses them. Arguments can be wrong or invented, so validate before running anything with side effects.</li>
+    </ul>
+    <aside class="why"><p>When Claude Code shows several reads or greps firing at once, that is one assistant turn with multiple <code>tool_use</code> blocks. When a long tool output makes the session sluggish, it is because every <code>tool_result</code> stays in the conversation and is resent on each later call.</p></aside>
+    <aside class="key"><p>Tool use is a protocol, not a capability: the model writes a request, your code executes it, and the result comes back as a user message tied by id.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Write a minimal Python script that calls the Anthropic Messages API with one tool, get_weather, prints the raw tool_use block the model returns, then sends back a fake tool_result and prints the final answer. Comment each step of the round trip.</pre></aside>
+  </article>
+
+  <article class="topic" id="t3-2" data-num="3.2">
+    <h3><span class="tn">3.2</span>Structured output and JSON schema</h3>
+    <p class="tl">Asking nicely for JSON usually works; constrained decoding makes it guaranteed to parse, but neither guarantees the values are right.</p>
+    <p>When code consumes model output, you need a fixed shape. There are roughly three ways to get one, in increasing order of strictness.</p>
+    <ol>
+      <li><strong>Ask in the prompt.</strong> Describe the shape, give an example, say "respond with JSON only". Strong models comply almost always, but "almost" means you still need a parser that can fail gracefully: stray prose, a code fence, a trailing comma.</li>
+      <li><strong>Use a tool as the schema.</strong> Define a tool whose <code>input_schema</code> is your output shape and force the model to call it. The arguments come back as a parsed object. This was the standard trick for a long time and still works everywhere tool use does.</li>
+      <li><strong>Constrained decoding.</strong> Many APIs now offer a strict or structured-output mode (as of late 2026 this is common across major providers). At each step the sampler only allows tokens that keep the output valid against your schema, so the result always parses.</li>
+    </ol>
+    <p>Strict modes usually support only a subset of JSON Schema. Expect limits on things like complex <code>pattern</code> regexes, deep recursion, or open-ended <code>additionalProperties</code>; check the docs for the API you use.</p>
+    <p>Three things catch engineers out:</p>
+    <ul>
+      <li><strong>Valid is not correct.</strong> The schema guarantees <code>"severity"</code> is one of your enum values, not that it is the right one. Semantic checks still belong in your code and your evals (see <a class="xref" href="#t6-1">6.1</a>).</li>
+      <li><strong>Field order is thinking order.</strong> The model writes fields left to right, and each token can only use what came before. Put a <code>reasoning</code> or <code>evidence</code> field before the <code>verdict</code> field, not after, or the verdict is decided before any reasoning exists.</li>
+      <li><strong>Over-constraining hurts.</strong> Forcing a model into a tight format can make answers worse than letting it reason in free text first and extracting afterward. For hard tasks, a two-step "think, then fill the schema" often beats one strict call.</li>
+    </ul>
+    <p>For anything you will rely on, validate with a real schema library on your side too, and on failure send the validation error back and ask for a fix. One retry resolves most problems.</p>
+    <aside class="key"><p>Schemas control shape, not truth. Order fields so reasoning comes before conclusions, and keep validating on your side.</p></aside>
+  </article>
+
+  <article class="topic" id="t3-3" data-num="3.3">
+    <h3><span class="tn">3.3</span>Computer use and browser agents</h3>
+    <p class="tl">Computer use is the ordinary tool loop with screenshots as results and mouse and keyboard actions as calls, which makes it general but slow, costly and easy to mislead.</p>
+    <p>There is no special mechanism. The harness offers a tool whose actions are things like <em>screenshot</em>, <em>click at (x, y)</em>, <em>type text</em>, <em>press key</em> and <em>scroll</em>. The model sees an image, decides on one action, the harness performs it on a real or virtual desktop, takes a new screenshot, and sends it back as the tool result.</p>
+    <pre class="diag">screenshot --&gt; model --&gt; action
+     ^                       |
+     |                       v
+     +---- harness runs it --+</pre>
+    <p>This is powerful because almost any software has a screen. It is also the most expensive way to drive software:</p>
+    <ul>
+      <li><strong>Images are many tokens.</strong> Each screenshot costs far more than the equivalent text, and a task can take dozens of them.</li>
+      <li><strong>Every step is a round trip.</strong> A form a script fills in milliseconds can take a minute.</li>
+      <li><strong>Pixels are brittle.</strong> Click coordinates depend on resolution and scaling, and a pop-up or slow page load shifts the target.</li>
+    </ul>
+    <p><strong>Browser agents</strong> usually do better by reading the page structure rather than only pixels.
+    Tools that expose the DOM or the accessibility tree (the labelled list of buttons, links and fields that screen readers use) let the model say "click the button labelled Submit" instead of guessing coordinates.
+    Most combine both: structure for targeting, screenshots for checking what actually rendered.</p>
+    <p>The security problem is serious. Every web page the agent reads is untrusted input, and a page can contain text written to look like instructions (prompt injection, see <a class="xref" href="#t10-1">10.1</a>).
+    An agent logged in as you, with your cookies, can be talked into acting on that text. Mitigations in most products: per-site permissions, confirmation before purchases, sends or deletions, and keeping the agent out of sensitive sites entirely.</p>
+    <p>Rule of thumb for an engineer: if there is an API, a CLI or a scriptable test framework, use that and keep computer use for the parts with no other interface. Driving a UI through screenshots is the fallback, not the default.</p>
+    <aside class="key"><p>Computer use trades cost, speed and safety for generality. Prefer APIs and page structure; use pixels when nothing else exists, and confirm irreversible actions.</p></aside>
+    <aside class="try"><p class="tryl">Try it in Claude</p><pre class="prompt">Explain step by step what happens, at the level of tool calls and tool results, when a browser agent is asked to "find the cheapest flight and fill in the passenger form but do not pay". Point out where prompt injection could enter and where a confirmation step belongs.</pre></aside>
+  </article>
+</section>
