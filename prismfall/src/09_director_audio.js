@@ -253,6 +253,7 @@ const SECTIONS = {
   title: { root: 62, scale: PENTm, bpm: 70, prog: [0, 3, 1, 4], pad: 0.8, arp: 0.25, bass: 0.3, perc: 0, cut: 900 },
   b1p1: { root: 57, scale: AEOL, bpm: 96, prog: [0, 5, 2, 6], pad: 1, arp: 0.65, bass: 1, perc: 0.3, cut: 1200 },
   b1p2: { root: 57, scale: PHRYD, bpm: 112, prog: [0, 1, 0, 6], pad: 1, arp: 0.85, bass: 1, perc: 1, cut: 1800 },
+  b1p3: { root: 57, scale: PHRYD, bpm: 124, prog: [0, 5, 1, 6], pad: 1, arp: 1, bass: 1, perc: 1, cut: 2600 },
   b2p1: { root: 52, scale: DOR, bpm: 104, prog: [0, 3, 0, 6], pad: 1, arp: 0.6, bass: 1, perc: 0.3, cut: 1300 },
   b2p2: { root: 52, scale: LYD, bpm: 110, prog: [0, 1, 4, 0], pad: 1, arp: 0.75, bass: 1, perc: 0.6, cut: 1600 },
   b2p3: { root: 52, scale: PHRY, bpm: 124, prog: [0, 1, 5, 6], pad: 1, arp: 0.9, bass: 1, perc: 1, cut: 2000 },

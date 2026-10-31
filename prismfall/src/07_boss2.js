@@ -481,7 +481,7 @@ function b2SapHit(s, d, crit, src) {
   if (!s.alive || game.state !== 'fight') return;
   s.hp -= d; s.u.uFlash.value = 0.45; s.u.uCrack.value = clamp(1 - s.hp / 220, 0, 1);
   if (src !== 'bolt') dmgNumber(s.x, 1.9, s.z, String(Math.round(d)), crit ? 1 : 0); else if (frand() < 0.3) burst(s.x, 0.9, s.z, 3, 0.6, 2.2, 1, 3, 0.3, 0.12, 1, 0);
-  if (s.hp <= 0) { b2KillSap(s, true); addCharge(Bc, 15); streakToPlayer(s.x, 0.9, s.z, Bc, 6); dmgNumber(s.x, 2.4, s.z, '+15 BLUE', 4, '#7fb4ff'); }
+  if (s.hp <= 0) { b2KillSap(s, true); addRadiance(5); streakToPlayer(s.x, 0.9, s.z, W, 6); dmgNumber(s.x, 2.4, s.z, '+RADIANCE', 4, '#fff3c0'); }
 }
 function b2KillSap(s, withFx) {
   if (!s.alive) return; s.alive = false; s.tgt.alive = false; s.g.visible = false; s.beam.m.visible = false;
@@ -571,7 +571,7 @@ function b2UpdateBloom(dt, fighting) {
 function b2SoakResolve(ok) {
   const s = B2.soak; s.active = false; s.fade = 0.8; B2.seedOrb.visible = false;
   if (ok && s.inT >= 0.75) {
-    addCharge(G, 25); addCharge(R, 25); bossRT.stagger = Math.max(bossRT.stagger, 2.5); bossRT.staggerMul = Math.max(bossRT.staggerMul, 1.5); bossAddFracture(15);
+    addRadiance(15); bossRT.stagger = Math.max(bossRT.stagger, 2.5); bossRT.staggerMul = Math.max(bossRT.staggerMul, 1.5); bossAddFracture(15);
     beam(s.x, 1.4, s.z, B2.vx, B2.hy, B2.vz, 0.35, 0.6, 1.4, 1.4, 1.1, 0, 1.4);
     burst(s.x, 1.4, s.z, 60, 2.4, 2.4, 1.8, 9, 0.9, 0.22, 1, 0); streakToPlayer(s.x, 1.4, s.z, G, 10); streakToPlayer(s.x, 1.4, s.z, R, 10);
     dmgNumber(player.x, 2.7, player.z, 'SEED CLAIMED', 4, '#fff3c0'); B2.vU.uFlash.value = 1; bloomSpike(1.0); sfx.victoryStab(); sfx.perfect(G, 4);
@@ -692,7 +692,7 @@ function b2LeafWall(life) {
 }
 const BOSS2 = {
   id: 2, name: 'VEYRA, THE GLASS ORCHARD', subtitle: 'Second Refraction', deathTitle: 'VEYRA', deathSub: 'UNBOUND',
-  arena: 1, arenaR: 15, maxHp: 19000, enrage: 270, hit: { x: 0, y: 3.4, z: 0.25, r: 2.2, hy: 3 },
+  arena: 1, arenaR: 15, maxHp: 22000, enrage: 270, hit: { x: 0, y: 3.4, z: 0.25, r: 2.2, hy: 3 },
   barGrad: 'linear-gradient(90deg,#1fd16a,#7dffb0 45%,#b98cff 75%,#ff5a86)', music: ['b2p1', 'b2p2', 'b2p3'],
   phases: [
     { name: 'Grove', until: 0.7, loop: 15, steps: [[0, 'Seedfall', 3], [5, 'RootLash', 0], [9, 'ThornVolley', 0], [12, 'PetalStorm']] },
@@ -709,7 +709,7 @@ const BOSS2 = {
     if (n === 2) { b2Uproot(true); b2SetPal('thorn', false); b2RingOn(true); B2.vortex = B2.vortexTo = 1; }
   },
   onPhase(n) {
-    if (n === 1) { ui.tutorial('leafwall', 'The leaf walls are harmless while faint — slip through the gaps and GRAZE'); }
+    if (n === 1) { ui.tutorial('leafwall', 'The leaf walls are harmless while faint — slip through the gaps'); }
     if (n === 2) { b2RingOn(true); ui.tutorial('thorns', 'The thorns close in — fill FRACTURE or VULNERABLE to push them back'); }
   },
   onInterrupt() { b2ClearAdds(true); },

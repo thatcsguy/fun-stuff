@@ -200,7 +200,7 @@ function b3MoonHit(m, d, crit, src) {
   m.hp -= d; m.u.uFlash.value = 0.5; m.u.uCrack.value = clamp(1 - m.hp / 1400, 0, 1);
   if (src !== 'bolt') dmgNumber(m.x, m.y + 1.4, m.z, String(Math.round(d)), crit ? 1 : 0, CSSCOL[m.c]);
   if (m.hp <= 0) {
-    b3KillMoon(m, true); addCharge(m.c, 20); streakToPlayer(m.x, m.y, m.z, m.c, 10);
+    b3KillMoon(m, true); addRadiance(10); streakToPlayer(m.x, m.y, m.z, m.c, 10);
     if (!B3.moons.some((o) => o.alive) && !B3.moonsDown) {
       B3.moonsDown = true; bossRT.shieldMul = 1; bossRT.stagger = 4; bossRT.staggerMul = 1.5; bossAddFracture(50);
       ui.toast('THE COURT FALLS — SUN STUNNED', 2.2, true); hitstop(0.12); sfx.boom(); bloomSpike(1.2); addTrauma(0.5); B3.sunU.uFlash.value = 1;
@@ -356,8 +356,9 @@ function b3LastLight() {
   const b = bossRT; ll.active = true; ll.done = true; ll.t = 0; ll.spT = 0.6; ll.spA = rng() * TAU;
   bossInterrupt(); b.invuln = true; b.lastLight = true; b.novaInLastLight = false; b.vuln = 0; b.stagger = 0; b.fracture = 100;
   pjClearAll(true); b3CloseVoids();
+  if (player.rad < 60 && player.novaT < 0) { player.rad = 60; streakToPlayer(0, B3.sunY, 0, W, 20); } // insurance: the sun's light pours into you
   castBar('LAST LIGHT', ll.dur); ui.el.bigCastName.textContent = 'LAST LIGHT'; ui.el.bigCast.classList.add('on'); B3.prompt.classList.add('on');
-  ui.toast('THE SUN GATHERS ITS LAST LIGHT', 2.6, true);
+  ui.toast('LAST LIGHT — every hit now surges your Radiance. NOVA it!', 3.0, true);
   bloomSpike(1.8); addTrauma(0.6); shockAt(0, B3.sunY, 0, 0.07); sfx.riser(); sfx.choir(3); sfx.boom(); B3.sunU.uFlash.value = 1;
   burst(0, B3.sunY, 0, 160, 2, 2, 2.4, 12, 1.2, 0.25, 1, 0);
 }
@@ -369,7 +370,7 @@ function b3UpdateLastLight(dt) {
   const ll = B3.ll; if (!ll.active) return;
   const b = bossRT; ll.t += dt; b.fracture = 100;
   ui.set('bigcf', ui.el.bigCastFill, 'tf', `scaleX(${clamp(ll.t / ll.dur, 0, 1).toFixed(3)})`);
-  // slow white spiral to graze (two arms, 5 shots/s)
+  // slow white spiral to dodge while your Radiance surges (two arms, 5 shots/s)
   ll.spT -= dt; while (ll.spT <= 0) { ll.spT += 0.4; ll.spA += 0.5; for (let k = 0; k < 2; k++) { const a = ll.spA + k * Math.PI; shoot(Math.cos(a) * 2.9, Math.sin(a) * 2.9, a, 3.0, W, 0.32, 12, 9); } sfx.shot(W); }
   // sun gathers light inward
   if (frand() < 0.9) { const a = frand() * TAU, r = 9 + frand() * 6, y = 1 + frand() * 6; emitP(Math.cos(a) * r, y, Math.sin(a) * r, -Math.cos(a) * r * 0.9, (B3.sunY - y) * 0.9, -Math.sin(a) * r * 0.9, 2, 2, 2.3, 1.0, 0.18, 4); }
@@ -439,7 +440,7 @@ function b3SolarFlare(mode) { // mode 0: blue wall ×2 · mode 1: eclipse flare 
 
 const BOSS3 = {
   id: 3, name: 'THE NULL SUN', subtitle: 'Eclipse Sovereign', deathTitle: 'THE NULL SUN', deathSub: 'DAWN',
-  arena: 2, arenaR: 15, maxHp: 32000, enrage: 300, hit: { x: 0, y: 4.5, z: 0, r: 2.6, hy: 4.6 },
+  arena: 2, arenaR: 15, maxHp: 36000, enrage: 300, hit: { x: 0, y: 4.5, z: 0, r: 2.6, hy: 4.6 },
   barGrad: 'linear-gradient(90deg,#ff4a2a,#ffb070 18%,#ffffff 45%,#9fb8ff 70%,#3a52ff)', music: ['b3p1', 'b3p2', 'b3p3'],
   phases: [
     { name: 'Corona', until: 0.7, loop: 14, steps: [[0, 'SolarFlare', 0], [5.5, 'CoronaPulse', 0], [9, 'Sunspot', 5], [11.5, 'PrismShards']] },
@@ -536,7 +537,7 @@ const BOSS3 = {
       castBar('White Halo', 1.8); B3.coronaU.uFlash.value = 1;
       const a0 = rng() * TAU;
       every(0.6, 3, (i) => { patRing(0, 0, 36, 3.2 * DIFF[2].spd, W, 0.3, 15, a0 + i * 5 * Math.PI / 180, null, 0, 0, 9); sfx.shot(W); ring(0, 1, 0, 2.6, 6, 0.4, 0.3, 2, 2, 2, 1.2); });
-      ui.tutorial('white', 'WHITE shots charge every color — graze them to fuel White Nova');
+      ui.tutorial('white', 'White Halo: slip through the gaps, or DASH through a wave for a PERFECT');
     },
     FrontalEclipse() {
       const w = b3Windup(), half = 40 * Math.PI / 180;

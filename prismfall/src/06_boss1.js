@@ -2,7 +2,11 @@
 // BOSS 1 — THE LANTERN CHOIR (Ember Pond)
 // ------------------------------------------------------------------
 const B1 = { group: new THREE.Group(), lanterns: [], drops: [], heart: null, heartU: null, flame: null, flameU: null, candles: null, flames: null, flameMatU: null,
-  orbitT: 0, fire: 0, mode: 'title', heartYaw: 0, heartYawTarget: 0, beat: 0, ignited: 0, chorusDir: 1, firstEmber: true, tut: {}, padCandles: 60, floatIdx: 0 };
+  orbitT: 0, fire: 0, mode: 'title', heartYaw: 0, heartYawTarget: 0, beat: 0, ignited: 0, chorusDir: 1, firstEmber: true, tut: {}, padCandles: 60, floatIdx: 0,
+  // phase 3 (Requiem): blue flame, Cantor adds that shield + heal the heart, Lantern Light safe zones
+  pale: 0, paleT: 0, cantors: [], healAcc: 0, healShowT: 0,
+  ll: { active: false, t: 0, dur: 4.2, gaze: false, sx: [0, 0], sz: [0, 0], sr: 2.4, beacons: [-1, -1], ring1: false, ring2: false, dim: 0 } };
+const B1_CANTOR_HP = 380, B1_P3_AT = 0.32;
 function makeLanternTex() {
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256; const c = cv.getContext('2d');
   c.fillStyle = 'rgb(225,0,0)'; c.fillRect(0, 0, 256, 256);
@@ -32,10 +36,10 @@ function buildBoss1() {
   const capMat = new THREE.MeshStandardMaterial({ color: 0x1a0d08, roughness: 0.6, metalness: 0.2, emissive: 0x220a04 });
   const tex = makeLanternTex();
   const lanternMat = new THREE.ShaderMaterial({
-    uniforms: { uMap: { value: tex }, uGlow: { value: 1 }, uFire: { value: 0 }, uTime: { value: 0 }, uDark: { value: 0 }, uSeed: { value: 0 }, uFlash: { value: 0 } },
+    uniforms: { uMap: { value: tex }, uGlow: { value: 1 }, uFire: { value: 0 }, uPale: { value: 0 }, uTime: { value: 0 }, uDark: { value: 0 }, uSeed: { value: 0 }, uFlash: { value: 0 } },
     vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv=uv; vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); vV=-mv.xyz; gl_Position=projectionMatrix*mv; }`,
     fragmentShader: GLSL_LIB + /* glsl */`
-      uniform sampler2D uMap; uniform float uGlow,uFire,uTime,uDark,uSeed,uFlash; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+      uniform sampler2D uMap; uniform float uGlow,uFire,uPale,uTime,uDark,uSeed,uFlash; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
       void main(){ vec3 t = texture2D(uMap, vUv).rgb; vec3 n = normalize(vN), v = normalize(vV);
         float fr = fresnelF(n, v, 2.0);
         float flick = 0.82 + 0.18*noise2(vec2(uTime*5.0 + uSeed*10.0, uSeed));
@@ -49,6 +53,7 @@ function buildBoss1() {
         float fl = noise2(vec2(vUv.x*12.0, vUv.y*6.0 - uTime*3.0));
         c += vec3(1.0,0.4,0.08)*uFire*smoothstep(0.45,0.9,fl)*(0.6+fr)*1.6;
         c += vec3(0.05,0.045,0.04)*(0.4+0.6*max(n.y,0.0))*(1.0-glow*0.5);
+        c = mix(c, c.bgr*vec3(0.7,1.0,1.25), uPale);
         c += vec3(2.5,2.0,1.6)*uFlash;
         gl_FragColor = vec4(c, 1.0); }`,
   });
@@ -86,12 +91,12 @@ function buildBoss1() {
   for (let i = 0; i < 96; i++) { const t = i / 96 * TAU; const x = 16 * Math.pow(Math.sin(t), 3), y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); hp.push(new THREE.Vector2(x * 0.05, y * 0.05)); }
   hs.setFromPoints(hp);
   const hgeo = new THREE.ExtrudeGeometry(hs, { depth: 0.35, bevelEnabled: true, bevelThickness: 0.38, bevelSize: 0.22, bevelSegments: 6, curveSegments: 8 }); hgeo.center();
-  B1.heartU = { uTime: { value: 0 }, uPulse: { value: 0 }, uFire: { value: 0 }, uFlash: { value: 0 }, uCrack: { value: 0 }, uDark: { value: 0 }, uFracture: { value: 0 } };
+  B1.heartU = { uPale: { value: 0 }, uTime: { value: 0 }, uPulse: { value: 0 }, uFire: { value: 0 }, uFlash: { value: 0 }, uCrack: { value: 0 }, uDark: { value: 0 }, uFracture: { value: 0 } };
   B1.heart = new THREE.Mesh(hgeo, new THREE.ShaderMaterial({
     uniforms: B1.heartU,
     vertexShader: `varying vec3 vN; varying vec3 vV; varying vec3 vO; void main(){ vO = position; vN = normalize(normalMatrix*normal); vec4 mv = modelViewMatrix*vec4(position,1.0); vV=-mv.xyz; gl_Position=projectionMatrix*mv; }`,
     fragmentShader: GLSL_LIB + /* glsl */`
-      uniform float uTime,uPulse,uFire,uFlash,uCrack,uDark,uFracture; varying vec3 vN; varying vec3 vV; varying vec3 vO;
+      uniform float uTime,uPulse,uFire,uFlash,uCrack,uDark,uFracture,uPale; varying vec3 vN; varying vec3 vV; varying vec3 vO;
       vec2 vor(vec2 p){ vec2 i=floor(p), f=fract(p); float d1=8.0, d2=8.0; for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){ vec2 g=vec2(x,y); vec2 o=vec2(hash12(i+g), hash12(i+g+17.0)); vec2 r=g+o-f; float d=dot(r,r); if(d<d1){d2=d1; d1=d;} else if(d<d2) d2=d; } return vec2(sqrt(d1), sqrt(d2)); }
       void main(){ vec3 n = normalize(vN), v = normalize(vV); float fr = fresnelF(n, v, 2.2);
         float veins = fbm(vO.xy*3.2 + vec2(0.0, uTime*0.25) + vO.z);
@@ -106,27 +111,29 @@ function buildBoss1() {
         vec2 vr = vor(vO.xy*2.6 + vO.z*0.5); float ce = smoothstep(0.06, 0.0, vr.y-vr.x);
         c += vec3(2.2,2.3,2.6)*ce*max(uCrack, uFracture*0.35*(0.5+0.5*sin(uTime*9.0)));
         c *= 1.0-uDark*0.9;
+        c = mix(c, c.bgr*vec3(0.7,1.0,1.25), uPale);
         c = mix(c, vec3(3.0), uFlash);
         gl_FragColor = vec4(c, 1.0); }`,
   }));
   B1.heart.scale.setScalar(1.35); B1.heart.position.set(0, 2.1, 0); g.add(B1.heart);
   // fire billboard (phase 2)
-  B1.flameU = { uTime: { value: 0 }, uA: { value: 0 } };
+  B1.flameU = { uTime: { value: 0 }, uA: { value: 0 }, uPale: { value: 0 } };
   B1.flame = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 7), new THREE.ShaderMaterial({
     uniforms: B1.flameU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, defines: fbmDefines(),
     vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-    fragmentShader: GLSL_LIB + `uniform float uTime,uA; varying vec2 vUv;
+    fragmentShader: GLSL_LIB + `uniform float uTime,uA,uPale; varying vec2 vUv;
       void main(){ vec2 p = vUv*2.0-1.0; float n = fbm(vec2(p.x*2.2, p.y*1.6 - uTime*1.8)); float n2 = fbm(vec2(p.x*4.0+3.0, p.y*3.0 - uTime*3.1));
         float d = length(vec2(p.x*1.35, (p.y+0.2)*0.72)); float s = smoothstep(1.0, 0.0, d + (n-0.5)*0.9 + (n2-0.5)*0.35 + p.y*0.15);
         s *= smoothstep(1.0, 0.72, abs(p.x))*smoothstep(1.0, 0.68, abs(p.y));   // never reach the quad edges
         vec3 c = mix(vec3(0.6,0.03,0.01), vec3(1.0,0.3,0.04), smoothstep(0.1,0.5,s)); c = mix(c, vec3(1.0,0.58,0.16), smoothstep(0.65,0.95,s));
+        c = mix(c, c.bgr*vec3(0.7,1.0,1.3), uPale);
         gl_FragColor = vec4(c*s*0.85*uA, 1.0); }`,
   }));
   B1.flame.position.set(0, 2.6, -0.4); B1.flame.renderOrder = 3; g.add(B1.flame);
   // candles: 400 around the pond + 60 floating inside
   const NC = 400, NF = 60;
   const bodyGeo = new THREE.CylinderGeometry(0.07, 0.085, 0.32, 7).translate(0, 0.16, 0);
-  B1.flameMatU = { uTime: { value: 0 }, uFlare: { value: 1 }, uIgnite: { value: 1 }, uIgR: { value: 99 } };
+  B1.flameMatU = { uTime: { value: 0 }, uFlare: { value: 1 }, uIgnite: { value: 1 }, uIgR: { value: 99 }, uPale: { value: 0 } };
   // warm ivory wax: dark at the base, lit lip at the top, fading out beyond the pond rim
   const bodyMat = new THREE.ShaderMaterial({
     uniforms: B1.flameMatU,
@@ -148,9 +155,9 @@ function buildBoss1() {
         float fl = 0.78 + 0.22*sin(uTime*13.0+id*1.7)*sin(uTime*7.3+id*0.37); vF = fl*smoothstep(uIgR+1.5, uIgR-1.5, cr)*mix(1.0, 0.55, smoothstep(17.0, 21.5, cr));
         float s = sqrt(uFlare)*fl; vec4 mv = viewMatrix*vec4(c + vec3(0.0, 0.32, 0.0), 1.0);
         mv.xy += vec2(position.x + sin(uTime*3.0+id)*0.02*position.y*5.0, position.y + 0.21)*s; vUv = uv; gl_Position = projectionMatrix*mv; }`,
-    fragmentShader: `uniform float uFlare,uIgnite; varying vec2 vUv; varying float vF;
+    fragmentShader: `uniform float uFlare,uIgnite,uPale; varying vec2 vUv; varying float vF;
       void main(){ vec2 q = vUv*2.0-1.0; float w = 0.55*(1.0 - q.y*0.45); float d = length(vec2(q.x/w, (q.y+0.3)*0.85)); float a = smoothstep(1.0, 0.0, d);
-        vec3 c = mix(vec3(1.0,0.3,0.04), vec3(1.0,0.88,0.6), a*a)*a*2.2*vF*uFlare*uIgnite; gl_FragColor = vec4(c, 1.0); }`,
+        vec3 c = mix(vec3(1.0,0.3,0.04), vec3(1.0,0.88,0.6), a*a)*a*2.2*vF*uFlare*uIgnite; c = mix(c, c.bgr*vec3(0.7,1.0,1.3), uPale); gl_FragColor = vec4(c, 1.0); }`,
   }), NC + NF);
   B1.flames.frustumCulled = false; B1.candles.frustumCulled = false;
   B1.floatData = new Float32Array(NF * 4);
@@ -163,6 +170,14 @@ function buildBoss1() {
   B1.candles.instanceMatrix.setUsage(THREE.DynamicDrawUsage); B1.flames.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   B1.NC = NC; B1.NF = NF;
   g.add(B1.candles, B1.flames);
+  // Cantor tethers (own meshes so the shared beam pool can never steal them)
+  for (let k = 0; k < 2; k++) {
+    const m = new THREE.Mesh(beamGeo, beamMatBase.clone()); m.visible = false; m.renderOrder = 16; m.frustumCulled = false; g.add(m);
+    m.material.uniforms.uCol.value.setRGB(1.0, 0.8, 0.35);
+    const C = { k, L: -1, alive: false, hp: 0, x: 0, z: 0, y: 1.5, shootT: 0, pulseT: 0, tether: m, tu: m.material.uniforms, a: 0 };
+    C.tgt = { x: 0, y: 1.5, z: 0, r: 0.8, hy: 1.3, alive: false, priority: true, isBoss: false, lanceMul: 1.4, hit: (d, crit, src) => b1CantorHit(C, d, crit, src) };
+    B1.cantors.push(C);
+  }
   g.visible = false;
 }
 function b1LanternOrbitPos(i, out) {
@@ -177,29 +192,133 @@ function b1Drop(x, z, dur) {
   let d = null; for (const o of B1.drops) if (!o.active) { d = o; break; } if (!d) d = B1.drops[0];
   d.active = true; d.t = 0; d.dur = dur; d.x = x; d.z = z; d.m.visible = true; d.m.position.set(x, 14, z);
 }
+// ---- phase 3: Cantors ----
+function b1CantorSpawn(C, ang) {
+  const i = b1PickLantern(); const L = B1.lanterns[i];
+  C.L = i; C.alive = true; C.hp = B1_CANTOR_HP; C.a = ang; C.x = Math.cos(ang) * 10.5; C.z = Math.sin(ang) * 10.5; C.shootT = 2.2 + C.k * 0.9; C.pulseT = 0;
+  C.tgt.x = C.x; C.tgt.z = C.z; C.tgt.alive = true;
+  L.mode = 6; L.t = 0; L.glowT = 2.6; L.u.uFlash.value = 1;
+  burst(L.pos.x, L.pos.y, L.pos.z, 24, 2.6, 1.8, 0.6, 4, 0.7, 0.18, 1, 3); sfx.chime(5 + C.k, 0.8);
+}
+function b1CantorHit(C, d, crit, src) {
+  if (!C.alive || game.state !== 'fight') return;
+  C.hp -= d; const L = B1.lanterns[C.L]; L.u.uFlash.value = Math.max(L.u.uFlash.value, src === 'bolt' ? 0.35 : 1);
+  if (src !== 'bolt') dmgNumber(C.x, 2.6, C.z, String(Math.round(d)), crit ? 1 : 0); else if (frand() < 0.3) burst(C.x, C.y, C.z, 3, 2.4, 1.6, 0.6, 3, 0.3, 0.12, 1, 0);
+  if (C.hp <= 0) b1CantorKill(C, true);
+}
+function b1CantorKill(C, withFx) {
+  if (!C.alive) return; C.alive = false; C.tgt.alive = false; C.tether.visible = false;
+  const L = B1.lanterns[C.L]; if (L) { L.mode = 4; L.dark = 1; L.fallV = 0; L.splashed = false; L.reviveT = 5; }
+  if (withFx) {
+    shatter(C.x, C.y, C.z, 0.5, 26, 2.4, 1.6, 0.5, 6, 1.4, 9); burst(C.x, C.y, C.z, 40, 2.6, 1.8, 0.6, 8, 0.8, 0.2, 1, 0);
+    ring(C.x, 0.08, C.z, 0.3, 3, 0.45, 0.2, 2.4, 1.8, 0.6, 1.3); sfx.shatter(0.5); addTrauma(0.2); hitstop(0.05);
+    addRadiance(6); bossAddFracture(10); streakToPlayer(C.x, C.y, C.z, W, 8);
+    dmgNumber(C.x, 2.9, C.z, B1.cantors.some((o) => o.alive) ? 'CANTOR SILENCED' : 'SHIELD BROKEN', 4, '#ffe1a0');
+  }
+}
+function b1CantorsClear() { for (const C of B1.cantors) { C.alive = false; C.tgt.alive = false; C.tether.visible = false; } bossRT.shieldMul = 1; }
+function b1UpdateCantors(dt, fighting) {
+  let n = 0; const b = bossRT;
+  for (const C of B1.cantors) {
+    if (!C.alive) continue; n++;
+    const L = B1.lanterns[C.L];
+    // tether: lantern -> heart, a golden hymn stream
+    const m = C.tether; m.visible = true;
+    const x0 = L.pos.x, y0 = L.pos.y, z0 = L.pos.z, x1 = 0, y1 = 2.2, z1 = 0;
+    m.position.set(x0, y0, z0); _v1.set(x1, y1, z1); m.lookAt(_v1);
+    const len = Math.max(0.01, Math.hypot(x1 - x0, y1 - y0, z1 - z0)); const w = 0.075 + 0.025 * Math.sin(fx.simTime * 9 + C.k);
+    m.scale.set(w, w, len); C.tu.uLen.value = len; C.tu.uTime.value = fx.simTime; C.tu.uA.value = Math.min(1, L.t / 0.8) * 0.9;
+    if (!fighting || b.transitioning) continue;
+    C.pulseT -= dt; if (C.pulseT <= 0) { C.pulseT = 0.9; ring(C.x, 0.07, C.z, 0.3, 1.8, 0.6, 0.12, 2.2, 1.7, 0.6, 1); }
+    // heal the heart (never past the phase line)
+    const cap = B1_P3_AT * b.maxHp, h = 0.0035 * b.maxHp * dt;
+    if (b.hp < cap && !b.dead) { const add = Math.min(h, cap - b.hp); b.hp += add; B1.healAcc += add; }
+    // a slow three-shot hymn at the player (good Mirror fodder)
+    C.shootT -= dt;
+    if (C.shootT <= 0) { C.shootT = 2.2; patFan(C.x, C.z, aimAt(C.x, C.z), 5, 0.8, 5.2 * DIFF[0].spd, R, 0.3, 8); sfx.shot(R); L.u.uFlash.value = 0.6; }
+  }
+  if (b.phase === 2 && !b.dead) b.shieldMul = n > 0 ? 0.5 : 1;
+  B1.healShowT -= dt;
+  if (B1.healShowT <= 0) { B1.healShowT = 1; if (B1.healAcc >= 1) { dmgNumber(0, 4.4, 0, '+' + Math.round(B1.healAcc), 3); B1.healAcc = 0; } }
+}
+// ---- phase 3: Lantern Light (stand in a lantern's light when the Requiem resolves) ----
+function b1LLStart() {
+  const ll = B1.ll; ll.active = true; ll.t = 0; ll.ring1 = ll.ring2 = ll.gaze = false;
+  const pa = Math.atan2(player.z, player.x), a1 = pa + (rng() < 0.5 ? 1 : -1) * (Math.PI * 0.55 + rng() * 0.3);
+  for (let k = 0; k < 2; k++) {
+    const a = a1 + k * Math.PI, r = 7.5 + rng() * 2;
+    ll.sx[k] = Math.cos(a) * r; ll.sz[k] = Math.sin(a) * r;
+    teleSafe(ll.sx[k], ll.sz[k], ll.sr, ll.dur);
+    const i = b1PickLantern(); const L = B1.lanterns[i]; L.mode = 8; L.t = 0; L.glowT = 3.2; L.beaconK = k; L.u.uFlash.value = 1; ll.beacons[k] = i;
+  }
+  castBar('Requiem', ll.dur); sfx.choir(1); sfx.riser(); B1.heartU.uFlash.value = 0.6;
+  ui.tutorial('lanternlight', 'REQUIEM: the light dies. Stand in a LANTERN\'s light (cyan) before the cast ends');
+}
+function b1LLEnd() {
+  const ll = B1.ll; ll.active = false;
+  for (const i of ll.beacons) if (i >= 0) { const L = B1.lanterns[i]; if (L.mode === 8) { L.mode = 0; L.glowT = 1; } }
+  ll.beacons[0] = ll.beacons[1] = -1;
+}
+function b1UpdateLL(dt, fighting) {
+  const ll = B1.ll;
+  ll.dim = damp(ll.dim, ll.active ? smooth(ll.t / 1.2) : 0, ll.active ? 10 : 4, dt);
+  floorU.uFloorDim.value = 0.8 * ll.dim;
+  if (!ll.active || !fighting || bossRT.transitioning) return;
+  ll.t += dt;
+  if (!ll.ring1 && ll.t > 1.1) { ll.ring1 = true; patRing(0, 0, 18, 4.2 * DIFF[0].spd, R, 0.3, 8, rng() * TAU); sfx.shot(R); ring(0, 1, 0, 0.5, 4, 0.4, 0.2, 2.4, 0.9, 0.3, 1.2); }
+  if (!ll.ring2 && ll.t > 2.6) { ll.ring2 = true; patRing(0, 0, 18, 4.2 * DIFF[0].spd, R, 0.3, 8, rng() * TAU); sfx.shot(R); ring(0, 1, 0, 0.5, 4, 0.4, 0.2, 2.4, 0.9, 0.3, 1.2); }
+  if (!ll.gaze && ll.t > 1.0) { // one free lantern stares down your path to the light
+    ll.gaze = true; const i = b1PickLantern(); const L = B1.lanterns[i]; L.mode = 1; L.t = 0; L.glowT = 3;
+    teleLine(L.pos.x, L.pos.z, player.x, player.z, 1.6, 1.15, 14, R, {
+      noHit: true, lockAt: 0.7,
+      follow: (o) => { const a = Math.atan2(player.z - L.pos.z, player.x - L.pos.x); teleSetLine(o, L.pos.x, L.pos.z, L.pos.x + Math.cos(a) * 30, L.pos.z + Math.sin(a) * 30, 1.6); },
+      onResolve: (o) => { hzBeam(o.x, 0.9, o.z, o.x1, 0.9, o.z1, 1.6, 0.4, 14, R); beam(L.pos.x, L.pos.y, L.pos.z, o.x, 0.9, o.z, 0.18, 0.4, 1, 0.3, 0.2, 1, 0.9); sfx.laser(); addTrauma(0.15); L.mode = 0; L.glowT = 1; },
+    });
+  }
+  if (ll.t >= ll.dur) {
+    let safe = false; for (let k = 0; k < 2; k++) if (Math.hypot(player.x - ll.sx[k], player.z - ll.sz[k]) < ll.sr + PLAYER.hurtR * 0.6) safe = true;
+    if (!safe) { hitSrc = 'requiem'; resolveHazard(-1, 0, R, 35, true); } else dmgNumber(player.x, 2.8, player.z, 'SHELTERED', 4, '#7ffff0');
+    B1.heartU.uFlash.value = 1; bloomSpike(1.0); addTrauma(0.45); shockAt(0, 2, 0, 0.05); sfx.boom();
+    ring(0, 0.2, 0, 1, 18, 0.7, 0.5, 0.4, 0.9, 2.6, 1.4); burst(0, 2.1, 0, 80, 0.5, 1.2, 2.6, 12, 0.9, 0.25, 1, 0);
+    for (let k = 0; k < 2; k++) ring(ll.sx[k], 0.08, ll.sz[k], 0.4, ll.sr * 1.3, 0.5, 0.18, 0.4, 2.4, 2.4, 1.3);
+    b1LLEnd();
+  }
+}
 const BOSS1 = {
   id: 1, name: 'THE LANTERN CHOIR', subtitle: 'First Refraction', deathTitle: 'THE LANTERN CHOIR', deathSub: 'SILENCED',
-  arena: 0, arenaR: 15, maxHp: 11000, enrage: 240, hit: { x: 0, y: 2.1, z: 0, r: 1.6, hy: 2.2 },
-  barGrad: 'linear-gradient(90deg,#ff2d55,#ff7a3d 60%,#ffd27a)', music: ['b1p1', 'b1p2'],
+  arena: 0, arenaR: 15, maxHp: 13000, enrage: 270, dmgMul: 1.3, hit: { x: 0, y: 2.1, z: 0, r: 1.6, hy: 2.2 },
+  barGrad: 'linear-gradient(90deg,#ff2d55,#ff7a3d 60%,#ffd27a)', music: ['b1p1', 'b1p2', 'b1p3'],
   phases: [
-    { name: 'Vespers', until: 0.6, loop: 14, steps: [[0, 'SpiralHymn'], [4.5, 'LanternGaze'], [8, 'EmberRing'], [11, 'PaperRain']] },
-    { name: 'Choir of Cinders', until: 0, loop: 16, steps: [[0, 'Swoop'], [5, 'Chorus'], [10.5, 'CandleRain'], [13.5, 'FrontalHymn']] },
+    { name: 'Vespers', until: 0.65, loop: 14, steps: [[0, 'SpiralHymn'], [4.5, 'LanternGaze'], [8, 'EmberRing'], [11, 'PaperRain']] },
+    { name: 'Choir of Cinders', until: B1_P3_AT, loop: 16, steps: [[0, 'Swoop'], [5, 'Chorus'], [10.5, 'CandleRain'], [13.5, 'FrontalHymn']] },
+    { name: 'Requiem', until: 0, loop: 19, steps: [[0, 'Cantors'], [2.5, 'TwinHymn'], [7.5, 'Swoop'], [11, 'LanternLight'], [16.5, 'PaperRain']] },
   ],
+  // autopilot (debug bot): head for the nearest lantern light during the Requiem
+  apPenalty(cx, cz) {
+    const ll = B1.ll; if (!ll.active) return 0;
+    let best = 1e9; for (let k = 0; k < 2; k++) best = Math.min(best, Math.hypot(cx - ll.sx[k], cz - ll.sz[k]));
+    return Math.max(0, best - (ll.sr - 0.8)) * (ll.t > ll.dur - 2.2 ? 9 : 3);
+  },
   build: buildBoss1,
   show(on) { B1.group.visible = on; },
   hue: [1.0, 0.35, 0.12],
   camTop() { return 3.7; },
-  setTitleMode() { B1.mode = 'title'; for (const L of B1.lanterns) { L.ign = 0.22; L.mode = 0; L.dark = 0; L.vis = true; } B1.heart.visible = false; B1.flameU.uA.value = 0; B1.fire = 0; B1.heartU.uFire.value = 0; B1.flameMatU.uFlare.value = 1; B1.flameMatU.uIgR.value = 99; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 0; floorU.uPalRadius.value = 0; floorU.uBeat.value = 0; },
+  setTitleMode() { B1.mode = 'title'; B1.pale = B1.paleT = 0; b1CantorsClear(); B1.ll.active = false; B1.ll.dim = 0; floorU.uFloorDim.value = 0; for (const L of B1.lanterns) { L.ign = 0.22; L.mode = 0; L.dark = 0; L.vis = true; } B1.heart.visible = false; B1.flameU.uA.value = 0; B1.fire = 0; B1.heartU.uFire.value = 0; B1.flameMatU.uFlare.value = 1; B1.flameMatU.uIgR.value = 99; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 0; floorU.uPalRadius.value = 0; floorU.uBeat.value = 0; },
   reset() {
     B1.mode = 'fight'; B1.fire = 0; B1.heartU.uFire.value = 0; B1.heartU.uDark.value = 0; B1.heartU.uCrack.value = 0; B1.flameU.uA.value = 0; B1.flameMatU.uFlare.value = 1; B1.flameMatU.uIgR.value = 99;
     B1.heart.visible = true; B1.heartYaw = Math.PI / 2; B1.cleaving = false; B1.chorusDir = 1; B1.firstEmber = true; B1.tut = {};
-    for (let i = 0; i < 8; i++) { const L = B1.lanterns[i]; L.mode = 0; L.ign = 1; L.dark = 0; L.glowT = 1; L.vis = true; L.g.visible = true; b1LanternOrbitPos(i, L.pos); L.last.copy(L.pos); }
+    B1.pale = B1.paleT = 0; B1.healAcc = 0; B1.healShowT = 1; b1CantorsClear(); for (const C of B1.cantors) targets.push(C.tgt);
+    B1.ll.active = false; B1.ll.dim = 0; B1.ll.beacons[0] = B1.ll.beacons[1] = -1; floorU.uFloorDim.value = 0;
+    for (let i = 0; i < 8; i++) { const L = B1.lanterns[i]; L.mode = 0; L.ign = 1; L.dark = 0; L.glowT = 1; L.vis = true; L.g.visible = true; L.reviveT = 0; b1LanternOrbitPos(i, L.pos); L.last.copy(L.pos); }
     for (const d of B1.drops) { d.active = false; d.m.visible = false; }
     floorU.uPalFrom.value = 0; floorU.uPalTo.value = 0; floorU.uPalRadius.value = 0;
   },
-  transitionInstant(n) { if (n === 1) { B1.fire = 1; B1.heartU.uFire.value = 1; B1.flameU.uA.value = 1; B1.flameMatU.uFlare.value = 1.6; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 1; floorU.uPalRadius.value = 40; } },
+  transitionInstant(n) { if (n === 2) { B1.pale = B1.paleT = 1; } if (n === 1) { B1.fire = 1; B1.heartU.uFire.value = 1; B1.flameU.uA.value = 1; B1.flameMatU.uFlare.value = 1.6; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 1; floorU.uPalRadius.value = 40; } },
   onPhase(n) { },
-  onInterrupt() { for (const L of B1.lanterns) if (L.mode !== 0 && L.mode !== 4) { L.mode = 0; L.glowT = 1; } },
+  onInterrupt() {
+    if (B1.ll.active) { b1LLEnd(); if (!bossRT.transitioning && !bossRT.dead) ui.toast('REQUIEM BROKEN', 1.6); }
+    for (const L of B1.lanterns) if (L.mode !== 0 && L.mode !== 4 && L.mode !== 6) { L.mode = 0; L.glowT = 1; }
+  },
   casts: {
     SpiralHymn() {
       castBar('Spiral Hymn', 3); B1.heartU.uFlash.value = 0.3;
@@ -228,7 +347,7 @@ const BOSS1 = {
     },
     EmberRing() {
       castBar('Ember Ring', 1);
-      if (B1.firstEmber) { B1.firstEmber = false; ui.tutorial('graze', 'Brush past shots to GRAZE their color'); }
+      if (B1.firstEmber) { B1.firstEmber = false; ui.tutorial('mirror', IS_TOUCH ? 'Bullet waves: raise your Azure MIRROR to throw them back' : 'Bullet waves: raise your Azure MIRROR to throw them back  [3 / E]'); }
       const fire = (rot) => { const ga = aimAt(0, 0); patRing(0, 0, 24, 5 * DIFF[0].spd, Bc, 0.3, 8, ga + rot, ga, 3); sfx.shot(Bc); ring(0, 1, 0, 0.5, 4, 0.4, 0.2, 0.5, 0.9, 2.5, 1.2); };
       fire(0); after(1, () => fire(TAU / 48));
     },
@@ -284,6 +403,20 @@ const BOSS1 = {
         for (let k = 0; k < 4; k++) emitP(x + (frand() - 0.5) * 0.5, 12 + k * 0.6, z + (frand() - 0.5) * 0.5, 0, -12 / w, 0, 2.6, 1.0, 0.25, w, 0.35 - k * 0.05, 4);
       });
     },
+    Cantors() {
+      const free = B1.cantors.filter((C) => !C.alive); if (!free.length) { castBar('Crescendo', 1.2); B1.heartU.uFlash.value = 0.6; patRing(0, 0, 24, 5 * DIFF[0].spd, R, 0.3, 8, rng() * TAU); sfx.shot(R); return; }
+      castBar('Cantors', 1.6); sfx.choir(0);
+      const a0 = Math.atan2(player.z, player.x) + Math.PI / 2;
+      for (const C of free) b1CantorSpawn(C, a0 + C.k * Math.PI);
+      ui.tutorial('cantors', 'CANTORS shield and heal the heart: break them first! (your bolts auto-target them)');
+    },
+    TwinHymn() {
+      castBar('Twin Hymn', 3); B1.heartU.uFlash.value = 0.3; sfx.choir(0);
+      const a0 = rng() * TAU;
+      patSpiral(0, 0, 2, 8, 3, 17, 6 * DIFF[0].spd, R, 0.3, 8, a0);
+      patSpiral(0, 0, 2, 8, 3, -17, 6 * DIFF[0].spd, Bc, 0.3, 8, a0 + Math.PI / 2);
+    },
+    LanternLight() { b1LLStart(); },
     FrontalHymn() {
       castBar('Frontal Hymn', 1.6); sfx.growl();
       B1.cleaving = true;
@@ -300,7 +433,12 @@ const BOSS1 = {
   },
   update(dt) {
     const t = fx.simTime;
-    B1.orbitT += dt * (bossRT.phase === 1 ? 0.42 : 0.3);
+    const fighting = game.state === 'fight' && bossRT.def === BOSS1 && !bossRT.dead;
+    B1.orbitT += dt * (bossRT.phase >= 1 ? 0.42 : 0.3);
+    // Requiem: the flames turn blue
+    B1.pale = damp(B1.pale, B1.paleT, 2.5, dt);
+    B1.heartU.uPale.value = B1.pale; B1.flameU.uPale.value = B1.pale; B1.flameMatU.uPale.value = B1.pale; B1.dropMat.uniforms.uPale.value = B1.pale;
+    b1UpdateCantors(dt, fighting); b1UpdateLL(dt, fighting);
     const beatRate = bossRT.phase === 1 ? 1.8 : 1.2;
     B1.beat = Math.pow(Math.max(0, Math.sin(t * beatRate * Math.PI)), 12);
     const hu = B1.heartU; hu.uTime.value = t; hu.uPulse.value = B1.beat; hu.uCrack.value = damp(hu.uCrack.value, bossRT.vuln > 0 ? 1 : 0, 6, dt);
@@ -349,10 +487,18 @@ const BOSS1 = {
       } else if (L.mode === 4) { // dark, falling
         L.fallV += 6 * dt; L.pos.y = Math.max(0.15, L.pos.y - L.fallV * dt);
         if (L.pos.y <= 0.15 && !L.splashed) { L.splashed = true; addRipple(L.pos.x, L.pos.z, 1.2); burst(L.pos.x, 0.1, L.pos.z, 10, 0.4, 0.4, 0.5, 2, 0.6, 0.12, 1, 0); }
+        if (L.reviveT > 0 && B1.mode === 'fight') { L.reviveT -= dt; if (L.reviveT <= 0) { L.mode = 0; L.dark = 0; L.glowT = 1; L.u.uFlash.value = 1; } }
+      } else if (L.mode === 6) { // Cantor: planted on the pond, singing to the heart
+        const C = B1.cantors.find((o) => o.L === i && o.alive);
+        if (C) { _v1.set(C.x, C.y + Math.sin(t * 2 + i) * 0.12, C.z); L.pos.lerp(_v1, 1 - Math.exp(-4 * dt)); L.glowT = 2.6; L.g.scale.setScalar(damp(L.g.scale.x, 1.45, 4, dt)); }
+        else L.mode = 0;
+      } else if (L.mode === 8) { // Requiem beacon: hovers over a safe light
+        const k = L.beaconK; _v1.set(B1.ll.sx[k], 3.0 + Math.sin(t * 1.7 + i) * 0.15, B1.ll.sz[k]); L.pos.lerp(_v1, 1 - Math.exp(-5 * dt)); L.glowT = 3.4;
       }
+      if (L.mode !== 6 && L.g.scale.x !== 1) L.g.scale.setScalar(damp(L.g.scale.x, 1, 4, dt));
       if (L.mode === 0 || L.mode === 1) L.mode0Ready = true;
       L.glow = damp(L.glow, L.glowT * L.ign * (1 - L.dark), 8, dt);
-      L.u.uGlow.value = L.glow; L.u.uTime.value = t; L.u.uFire.value = damp(L.u.uFire.value, B1.fire, 3, dt); L.u.uDark.value = L.dark;
+      L.u.uGlow.value = L.glow; L.u.uTime.value = t; L.u.uPale.value = B1.pale; L.u.uFire.value = damp(L.u.uFire.value, B1.fire, 3, dt); L.u.uDark.value = L.dark;
       if (L.u.uFlash.value > 0) L.u.uFlash.value = Math.max(0, L.u.uFlash.value - dt * 3);
       L.g.position.copy(L.pos);
       // face the player (face is on local +z)
@@ -380,16 +526,17 @@ const BOSS1 = {
     // floor light blobs: heart + 3 lanterns nearest the player
     const Lv = floorU.uLights.value, Lc = floorU.uLightCol.value;
     const heartI = B1.heart.visible ? (1.0 + B1.beat * 0.6) * (1 - hu.uDark.value) : 0;
-    Lv[0].set(0, 2.1, 0, heartI * 0.9); if (B1.fire > 0.5) Lc[0].setRGB(1.0, 0.45, 0.1); else Lc[0].setRGB(1.0, 0.12, 0.18);
+    Lv[0].set(0, 2.1, 0, heartI * 0.9); if (B1.fire > 0.5) Lc[0].setRGB(lerp(1.0, 0.2, B1.pale), lerp(0.45, 0.55, B1.pale), lerp(0.1, 1.0, B1.pale)); else Lc[0].setRGB(1.0, 0.12, 0.18);
     let i1 = -1, i2 = -1, i3 = -1, d1 = 1e9, d2 = 1e9, d3 = 1e9;
     for (let i = 0; i < 8; i++) { const L = B1.lanterns[i]; const d = (L.pos.x - player.x) ** 2 + (L.pos.z - player.z) ** 2; if (d < d1) { d3 = d2; i3 = i2; d2 = d1; i2 = i1; d1 = d; i1 = i; } else if (d < d2) { d3 = d2; i3 = i2; d2 = d; i2 = i; } else if (d < d3) { d3 = d; i3 = i; } }
     const ids = [i1, i2, i3];
-    for (let k = 0; k < 3; k++) { const L = B1.lanterns[ids[k]]; Lv[k + 1].set(L.pos.x, L.pos.y, L.pos.z, L.glow * 0.55); Lc[k + 1].setRGB(1.0, 0.5, 0.2); }
+    if (B1.ll.active && B1.ll.beacons[0] >= 0) { ids[0] = B1.ll.beacons[0]; ids[1] = B1.ll.beacons[1]; }
+    for (let k = 0; k < 3; k++) { const L = B1.lanterns[ids[k]]; const beacon = L.mode === 8; Lv[k + 1].set(L.pos.x, L.pos.y, L.pos.z, L.glow * (beacon ? 0.5 : 0.55)); if (beacon) Lc[k + 1].setRGB(0.4, 1.0, 0.95); else Lc[k + 1].setRGB(lerp(1.0, 0.25, B1.pale), 0.5, lerp(0.2, 1.0, B1.pale)); }
     floorU.uBossPos.value.set(0, 0); floorU.uBossShadow.value = B1.heart.visible ? 1 : 0;
     // tutorial prompts
     if (game.state === 'fight' && bossRT.phase === 0) {
-      if (player.r >= 35) ui.tutorial('lance', IS_TOUCH ? 'Crimson Lance ready — spend RED' : 'Crimson Lance ready — spend RED  [1 / Q / Click]');
-      else if (player.b >= 35 && game.fightTime > 12) ui.tutorial('mirror', IS_TOUCH ? 'Azure Mirror reflects shots' : 'Azure Mirror reflects shots  [3 / E]');
+      if (game.fightTime > 3) ui.tutorial('lance', IS_TOUCH ? 'Crimson LANCE: big piercing beam, recharges in a few seconds' : 'Crimson LANCE: big piercing beam  [1 / Q / Click]');
+      if (game.fightTime > 9) ui.tutorial('radiance', 'Landing hits fills RADIANCE (top left). Full = WHITE NOVA');
     }
   },
   // ---- cinematics ----
@@ -418,6 +565,21 @@ const BOSS1 = {
   },
   transitionCine(n) {
     let a0 = 0;
+    if (n === 2) return {
+      dur: 2.6,
+      start() { a0 = Math.atan2(cam.pos.z, cam.pos.x); director.timeScale = 0.3; ui.titleCard('REQUIEM', 'the last verse', 2.0); sfx.riser(); b1CantorsClear(); },
+      update(t) {
+        const k = smooth(t / 2.6); const a = a0 - k * (100 * Math.PI / 180); const r = lerp(14, 9, Math.sin(k * Math.PI));
+        director.camPos.set(Math.cos(a) * r, lerp(9, 4.5, Math.sin(k * Math.PI)), Math.sin(a) * r); director.camLook.set(0, 2.4, 0); director.fov = 52;
+        if (t > 2.0) director.timeScale = lerp(0.3, 1, (t - 2.0) / 0.6);
+      },
+      ev: [
+        [0.25, () => { for (const L of B1.lanterns) { L.u.uFlash.value = 1.2; burst(L.pos.x, L.pos.y, L.pos.z, 16, 0.6, 1.2, 2.6, 4, 0.8, 0.2, 1, 3); } sfx.choir(1); }],
+        [0.8, () => { B1.paleT = 1; B1.heartU.uFlash.value = 1; bloomSpike(1.5); addTrauma(0.7); shockAt(0, 2, 0, 0.06); sfx.boom();
+          burst(0, 2.1, 0, 140, 0.4, 1.0, 2.6, 13, 1.2, 0.3, 1, 0); ring(0, 0.2, 0, 1, 20, 1.0, 0.5, 0.5, 1.2, 2.6, 1.3); rainbowWave(0, 0, 1.0, 14); }],
+      ],
+      end() { director.timeScale = 1; B1.paleT = 1; },
+    };
     return {
       dur: 2.2,
       start() { a0 = Math.atan2(cam.pos.z, cam.pos.x); director.timeScale = 0.25; ui.titleCard('KINDLING', '', 1.8); sfx.riser(); },

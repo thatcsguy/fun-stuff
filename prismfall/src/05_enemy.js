@@ -76,6 +76,7 @@ function bossTakeDamage(n, crit, src) {
   if (b.invuln || b.transitioning) { if (src !== 'bolt' || frand() < 0.1) dmgNumber(bossTarget.x, bossTarget.y + 1.5, bossTarget.z, 'IMMUNE', 4, '#aaaacc'); return; }
   let m = 1; if (b.vuln > 0) m *= 2; if (b.stagger > 0) m *= b.staggerMul; m *= b.shieldMul;
   n *= m; b.hp -= n; b.flash = 0.08;
+  if (debug.dmg) debug.dmg[src] = (debug.dmg[src] || 0) + Math.round(n);
   // every non-crit source ticks one rolling number up; crits pop on their own
   if (crit) dmgNumber(bossTarget.x - dnRoll.ox * 0.9 + (frand() - 0.5) * 0.8, bossTarget.y + 1.0, bossTarget.z + 0.8, String(Math.round(n)), 1);
   else dmgRollAdd(n, src === 'refl');

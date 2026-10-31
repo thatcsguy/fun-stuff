@@ -62,6 +62,13 @@ button{font-family:var(--serif);cursor:pointer}
 #hpFill.low{background:linear-gradient(90deg,#ff3355,#ff8899)}
 #combo{margin-top:4px;font-size:13px;letter-spacing:.2em;font-weight:bold;height:18px;opacity:0;transition:opacity .2s;font-family:var(--serif);font-style:italic}
 #combo.on{opacity:1}
+#radWrap{position:relative;margin-top:5px;height:14px;border-radius:7px;background:rgba(10,10,20,.6);box-shadow:0 0 0 1px rgba(255,255,255,.18);overflow:hidden}
+#radFill{position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(.25);background:linear-gradient(90deg,#ff3456,#ffd24a 30%,#4dff7a 55%,#5a9cff 80%,#c58aff);opacity:.85}
+#radTxt{position:absolute;inset:0;display:flex;align-items:center;padding-left:8px;font:bold 9px ui-monospace,Menlo,monospace;letter-spacing:.18em;color:#fff;text-shadow:0 0 3px #000,0 0 2px #000}
+#radWrap.full{box-shadow:0 0 0 1px #fff,0 0 14px rgba(255,255,255,.8);animation:radPulse .8s infinite alternate}
+#radWrap.full #radFill{background:linear-gradient(90deg,#fff,#ffe9c0,#fff);opacity:1}
+#radWrap.full #radTxt{color:#201830;text-shadow:none}
+@keyframes radPulse{from{filter:brightness(1)}to{filter:brightness(1.35)}}
 
 #spectrum{position:absolute;display:flex;gap:6px;align-items:flex-end;
   right:calc(var(--sar) + 268px * var(--s));bottom:calc(var(--sab) + 18px)}
@@ -100,10 +107,14 @@ button{font-family:var(--serif);cursor:pointer}
 #ab-lance{--sz:66px;--rx:136px;--by:31px}
 #ab-lattice{--sz:66px;--rx:105px;--by:105px}
 #ab-mirror{--sz:66px;--rx:31px;--by:136px}
-#ab-nova{--sz:74px;--rx:161px;--by:161px;transform:scale(0);transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
+#ab-nova{--sz:74px;--rx:161px;--by:161px;transform:scale(.78);transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
 #ab-nova.ready{transform:scale(1);animation:novaPulse 1s infinite}
 #ab-nova.ready.pressed{transform:scale(.92)}
-#ab-nova::before{content:"";position:absolute;inset:-2px;border-radius:50%;background:conic-gradient(#f35,#fd4,#4f8,#4cf,#86f,#f4c,#f35);animation:spin 2s linear infinite;z-index:-1}
+#ab-nova:not(.ready) svg,#ab-nova:not(.ready) .lbl{opacity:.45}
+#ab-nova::before{content:"";position:absolute;inset:-3px;border-radius:50%;background:conic-gradient(rgba(255,255,255,.9) var(--k,25%),rgba(255,255,255,.1) 0);z-index:-1}
+#ab-nova.ready::before{inset:-2px;background:conic-gradient(#f35,#fd4,#4f8,#4cf,#86f,#f4c,#f35);animation:spin 2s linear infinite}
+.ab.rdy{animation:abReady .6s ease-out}
+@keyframes abReady{0%{box-shadow:0 0 0 3px #fff,0 0 30px #fff}100%{box-shadow:0 0 0 0 rgba(255,255,255,0),0 0 0 rgba(255,255,255,0)}}
 #ab-nova::after{content:"";position:absolute;inset:3px;border-radius:50%;background:rgba(20,20,34,.85);z-index:-1}
 #ab-nova{background:transparent;isolation:isolate}
 #ab-nova .lbl{position:absolute;left:0;right:0;bottom:12%;text-align:center;font:bold calc(10px * var(--s)) var(--serif);letter-spacing:.2em;color:#fff}
@@ -294,11 +305,8 @@ body.touch .ab .key{display:none}
   <div id="playerFrame">
     <div class="lbl"><span>Lightbreaker</span><span id="hpNum">100</span></div>
     <div class="bar"><div class="chunk" id="hpChunk"></div><div class="fill" id="hpFill"></div><div class="sheen"></div></div>
-    <div id="combo">GRAZE ×0</div>
-  </div>
-  <div id="spectrum">
-    <div class="spc" id="spcR"><i></i></div><div class="spc" id="spcG"><i></i></div><div class="spc" id="spcB"><i></i></div>
-    <div class="lab"><span id="spcRn">30</span><span id="spcGn">30</span><span id="spcBn">30</span></div>
+    <div id="radWrap"><div id="radFill"></div><span id="radTxt">RADIANCE 25%</span></div>
+    <div id="combo">PERFECT ×0</div>
   </div>
   <button id="pauseBtn" aria-label="Pause"><svg viewBox="0 0 16 16"><rect x="3" y="2" width="3.5" height="12" rx="1" fill="#fff"/><rect x="9.5" y="2" width="3.5" height="12" rx="1" fill="#fff"/></svg></button>
   <div id="abilities">

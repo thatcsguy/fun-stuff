@@ -15,7 +15,7 @@ const TIERS = ['low', 'med', 'high'];
 
 // Per-boss difficulty knobs (index = boss index)
 const DIFF = [
-  { windup: 1.5, spd: 0.8, enrage: 240 },
+  { windup: 1.35, spd: 0.88, enrage: 270 },
   { windup: 1.1, spd: 1.0, enrage: 270 },
   { windup: 0.8, spd: 1.2, enrage: 300 },
 ];
@@ -30,20 +30,21 @@ const PLAYER = {
   hp: 100, speed: 7.5, accel: 14, hurtR: 0.45, grazeR: 1.6, hurtI: 0.6,
   boltInterval: 0.18, boltDmg: 10, boltSpeed: 38, boltRange: 20, crit: 0.1,
   dashCharges: 2, dashCd: 3.5, dashDist: 6.5, dashTime: 0.16, dashI: 0.35,
-  lanceCost: 35, lanceCd: 1.5, lanceDmg: 140, lanceLen: 24, lanceW: 0.9,
-  latCost: 35, latCd: 8, latR: 4.5, latDur: 6, latHeal: 4,
-  mirCost: 35, mirCd: 10, mirDur: 2.5, mirR: 2.2, mirDmg: 25,
-  novaReq: 60,
+  lanceCd: 5, lanceDmg: 140, lanceLen: 24, lanceW: 0.9,
+  latCd: 16, latR: 4.5, latDur: 6, latHeal: 4,
+  mirCd: 9, mirDur: 2.5, mirR: 2.2, mirDmg: 25,
+  // RADIANCE: one meter (0-100) that fills from landing hits; full = White Nova. Abilities are plain cooldowns.
+  novaDmg: 1400, radStart: 25, radBolt: 0.2, radLance: 3, radRefl: 1, radPerfect: 10, radLastLight: 4,
 };
 
 const FACETS = [
   { id: 'echo', name: 'PRISM ECHO', glyph: '✦', color: '#ff5a7a', desc: 'Crimson Lance fires a second beam (50%) at a 12° offset.' },
   { id: 'living', name: 'LIVING LATTICE', glyph: '⬡', color: '#5aff8a', desc: 'Lattice radius +30% and heals 6 HP/s.' },
   { id: 'polished', name: 'POLISHED MIRROR', glyph: '◈', color: '#6aa8ff', desc: 'Mirror lasts 4 s and reflected shots deal 40.' },
-  { id: 'greed', name: 'SPECTRAL GREED', glyph: '◎', color: '#ffd76a', desc: 'Graze radius +0.4 m and every graze grants +2 more charge.' },
+  { id: 'radiant', name: 'RADIANT SOUL', glyph: '◎', color: '#ffd76a', desc: 'Radiance builds 50% faster, so White Nova comes around more often.' },
   { id: 'third', name: 'THIRD REFRACTION', glyph: '»', color: '#bfe4ff', desc: 'Refract Dash gains a third charge.' },
   { id: 'core', name: 'BRIGHT CORE', glyph: '♦', color: '#fff3c0', desc: '+30 max HP (130) and heal to full now.' },
-  { id: 'afterglow', name: 'AFTERGLOW', glyph: '☀', color: '#ffb36a', desc: 'After a White Nova, all ability costs are halved for 5 s.' },
+  { id: 'afterglow', name: 'AFTERGLOW', glyph: '☀', color: '#ffb36a', desc: 'After a White Nova, your abilities recharge twice as fast for 6 s.' },
   { id: 'splinter', name: 'SPLINTER BOLTS', glyph: '⁂', color: '#e0b0ff', desc: 'Prism Bolt fires twin bolts in a 6° spread (+20% DPS).' },
 ];
 

@@ -119,8 +119,8 @@ function autopilot() {
   input.mx = bx; input.mz = bz;
   if (here > 9 && player.dashT < 0) useAbility('dash');
   if (abilityReady('nova')) useAbility('nova');
-  if (abilityReady('lance') && p.r > 50) useAbility('lance');
-  if (PJ.count > 12 && abilityReady('mirror') && (bossRT.fracture < 100 || p.b > PLAYER.novaReq + PLAYER.mirCost || here > 9)) useAbility('mirror');
+  if (abilityReady('lance')) useAbility('lance');
+  if (PJ.count > 12 && abilityReady('mirror')) useAbility('mirror');
   if (p.hp < 70 && abilityReady('lattice')) useAbility('lattice');
   if (bossRT.def && bossRT.def.apHook) bossRT.def.apHook();
 }
@@ -140,7 +140,7 @@ const ui = {
   el: {
     hud: $('hud'), bossNameT: $('bossNameT'), enrageT: $('enrageT'), bossHpFill: $('bossHpFill'), bossHpChunk: $('bossHpChunk'), bossPct: $('bossPct'), bossNotches: $('bossNotches'),
     fracWrap: $('fracWrap'), fracFill: $('fracFill'), bossTags: $('bossTags'), castBar: $('castBar'), castName: $('castName'), castFill: $('castFill'),
-    hpFill: $('hpFill'), hpChunk: $('hpChunk'), hpNum: $('hpNum'), combo: $('combo'), spc: [$('spcR'), $('spcG'), $('spcB')], spcI: [$('spcR').firstChild, $('spcG').firstChild, $('spcB').firstChild], spcN: [$('spcRn'), $('spcGn'), $('spcBn')],
+    hpFill: $('hpFill'), hpChunk: $('hpChunk'), hpNum: $('hpNum'), combo: $('combo'), radWrap: $('radWrap'), radFill: $('radFill'), radTxt: $('radTxt'),
     toast: $('toast'), letterbox: $('letterbox'), titleCard: $('titleCard'), tcBig: $('tcBig'), tcSub: $('tcSub'), bigCast: $('bigCast'), bigCastFill: $('bigCastFill'), bigCastName: $('bigCastName'), fade: $('fade'),
     ab: { dash: $('ab-dash'), lance: $('ab-lance'), lattice: $('ab-lattice'), mirror: $('ab-mirror'), nova: $('ab-nova') }, dbg: $('dbg'), descend: $('descendText'), descendSub: $('descendSub'),
   },
@@ -153,6 +153,7 @@ const ui = {
   tutorial(key, text) { if (game.tutorial[key]) return; game.tutorial[key] = true; if (this.tutQ.length < 4) this.tutQ.push(text); },
   lbOn: false, letterbox(on) { this.lbOn = !!on; this.el.letterbox.classList.toggle('on', !!on); },
   titleCard(big, sub, dur = 2.8) { this.el.tcBig.textContent = big; this.el.tcSub.textContent = sub || ''; this.el.titleCard.classList.add('on'); this.tcT = dur; },
+  readyFlash(name) { const el = this.el.ab[name]; if (!el) return; el.classList.remove('rdy'); void el.offsetWidth; el.classList.add('rdy'); setTimeout(() => el.classList.remove('rdy'), 600); },
   pressFlash(name) { const el = this.el.ab[name]; if (!el) return; el.classList.add('pressed'); setTimeout(() => el.classList.remove('pressed'), 110); },
   setupBossFrame(def) {
     this.el.bossNameT.textContent = def.name; this.el.bossHpFill.style.background = def.barGrad;
@@ -196,19 +197,17 @@ const ui = {
     this.set('phpc', e.hpFill, 'cls', pk < 0.3 ? 'fill low' : 'fill');
     const comboOn = p.comboN >= 2;
     this.set('combo', e.combo, 'cls', comboOn ? 'on' : '');
-    if (comboOn) { if (this.setN('comboN', p.comboN)) e.combo.textContent = 'GRAZE ×' + p.comboN; this.comboHueT -= realDt; if (this.comboHueT <= 0) { this.comboHueT = 0.08; e.combo.style.color = 'hsl(' + Math.round((performance.now() / 6) % 360) + ',100%,72%)'; } }
-    for (let i = 0; i < 3; i++) {
-      const v = i === 0 ? p.r : i === 1 ? p.g : p.b;
-      q = Math.round(v * 5); if (this.setN('sp' + i, q)) e.spcI[i].style.transform = 'scaleY(' + (q / 500) + ')';
-      q = Math.floor(v); if (this.setN('spn' + i, q)) e.spcN[i].textContent = String(q);
-      this.set('spc' + i, e.spc[i], 'cls', v >= 60 ? 'spc full' : 'spc');
-    }
+    if (comboOn) { if (this.setN('comboN', p.comboN)) e.combo.textContent = 'PERFECT ×' + p.comboN; this.comboHueT -= realDt; if (this.comboHueT <= 0) { this.comboHueT = 0.08; e.combo.style.color = 'hsl(' + Math.round((performance.now() / 6) % 360) + ',100%,72%)'; } }
+    // Radiance bar (fills from landing hits; full = White Nova)
+    q = Math.round(p.rad * 5); if (this.setN('rad', q)) { e.radFill.style.transform = 'scaleX(' + (q / 500) + ')'; e.ab.nova.style.setProperty('--k', (q / 5).toFixed(1) + '%'); }
+    const full = p.rad >= 100;
+    this.set('radc', e.radWrap, 'cls', full ? 'full' : '');
+    q = full ? -1 : Math.floor(p.rad); if (this.setN('radt', q)) e.radTxt.textContent = full ? (IS_TOUCH ? 'NOVA READY' : 'NOVA READY  [4 / R]') : 'RADIANCE ' + q + '%';
     // abilities (≤30 Hz)
     this.cdTick -= realDt; if (this.cdTick > 0) return; this.cdTick = 1 / 30;
-    const m = costMul();
-    this.abil('lance', p.r / (PLAYER.lanceCost * m), p.cdLance, PLAYER.lanceCd);
-    this.abil('lattice', p.g / (PLAYER.latCost * m), p.cdLattice, PLAYER.latCd);
-    this.abil('mirror', p.b / (PLAYER.mirCost * m), p.cdMirror, PLAYER.mirCd);
+    this.abil('lance', 1, p.cdLance, PLAYER.lanceCd);
+    this.abil('lattice', 1, p.cdLattice, PLAYER.latCd);
+    this.abil('mirror', 1, p.cdMirror, PLAYER.mirCd);
     // dash
     const D = this.abEl('dash'); const dk = p.dashCharges >= p.dashMax ? 0 : 1 - p.dashRecharge / PLAYER.dashCd;
     q = p.dashCharges === 0 ? Math.round(dk * 200) : -1; if (this.setN('dashcd', q)) D.cd.style.background = q >= 0 ? 'conic-gradient(rgba(0,0,0,.62) ' + (q / 2) + '%, transparent 0)' : 'none';

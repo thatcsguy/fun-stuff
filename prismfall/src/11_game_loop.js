@@ -24,7 +24,7 @@ function setArenaLook(arena) {
 }
 function startRun(full, idx = 0) {
   game.runMode = full ? 'full' : 'single'; game.facets = []; game.runTime = 0; game.bossTimes = [null, null, null]; game.cpBoss = {}; game.checkpointed = false;
-  game.stats.grazes = 0; game.stats.perfects = 0; game.stats.deaths = 0; game.stats.time = 0; game.tutorial = {};
+  game.stats.grazes = 0; game.stats.novas = 0; game.stats.perfects = 0; game.stats.deaths = 0; game.stats.time = 0; game.tutorial = {};
   game.sat = game.satTarget = SAT_BOSS[idx];
   beginBoss(idx, { intro: true });
 }
@@ -39,7 +39,7 @@ function beginBoss(idx, opts = {}) {
   const def = BOSSES[idx];
   setArenaLook(def.arena);
   bossReset(idx, opts.phase || 0);
-  resetPlayer(opts.charge || 30);
+  resetPlayer(opts.charge || PLAYER.radStart);
   game.fightTime = 0; director.timeScale = 1; LU.uWhite.value = 0; LU.uDark.value = 0;
   ui.setupBossFrame(def);
   ui.el.fade.style.opacity = '0';
@@ -58,7 +58,7 @@ function startFight() {
   if (bossRT.idx === 0 && bossRT.phase === 0) {
     const gen = game.gen;
     ui.tutorial('move', IS_TOUCH ? 'Move: drag the left side of the screen' : 'Move: WASD  ·  Aim: mouse  ·  Dash: SPACE');
-    setTimeout(() => { if (game.gen === gen && game.state === 'fight') ui.tutorial('dash', 'Dash through attacks for PERFECT grazes'); }, 6500);
+    setTimeout(() => { if (game.gen === gen && game.state === 'fight') ui.tutorial('dash', 'Dash THROUGH an attack for a PERFECT: it recharges your Lance'); }, 6500);
   }
 }
 function retryBoss() {
@@ -124,7 +124,7 @@ function showVictory() {
   const rows = [];
   if (run != null) rows.push(`<div class="${nb.run ? 'best' : ''}">TOTAL ${fmtTimeMs(run)}${nb.run ? ' · NEW BEST' : ''}</div>`);
   game.bossTimes.forEach((t, i) => { if (t != null) rows.push(`<div class="${nb['b' + (i + 1)] ? 'best' : ''}">${BOSSES[i].name} · ${fmtTimeMs(t)}${cpb['b' + (i + 1)] ? ' · CHECKPOINT' : ''}</div>`); });
-  rows.push(`<div>GRAZES ${game.stats.grazes} · PERFECT DASHES ${game.stats.perfects} · SHATTERED ${game.stats.deaths}</div>`);
+  rows.push(`<div>WHITE NOVAS ${game.stats.novas || 0} · PERFECT DASHES ${game.stats.perfects} · SHATTERED ${game.stats.deaths}</div>`);
   if (game.facets.length) rows.push(`<div>FACETS · ${game.facets.map((id) => FACETS.find((f) => f.id === id).name).join(' · ')}</div>`);
   $('victoryStats').innerHTML = rows.join('');
   const cred = ['<div class="h">PRISMFALL</div>', '<div>THE LANTERN CHOIR · SILENCED</div>', '<div>VEYRA · UNBOUND</div>', '<div>THE NULL SUN · DAWN</div>',
@@ -137,7 +137,7 @@ function showDefeat() {
   game.state = 'defeat'; ui.hud(false);
   const b = bossRT;
   $('defeatSub').textContent = b.def ? b.def.name : '';
-  $('defeatStats').innerHTML = `<div>BOSS REMAINING ${(b.hp / b.maxHp * 100).toFixed(1)}%</div><div>TIME ${fmtTimeMs(game.fightTime)}</div><div>GRAZES ${game.stats.grazes} · PERFECT ${game.stats.perfects}</div>`;
+  $('defeatStats').innerHTML = `<div>BOSS REMAINING ${(b.hp / b.maxHp * 100).toFixed(1)}%</div><div>TIME ${fmtTimeMs(game.fightTime)}</div><div>NOVAS ${game.stats.novas || 0} · PERFECT ${game.stats.perfects}</div>`;
   showScreen('defeat');
 }
 function toTitle() {
@@ -250,7 +250,7 @@ function frame(now) {
    ===================================================================== */
 window.__game = {
   get state() { return game.state; },
-  get player() { const p = player; return { hp: p.hp, maxHp: p.maxHp, x: p.x, z: p.z, r: p.r, g: p.g, b: p.b, dashCharges: p.dashCharges, iframes: Math.max(p.dashI, p.hurtI, p.invuln), alive: p.alive }; },
+  get player() { const p = player; return { hp: p.hp, maxHp: p.maxHp, x: p.x, z: p.z, rad: p.rad, cd: [p.cdLance, p.cdLattice, p.cdMirror], dashCharges: p.dashCharges, iframes: Math.max(p.dashI, p.hurtI, p.invuln), alive: p.alive }; },
   get boss() { const b = bossRT; return b.def ? { index: b.idx, name: b.def.name, hp: b.hp, maxHp: b.maxHp, phase: b.phase, fracture: b.fracture, vulnerable: b.vuln > 0, shielded: b.shieldMul < 1, cast: b.cast.active ? b.cast.name : null, enrageLeft: b.enrageLeft, dead: b.dead } : null; },
   get fps() { return perf.fps; }, get quality() { return Q.name; }, get projectiles() { return PJ.count; },
   get stats() { return Object.assign({}, game.stats, { time: game.fightTime }); },
@@ -264,15 +264,29 @@ window.__game = {
   killBoss() { if (bossRT.def && !bossRT.dead) { if (game.state !== 'fight') game.state = 'fight'; bossDie(); } },
   damageBoss(n) { const was = game.state; bossTakeDamage(n, false, 'debug'); return was; },
   godMode(on = true) { debug.god = !!on; },
-  fill() { player.r = player.g = player.b = 100; player.cdLance = player.cdLattice = player.cdMirror = 0; player.dashCharges = player.dashMax; },
+  fill() { player.rad = 100; player.cdLance = player.cdLattice = player.cdMirror = 0; player.dashCharges = player.dashMax; },
   get timeScale() { return debug.timeScale; }, set timeScale(v) { debug.timeScale = Math.max(0, +v || 0); },
   forceQuality(t) { if (t === 'auto') { Q.auto = true; return; } Q.auto = false; applyQuality(t); },
   skipCinematic() { skipCine(true); },
   setCam(x, y, z, lx, ly, lz) { if (x === null || x === undefined) { cam.lock = null; return; } cam.lock = { pos: new THREE.Vector3(x, y, z), look: new THREE.Vector3(lx, ly, lz) }; },
   cast(name, arg) { const d = bossRT.def; if (d && d.casts[name]) { d.casts[name](arg); return true; } return false; },
   facet(id) { pickFacet(id); }, victory() { showVictory(); }, defeat() { player.hurtI = 0; player.invuln = 0; debug.god = false; damagePlayer(9999, R); },
-  use(name) { return useAbility(name); }, autopilot(on = true) { debug.autopilot = !!on; debug.log = []; }, get hitLog() { return debug.log || []; }, move(x, z) { input.jx = x; input.jz = z; },
+  use(name) { return useAbility(name); }, autopilot(on = true) { debug.autopilot = !!on; debug.log = []; debug.dmg = {}; },
+  dbgExtra() { return { dmg: debug.dmg, novas: game.stats.novas, perfects: game.stats.perfects }; }, get hitLog() { return debug.log || []; }, move(x, z) { input.jx = x; input.jz = z; },
   setPlayer(x, z) { player.x = x; player.z = z; },
+  // headless fast-forward for bot balance tests: steps input/director/sim at 30 Hz without rendering
+  fastForward(sec, stopOnEnd = true) {
+    const h = 1 / 30; let t = 0;
+    while (t < sec) {
+      updateInput(h); if (game.state !== 'paused') updateDirector(h * debug.timeScale);
+      let ts = director.timeScale * debug.timeScale; if (director.hitstopT > 0) ts = 0;
+      if (ts > 0 && game.state !== 'paused') simStep(h * ts);
+      if (game.state !== 'paused') updateNova(h * debug.timeScale);
+      t += h;
+      if (stopOnEnd && (game.state === 'defeat' || game.state === 'facet' || game.state === 'victory' || (bossRT.dead && !director.cine))) break;
+    }
+    return t;
+  },
   setPixelRatio(v) { Q.prOverride = v || 0; resize(); },  // test helper (software renderers)
   _dbg: { scene, renderer, floor, nebula, stars, composer, bloom, lensPass, Q, resize },
 };

@@ -62,6 +62,13 @@ button{font-family:var(--serif);cursor:pointer}
 #hpFill.low{background:linear-gradient(90deg,#ff3355,#ff8899)}
 #combo{margin-top:4px;font-size:13px;letter-spacing:.2em;font-weight:bold;height:18px;opacity:0;transition:opacity .2s;font-family:var(--serif);font-style:italic}
 #combo.on{opacity:1}
+#radWrap{position:relative;margin-top:5px;height:14px;border-radius:7px;background:rgba(10,10,20,.6);box-shadow:0 0 0 1px rgba(255,255,255,.18);overflow:hidden}
+#radFill{position:absolute;inset:0;transform-origin:0 50%;transform:scaleX(.25);background:linear-gradient(90deg,#ff3456,#ffd24a 30%,#4dff7a 55%,#5a9cff 80%,#c58aff);opacity:.85}
+#radTxt{position:absolute;inset:0;display:flex;align-items:center;padding-left:8px;font:bold 9px ui-monospace,Menlo,monospace;letter-spacing:.18em;color:#fff;text-shadow:0 0 3px #000,0 0 2px #000}
+#radWrap.full{box-shadow:0 0 0 1px #fff,0 0 14px rgba(255,255,255,.8);animation:radPulse .8s infinite alternate}
+#radWrap.full #radFill{background:linear-gradient(90deg,#fff,#ffe9c0,#fff);opacity:1}
+#radWrap.full #radTxt{color:#201830;text-shadow:none}
+@keyframes radPulse{from{filter:brightness(1)}to{filter:brightness(1.35)}}
 
 #spectrum{position:absolute;display:flex;gap:6px;align-items:flex-end;
   right:calc(var(--sar) + 268px * var(--s));bottom:calc(var(--sab) + 18px)}
@@ -100,10 +107,14 @@ button{font-family:var(--serif);cursor:pointer}
 #ab-lance{--sz:66px;--rx:136px;--by:31px}
 #ab-lattice{--sz:66px;--rx:105px;--by:105px}
 #ab-mirror{--sz:66px;--rx:31px;--by:136px}
-#ab-nova{--sz:74px;--rx:161px;--by:161px;transform:scale(0);transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
+#ab-nova{--sz:74px;--rx:161px;--by:161px;transform:scale(.78);transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
 #ab-nova.ready{transform:scale(1);animation:novaPulse 1s infinite}
 #ab-nova.ready.pressed{transform:scale(.92)}
-#ab-nova::before{content:"";position:absolute;inset:-2px;border-radius:50%;background:conic-gradient(#f35,#fd4,#4f8,#4cf,#86f,#f4c,#f35);animation:spin 2s linear infinite;z-index:-1}
+#ab-nova:not(.ready) svg,#ab-nova:not(.ready) .lbl{opacity:.45}
+#ab-nova::before{content:"";position:absolute;inset:-3px;border-radius:50%;background:conic-gradient(rgba(255,255,255,.9) var(--k,25%),rgba(255,255,255,.1) 0);z-index:-1}
+#ab-nova.ready::before{inset:-2px;background:conic-gradient(#f35,#fd4,#4f8,#4cf,#86f,#f4c,#f35);animation:spin 2s linear infinite}
+.ab.rdy{animation:abReady .6s ease-out}
+@keyframes abReady{0%{box-shadow:0 0 0 3px #fff,0 0 30px #fff}100%{box-shadow:0 0 0 0 rgba(255,255,255,0),0 0 0 rgba(255,255,255,0)}}
 #ab-nova::after{content:"";position:absolute;inset:3px;border-radius:50%;background:rgba(20,20,34,.85);z-index:-1}
 #ab-nova{background:transparent;isolation:isolate}
 #ab-nova .lbl{position:absolute;left:0;right:0;bottom:12%;text-align:center;font:bold calc(10px * var(--s)) var(--serif);letter-spacing:.2em;color:#fff}
@@ -294,11 +305,8 @@ body.touch .ab .key{display:none}
   <div id="playerFrame">
     <div class="lbl"><span>Lightbreaker</span><span id="hpNum">100</span></div>
     <div class="bar"><div class="chunk" id="hpChunk"></div><div class="fill" id="hpFill"></div><div class="sheen"></div></div>
-    <div id="combo">GRAZE ×0</div>
-  </div>
-  <div id="spectrum">
-    <div class="spc" id="spcR"><i></i></div><div class="spc" id="spcG"><i></i></div><div class="spc" id="spcB"><i></i></div>
-    <div class="lab"><span id="spcRn">30</span><span id="spcGn">30</span><span id="spcBn">30</span></div>
+    <div id="radWrap"><div id="radFill"></div><span id="radTxt">RADIANCE 25%</span></div>
+    <div id="combo">PERFECT ×0</div>
   </div>
   <button id="pauseBtn" aria-label="Pause"><svg viewBox="0 0 16 16"><rect x="3" y="2" width="3.5" height="12" rx="1" fill="#fff"/><rect x="9.5" y="2" width="3.5" height="12" rx="1" fill="#fff"/></svg></button>
   <div id="abilities">
@@ -412,7 +420,7 @@ const TIERS = ['low', 'med', 'high'];
 
 // Per-boss difficulty knobs (index = boss index)
 const DIFF = [
-  { windup: 1.5, spd: 0.8, enrage: 240 },
+  { windup: 1.35, spd: 0.88, enrage: 270 },
   { windup: 1.1, spd: 1.0, enrage: 270 },
   { windup: 0.8, spd: 1.2, enrage: 300 },
 ];
@@ -427,20 +435,21 @@ const PLAYER = {
   hp: 100, speed: 7.5, accel: 14, hurtR: 0.45, grazeR: 1.6, hurtI: 0.6,
   boltInterval: 0.18, boltDmg: 10, boltSpeed: 38, boltRange: 20, crit: 0.1,
   dashCharges: 2, dashCd: 3.5, dashDist: 6.5, dashTime: 0.16, dashI: 0.35,
-  lanceCost: 35, lanceCd: 1.5, lanceDmg: 140, lanceLen: 24, lanceW: 0.9,
-  latCost: 35, latCd: 8, latR: 4.5, latDur: 6, latHeal: 4,
-  mirCost: 35, mirCd: 10, mirDur: 2.5, mirR: 2.2, mirDmg: 25,
-  novaReq: 60,
+  lanceCd: 5, lanceDmg: 140, lanceLen: 24, lanceW: 0.9,
+  latCd: 16, latR: 4.5, latDur: 6, latHeal: 4,
+  mirCd: 9, mirDur: 2.5, mirR: 2.2, mirDmg: 25,
+  // RADIANCE: one meter (0-100) that fills from landing hits; full = White Nova. Abilities are plain cooldowns.
+  novaDmg: 1400, radStart: 25, radBolt: 0.2, radLance: 3, radRefl: 1, radPerfect: 10, radLastLight: 4,
 };
 
 const FACETS = [
   { id: 'echo', name: 'PRISM ECHO', glyph: '✦', color: '#ff5a7a', desc: 'Crimson Lance fires a second beam (50%) at a 12° offset.' },
   { id: 'living', name: 'LIVING LATTICE', glyph: '⬡', color: '#5aff8a', desc: 'Lattice radius +30% and heals 6 HP/s.' },
   { id: 'polished', name: 'POLISHED MIRROR', glyph: '◈', color: '#6aa8ff', desc: 'Mirror lasts 4 s and reflected shots deal 40.' },
-  { id: 'greed', name: 'SPECTRAL GREED', glyph: '◎', color: '#ffd76a', desc: 'Graze radius +0.4 m and every graze grants +2 more charge.' },
+  { id: 'radiant', name: 'RADIANT SOUL', glyph: '◎', color: '#ffd76a', desc: 'Radiance builds 50% faster, so White Nova comes around more often.' },
   { id: 'third', name: 'THIRD REFRACTION', glyph: '»', color: '#bfe4ff', desc: 'Refract Dash gains a third charge.' },
   { id: 'core', name: 'BRIGHT CORE', glyph: '♦', color: '#fff3c0', desc: '+30 max HP (130) and heal to full now.' },
-  { id: 'afterglow', name: 'AFTERGLOW', glyph: '☀', color: '#ffb36a', desc: 'After a White Nova, all ability costs are halved for 5 s.' },
+  { id: 'afterglow', name: 'AFTERGLOW', glyph: '☀', color: '#ffb36a', desc: 'After a White Nova, your abilities recharge twice as fast for 6 s.' },
   { id: 'splinter', name: 'SPLINTER BOLTS', glyph: '⁂', color: '#e0b0ff', desc: 'Prism Bolt fires twin bolts in a 6° spread (+20% DPS).' },
 ];
 
@@ -1395,7 +1404,7 @@ function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } cat
    10  PLAYER — The Lightbreaker
    ===================================================================== */
 const player = {
-  x: 0, z: 7, y: 0, vx: 0, vz: 0, alive: true, hp: 100, maxHp: 100, r: 30, g: 30, b: 30,
+  x: 0, z: 7, y: 0, vx: 0, vz: 0, alive: true, hp: 100, maxHp: 100, rad: 25, radFullT: 0, castCol: 0, castColT: 0,
   facing: -Math.PI / 2, dashCharges: 2, dashMax: 2, dashRecharge: 0, dashT: -1, dashDX: 0, dashDZ: 0, dashSX: 0, dashSZ: 0, dashI: 0, perfectsThisDash: 0, ghostN: 0,
   hurtI: 0, invuln: 0, slowT: 0, stunT: 0, boltT: 0, cdLance: 0, cdLattice: 0, cdMirror: 0, comboN: 0, comboT: 0, novaT: -1, novaConsumed: 0, afterglowT: 0,
   grazeFlash: 0, distWalked: 0, healAcc: 0, healT: 0, lowHpBeatT: 0, coreCol: new THREE.Color(1, 1, 1), reflectN: 0,
@@ -1404,7 +1413,7 @@ const aim = { x: 0, y: 2, z: 0, tgt: null, ang: -Math.PI / 2 };
 const targets = [];         // {x,y,z,r,hy,alive,priority,isBoss,hit(dmg,crit,src)}
 function hasFacet(id) { return game.facets.indexOf(id) >= 0; }
 function grazeRadius() { return PLAYER.grazeR + (hasFacet('greed') ? 0.4 : 0); }
-function costMul() { return player.afterglowT > 0 ? 0.5 : 1; }
+function cdRate() { return player.afterglowT > 0 ? 2 : 1; }
 
 // ---- model ----
 const crystalU = { uTime: { value: 0 }, uCore: { value: new THREE.Color(1, 1, 1) }, uFlash: { value: 0 }, uAlpha: { value: 0.88 } };
@@ -1451,7 +1460,7 @@ const hitDot = (() => {
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
   sp.scale.setScalar(0.5); sp.position.y = 1.15; sp.renderOrder = 998; playerG.add(sp); return sp;
 })();
-// spectrum ring
+// ability ring (R lance, G lattice, B mirror arcs fill as each cooldown recovers; the ring turns white when Nova is ready)
 const specU = { uVal: { value: new THREE.Vector3(0.3, 0.3, 0.3) }, uWhite: { value: 0 }, uTime: { value: 0 }, uPop: { value: new THREE.Vector3() } };
 const specRing = new THREE.Mesh(new THREE.RingGeometry(0.98, 1.2, 96, 1), new THREE.ShaderMaterial({
   uniforms: specU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -1475,7 +1484,7 @@ const grazeRingMesh = new THREE.Mesh(new THREE.RingGeometry(PLAYER.grazeR - 0.03
   vertexShader: `varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
   fragmentShader: `uniform float uA,uTime; varying vec2 vP; void main(){ float a = atan(vP.y,vP.x); float dash = step(0.2, sin(a*40.0 + uTime*1.5)); gl_FragColor = vec4(vec3(0.85,0.92,1.0)*dash*uA*1.6, 1.0); }`,
 }));
-grazeRingMesh.rotation.x = -Math.PI / 2; grazeRingMesh.position.y = 0.06; grazeRingMesh.renderOrder = 30; grazeRingMesh.material.depthTest = false; playerG.add(grazeRingMesh);
+grazeRingMesh.rotation.x = -Math.PI / 2; grazeRingMesh.position.y = 0.06; grazeRingMesh.renderOrder = 30; grazeRingMesh.material.depthTest = false; grazeRingMesh.visible = false; playerG.add(grazeRingMesh);
 // ghosts (dash afterimages)
 const ghostMatBase = new THREE.ShaderMaterial({
   uniforms: { uCol: { value: new THREE.Color(1, 1, 1) }, uA: { value: 1 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -1534,39 +1543,42 @@ const mirrorMesh = new THREE.Mesh(new THREE.CircleGeometry(1.1, 6), new THREE.Sh
 mirrorMesh.visible = false; mirrorMesh.renderOrder = 13; scene.add(mirrorMesh);
 const mirror = { active: false, t: 0, dur: 2.5, ang: 0, blockUsed: false, x: 0, z: 0 };
 
-// ---- spectrum helpers ----
-function chan(c) { return c === R ? player.r : c === G ? player.g : player.b; }
-function addCharge(c, n) {
-  if (c === W) { player.r = Math.min(100, player.r + n); player.g = Math.min(100, player.g + n); player.b = Math.min(100, player.b + n); specU.uPop.value.set(1, 1, 1); return; }
-  if (c === R) player.r = Math.min(100, player.r + n); else if (c === G) player.g = Math.min(100, player.g + n); else player.b = Math.min(100, player.b + n);
-  if (c === R) specU.uPop.value.x = 1; else if (c === G) specU.uPop.value.y = 1; else specU.uPop.value.z = 1;
+// ---- Radiance (the White Nova meter) ----
+// Fills from landing hits: Prism Bolts, Lance, reflected shots, Perfect dodges, breaking adds. Full = White Nova.
+function radMul() { return (hasFacet('radiant') ? 1.5 : 1) * (bossRT.lastLight ? PLAYER.radLastLight : 1); }
+function addRadiance(n) {
+  const p = player; if (n <= 0 || !p.alive || p.novaT >= 0) return;
+  const before = p.rad; p.rad = Math.min(100, p.rad + n * radMul());
+  if (before < 100 && p.rad >= 100) {
+    p.radFullT = 1; specU.uPop.value.set(1, 1, 1); sfx.chime(7, 0.8);
+    ring(p.x, 0.08, p.z, 0.4, 3.2, 0.5, 0.14, 2.2, 2.2, 2.4, 1.3); burstRainbow(p.x, 1.2, p.z, 30, 4, 0.6, 0.14, 4);
+    ui.tutorial('nova', IS_TOUCH ? 'RADIANCE full: tap NOVA to unleash White Nova' : 'RADIANCE full: unleash WHITE NOVA  [4 / R]');
+  }
 }
-function spend(c, n) { if (c === R) player.r -= n; else if (c === G) player.g -= n; else player.b -= n; }
-function chargeMul() { return (bossRT.lastLight ? 2 : 1); }
-function onGraze(c, amt, sx, sz) {
-  if (c < 0) c = W;
-  const greed = hasFacet('greed') ? 2 : 0;
-  if (c === W) addCharge(W, 3 * chargeMul()); else addCharge(c, (amt + greed) * chargeMul());
-  player.comboN++; player.comboT = 2; player.grazeFlash = 0.15; game.stats.grazes++;
-  sfx.graze(c, player.comboN);
-  streakToPlayer(sx, 0.9, sz, c, 6);
-}
+function onGraze(c, amt, sx, sz) { } // near-misses no longer do anything: Radiance comes from landing hits
 function onPerfect(c, sx, sz) {
   if (c < 0) c = W;
-  player.perfectsThisDash++; game.stats.perfects++;
-  addCharge(c === W ? W : c, (c === W ? 4 : 12) * chargeMul());
+  const p = player, first = p.perfectsThisDash === 0;
+  p.perfectsThisDash++; game.stats.perfects++;
   hitstop(0.08); aberrSpike(0.008); vibrate(15);
-  player.dashRecharge += 0.5; if (player.dashCharges < player.dashMax && player.dashRecharge >= PLAYER.dashCd) { player.dashCharges++; player.dashRecharge = 0; }
-  dmgNumber(player.x, 2.6, player.z, 'PERFECT', 5);
+  p.dashRecharge += 0.5; if (p.dashCharges < p.dashMax && p.dashRecharge >= PLAYER.dashCd) { p.dashCharges++; p.dashRecharge = 0; }
+  if (first) {
+    addRadiance(PLAYER.radPerfect);
+    // a perfect dodge instantly recharges the Crimson Lance: dodge through, then punish
+    if (p.cdLance > 0) { p.cdLance = 0; specU.uPop.value.x = 1; ui.readyFlash('lance'); dmgNumber(p.x, 3.2, p.z, 'LANCE READY', 4, '#ff7a8e'); }
+    ui.tutorial('perfect', 'PERFECT dodge: Lance recharged and Radiance gained');
+  }
+  dmgNumber(p.x, 2.6, p.z, 'PERFECT', 5);
   if (bossRT.def) bossAddFracture(2);
-  player.comboN++; player.comboT = 2;
-  sfx.perfect(c, player.comboN);
+  p.comboN++; p.comboT = 3;
+  sfx.perfect(c, p.comboN);
   streakToPlayer(sx, 0.9, sz, c, 10);
-  ring(player.x, 0.08, player.z, 0.4, 2.6, 0.35, 0.12, 2, 2, 2.4, 1.2);
+  ring(p.x, 0.08, p.z, 0.4, 2.6, 0.35, 0.12, 2, 2, 2.4, 1.2);
 }
 let hitSrc = '';
 function damagePlayer(dmg, col) {
   if (dmg <= 0) return;
+  if (bossRT.def && bossRT.def.dmgMul && dmg < 900) dmg = Math.round(dmg * bossRT.def.dmgMul);
   player.hp -= dmg; player.hurtI = PLAYER.hurtI;
   if (debug.log) debug.log.push([Math.round(game.fightTime), dmg, hitSrc, bossRT.cast.active ? bossRT.cast.name : '']);
   addTrauma(0.35); LU.uHurt.value = 0.55; vibrate(40);
@@ -1591,10 +1603,10 @@ function playerDie() {
   sfx.shatter(1);
   game.defeatT = 1.2;
 }
-function resetPlayer(fullCharge = 30) {
+function resetPlayer(startRad = PLAYER.radStart) {
   player.maxHp = hasFacet('core') ? 130 : 100; player.hp = player.maxHp; player.alive = true;
   player.x = 0; player.z = 7; player.vx = player.vz = 0; player.y = 0;
-  player.r = player.g = player.b = fullCharge;
+  player.rad = startRad; player.radFullT = 0; player.castColT = 0;
   player.dashMax = hasFacet('third') ? 3 : 2; player.dashCharges = player.dashMax; player.dashRecharge = 0; player.dashT = -1; player.dashI = 0;
   player.hurtI = 0; player.invuln = 0; player.slowT = 0; player.stunT = 0; player.cdLance = player.cdLattice = player.cdMirror = 0; player.boltT = 0;
   player.comboN = 0; player.comboT = 0; player.novaT = -1; player.afterglowT = 0; player.facing = -Math.PI / 2;
@@ -1624,13 +1636,12 @@ function computeAim() {
 // ---- abilities ----
 function canControl() { return game.state === 'fight' && player.alive && player.novaT < 0 && player.stunT <= 0; }
 function abilityReady(name) {
-  const m = costMul();
   switch (name) {
     case 'dash': return player.dashCharges > 0 && player.dashT < 0;
-    case 'lance': return player.cdLance <= 0 && player.r >= PLAYER.lanceCost * m;
-    case 'lattice': return player.cdLattice <= 0 && player.g >= PLAYER.latCost * m;
-    case 'mirror': return player.cdMirror <= 0 && player.b >= PLAYER.mirCost * m;
-    case 'nova': return player.r >= PLAYER.novaReq && player.g >= PLAYER.novaReq && player.b >= PLAYER.novaReq && player.novaT < 0;
+    case 'lance': return player.cdLance <= 0;
+    case 'lattice': return player.cdLattice <= 0;
+    case 'mirror': return player.cdMirror <= 0;
+    case 'nova': return player.rad >= 100 && player.novaT < 0;
   }
   return false;
 }
@@ -1657,7 +1668,7 @@ function castDash() {
   burst(p.x, 0.6, p.z, 14, 1.5, 1.7, 2.2, 3, 0.4, 0.14, 0.5, 4);
 }
 function castLance() {
-  const p = player; spend(R, PLAYER.lanceCost * costMul()); p.cdLance = PLAYER.lanceCd;
+  const p = player; p.cdLance = PLAYER.lanceCd; p.castCol = R; p.castColT = 1;
   computeAim();
   fireLanceBeam(aim.ang, 1);
   if (hasFacet('echo')) fireLanceBeam(aim.ang + 12 * Math.PI / 180, 0.5);
@@ -1680,6 +1691,7 @@ function fireLanceBeam(ang, mul) {
       const crit = frand() < 0.25; const dmg = PLAYER.lanceDmg * mul * (crit ? 1.6 : 1) * (t.lanceMul || 1);
       t.hit(dmg, crit, 'lance');
       if (t.isBoss) bossAddFracture(3);
+      if (!hitAny) addRadiance(PLAYER.radLance * mul);
       hitAny = true; critAny = critAny || crit;
       const along = Math.max(0, (t.x - x0) * c + (t.z - z0) * s);
       const hx = x0 + c * along, hz = z0 + s * along, hy = 1.15 + slope * along;
@@ -1693,7 +1705,7 @@ function fireLanceBeam(ang, mul) {
   if (hitAny) { hitstop(critAny ? 0.07 : 0.05); addTrauma(critAny ? 0.1 : 0); sfx.bossHit(); }
 }
 function castLattice() {
-  const p = player; spend(G, PLAYER.latCost * costMul()); p.cdLattice = PLAYER.latCd;
+  const p = player; p.cdLattice = PLAYER.latCd; p.castCol = G; p.castColT = 1;
   lattice.active = true; lattice.x = p.x; lattice.z = p.z; lattice.t = 0; lattice.dur = PLAYER.latDur; lattice.r = PLAYER.latR * (hasFacet('living') ? 1.3 : 1);
   latDisc.position.set(p.x, 0.04, p.z); latDisc.scale.setScalar(lattice.r); latWall.position.set(p.x, 0, p.z); latWall.scale.set(lattice.r, 0.9, lattice.r);
   latDisc.visible = latWall.visible = true;
@@ -1702,39 +1714,37 @@ function castLattice() {
   sfx.lattice();
 }
 function castMirror() {
-  const p = player; spend(Bc, PLAYER.mirCost * costMul()); p.cdMirror = PLAYER.mirCd;
+  const p = player; p.cdMirror = PLAYER.mirCd; p.castCol = Bc; p.castColT = 1;
   mirror.active = true; mirror.t = 0; mirror.dur = hasFacet('polished') ? 4 : PLAYER.mirDur; mirror.blockUsed = false; p.reflectN = 0;
   mirrorMesh.visible = true; computeAim(); mirror.ang = aim.ang;
   sfx.mirror();
   burst(p.x, 1.2, p.z, 24, 0.5, 1.2, 2.6, 5, 0.5, 0.15, 1, 4);
 }
 function castNova() {
-  const p = player; p.novaConsumed = p.r + p.g + p.b; p.r = p.g = p.b = 0; p.novaT = 0; p.invuln = 1.2;
-  p.novaRefund = [0, 0, 0];
+  const p = player; p.rad = 0; p.novaT = 0; p.invuln = 1.2; game.stats.novas = (game.stats.novas || 0) + 1;
   sfx.nova();
   if (bossRT.lastLight) bossRT.novaInLastLight = true;
 }
 function novaBurst() {
   const p = player;
   const vulnBefore = bossRT.vuln > 0;
-  // clear projectiles: refund
-  let rr = 0, gg = 0, bb = 0;
+  // clear projectiles: each one swallowed refunds a little Radiance (max +15)
+  let refund = 0;
   for (let i = 0; i <= PJ.hi; i++) if (PJ.alive[i] && !(PJ.fl[i] & F_REFL)) {
-    const c = PJ.c[i];
-    if (c === R && rr < 30) rr++; else if (c === G && gg < 30) gg++; else if (c === Bc && bb < 30) bb++; else if (c === W) { if (rr < 30) rr++; if (gg < 30) gg++; if (bb < 30) bb++; }
+    const c = PJ.c[i]; refund += 0.35;
     if ((i & 1) === 0) streakToPlayer(PJ.x[i], PJ.y[i], PJ.z[i], c, 1);
     pjKill(i, false);
   }
-  p.r = Math.min(100, p.r + rr); p.g = Math.min(100, p.g + gg); p.b = Math.min(100, p.b + bb);
+  p.rad = Math.min(100, Math.min(15, refund));
   if (bossRT.def && bossRT.fracture >= 100 && !vulnBefore) bossVulnerable();
-  const dmg = 300 + 6 * p.novaConsumed;
+  const dmg = PLAYER.novaDmg;
   for (let i = 0; i < targets.length; i++) { const t = targets[i]; if (t.alive) t.hit(dmg, true, 'nova'); }
   ring(p.x, 0.2, p.z, 0.5, 30, 1.0, 0.45, 0.9, 1.0, 1.3, 0.7);
   ring(p.x, 1.2, p.z, 0.2, 12, 0.6, 0.25, 1.1, 1.1, 1.5, 0.6);
   burstRainbow(p.x, 1.6, p.z, 180, 16, 1.3, 0.24, 0);
   bloomSpike(1.1); addTrauma(0.9); shockAt(p.x, 1.2, p.z, 0.06); rainbowWave(p.x, p.z, 1.0, 20);
   aberrSpike(0.012);
-  if (hasFacet('afterglow')) p.afterglowT = 5;
+  if (hasFacet('afterglow')) p.afterglowT = 6;
 }
 function updateNova(realDt) {
   const p = player; if (p.novaT < 0) return;
@@ -1756,7 +1766,7 @@ function updateNova(realDt) {
 // ---- per-frame player update ----
 function updatePlayer(dt) {
   const p = player;
-  crystalU.uTime.value = fx.simTime; specU.uTime.value = fx.simTime; grazeU.uTime.value = fx.simTime;
+  crystalU.uTime.value = fx.simTime; specU.uTime.value = fx.simTime;
   if (!p.alive) { return; }
   const ctrl = canControl();
   let ix = ctrl ? input.mx : 0, iz = ctrl ? input.mz : 0;
@@ -1781,7 +1791,11 @@ function updatePlayer(dt) {
   p.distWalked += Math.hypot(p.vx, p.vz) * dt;
   // timers
   if (p.dashI > 0) p.dashI -= dt; if (p.hurtI > 0) p.hurtI -= dt; if (p.invuln > 0) p.invuln -= dt; if (p.slowT > 0) p.slowT -= dt; if (p.stunT > 0) p.stunT -= dt;
-  if (p.cdLance > 0) p.cdLance -= dt; if (p.cdLattice > 0) p.cdLattice -= dt; if (p.cdMirror > 0) p.cdMirror -= dt; if (p.afterglowT > 0) p.afterglowT -= dt;
+  const cdt = dt * cdRate();
+  if (p.cdLance > 0) { p.cdLance -= cdt; if (p.cdLance <= 0) specU.uPop.value.x = 1; }
+  if (p.cdLattice > 0) { p.cdLattice -= cdt; if (p.cdLattice <= 0) specU.uPop.value.y = 1; }
+  if (p.cdMirror > 0) { p.cdMirror -= cdt; if (p.cdMirror <= 0) specU.uPop.value.z = 1; }
+  if (p.afterglowT > 0) p.afterglowT -= dt; if (p.castColT > 0) p.castColT -= dt * 1.2; if (p.radFullT > 0) p.radFullT -= dt;
   if (p.dashCharges < p.dashMax) { p.dashRecharge += dt; if (p.dashRecharge >= PLAYER.dashCd) { p.dashCharges++; p.dashRecharge = p.dashCharges < p.dashMax ? 0.0001 : 0; } } else p.dashRecharge = 0;
   if (p.comboT > 0) { p.comboT -= dt; if (p.comboT <= 0) p.comboN = 0; }
   if (p.grazeFlash > 0) p.grazeFlash -= dt;
@@ -1848,9 +1862,7 @@ function updateBolts(dt) {
       const t = targets[k]; if (!t.alive) continue;
       if (segDist(t.x, t.z, ox, oz, PB.x[i], PB.z[i]) < t.r + 0.12 && Math.abs(PB.y[i] - t.y) < t.hy) {
         const crit = PB.crit[i] === 1; t.hit(PB.dmg[i] * (crit ? 2 : 1), crit, 'bolt');
-        // trickle: lowest channel (ties R > G > B)
-        const p = player; const lo = p.r <= p.g && p.r <= p.b ? R : p.g <= p.b ? G : Bc; addCharge(lo, 1.2 * (bossRT.lastLight ? 1 : 1));
-        if (bossRT.lastLight) addCharge(W, 3);
+        addRadiance(PLAYER.radBolt);
         burst(PB.x[i], PB.y[i], PB.z[i], crit ? 10 : 5, 1.8, 1.8, 2.2, crit ? 6 : 3.5, 0.3, 0.12, 1, 0);
         dead = true; break;
       }
@@ -1866,23 +1878,20 @@ function updatePlayerVisuals(dt) {
   const p = player;
   playerG.position.set(p.x, p.y, p.z);
   const t = fx.simTime;
-  // dominant color
-  const white = p.r >= 60 && p.g >= 60 && p.b >= 60;
+  // core color: brightens with Radiance, white when Nova is ready, flashes the color of the last ability cast
+  const white = p.rad >= 100;
+  const rk = p.rad / 100;
   if (white) p.coreCol.setRGB(1.6, 1.55, 1.5);
-  else if (p.r >= p.g && p.r >= p.b) p.coreCol.setRGB(1.6, 0.25, 0.35);
-  else if (p.g >= p.b) p.coreCol.setRGB(0.35, 1.6, 0.5);
-  else p.coreCol.setRGB(0.35, 0.6, 1.7);
+  else p.coreCol.setRGB(0.55 + 0.6 * rk, 0.6 + 0.6 * rk, 0.85 + 0.6 * rk);
+  if (p.castColT > 0 && !white) { const c = PCOL[p.castCol], k = Math.min(1, p.castColT); p.coreCol.r = lerp(p.coreCol.r, c[0] * 1.6 + 0.2, k); p.coreCol.g = lerp(p.coreCol.g, c[1] * 1.6 + 0.2, k); p.coreCol.b = lerp(p.coreCol.b, c[2] * 1.6 + 0.2, k); }
   crystalU.uCore.value.lerp(p.coreCol, 1 - Math.exp(-6 * dt));
   coreGlow.material.color.copy(crystalU.uCore.value).multiplyScalar(0.75);
-  specU.uVal.value.set(p.r / 100, p.g / 100, p.b / 100);
+  specU.uVal.value.set(1 - clamp(p.cdLance / PLAYER.lanceCd, 0, 1), 1 - clamp(p.cdLattice / PLAYER.latCd, 0, 1), 1 - clamp(p.cdMirror / PLAYER.mirCd, 0, 1));
   specU.uWhite.value = damp(specU.uWhite.value, white ? 1 : 0, 6, dt);
   specU.uPop.value.multiplyScalar(Math.exp(-6 * dt));
-  const tut = bossRT.def && bossRT.idx === 0 && bossRT.phase === 0 && game.fightTime < 20;
-  grazeU.uA.value = damp(grazeU.uA.value, (p.grazeFlash > 0 ? 1.0 : tut ? 0.45 : 0.14), 20, dt);
-  grazeRingMesh.scale.setScalar(grazeRadius() / PLAYER.grazeR);
   floorU.uPlayerPos.value.set(p.x, p.z);
   floorU.uPlayerColor.value.copy(crystalU.uCore.value);
-  const lvl = (p.r + p.g + p.b) / 300;
+  const lvl = p.rad / 100;
   floorU.uPlayerGlow.value = p.alive && playerG.visible ? 0.11 * (0.5 + lvl * 0.9) * (game.state === 'title' ? 0 : 1) : 0;
   hitDot.visible = p.alive && game.state !== 'title';
   hitDot.material.opacity = game.state === 'fight' ? 1 : 0.4;
@@ -1955,7 +1964,7 @@ function updateProjectiles(dt) {
       for (let k = 0; k < targets.length; k++) {
         const t = targets[k]; if (!t.alive) continue;
         if (Math.hypot(x - t.x, z - t.z) < t.r + r) {
-          t.hit(PJ.dmg[i], false, 'refl'); if (t.isBoss) bossAddFracture(4);
+          t.hit(PJ.dmg[i], false, 'refl'); if (t.isBoss) bossAddFracture(4); addRadiance(PLAYER.radRefl);
           burst(x, PJ.y[i], z, 12, 0.6, 1.2, 2.6, 5, 0.4, 0.15, 1, 0); PJ.fl[i] = fl; pjKill(i, false); break;
         }
       }
@@ -2075,6 +2084,7 @@ function bossTakeDamage(n, crit, src) {
   if (b.invuln || b.transitioning) { if (src !== 'bolt' || frand() < 0.1) dmgNumber(bossTarget.x, bossTarget.y + 1.5, bossTarget.z, 'IMMUNE', 4, '#aaaacc'); return; }
   let m = 1; if (b.vuln > 0) m *= 2; if (b.stagger > 0) m *= b.staggerMul; m *= b.shieldMul;
   n *= m; b.hp -= n; b.flash = 0.08;
+  if (debug.dmg) debug.dmg[src] = (debug.dmg[src] || 0) + Math.round(n);
   // every non-crit source ticks one rolling number up; crits pop on their own
   if (crit) dmgNumber(bossTarget.x - dnRoll.ox * 0.9 + (frand() - 0.5) * 0.8, bossTarget.y + 1.0, bossTarget.z + 0.8, String(Math.round(n)), 1);
   else dmgRollAdd(n, src === 'refl');
@@ -2178,7 +2188,11 @@ function randInArena(maxR) { const a = rng() * TAU, r = Math.sqrt(rng()) * maxR;
 // BOSS 1 — THE LANTERN CHOIR (Ember Pond)
 // ------------------------------------------------------------------
 const B1 = { group: new THREE.Group(), lanterns: [], drops: [], heart: null, heartU: null, flame: null, flameU: null, candles: null, flames: null, flameMatU: null,
-  orbitT: 0, fire: 0, mode: 'title', heartYaw: 0, heartYawTarget: 0, beat: 0, ignited: 0, chorusDir: 1, firstEmber: true, tut: {}, padCandles: 60, floatIdx: 0 };
+  orbitT: 0, fire: 0, mode: 'title', heartYaw: 0, heartYawTarget: 0, beat: 0, ignited: 0, chorusDir: 1, firstEmber: true, tut: {}, padCandles: 60, floatIdx: 0,
+  // phase 3 (Requiem): blue flame, Cantor adds that shield + heal the heart, Lantern Light safe zones
+  pale: 0, paleT: 0, cantors: [], healAcc: 0, healShowT: 0,
+  ll: { active: false, t: 0, dur: 4.2, gaze: false, sx: [0, 0], sz: [0, 0], sr: 2.4, beacons: [-1, -1], ring1: false, ring2: false, dim: 0 } };
+const B1_CANTOR_HP = 380, B1_P3_AT = 0.32;
 function makeLanternTex() {
   const cv = document.createElement('canvas'); cv.width = 256; cv.height = 256; const c = cv.getContext('2d');
   c.fillStyle = 'rgb(225,0,0)'; c.fillRect(0, 0, 256, 256);
@@ -2208,10 +2222,10 @@ function buildBoss1() {
   const capMat = new THREE.MeshStandardMaterial({ color: 0x1a0d08, roughness: 0.6, metalness: 0.2, emissive: 0x220a04 });
   const tex = makeLanternTex();
   const lanternMat = new THREE.ShaderMaterial({
-    uniforms: { uMap: { value: tex }, uGlow: { value: 1 }, uFire: { value: 0 }, uTime: { value: 0 }, uDark: { value: 0 }, uSeed: { value: 0 }, uFlash: { value: 0 } },
+    uniforms: { uMap: { value: tex }, uGlow: { value: 1 }, uFire: { value: 0 }, uPale: { value: 0 }, uTime: { value: 0 }, uDark: { value: 0 }, uSeed: { value: 0 }, uFlash: { value: 0 } },
     vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv=uv; vN=normalize(normalMatrix*normal); vec4 mv=modelViewMatrix*vec4(position,1.0); vV=-mv.xyz; gl_Position=projectionMatrix*mv; }`,
     fragmentShader: GLSL_LIB + /* glsl */`
-      uniform sampler2D uMap; uniform float uGlow,uFire,uTime,uDark,uSeed,uFlash; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+      uniform sampler2D uMap; uniform float uGlow,uFire,uPale,uTime,uDark,uSeed,uFlash; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
       void main(){ vec3 t = texture2D(uMap, vUv).rgb; vec3 n = normalize(vN), v = normalize(vV);
         float fr = fresnelF(n, v, 2.0);
         float flick = 0.82 + 0.18*noise2(vec2(uTime*5.0 + uSeed*10.0, uSeed));
@@ -2225,6 +2239,7 @@ function buildBoss1() {
         float fl = noise2(vec2(vUv.x*12.0, vUv.y*6.0 - uTime*3.0));
         c += vec3(1.0,0.4,0.08)*uFire*smoothstep(0.45,0.9,fl)*(0.6+fr)*1.6;
         c += vec3(0.05,0.045,0.04)*(0.4+0.6*max(n.y,0.0))*(1.0-glow*0.5);
+        c = mix(c, c.bgr*vec3(0.7,1.0,1.25), uPale);
         c += vec3(2.5,2.0,1.6)*uFlash;
         gl_FragColor = vec4(c, 1.0); }`,
   });
@@ -2262,12 +2277,12 @@ function buildBoss1() {
   for (let i = 0; i < 96; i++) { const t = i / 96 * TAU; const x = 16 * Math.pow(Math.sin(t), 3), y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); hp.push(new THREE.Vector2(x * 0.05, y * 0.05)); }
   hs.setFromPoints(hp);
   const hgeo = new THREE.ExtrudeGeometry(hs, { depth: 0.35, bevelEnabled: true, bevelThickness: 0.38, bevelSize: 0.22, bevelSegments: 6, curveSegments: 8 }); hgeo.center();
-  B1.heartU = { uTime: { value: 0 }, uPulse: { value: 0 }, uFire: { value: 0 }, uFlash: { value: 0 }, uCrack: { value: 0 }, uDark: { value: 0 }, uFracture: { value: 0 } };
+  B1.heartU = { uPale: { value: 0 }, uTime: { value: 0 }, uPulse: { value: 0 }, uFire: { value: 0 }, uFlash: { value: 0 }, uCrack: { value: 0 }, uDark: { value: 0 }, uFracture: { value: 0 } };
   B1.heart = new THREE.Mesh(hgeo, new THREE.ShaderMaterial({
     uniforms: B1.heartU,
     vertexShader: `varying vec3 vN; varying vec3 vV; varying vec3 vO; void main(){ vO = position; vN = normalize(normalMatrix*normal); vec4 mv = modelViewMatrix*vec4(position,1.0); vV=-mv.xyz; gl_Position=projectionMatrix*mv; }`,
     fragmentShader: GLSL_LIB + /* glsl */`
-      uniform float uTime,uPulse,uFire,uFlash,uCrack,uDark,uFracture; varying vec3 vN; varying vec3 vV; varying vec3 vO;
+      uniform float uTime,uPulse,uFire,uFlash,uCrack,uDark,uFracture,uPale; varying vec3 vN; varying vec3 vV; varying vec3 vO;
       vec2 vor(vec2 p){ vec2 i=floor(p), f=fract(p); float d1=8.0, d2=8.0; for(int y=-1;y<=1;y++) for(int x=-1;x<=1;x++){ vec2 g=vec2(x,y); vec2 o=vec2(hash12(i+g), hash12(i+g+17.0)); vec2 r=g+o-f; float d=dot(r,r); if(d<d1){d2=d1; d1=d;} else if(d<d2) d2=d; } return vec2(sqrt(d1), sqrt(d2)); }
       void main(){ vec3 n = normalize(vN), v = normalize(vV); float fr = fresnelF(n, v, 2.2);
         float veins = fbm(vO.xy*3.2 + vec2(0.0, uTime*0.25) + vO.z);
@@ -2282,27 +2297,29 @@ function buildBoss1() {
         vec2 vr = vor(vO.xy*2.6 + vO.z*0.5); float ce = smoothstep(0.06, 0.0, vr.y-vr.x);
         c += vec3(2.2,2.3,2.6)*ce*max(uCrack, uFracture*0.35*(0.5+0.5*sin(uTime*9.0)));
         c *= 1.0-uDark*0.9;
+        c = mix(c, c.bgr*vec3(0.7,1.0,1.25), uPale);
         c = mix(c, vec3(3.0), uFlash);
         gl_FragColor = vec4(c, 1.0); }`,
   }));
   B1.heart.scale.setScalar(1.35); B1.heart.position.set(0, 2.1, 0); g.add(B1.heart);
   // fire billboard (phase 2)
-  B1.flameU = { uTime: { value: 0 }, uA: { value: 0 } };
+  B1.flameU = { uTime: { value: 0 }, uA: { value: 0 }, uPale: { value: 0 } };
   B1.flame = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 7), new THREE.ShaderMaterial({
     uniforms: B1.flameU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, defines: fbmDefines(),
     vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-    fragmentShader: GLSL_LIB + `uniform float uTime,uA; varying vec2 vUv;
+    fragmentShader: GLSL_LIB + `uniform float uTime,uA,uPale; varying vec2 vUv;
       void main(){ vec2 p = vUv*2.0-1.0; float n = fbm(vec2(p.x*2.2, p.y*1.6 - uTime*1.8)); float n2 = fbm(vec2(p.x*4.0+3.0, p.y*3.0 - uTime*3.1));
         float d = length(vec2(p.x*1.35, (p.y+0.2)*0.72)); float s = smoothstep(1.0, 0.0, d + (n-0.5)*0.9 + (n2-0.5)*0.35 + p.y*0.15);
         s *= smoothstep(1.0, 0.72, abs(p.x))*smoothstep(1.0, 0.68, abs(p.y));   // never reach the quad edges
         vec3 c = mix(vec3(0.6,0.03,0.01), vec3(1.0,0.3,0.04), smoothstep(0.1,0.5,s)); c = mix(c, vec3(1.0,0.58,0.16), smoothstep(0.65,0.95,s));
+        c = mix(c, c.bgr*vec3(0.7,1.0,1.3), uPale);
         gl_FragColor = vec4(c*s*0.85*uA, 1.0); }`,
   }));
   B1.flame.position.set(0, 2.6, -0.4); B1.flame.renderOrder = 3; g.add(B1.flame);
   // candles: 400 around the pond + 60 floating inside
   const NC = 400, NF = 60;
   const bodyGeo = new THREE.CylinderGeometry(0.07, 0.085, 0.32, 7).translate(0, 0.16, 0);
-  B1.flameMatU = { uTime: { value: 0 }, uFlare: { value: 1 }, uIgnite: { value: 1 }, uIgR: { value: 99 } };
+  B1.flameMatU = { uTime: { value: 0 }, uFlare: { value: 1 }, uIgnite: { value: 1 }, uIgR: { value: 99 }, uPale: { value: 0 } };
   // warm ivory wax: dark at the base, lit lip at the top, fading out beyond the pond rim
   const bodyMat = new THREE.ShaderMaterial({
     uniforms: B1.flameMatU,
@@ -2324,9 +2341,9 @@ function buildBoss1() {
         float fl = 0.78 + 0.22*sin(uTime*13.0+id*1.7)*sin(uTime*7.3+id*0.37); vF = fl*smoothstep(uIgR+1.5, uIgR-1.5, cr)*mix(1.0, 0.55, smoothstep(17.0, 21.5, cr));
         float s = sqrt(uFlare)*fl; vec4 mv = viewMatrix*vec4(c + vec3(0.0, 0.32, 0.0), 1.0);
         mv.xy += vec2(position.x + sin(uTime*3.0+id)*0.02*position.y*5.0, position.y + 0.21)*s; vUv = uv; gl_Position = projectionMatrix*mv; }`,
-    fragmentShader: `uniform float uFlare,uIgnite; varying vec2 vUv; varying float vF;
+    fragmentShader: `uniform float uFlare,uIgnite,uPale; varying vec2 vUv; varying float vF;
       void main(){ vec2 q = vUv*2.0-1.0; float w = 0.55*(1.0 - q.y*0.45); float d = length(vec2(q.x/w, (q.y+0.3)*0.85)); float a = smoothstep(1.0, 0.0, d);
-        vec3 c = mix(vec3(1.0,0.3,0.04), vec3(1.0,0.88,0.6), a*a)*a*2.2*vF*uFlare*uIgnite; gl_FragColor = vec4(c, 1.0); }`,
+        vec3 c = mix(vec3(1.0,0.3,0.04), vec3(1.0,0.88,0.6), a*a)*a*2.2*vF*uFlare*uIgnite; c = mix(c, c.bgr*vec3(0.7,1.0,1.3), uPale); gl_FragColor = vec4(c, 1.0); }`,
   }), NC + NF);
   B1.flames.frustumCulled = false; B1.candles.frustumCulled = false;
   B1.floatData = new Float32Array(NF * 4);
@@ -2339,6 +2356,14 @@ function buildBoss1() {
   B1.candles.instanceMatrix.setUsage(THREE.DynamicDrawUsage); B1.flames.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   B1.NC = NC; B1.NF = NF;
   g.add(B1.candles, B1.flames);
+  // Cantor tethers (own meshes so the shared beam pool can never steal them)
+  for (let k = 0; k < 2; k++) {
+    const m = new THREE.Mesh(beamGeo, beamMatBase.clone()); m.visible = false; m.renderOrder = 16; m.frustumCulled = false; g.add(m);
+    m.material.uniforms.uCol.value.setRGB(1.0, 0.8, 0.35);
+    const C = { k, L: -1, alive: false, hp: 0, x: 0, z: 0, y: 1.5, shootT: 0, pulseT: 0, tether: m, tu: m.material.uniforms, a: 0 };
+    C.tgt = { x: 0, y: 1.5, z: 0, r: 0.8, hy: 1.3, alive: false, priority: true, isBoss: false, lanceMul: 1.4, hit: (d, crit, src) => b1CantorHit(C, d, crit, src) };
+    B1.cantors.push(C);
+  }
   g.visible = false;
 }
 function b1LanternOrbitPos(i, out) {
@@ -2353,29 +2378,133 @@ function b1Drop(x, z, dur) {
   let d = null; for (const o of B1.drops) if (!o.active) { d = o; break; } if (!d) d = B1.drops[0];
   d.active = true; d.t = 0; d.dur = dur; d.x = x; d.z = z; d.m.visible = true; d.m.position.set(x, 14, z);
 }
+// ---- phase 3: Cantors ----
+function b1CantorSpawn(C, ang) {
+  const i = b1PickLantern(); const L = B1.lanterns[i];
+  C.L = i; C.alive = true; C.hp = B1_CANTOR_HP; C.a = ang; C.x = Math.cos(ang) * 10.5; C.z = Math.sin(ang) * 10.5; C.shootT = 2.2 + C.k * 0.9; C.pulseT = 0;
+  C.tgt.x = C.x; C.tgt.z = C.z; C.tgt.alive = true;
+  L.mode = 6; L.t = 0; L.glowT = 2.6; L.u.uFlash.value = 1;
+  burst(L.pos.x, L.pos.y, L.pos.z, 24, 2.6, 1.8, 0.6, 4, 0.7, 0.18, 1, 3); sfx.chime(5 + C.k, 0.8);
+}
+function b1CantorHit(C, d, crit, src) {
+  if (!C.alive || game.state !== 'fight') return;
+  C.hp -= d; const L = B1.lanterns[C.L]; L.u.uFlash.value = Math.max(L.u.uFlash.value, src === 'bolt' ? 0.35 : 1);
+  if (src !== 'bolt') dmgNumber(C.x, 2.6, C.z, String(Math.round(d)), crit ? 1 : 0); else if (frand() < 0.3) burst(C.x, C.y, C.z, 3, 2.4, 1.6, 0.6, 3, 0.3, 0.12, 1, 0);
+  if (C.hp <= 0) b1CantorKill(C, true);
+}
+function b1CantorKill(C, withFx) {
+  if (!C.alive) return; C.alive = false; C.tgt.alive = false; C.tether.visible = false;
+  const L = B1.lanterns[C.L]; if (L) { L.mode = 4; L.dark = 1; L.fallV = 0; L.splashed = false; L.reviveT = 5; }
+  if (withFx) {
+    shatter(C.x, C.y, C.z, 0.5, 26, 2.4, 1.6, 0.5, 6, 1.4, 9); burst(C.x, C.y, C.z, 40, 2.6, 1.8, 0.6, 8, 0.8, 0.2, 1, 0);
+    ring(C.x, 0.08, C.z, 0.3, 3, 0.45, 0.2, 2.4, 1.8, 0.6, 1.3); sfx.shatter(0.5); addTrauma(0.2); hitstop(0.05);
+    addRadiance(6); bossAddFracture(10); streakToPlayer(C.x, C.y, C.z, W, 8);
+    dmgNumber(C.x, 2.9, C.z, B1.cantors.some((o) => o.alive) ? 'CANTOR SILENCED' : 'SHIELD BROKEN', 4, '#ffe1a0');
+  }
+}
+function b1CantorsClear() { for (const C of B1.cantors) { C.alive = false; C.tgt.alive = false; C.tether.visible = false; } bossRT.shieldMul = 1; }
+function b1UpdateCantors(dt, fighting) {
+  let n = 0; const b = bossRT;
+  for (const C of B1.cantors) {
+    if (!C.alive) continue; n++;
+    const L = B1.lanterns[C.L];
+    // tether: lantern -> heart, a golden hymn stream
+    const m = C.tether; m.visible = true;
+    const x0 = L.pos.x, y0 = L.pos.y, z0 = L.pos.z, x1 = 0, y1 = 2.2, z1 = 0;
+    m.position.set(x0, y0, z0); _v1.set(x1, y1, z1); m.lookAt(_v1);
+    const len = Math.max(0.01, Math.hypot(x1 - x0, y1 - y0, z1 - z0)); const w = 0.075 + 0.025 * Math.sin(fx.simTime * 9 + C.k);
+    m.scale.set(w, w, len); C.tu.uLen.value = len; C.tu.uTime.value = fx.simTime; C.tu.uA.value = Math.min(1, L.t / 0.8) * 0.9;
+    if (!fighting || b.transitioning) continue;
+    C.pulseT -= dt; if (C.pulseT <= 0) { C.pulseT = 0.9; ring(C.x, 0.07, C.z, 0.3, 1.8, 0.6, 0.12, 2.2, 1.7, 0.6, 1); }
+    // heal the heart (never past the phase line)
+    const cap = B1_P3_AT * b.maxHp, h = 0.0035 * b.maxHp * dt;
+    if (b.hp < cap && !b.dead) { const add = Math.min(h, cap - b.hp); b.hp += add; B1.healAcc += add; }
+    // a slow three-shot hymn at the player (good Mirror fodder)
+    C.shootT -= dt;
+    if (C.shootT <= 0) { C.shootT = 2.2; patFan(C.x, C.z, aimAt(C.x, C.z), 5, 0.8, 5.2 * DIFF[0].spd, R, 0.3, 8); sfx.shot(R); L.u.uFlash.value = 0.6; }
+  }
+  if (b.phase === 2 && !b.dead) b.shieldMul = n > 0 ? 0.5 : 1;
+  B1.healShowT -= dt;
+  if (B1.healShowT <= 0) { B1.healShowT = 1; if (B1.healAcc >= 1) { dmgNumber(0, 4.4, 0, '+' + Math.round(B1.healAcc), 3); B1.healAcc = 0; } }
+}
+// ---- phase 3: Lantern Light (stand in a lantern's light when the Requiem resolves) ----
+function b1LLStart() {
+  const ll = B1.ll; ll.active = true; ll.t = 0; ll.ring1 = ll.ring2 = ll.gaze = false;
+  const pa = Math.atan2(player.z, player.x), a1 = pa + (rng() < 0.5 ? 1 : -1) * (Math.PI * 0.55 + rng() * 0.3);
+  for (let k = 0; k < 2; k++) {
+    const a = a1 + k * Math.PI, r = 7.5 + rng() * 2;
+    ll.sx[k] = Math.cos(a) * r; ll.sz[k] = Math.sin(a) * r;
+    teleSafe(ll.sx[k], ll.sz[k], ll.sr, ll.dur);
+    const i = b1PickLantern(); const L = B1.lanterns[i]; L.mode = 8; L.t = 0; L.glowT = 3.2; L.beaconK = k; L.u.uFlash.value = 1; ll.beacons[k] = i;
+  }
+  castBar('Requiem', ll.dur); sfx.choir(1); sfx.riser(); B1.heartU.uFlash.value = 0.6;
+  ui.tutorial('lanternlight', 'REQUIEM: the light dies. Stand in a LANTERN\'s light (cyan) before the cast ends');
+}
+function b1LLEnd() {
+  const ll = B1.ll; ll.active = false;
+  for (const i of ll.beacons) if (i >= 0) { const L = B1.lanterns[i]; if (L.mode === 8) { L.mode = 0; L.glowT = 1; } }
+  ll.beacons[0] = ll.beacons[1] = -1;
+}
+function b1UpdateLL(dt, fighting) {
+  const ll = B1.ll;
+  ll.dim = damp(ll.dim, ll.active ? smooth(ll.t / 1.2) : 0, ll.active ? 10 : 4, dt);
+  floorU.uFloorDim.value = 0.8 * ll.dim;
+  if (!ll.active || !fighting || bossRT.transitioning) return;
+  ll.t += dt;
+  if (!ll.ring1 && ll.t > 1.1) { ll.ring1 = true; patRing(0, 0, 18, 4.2 * DIFF[0].spd, R, 0.3, 8, rng() * TAU); sfx.shot(R); ring(0, 1, 0, 0.5, 4, 0.4, 0.2, 2.4, 0.9, 0.3, 1.2); }
+  if (!ll.ring2 && ll.t > 2.6) { ll.ring2 = true; patRing(0, 0, 18, 4.2 * DIFF[0].spd, R, 0.3, 8, rng() * TAU); sfx.shot(R); ring(0, 1, 0, 0.5, 4, 0.4, 0.2, 2.4, 0.9, 0.3, 1.2); }
+  if (!ll.gaze && ll.t > 1.0) { // one free lantern stares down your path to the light
+    ll.gaze = true; const i = b1PickLantern(); const L = B1.lanterns[i]; L.mode = 1; L.t = 0; L.glowT = 3;
+    teleLine(L.pos.x, L.pos.z, player.x, player.z, 1.6, 1.15, 14, R, {
+      noHit: true, lockAt: 0.7,
+      follow: (o) => { const a = Math.atan2(player.z - L.pos.z, player.x - L.pos.x); teleSetLine(o, L.pos.x, L.pos.z, L.pos.x + Math.cos(a) * 30, L.pos.z + Math.sin(a) * 30, 1.6); },
+      onResolve: (o) => { hzBeam(o.x, 0.9, o.z, o.x1, 0.9, o.z1, 1.6, 0.4, 14, R); beam(L.pos.x, L.pos.y, L.pos.z, o.x, 0.9, o.z, 0.18, 0.4, 1, 0.3, 0.2, 1, 0.9); sfx.laser(); addTrauma(0.15); L.mode = 0; L.glowT = 1; },
+    });
+  }
+  if (ll.t >= ll.dur) {
+    let safe = false; for (let k = 0; k < 2; k++) if (Math.hypot(player.x - ll.sx[k], player.z - ll.sz[k]) < ll.sr + PLAYER.hurtR * 0.6) safe = true;
+    if (!safe) { hitSrc = 'requiem'; resolveHazard(-1, 0, R, 35, true); } else dmgNumber(player.x, 2.8, player.z, 'SHELTERED', 4, '#7ffff0');
+    B1.heartU.uFlash.value = 1; bloomSpike(1.0); addTrauma(0.45); shockAt(0, 2, 0, 0.05); sfx.boom();
+    ring(0, 0.2, 0, 1, 18, 0.7, 0.5, 0.4, 0.9, 2.6, 1.4); burst(0, 2.1, 0, 80, 0.5, 1.2, 2.6, 12, 0.9, 0.25, 1, 0);
+    for (let k = 0; k < 2; k++) ring(ll.sx[k], 0.08, ll.sz[k], 0.4, ll.sr * 1.3, 0.5, 0.18, 0.4, 2.4, 2.4, 1.3);
+    b1LLEnd();
+  }
+}
 const BOSS1 = {
   id: 1, name: 'THE LANTERN CHOIR', subtitle: 'First Refraction', deathTitle: 'THE LANTERN CHOIR', deathSub: 'SILENCED',
-  arena: 0, arenaR: 15, maxHp: 11000, enrage: 240, hit: { x: 0, y: 2.1, z: 0, r: 1.6, hy: 2.2 },
-  barGrad: 'linear-gradient(90deg,#ff2d55,#ff7a3d 60%,#ffd27a)', music: ['b1p1', 'b1p2'],
+  arena: 0, arenaR: 15, maxHp: 13000, enrage: 270, dmgMul: 1.3, hit: { x: 0, y: 2.1, z: 0, r: 1.6, hy: 2.2 },
+  barGrad: 'linear-gradient(90deg,#ff2d55,#ff7a3d 60%,#ffd27a)', music: ['b1p1', 'b1p2', 'b1p3'],
   phases: [
-    { name: 'Vespers', until: 0.6, loop: 14, steps: [[0, 'SpiralHymn'], [4.5, 'LanternGaze'], [8, 'EmberRing'], [11, 'PaperRain']] },
-    { name: 'Choir of Cinders', until: 0, loop: 16, steps: [[0, 'Swoop'], [5, 'Chorus'], [10.5, 'CandleRain'], [13.5, 'FrontalHymn']] },
+    { name: 'Vespers', until: 0.65, loop: 14, steps: [[0, 'SpiralHymn'], [4.5, 'LanternGaze'], [8, 'EmberRing'], [11, 'PaperRain']] },
+    { name: 'Choir of Cinders', until: B1_P3_AT, loop: 16, steps: [[0, 'Swoop'], [5, 'Chorus'], [10.5, 'CandleRain'], [13.5, 'FrontalHymn']] },
+    { name: 'Requiem', until: 0, loop: 19, steps: [[0, 'Cantors'], [2.5, 'TwinHymn'], [7.5, 'Swoop'], [11, 'LanternLight'], [16.5, 'PaperRain']] },
   ],
+  // autopilot (debug bot): head for the nearest lantern light during the Requiem
+  apPenalty(cx, cz) {
+    const ll = B1.ll; if (!ll.active) return 0;
+    let best = 1e9; for (let k = 0; k < 2; k++) best = Math.min(best, Math.hypot(cx - ll.sx[k], cz - ll.sz[k]));
+    return Math.max(0, best - (ll.sr - 0.8)) * (ll.t > ll.dur - 2.2 ? 9 : 3);
+  },
   build: buildBoss1,
   show(on) { B1.group.visible = on; },
   hue: [1.0, 0.35, 0.12],
   camTop() { return 3.7; },
-  setTitleMode() { B1.mode = 'title'; for (const L of B1.lanterns) { L.ign = 0.22; L.mode = 0; L.dark = 0; L.vis = true; } B1.heart.visible = false; B1.flameU.uA.value = 0; B1.fire = 0; B1.heartU.uFire.value = 0; B1.flameMatU.uFlare.value = 1; B1.flameMatU.uIgR.value = 99; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 0; floorU.uPalRadius.value = 0; floorU.uBeat.value = 0; },
+  setTitleMode() { B1.mode = 'title'; B1.pale = B1.paleT = 0; b1CantorsClear(); B1.ll.active = false; B1.ll.dim = 0; floorU.uFloorDim.value = 0; for (const L of B1.lanterns) { L.ign = 0.22; L.mode = 0; L.dark = 0; L.vis = true; } B1.heart.visible = false; B1.flameU.uA.value = 0; B1.fire = 0; B1.heartU.uFire.value = 0; B1.flameMatU.uFlare.value = 1; B1.flameMatU.uIgR.value = 99; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 0; floorU.uPalRadius.value = 0; floorU.uBeat.value = 0; },
   reset() {
     B1.mode = 'fight'; B1.fire = 0; B1.heartU.uFire.value = 0; B1.heartU.uDark.value = 0; B1.heartU.uCrack.value = 0; B1.flameU.uA.value = 0; B1.flameMatU.uFlare.value = 1; B1.flameMatU.uIgR.value = 99;
     B1.heart.visible = true; B1.heartYaw = Math.PI / 2; B1.cleaving = false; B1.chorusDir = 1; B1.firstEmber = true; B1.tut = {};
-    for (let i = 0; i < 8; i++) { const L = B1.lanterns[i]; L.mode = 0; L.ign = 1; L.dark = 0; L.glowT = 1; L.vis = true; L.g.visible = true; b1LanternOrbitPos(i, L.pos); L.last.copy(L.pos); }
+    B1.pale = B1.paleT = 0; B1.healAcc = 0; B1.healShowT = 1; b1CantorsClear(); for (const C of B1.cantors) targets.push(C.tgt);
+    B1.ll.active = false; B1.ll.dim = 0; B1.ll.beacons[0] = B1.ll.beacons[1] = -1; floorU.uFloorDim.value = 0;
+    for (let i = 0; i < 8; i++) { const L = B1.lanterns[i]; L.mode = 0; L.ign = 1; L.dark = 0; L.glowT = 1; L.vis = true; L.g.visible = true; L.reviveT = 0; b1LanternOrbitPos(i, L.pos); L.last.copy(L.pos); }
     for (const d of B1.drops) { d.active = false; d.m.visible = false; }
     floorU.uPalFrom.value = 0; floorU.uPalTo.value = 0; floorU.uPalRadius.value = 0;
   },
-  transitionInstant(n) { if (n === 1) { B1.fire = 1; B1.heartU.uFire.value = 1; B1.flameU.uA.value = 1; B1.flameMatU.uFlare.value = 1.6; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 1; floorU.uPalRadius.value = 40; } },
+  transitionInstant(n) { if (n === 2) { B1.pale = B1.paleT = 1; } if (n === 1) { B1.fire = 1; B1.heartU.uFire.value = 1; B1.flameU.uA.value = 1; B1.flameMatU.uFlare.value = 1.6; floorU.uPalFrom.value = 0; floorU.uPalTo.value = 1; floorU.uPalRadius.value = 40; } },
   onPhase(n) { },
-  onInterrupt() { for (const L of B1.lanterns) if (L.mode !== 0 && L.mode !== 4) { L.mode = 0; L.glowT = 1; } },
+  onInterrupt() {
+    if (B1.ll.active) { b1LLEnd(); if (!bossRT.transitioning && !bossRT.dead) ui.toast('REQUIEM BROKEN', 1.6); }
+    for (const L of B1.lanterns) if (L.mode !== 0 && L.mode !== 4 && L.mode !== 6) { L.mode = 0; L.glowT = 1; }
+  },
   casts: {
     SpiralHymn() {
       castBar('Spiral Hymn', 3); B1.heartU.uFlash.value = 0.3;
@@ -2404,7 +2533,7 @@ const BOSS1 = {
     },
     EmberRing() {
       castBar('Ember Ring', 1);
-      if (B1.firstEmber) { B1.firstEmber = false; ui.tutorial('graze', 'Brush past shots to GRAZE their color'); }
+      if (B1.firstEmber) { B1.firstEmber = false; ui.tutorial('mirror', IS_TOUCH ? 'Bullet waves: raise your Azure MIRROR to throw them back' : 'Bullet waves: raise your Azure MIRROR to throw them back  [3 / E]'); }
       const fire = (rot) => { const ga = aimAt(0, 0); patRing(0, 0, 24, 5 * DIFF[0].spd, Bc, 0.3, 8, ga + rot, ga, 3); sfx.shot(Bc); ring(0, 1, 0, 0.5, 4, 0.4, 0.2, 0.5, 0.9, 2.5, 1.2); };
       fire(0); after(1, () => fire(TAU / 48));
     },
@@ -2460,6 +2589,20 @@ const BOSS1 = {
         for (let k = 0; k < 4; k++) emitP(x + (frand() - 0.5) * 0.5, 12 + k * 0.6, z + (frand() - 0.5) * 0.5, 0, -12 / w, 0, 2.6, 1.0, 0.25, w, 0.35 - k * 0.05, 4);
       });
     },
+    Cantors() {
+      const free = B1.cantors.filter((C) => !C.alive); if (!free.length) { castBar('Crescendo', 1.2); B1.heartU.uFlash.value = 0.6; patRing(0, 0, 24, 5 * DIFF[0].spd, R, 0.3, 8, rng() * TAU); sfx.shot(R); return; }
+      castBar('Cantors', 1.6); sfx.choir(0);
+      const a0 = Math.atan2(player.z, player.x) + Math.PI / 2;
+      for (const C of free) b1CantorSpawn(C, a0 + C.k * Math.PI);
+      ui.tutorial('cantors', 'CANTORS shield and heal the heart: break them first! (your bolts auto-target them)');
+    },
+    TwinHymn() {
+      castBar('Twin Hymn', 3); B1.heartU.uFlash.value = 0.3; sfx.choir(0);
+      const a0 = rng() * TAU;
+      patSpiral(0, 0, 2, 8, 3, 17, 6 * DIFF[0].spd, R, 0.3, 8, a0);
+      patSpiral(0, 0, 2, 8, 3, -17, 6 * DIFF[0].spd, Bc, 0.3, 8, a0 + Math.PI / 2);
+    },
+    LanternLight() { b1LLStart(); },
     FrontalHymn() {
       castBar('Frontal Hymn', 1.6); sfx.growl();
       B1.cleaving = true;
@@ -2476,7 +2619,12 @@ const BOSS1 = {
   },
   update(dt) {
     const t = fx.simTime;
-    B1.orbitT += dt * (bossRT.phase === 1 ? 0.42 : 0.3);
+    const fighting = game.state === 'fight' && bossRT.def === BOSS1 && !bossRT.dead;
+    B1.orbitT += dt * (bossRT.phase >= 1 ? 0.42 : 0.3);
+    // Requiem: the flames turn blue
+    B1.pale = damp(B1.pale, B1.paleT, 2.5, dt);
+    B1.heartU.uPale.value = B1.pale; B1.flameU.uPale.value = B1.pale; B1.flameMatU.uPale.value = B1.pale; B1.dropMat.uniforms.uPale.value = B1.pale;
+    b1UpdateCantors(dt, fighting); b1UpdateLL(dt, fighting);
     const beatRate = bossRT.phase === 1 ? 1.8 : 1.2;
     B1.beat = Math.pow(Math.max(0, Math.sin(t * beatRate * Math.PI)), 12);
     const hu = B1.heartU; hu.uTime.value = t; hu.uPulse.value = B1.beat; hu.uCrack.value = damp(hu.uCrack.value, bossRT.vuln > 0 ? 1 : 0, 6, dt);
@@ -2525,10 +2673,18 @@ const BOSS1 = {
       } else if (L.mode === 4) { // dark, falling
         L.fallV += 6 * dt; L.pos.y = Math.max(0.15, L.pos.y - L.fallV * dt);
         if (L.pos.y <= 0.15 && !L.splashed) { L.splashed = true; addRipple(L.pos.x, L.pos.z, 1.2); burst(L.pos.x, 0.1, L.pos.z, 10, 0.4, 0.4, 0.5, 2, 0.6, 0.12, 1, 0); }
+        if (L.reviveT > 0 && B1.mode === 'fight') { L.reviveT -= dt; if (L.reviveT <= 0) { L.mode = 0; L.dark = 0; L.glowT = 1; L.u.uFlash.value = 1; } }
+      } else if (L.mode === 6) { // Cantor: planted on the pond, singing to the heart
+        const C = B1.cantors.find((o) => o.L === i && o.alive);
+        if (C) { _v1.set(C.x, C.y + Math.sin(t * 2 + i) * 0.12, C.z); L.pos.lerp(_v1, 1 - Math.exp(-4 * dt)); L.glowT = 2.6; L.g.scale.setScalar(damp(L.g.scale.x, 1.45, 4, dt)); }
+        else L.mode = 0;
+      } else if (L.mode === 8) { // Requiem beacon: hovers over a safe light
+        const k = L.beaconK; _v1.set(B1.ll.sx[k], 3.0 + Math.sin(t * 1.7 + i) * 0.15, B1.ll.sz[k]); L.pos.lerp(_v1, 1 - Math.exp(-5 * dt)); L.glowT = 3.4;
       }
+      if (L.mode !== 6 && L.g.scale.x !== 1) L.g.scale.setScalar(damp(L.g.scale.x, 1, 4, dt));
       if (L.mode === 0 || L.mode === 1) L.mode0Ready = true;
       L.glow = damp(L.glow, L.glowT * L.ign * (1 - L.dark), 8, dt);
-      L.u.uGlow.value = L.glow; L.u.uTime.value = t; L.u.uFire.value = damp(L.u.uFire.value, B1.fire, 3, dt); L.u.uDark.value = L.dark;
+      L.u.uGlow.value = L.glow; L.u.uTime.value = t; L.u.uPale.value = B1.pale; L.u.uFire.value = damp(L.u.uFire.value, B1.fire, 3, dt); L.u.uDark.value = L.dark;
       if (L.u.uFlash.value > 0) L.u.uFlash.value = Math.max(0, L.u.uFlash.value - dt * 3);
       L.g.position.copy(L.pos);
       // face the player (face is on local +z)
@@ -2556,16 +2712,17 @@ const BOSS1 = {
     // floor light blobs: heart + 3 lanterns nearest the player
     const Lv = floorU.uLights.value, Lc = floorU.uLightCol.value;
     const heartI = B1.heart.visible ? (1.0 + B1.beat * 0.6) * (1 - hu.uDark.value) : 0;
-    Lv[0].set(0, 2.1, 0, heartI * 0.9); if (B1.fire > 0.5) Lc[0].setRGB(1.0, 0.45, 0.1); else Lc[0].setRGB(1.0, 0.12, 0.18);
+    Lv[0].set(0, 2.1, 0, heartI * 0.9); if (B1.fire > 0.5) Lc[0].setRGB(lerp(1.0, 0.2, B1.pale), lerp(0.45, 0.55, B1.pale), lerp(0.1, 1.0, B1.pale)); else Lc[0].setRGB(1.0, 0.12, 0.18);
     let i1 = -1, i2 = -1, i3 = -1, d1 = 1e9, d2 = 1e9, d3 = 1e9;
     for (let i = 0; i < 8; i++) { const L = B1.lanterns[i]; const d = (L.pos.x - player.x) ** 2 + (L.pos.z - player.z) ** 2; if (d < d1) { d3 = d2; i3 = i2; d2 = d1; i2 = i1; d1 = d; i1 = i; } else if (d < d2) { d3 = d2; i3 = i2; d2 = d; i2 = i; } else if (d < d3) { d3 = d; i3 = i; } }
     const ids = [i1, i2, i3];
-    for (let k = 0; k < 3; k++) { const L = B1.lanterns[ids[k]]; Lv[k + 1].set(L.pos.x, L.pos.y, L.pos.z, L.glow * 0.55); Lc[k + 1].setRGB(1.0, 0.5, 0.2); }
+    if (B1.ll.active && B1.ll.beacons[0] >= 0) { ids[0] = B1.ll.beacons[0]; ids[1] = B1.ll.beacons[1]; }
+    for (let k = 0; k < 3; k++) { const L = B1.lanterns[ids[k]]; const beacon = L.mode === 8; Lv[k + 1].set(L.pos.x, L.pos.y, L.pos.z, L.glow * (beacon ? 0.5 : 0.55)); if (beacon) Lc[k + 1].setRGB(0.4, 1.0, 0.95); else Lc[k + 1].setRGB(lerp(1.0, 0.25, B1.pale), 0.5, lerp(0.2, 1.0, B1.pale)); }
     floorU.uBossPos.value.set(0, 0); floorU.uBossShadow.value = B1.heart.visible ? 1 : 0;
     // tutorial prompts
     if (game.state === 'fight' && bossRT.phase === 0) {
-      if (player.r >= 35) ui.tutorial('lance', IS_TOUCH ? 'Crimson Lance ready — spend RED' : 'Crimson Lance ready — spend RED  [1 / Q / Click]');
-      else if (player.b >= 35 && game.fightTime > 12) ui.tutorial('mirror', IS_TOUCH ? 'Azure Mirror reflects shots' : 'Azure Mirror reflects shots  [3 / E]');
+      if (game.fightTime > 3) ui.tutorial('lance', IS_TOUCH ? 'Crimson LANCE: big piercing beam, recharges in a few seconds' : 'Crimson LANCE: big piercing beam  [1 / Q / Click]');
+      if (game.fightTime > 9) ui.tutorial('radiance', 'Landing hits fills RADIANCE (top left). Full = WHITE NOVA');
     }
   },
   // ---- cinematics ----
@@ -2594,6 +2751,21 @@ const BOSS1 = {
   },
   transitionCine(n) {
     let a0 = 0;
+    if (n === 2) return {
+      dur: 2.6,
+      start() { a0 = Math.atan2(cam.pos.z, cam.pos.x); director.timeScale = 0.3; ui.titleCard('REQUIEM', 'the last verse', 2.0); sfx.riser(); b1CantorsClear(); },
+      update(t) {
+        const k = smooth(t / 2.6); const a = a0 - k * (100 * Math.PI / 180); const r = lerp(14, 9, Math.sin(k * Math.PI));
+        director.camPos.set(Math.cos(a) * r, lerp(9, 4.5, Math.sin(k * Math.PI)), Math.sin(a) * r); director.camLook.set(0, 2.4, 0); director.fov = 52;
+        if (t > 2.0) director.timeScale = lerp(0.3, 1, (t - 2.0) / 0.6);
+      },
+      ev: [
+        [0.25, () => { for (const L of B1.lanterns) { L.u.uFlash.value = 1.2; burst(L.pos.x, L.pos.y, L.pos.z, 16, 0.6, 1.2, 2.6, 4, 0.8, 0.2, 1, 3); } sfx.choir(1); }],
+        [0.8, () => { B1.paleT = 1; B1.heartU.uFlash.value = 1; bloomSpike(1.5); addTrauma(0.7); shockAt(0, 2, 0, 0.06); sfx.boom();
+          burst(0, 2.1, 0, 140, 0.4, 1.0, 2.6, 13, 1.2, 0.3, 1, 0); ring(0, 0.2, 0, 1, 20, 1.0, 0.5, 0.5, 1.2, 2.6, 1.3); rainbowWave(0, 0, 1.0, 14); }],
+      ],
+      end() { director.timeScale = 1; B1.paleT = 1; },
+    };
     return {
       dur: 2.2,
       start() { a0 = Math.atan2(cam.pos.z, cam.pos.x); director.timeScale = 0.25; ui.titleCard('KINDLING', '', 1.8); sfx.riser(); },
@@ -3126,7 +3298,7 @@ function b2SapHit(s, d, crit, src) {
   if (!s.alive || game.state !== 'fight') return;
   s.hp -= d; s.u.uFlash.value = 0.45; s.u.uCrack.value = clamp(1 - s.hp / 220, 0, 1);
   if (src !== 'bolt') dmgNumber(s.x, 1.9, s.z, String(Math.round(d)), crit ? 1 : 0); else if (frand() < 0.3) burst(s.x, 0.9, s.z, 3, 0.6, 2.2, 1, 3, 0.3, 0.12, 1, 0);
-  if (s.hp <= 0) { b2KillSap(s, true); addCharge(Bc, 15); streakToPlayer(s.x, 0.9, s.z, Bc, 6); dmgNumber(s.x, 2.4, s.z, '+15 BLUE', 4, '#7fb4ff'); }
+  if (s.hp <= 0) { b2KillSap(s, true); addRadiance(5); streakToPlayer(s.x, 0.9, s.z, W, 6); dmgNumber(s.x, 2.4, s.z, '+RADIANCE', 4, '#fff3c0'); }
 }
 function b2KillSap(s, withFx) {
   if (!s.alive) return; s.alive = false; s.tgt.alive = false; s.g.visible = false; s.beam.m.visible = false;
@@ -3216,7 +3388,7 @@ function b2UpdateBloom(dt, fighting) {
 function b2SoakResolve(ok) {
   const s = B2.soak; s.active = false; s.fade = 0.8; B2.seedOrb.visible = false;
   if (ok && s.inT >= 0.75) {
-    addCharge(G, 25); addCharge(R, 25); bossRT.stagger = Math.max(bossRT.stagger, 2.5); bossRT.staggerMul = Math.max(bossRT.staggerMul, 1.5); bossAddFracture(15);
+    addRadiance(15); bossRT.stagger = Math.max(bossRT.stagger, 2.5); bossRT.staggerMul = Math.max(bossRT.staggerMul, 1.5); bossAddFracture(15);
     beam(s.x, 1.4, s.z, B2.vx, B2.hy, B2.vz, 0.35, 0.6, 1.4, 1.4, 1.1, 0, 1.4);
     burst(s.x, 1.4, s.z, 60, 2.4, 2.4, 1.8, 9, 0.9, 0.22, 1, 0); streakToPlayer(s.x, 1.4, s.z, G, 10); streakToPlayer(s.x, 1.4, s.z, R, 10);
     dmgNumber(player.x, 2.7, player.z, 'SEED CLAIMED', 4, '#fff3c0'); B2.vU.uFlash.value = 1; bloomSpike(1.0); sfx.victoryStab(); sfx.perfect(G, 4);
@@ -3337,7 +3509,7 @@ function b2LeafWall(life) {
 }
 const BOSS2 = {
   id: 2, name: 'VEYRA, THE GLASS ORCHARD', subtitle: 'Second Refraction', deathTitle: 'VEYRA', deathSub: 'UNBOUND',
-  arena: 1, arenaR: 15, maxHp: 19000, enrage: 270, hit: { x: 0, y: 3.4, z: 0.25, r: 2.2, hy: 3 },
+  arena: 1, arenaR: 15, maxHp: 22000, enrage: 270, hit: { x: 0, y: 3.4, z: 0.25, r: 2.2, hy: 3 },
   barGrad: 'linear-gradient(90deg,#1fd16a,#7dffb0 45%,#b98cff 75%,#ff5a86)', music: ['b2p1', 'b2p2', 'b2p3'],
   phases: [
     { name: 'Grove', until: 0.7, loop: 15, steps: [[0, 'Seedfall', 3], [5, 'RootLash', 0], [9, 'ThornVolley', 0], [12, 'PetalStorm']] },
@@ -3354,7 +3526,7 @@ const BOSS2 = {
     if (n === 2) { b2Uproot(true); b2SetPal('thorn', false); b2RingOn(true); B2.vortex = B2.vortexTo = 1; }
   },
   onPhase(n) {
-    if (n === 1) { ui.tutorial('leafwall', 'The leaf walls are harmless while faint — slip through the gaps and GRAZE'); }
+    if (n === 1) { ui.tutorial('leafwall', 'The leaf walls are harmless while faint — slip through the gaps'); }
     if (n === 2) { b2RingOn(true); ui.tutorial('thorns', 'The thorns close in — fill FRACTURE or VULNERABLE to push them back'); }
   },
   onInterrupt() { b2ClearAdds(true); },
@@ -3732,7 +3904,7 @@ function b3MoonHit(m, d, crit, src) {
   m.hp -= d; m.u.uFlash.value = 0.5; m.u.uCrack.value = clamp(1 - m.hp / 1400, 0, 1);
   if (src !== 'bolt') dmgNumber(m.x, m.y + 1.4, m.z, String(Math.round(d)), crit ? 1 : 0, CSSCOL[m.c]);
   if (m.hp <= 0) {
-    b3KillMoon(m, true); addCharge(m.c, 20); streakToPlayer(m.x, m.y, m.z, m.c, 10);
+    b3KillMoon(m, true); addRadiance(10); streakToPlayer(m.x, m.y, m.z, m.c, 10);
     if (!B3.moons.some((o) => o.alive) && !B3.moonsDown) {
       B3.moonsDown = true; bossRT.shieldMul = 1; bossRT.stagger = 4; bossRT.staggerMul = 1.5; bossAddFracture(50);
       ui.toast('THE COURT FALLS — SUN STUNNED', 2.2, true); hitstop(0.12); sfx.boom(); bloomSpike(1.2); addTrauma(0.5); B3.sunU.uFlash.value = 1;
@@ -3888,8 +4060,9 @@ function b3LastLight() {
   const b = bossRT; ll.active = true; ll.done = true; ll.t = 0; ll.spT = 0.6; ll.spA = rng() * TAU;
   bossInterrupt(); b.invuln = true; b.lastLight = true; b.novaInLastLight = false; b.vuln = 0; b.stagger = 0; b.fracture = 100;
   pjClearAll(true); b3CloseVoids();
+  if (player.rad < 60 && player.novaT < 0) { player.rad = 60; streakToPlayer(0, B3.sunY, 0, W, 20); } // insurance: the sun's light pours into you
   castBar('LAST LIGHT', ll.dur); ui.el.bigCastName.textContent = 'LAST LIGHT'; ui.el.bigCast.classList.add('on'); B3.prompt.classList.add('on');
-  ui.toast('THE SUN GATHERS ITS LAST LIGHT', 2.6, true);
+  ui.toast('LAST LIGHT — every hit now surges your Radiance. NOVA it!', 3.0, true);
   bloomSpike(1.8); addTrauma(0.6); shockAt(0, B3.sunY, 0, 0.07); sfx.riser(); sfx.choir(3); sfx.boom(); B3.sunU.uFlash.value = 1;
   burst(0, B3.sunY, 0, 160, 2, 2, 2.4, 12, 1.2, 0.25, 1, 0);
 }
@@ -3901,7 +4074,7 @@ function b3UpdateLastLight(dt) {
   const ll = B3.ll; if (!ll.active) return;
   const b = bossRT; ll.t += dt; b.fracture = 100;
   ui.set('bigcf', ui.el.bigCastFill, 'tf', `scaleX(${clamp(ll.t / ll.dur, 0, 1).toFixed(3)})`);
-  // slow white spiral to graze (two arms, 5 shots/s)
+  // slow white spiral to dodge while your Radiance surges (two arms, 5 shots/s)
   ll.spT -= dt; while (ll.spT <= 0) { ll.spT += 0.4; ll.spA += 0.5; for (let k = 0; k < 2; k++) { const a = ll.spA + k * Math.PI; shoot(Math.cos(a) * 2.9, Math.sin(a) * 2.9, a, 3.0, W, 0.32, 12, 9); } sfx.shot(W); }
   // sun gathers light inward
   if (frand() < 0.9) { const a = frand() * TAU, r = 9 + frand() * 6, y = 1 + frand() * 6; emitP(Math.cos(a) * r, y, Math.sin(a) * r, -Math.cos(a) * r * 0.9, (B3.sunY - y) * 0.9, -Math.sin(a) * r * 0.9, 2, 2, 2.3, 1.0, 0.18, 4); }
@@ -3971,7 +4144,7 @@ function b3SolarFlare(mode) { // mode 0: blue wall ×2 · mode 1: eclipse flare 
 
 const BOSS3 = {
   id: 3, name: 'THE NULL SUN', subtitle: 'Eclipse Sovereign', deathTitle: 'THE NULL SUN', deathSub: 'DAWN',
-  arena: 2, arenaR: 15, maxHp: 32000, enrage: 300, hit: { x: 0, y: 4.5, z: 0, r: 2.6, hy: 4.6 },
+  arena: 2, arenaR: 15, maxHp: 36000, enrage: 300, hit: { x: 0, y: 4.5, z: 0, r: 2.6, hy: 4.6 },
   barGrad: 'linear-gradient(90deg,#ff4a2a,#ffb070 18%,#ffffff 45%,#9fb8ff 70%,#3a52ff)', music: ['b3p1', 'b3p2', 'b3p3'],
   phases: [
     { name: 'Corona', until: 0.7, loop: 14, steps: [[0, 'SolarFlare', 0], [5.5, 'CoronaPulse', 0], [9, 'Sunspot', 5], [11.5, 'PrismShards']] },
@@ -4068,7 +4241,7 @@ const BOSS3 = {
       castBar('White Halo', 1.8); B3.coronaU.uFlash.value = 1;
       const a0 = rng() * TAU;
       every(0.6, 3, (i) => { patRing(0, 0, 36, 3.2 * DIFF[2].spd, W, 0.3, 15, a0 + i * 5 * Math.PI / 180, null, 0, 0, 9); sfx.shot(W); ring(0, 1, 0, 2.6, 6, 0.4, 0.3, 2, 2, 2, 1.2); });
-      ui.tutorial('white', 'WHITE shots charge every color — graze them to fuel White Nova');
+      ui.tutorial('white', 'White Halo: slip through the gaps, or DASH through a wave for a PERFECT');
     },
     FrontalEclipse() {
       const w = b3Windup(), half = 40 * Math.PI / 180;
@@ -4546,6 +4719,7 @@ const SECTIONS = {
   title: { root: 62, scale: PENTm, bpm: 70, prog: [0, 3, 1, 4], pad: 0.8, arp: 0.25, bass: 0.3, perc: 0, cut: 900 },
   b1p1: { root: 57, scale: AEOL, bpm: 96, prog: [0, 5, 2, 6], pad: 1, arp: 0.65, bass: 1, perc: 0.3, cut: 1200 },
   b1p2: { root: 57, scale: PHRYD, bpm: 112, prog: [0, 1, 0, 6], pad: 1, arp: 0.85, bass: 1, perc: 1, cut: 1800 },
+  b1p3: { root: 57, scale: PHRYD, bpm: 124, prog: [0, 5, 1, 6], pad: 1, arp: 1, bass: 1, perc: 1, cut: 2600 },
   b2p1: { root: 52, scale: DOR, bpm: 104, prog: [0, 3, 0, 6], pad: 1, arp: 0.6, bass: 1, perc: 0.3, cut: 1300 },
   b2p2: { root: 52, scale: LYD, bpm: 110, prog: [0, 1, 4, 0], pad: 1, arp: 0.75, bass: 1, perc: 0.6, cut: 1600 },
   b2p3: { root: 52, scale: PHRY, bpm: 124, prog: [0, 1, 5, 6], pad: 1, arp: 0.9, bass: 1, perc: 1, cut: 2000 },
@@ -4743,8 +4917,8 @@ function autopilot() {
   input.mx = bx; input.mz = bz;
   if (here > 9 && player.dashT < 0) useAbility('dash');
   if (abilityReady('nova')) useAbility('nova');
-  if (abilityReady('lance') && p.r > 50) useAbility('lance');
-  if (PJ.count > 12 && abilityReady('mirror') && (bossRT.fracture < 100 || p.b > PLAYER.novaReq + PLAYER.mirCost || here > 9)) useAbility('mirror');
+  if (abilityReady('lance')) useAbility('lance');
+  if (PJ.count > 12 && abilityReady('mirror')) useAbility('mirror');
   if (p.hp < 70 && abilityReady('lattice')) useAbility('lattice');
   if (bossRT.def && bossRT.def.apHook) bossRT.def.apHook();
 }
@@ -4764,7 +4938,7 @@ const ui = {
   el: {
     hud: $('hud'), bossNameT: $('bossNameT'), enrageT: $('enrageT'), bossHpFill: $('bossHpFill'), bossHpChunk: $('bossHpChunk'), bossPct: $('bossPct'), bossNotches: $('bossNotches'),
     fracWrap: $('fracWrap'), fracFill: $('fracFill'), bossTags: $('bossTags'), castBar: $('castBar'), castName: $('castName'), castFill: $('castFill'),
-    hpFill: $('hpFill'), hpChunk: $('hpChunk'), hpNum: $('hpNum'), combo: $('combo'), spc: [$('spcR'), $('spcG'), $('spcB')], spcI: [$('spcR').firstChild, $('spcG').firstChild, $('spcB').firstChild], spcN: [$('spcRn'), $('spcGn'), $('spcBn')],
+    hpFill: $('hpFill'), hpChunk: $('hpChunk'), hpNum: $('hpNum'), combo: $('combo'), radWrap: $('radWrap'), radFill: $('radFill'), radTxt: $('radTxt'),
     toast: $('toast'), letterbox: $('letterbox'), titleCard: $('titleCard'), tcBig: $('tcBig'), tcSub: $('tcSub'), bigCast: $('bigCast'), bigCastFill: $('bigCastFill'), bigCastName: $('bigCastName'), fade: $('fade'),
     ab: { dash: $('ab-dash'), lance: $('ab-lance'), lattice: $('ab-lattice'), mirror: $('ab-mirror'), nova: $('ab-nova') }, dbg: $('dbg'), descend: $('descendText'), descendSub: $('descendSub'),
   },
@@ -4777,6 +4951,7 @@ const ui = {
   tutorial(key, text) { if (game.tutorial[key]) return; game.tutorial[key] = true; if (this.tutQ.length < 4) this.tutQ.push(text); },
   lbOn: false, letterbox(on) { this.lbOn = !!on; this.el.letterbox.classList.toggle('on', !!on); },
   titleCard(big, sub, dur = 2.8) { this.el.tcBig.textContent = big; this.el.tcSub.textContent = sub || ''; this.el.titleCard.classList.add('on'); this.tcT = dur; },
+  readyFlash(name) { const el = this.el.ab[name]; if (!el) return; el.classList.remove('rdy'); void el.offsetWidth; el.classList.add('rdy'); setTimeout(() => el.classList.remove('rdy'), 600); },
   pressFlash(name) { const el = this.el.ab[name]; if (!el) return; el.classList.add('pressed'); setTimeout(() => el.classList.remove('pressed'), 110); },
   setupBossFrame(def) {
     this.el.bossNameT.textContent = def.name; this.el.bossHpFill.style.background = def.barGrad;
@@ -4820,19 +4995,17 @@ const ui = {
     this.set('phpc', e.hpFill, 'cls', pk < 0.3 ? 'fill low' : 'fill');
     const comboOn = p.comboN >= 2;
     this.set('combo', e.combo, 'cls', comboOn ? 'on' : '');
-    if (comboOn) { if (this.setN('comboN', p.comboN)) e.combo.textContent = 'GRAZE ×' + p.comboN; this.comboHueT -= realDt; if (this.comboHueT <= 0) { this.comboHueT = 0.08; e.combo.style.color = 'hsl(' + Math.round((performance.now() / 6) % 360) + ',100%,72%)'; } }
-    for (let i = 0; i < 3; i++) {
-      const v = i === 0 ? p.r : i === 1 ? p.g : p.b;
-      q = Math.round(v * 5); if (this.setN('sp' + i, q)) e.spcI[i].style.transform = 'scaleY(' + (q / 500) + ')';
-      q = Math.floor(v); if (this.setN('spn' + i, q)) e.spcN[i].textContent = String(q);
-      this.set('spc' + i, e.spc[i], 'cls', v >= 60 ? 'spc full' : 'spc');
-    }
+    if (comboOn) { if (this.setN('comboN', p.comboN)) e.combo.textContent = 'PERFECT ×' + p.comboN; this.comboHueT -= realDt; if (this.comboHueT <= 0) { this.comboHueT = 0.08; e.combo.style.color = 'hsl(' + Math.round((performance.now() / 6) % 360) + ',100%,72%)'; } }
+    // Radiance bar (fills from landing hits; full = White Nova)
+    q = Math.round(p.rad * 5); if (this.setN('rad', q)) { e.radFill.style.transform = 'scaleX(' + (q / 500) + ')'; e.ab.nova.style.setProperty('--k', (q / 5).toFixed(1) + '%'); }
+    const full = p.rad >= 100;
+    this.set('radc', e.radWrap, 'cls', full ? 'full' : '');
+    q = full ? -1 : Math.floor(p.rad); if (this.setN('radt', q)) e.radTxt.textContent = full ? (IS_TOUCH ? 'NOVA READY' : 'NOVA READY  [4 / R]') : 'RADIANCE ' + q + '%';
     // abilities (≤30 Hz)
     this.cdTick -= realDt; if (this.cdTick > 0) return; this.cdTick = 1 / 30;
-    const m = costMul();
-    this.abil('lance', p.r / (PLAYER.lanceCost * m), p.cdLance, PLAYER.lanceCd);
-    this.abil('lattice', p.g / (PLAYER.latCost * m), p.cdLattice, PLAYER.latCd);
-    this.abil('mirror', p.b / (PLAYER.mirCost * m), p.cdMirror, PLAYER.mirCd);
+    this.abil('lance', 1, p.cdLance, PLAYER.lanceCd);
+    this.abil('lattice', 1, p.cdLattice, PLAYER.latCd);
+    this.abil('mirror', 1, p.cdMirror, PLAYER.mirCd);
     // dash
     const D = this.abEl('dash'); const dk = p.dashCharges >= p.dashMax ? 0 : 1 - p.dashRecharge / PLAYER.dashCd;
     q = p.dashCharges === 0 ? Math.round(dk * 200) : -1; if (this.setN('dashcd', q)) D.cd.style.background = q >= 0 ? 'conic-gradient(rgba(0,0,0,.62) ' + (q / 2) + '%, transparent 0)' : 'none';
@@ -4937,7 +5110,7 @@ function setArenaLook(arena) {
 }
 function startRun(full, idx = 0) {
   game.runMode = full ? 'full' : 'single'; game.facets = []; game.runTime = 0; game.bossTimes = [null, null, null]; game.cpBoss = {}; game.checkpointed = false;
-  game.stats.grazes = 0; game.stats.perfects = 0; game.stats.deaths = 0; game.stats.time = 0; game.tutorial = {};
+  game.stats.grazes = 0; game.stats.novas = 0; game.stats.perfects = 0; game.stats.deaths = 0; game.stats.time = 0; game.tutorial = {};
   game.sat = game.satTarget = SAT_BOSS[idx];
   beginBoss(idx, { intro: true });
 }
@@ -4952,7 +5125,7 @@ function beginBoss(idx, opts = {}) {
   const def = BOSSES[idx];
   setArenaLook(def.arena);
   bossReset(idx, opts.phase || 0);
-  resetPlayer(opts.charge || 30);
+  resetPlayer(opts.charge || PLAYER.radStart);
   game.fightTime = 0; director.timeScale = 1; LU.uWhite.value = 0; LU.uDark.value = 0;
   ui.setupBossFrame(def);
   ui.el.fade.style.opacity = '0';
@@ -4971,7 +5144,7 @@ function startFight() {
   if (bossRT.idx === 0 && bossRT.phase === 0) {
     const gen = game.gen;
     ui.tutorial('move', IS_TOUCH ? 'Move: drag the left side of the screen' : 'Move: WASD  ·  Aim: mouse  ·  Dash: SPACE');
-    setTimeout(() => { if (game.gen === gen && game.state === 'fight') ui.tutorial('dash', 'Dash through attacks for PERFECT grazes'); }, 6500);
+    setTimeout(() => { if (game.gen === gen && game.state === 'fight') ui.tutorial('dash', 'Dash THROUGH an attack for a PERFECT: it recharges your Lance'); }, 6500);
   }
 }
 function retryBoss() {
@@ -5037,7 +5210,7 @@ function showVictory() {
   const rows = [];
   if (run != null) rows.push(`<div class="${nb.run ? 'best' : ''}">TOTAL ${fmtTimeMs(run)}${nb.run ? ' · NEW BEST' : ''}</div>`);
   game.bossTimes.forEach((t, i) => { if (t != null) rows.push(`<div class="${nb['b' + (i + 1)] ? 'best' : ''}">${BOSSES[i].name} · ${fmtTimeMs(t)}${cpb['b' + (i + 1)] ? ' · CHECKPOINT' : ''}</div>`); });
-  rows.push(`<div>GRAZES ${game.stats.grazes} · PERFECT DASHES ${game.stats.perfects} · SHATTERED ${game.stats.deaths}</div>`);
+  rows.push(`<div>WHITE NOVAS ${game.stats.novas || 0} · PERFECT DASHES ${game.stats.perfects} · SHATTERED ${game.stats.deaths}</div>`);
   if (game.facets.length) rows.push(`<div>FACETS · ${game.facets.map((id) => FACETS.find((f) => f.id === id).name).join(' · ')}</div>`);
   $('victoryStats').innerHTML = rows.join('');
   const cred = ['<div class="h">PRISMFALL</div>', '<div>THE LANTERN CHOIR · SILENCED</div>', '<div>VEYRA · UNBOUND</div>', '<div>THE NULL SUN · DAWN</div>',
@@ -5050,7 +5223,7 @@ function showDefeat() {
   game.state = 'defeat'; ui.hud(false);
   const b = bossRT;
   $('defeatSub').textContent = b.def ? b.def.name : '';
-  $('defeatStats').innerHTML = `<div>BOSS REMAINING ${(b.hp / b.maxHp * 100).toFixed(1)}%</div><div>TIME ${fmtTimeMs(game.fightTime)}</div><div>GRAZES ${game.stats.grazes} · PERFECT ${game.stats.perfects}</div>`;
+  $('defeatStats').innerHTML = `<div>BOSS REMAINING ${(b.hp / b.maxHp * 100).toFixed(1)}%</div><div>TIME ${fmtTimeMs(game.fightTime)}</div><div>NOVAS ${game.stats.novas || 0} · PERFECT ${game.stats.perfects}</div>`;
   showScreen('defeat');
 }
 function toTitle() {
@@ -5163,7 +5336,7 @@ function frame(now) {
    ===================================================================== */
 window.__game = {
   get state() { return game.state; },
-  get player() { const p = player; return { hp: p.hp, maxHp: p.maxHp, x: p.x, z: p.z, r: p.r, g: p.g, b: p.b, dashCharges: p.dashCharges, iframes: Math.max(p.dashI, p.hurtI, p.invuln), alive: p.alive }; },
+  get player() { const p = player; return { hp: p.hp, maxHp: p.maxHp, x: p.x, z: p.z, rad: p.rad, cd: [p.cdLance, p.cdLattice, p.cdMirror], dashCharges: p.dashCharges, iframes: Math.max(p.dashI, p.hurtI, p.invuln), alive: p.alive }; },
   get boss() { const b = bossRT; return b.def ? { index: b.idx, name: b.def.name, hp: b.hp, maxHp: b.maxHp, phase: b.phase, fracture: b.fracture, vulnerable: b.vuln > 0, shielded: b.shieldMul < 1, cast: b.cast.active ? b.cast.name : null, enrageLeft: b.enrageLeft, dead: b.dead } : null; },
   get fps() { return perf.fps; }, get quality() { return Q.name; }, get projectiles() { return PJ.count; },
   get stats() { return Object.assign({}, game.stats, { time: game.fightTime }); },
@@ -5177,15 +5350,29 @@ window.__game = {
   killBoss() { if (bossRT.def && !bossRT.dead) { if (game.state !== 'fight') game.state = 'fight'; bossDie(); } },
   damageBoss(n) { const was = game.state; bossTakeDamage(n, false, 'debug'); return was; },
   godMode(on = true) { debug.god = !!on; },
-  fill() { player.r = player.g = player.b = 100; player.cdLance = player.cdLattice = player.cdMirror = 0; player.dashCharges = player.dashMax; },
+  fill() { player.rad = 100; player.cdLance = player.cdLattice = player.cdMirror = 0; player.dashCharges = player.dashMax; },
   get timeScale() { return debug.timeScale; }, set timeScale(v) { debug.timeScale = Math.max(0, +v || 0); },
   forceQuality(t) { if (t === 'auto') { Q.auto = true; return; } Q.auto = false; applyQuality(t); },
   skipCinematic() { skipCine(true); },
   setCam(x, y, z, lx, ly, lz) { if (x === null || x === undefined) { cam.lock = null; return; } cam.lock = { pos: new THREE.Vector3(x, y, z), look: new THREE.Vector3(lx, ly, lz) }; },
   cast(name, arg) { const d = bossRT.def; if (d && d.casts[name]) { d.casts[name](arg); return true; } return false; },
   facet(id) { pickFacet(id); }, victory() { showVictory(); }, defeat() { player.hurtI = 0; player.invuln = 0; debug.god = false; damagePlayer(9999, R); },
-  use(name) { return useAbility(name); }, autopilot(on = true) { debug.autopilot = !!on; debug.log = []; }, get hitLog() { return debug.log || []; }, move(x, z) { input.jx = x; input.jz = z; },
+  use(name) { return useAbility(name); }, autopilot(on = true) { debug.autopilot = !!on; debug.log = []; debug.dmg = {}; },
+  dbgExtra() { return { dmg: debug.dmg, novas: game.stats.novas, perfects: game.stats.perfects }; }, get hitLog() { return debug.log || []; }, move(x, z) { input.jx = x; input.jz = z; },
   setPlayer(x, z) { player.x = x; player.z = z; },
+  // headless fast-forward for bot balance tests: steps input/director/sim at 30 Hz without rendering
+  fastForward(sec, stopOnEnd = true) {
+    const h = 1 / 30; let t = 0;
+    while (t < sec) {
+      updateInput(h); if (game.state !== 'paused') updateDirector(h * debug.timeScale);
+      let ts = director.timeScale * debug.timeScale; if (director.hitstopT > 0) ts = 0;
+      if (ts > 0 && game.state !== 'paused') simStep(h * ts);
+      if (game.state !== 'paused') updateNova(h * debug.timeScale);
+      t += h;
+      if (stopOnEnd && (game.state === 'defeat' || game.state === 'facet' || game.state === 'victory' || (bossRT.dead && !director.cine))) break;
+    }
+    return t;
+  },
   setPixelRatio(v) { Q.prOverride = v || 0; resize(); },  // test helper (software renderers)
   _dbg: { scene, renderer, floor, nebula, stars, composer, bloom, lensPass, Q, resize },
 };
