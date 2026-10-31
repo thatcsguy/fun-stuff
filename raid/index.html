@@ -62,6 +62,9 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 #bb-ticks i{position:absolute;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:#ffe7b0;box-shadow:0 0 6px #ffb347}
 #bb-ticks i::after{content:"";position:absolute;left:-3px;top:-5px;border:4px solid transparent;border-top-color:#ffe7b0}
 #bb-pct{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-family:var(--num);font-weight:700;font-size:14px;line-height:1;color:#fff;text-shadow:0 1px 2px #000,0 0 4px #000;z-index:5}
+#bb-lock{position:absolute;right:0;top:0;font-family:var(--num);font-weight:700;font-size:11px;letter-spacing:.14em;line-height:1;padding:3px 7px;border-radius:3px;white-space:nowrap;color:#fff;background:rgba(110,50,210,.9);box-shadow:0 0 10px rgba(178,102,255,.8);z-index:5;opacity:0;transition:opacity .15s;pointer-events:none}
+#bossbar.locked #bb-frame{box-shadow:0 0 0 1px rgba(178,102,255,.9),0 0 14px rgba(178,102,255,.7)}
+#bossbar.locked #bb-lock{opacity:1}
 #bb-enrage{min-width:56px;font-family:var(--num);font-weight:700;font-size:16px;color:#ffe8c8;text-align:right;text-shadow:0 1px 3px #000}
 #bb-enrage.warn{color:#ff4a3a;animation:pulseRed .8s infinite}
 @keyframes pulseRed{50%{opacity:.55}}
@@ -101,6 +104,9 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 #hp-chip{background:#ff5a4a;opacity:.85}
 #hp-fill{background:linear-gradient(180deg,#d6fff6 0%,#46e0c8 45%,#108a7c 100%)}
 #hpbar.low #hp-fill{background:linear-gradient(180deg,#ffd0c8 0%,#ff5a4a 45%,#8a1410 100%);animation:pulseRed .6s infinite}
+/* what your next Shatter would heal (green ghost after the fill) */
+#hp-heal{position:absolute;top:0;bottom:0;left:0;width:0;background:linear-gradient(180deg,#d4ffe0 0%,#4fe88a 50%,#178a48 100%);box-shadow:inset 0 0 0 1px rgba(220,255,230,.7);animation:healGhost 1.1s ease-in-out infinite}
+@keyframes healGhost{0%,100%{opacity:.5}50%{opacity:.95}}
 #hp-shield{background:linear-gradient(180deg,rgba(255,236,170,.95),rgba(255,190,60,.8));mix-blend-mode:screen;transform:scaleX(0)}
 #hp-text{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-weight:700;font-size:14px;line-height:1;color:#fff;text-shadow:0 0 3px #000,0 1px 2px #000;z-index:2}
 #fluxbar{position:relative;height:7px;margin-top:4px;background:rgba(4,10,16,.75);border:1px solid rgba(95,242,255,.35);overflow:visible}
@@ -140,6 +146,15 @@ body.touch #hgbar{display:none}
 #numbers span.grand{color:#ffd76a;font-size:40px;font-family:var(--head);font-weight:900;text-shadow:0 0 3px #000,0 0 18px rgba(255,190,60,.95),0 0 2px #fff}
 #numbers span.taken{color:#ff5a48;font-size:22px}
 #numbers span.heal{color:#6dff9d;font-size:22px}
+/* shock-ring timing cue under the player (RingCue) */
+#ringcue{position:fixed;left:0;top:0;z-index:12;pointer-events:none;opacity:0;text-align:center;font-family:var(--num);font-weight:700;line-height:1;transition:opacity .08s}
+#ringcue.on{opacity:1}
+#ringcue b{display:block;font-size:24px;letter-spacing:.16em;color:#dffcff;padding:3px 10px 2px;border-radius:4px;background:rgba(2,14,20,.62);box-shadow:0 0 0 1px rgba(160,245,255,.7),0 0 14px rgba(95,242,255,.55);text-shadow:0 0 8px #5ff2ff}
+#ringcue small{display:inline-block;margin-top:3px;font-size:11px;letter-spacing:.1em;padding:2px 5px;border-radius:3px;color:#06141a;background:rgba(220,252,255,.9)}
+#ringcue small:empty{display:none}
+#ringcue.dash b{animation:cuePop .18s ease-out}
+#ringcue.gap b{font-size:14px;color:#c8ffd8;background:rgba(2,20,10,.55);box-shadow:0 0 0 1px rgba(120,255,170,.6);text-shadow:0 0 6px #3bff8a}
+@keyframes cuePop{from{transform:scale(1.5)}to{transform:scale(1)}}
 #numbers span.small{font-size:16px;opacity:.9}
 
 /* ---------- banners / stamps / phase titles ---------- */
@@ -239,6 +254,11 @@ body:not(.lasttouch) .tch{display:none}
   background:conic-gradient(var(--cyan) calc(var(--e) * 360deg),transparent 0);
   -webkit-mask:radial-gradient(circle,transparent 60%,#000 61%,#000 70%,transparent 71%);mask:radial-gradient(circle,transparent 60%,#000 61%,#000 70%,transparent 71%)}
 .ab[data-ab="lance"] svg{stroke:#e6d4ff;filter:drop-shadow(0 0 4px rgba(178,102,255,.8))}
+/* Stasis Lance mode tag: INTERRUPT (violet cast up: short cooldown) / PIERCE (damage + Time-Lock: long cooldown) */
+.ab .tag{position:absolute;left:50%;top:-5px;transform:translate(-50%,-100%);font-family:var(--num);font-weight:700;font-size:10px;letter-spacing:.1em;line-height:1;padding:2px 4px;border-radius:3px;white-space:nowrap;z-index:4;pointer-events:none;display:none}
+.ab .tag.int{display:block;color:#fff;background:rgba(130,60,230,.92);box-shadow:0 0 8px rgba(178,102,255,.9)}
+.ab .tag.pierce{display:block;color:#06141a;background:rgba(190,248,255,.85)}
+.ab.mode-pierce svg{stroke:#dffcff;filter:drop-shadow(0 0 4px rgba(95,242,255,.8))}
 .ab[data-ab="rend"]{border-width:2px}
 
 /* ---------- joystick ---------- */
@@ -394,6 +414,7 @@ body.compact:not(.portrait) #cb-shards{top:calc(6px + var(--sat) + 32px)}
 <div id="hud" class="off">
   <div id="bossbar" class="hide">
     <div class="bb-names"><span id="bb-name">—</span><span id="bb-epithet"></span></div>
+    <div id="bb-lock">TIME-LOCKED +20%</div>
     <div class="bb-row">
       <div id="bb-frame"><div id="bb-chip"></div><div id="bb-fill"></div><div id="bb-ticks"></div><div id="bb-pct">100%</div></div>
       <div id="bb-enrage"></div>
@@ -404,7 +425,7 @@ body.compact:not(.portrait) #cb-shards{top:calc(6px + var(--sat) + 32px)}
   <div id="topleft"><button id="pausebtn" class="glass" aria-label="Pause">II</button><div id="fpsbadge" class="glass"></div></div>
   <div id="playerpanel">
     <div id="statuses"></div>
-    <div id="hpbar"><div id="hp-chip"></div><div id="hp-fill"></div><div id="hp-shield"></div><span id="hp-text"></span></div>
+    <div id="hpbar"><div id="hp-chip"></div><div id="hp-fill"></div><div id="hp-heal"></div><div id="hp-shield"></div><span id="hp-text"></span></div>
     <div id="fluxbar"><div id="flux-fill"></div><div id="flux-mark"></div></div>
     <div id="hgbar"><div id="hg-fill"></div></div>
   </div>
@@ -437,7 +458,7 @@ body.compact:not(.portrait) #cb-shards{top:calc(6px + var(--sat) + 32px)}
     <span class="cdn"></span><span class="key">R</span></button>
   <button class="ab" data-ab="lance" style="--s:60px;--dx:214;--dy:244" aria-label="Stasis Lance">
     <svg viewBox="0 0 48 48"><path d="M8 40 L36 12"/><path d="M30 8 L42 6 L40 18 Z"/><path d="M12 30 l6 6 M16 26 l6 6" opacity=".7"/></svg>
-    <span class="cdn"></span><span class="key">F</span></button>
+    <span class="cdn"></span><span class="tag"></span><span class="key">F</span></button>
   <button class="ab" data-ab="ult" style="--s:64px;--dx:62;--dy:288" aria-label="Zero Hour">
     <svg viewBox="0 0 48 48"><path d="M14 6 H34 M14 42 H34"/><path d="M16 6 C16 18 32 20 32 42 M32 6 C32 18 16 20 16 42"/><path d="M20 38 Q24 32 28 38 Z" fill="#ffe8a8" stroke="none"/></svg>
     <span class="cdn"></span><span class="key">T</span></button>
@@ -481,8 +502,10 @@ body.compact:not(.portrait) #cb-shards{top:calc(6px + var(--sat) + 32px)}
     <div class="howgrid">
       <div><h3>MOVE &amp; FIGHT</h3><p>Left thumb anywhere (or WASD) to move. Attacks are automatic: blade up close, glass needles at range. Abilities never miss.</p></div>
       <div><h3>READ THE FLOOR</h3><p><span class="sw" style="border-color:#ff4a1c;background:rgba(255,74,28,.3)"></span>Red: get out. <span class="sw" style="border-color:#ffc845;background:rgba(255,200,69,.3)"></span>Gold: stand in. <span class="sw" style="border-color:#b266ff;background:rgba(178,102,255,.3)"></span>Violet: special rule.</p></div>
-      <div><h3>STEP &amp; RECALL</h3><p>Phase Step leaves an Echo. Dash through a hit as it lands for SLIPSTREAM. Recall snaps you back to your Echo and heals.</p></div>
-      <div><h3>FRACTURE &amp; SHATTER</h3><p>Rend cracks the boss (5 max). Shatter cashes them in. At 5 Fractures it becomes GRAND SHATTER. Fill the Hourglass for ZERO HOUR.</p></div>
+      <div><h3>STEP &amp; RECALL</h3><p>Phase Step through a hit as it lands for SLIPSTREAM (the charge comes back). It leaves an Echo: Recall rewinds you to it, untouchable on the way, and cleanses Entropy.</p></div>
+      <div><h3>FRACTURE &amp; SHATTER</h3><p>Rend cracks the boss (5 max). Shatter cashes them in and <b style="color:#6dff9d">heals you</b> for each one (the green on your HP bar). 5 = GRAND SHATTER. Fill the Hourglass for ZERO HOUR.</p></div>
+      <div><h3>STASIS LANCE</h3><p><span class="sw" style="border-color:#b266ff;background:rgba(178,102,255,.3)"></span>Violet cast bar? Lance it to INTERRUPT (short cooldown). No violet cast? It PIERCES: a heavy hit, +2 Fractures, boss takes +20% for 5 s, but a long cooldown.</p></div>
+      <div><h3>RINGS</h3><p>Shock rings can't be outrun. Each has a gap: stand in the green lane. Or Phase Step when the circle at your feet closes and ticks.</p></div>
     </div>
     <button class="btn primary" id="how-close">GOT IT</button>
   </div>
@@ -594,10 +617,19 @@ const CONFIG = {
             slip: { flux: 25, hourglass: 8, slowDur: 0.35, slowScale: 0.25, desat: 0.85, ca: 0.006, hitStop: 0.03 },
             fovKick: 4, ghosts: 5 },
     rend: { cd: 2.5, angle: 120, range: 6, dmg: 180, flux: 10, shardCount: 24, shardHold: 0.3 },
-    shatter: { cd: 1.0, cost: 50, base: 100, per: 150, grandMul: 1.5, grandHeal: 0.06, grandHourglass: 10,
+    // Shatter MENDS: every Fracture it spends heals healPer × max HP; a Grand Shatter adds grandHeal on top (5 × 2.5% + 5% = 17.5%).
+    // (Healing used to come from Recall: 40% of the damage taken since your last dash. Playtest: "felt odd" → it now rides the
+    //  button you already press for damage, shows as green numbers, and the HP bar previews it in green.)
+    shatter: { cd: 1.0, cost: 50, base: 100, per: 150, grandMul: 1.5, healPer: 0.025, grandHeal: 0.05, grandHourglass: 10,
                hitStop: 0.04, grandHitStop: 0.07, trauma: 0.15, grandTrauma: 0.3, grandBloom: 0.8 },
-    recall: { cd: 14, dur: 0.15, healFrac: 0.4 },
-    lance: { cd: 20, range: 25, speed: 60, dmg: 250, flux: 30, hourglass: 15, borrowed: 6, borrowedRate: 1.3, root: 3, freeze: 0.6 },
+    // Recall: rewind to your Echo. Untouchable while rewinding (+ invulnTail after landing); cleanses Entropy. No longer heals.
+    recall: { cd: 14, dur: 0.15, invulnTail: 0.2 },
+    // Stasis Lance has two modes, chosen when you throw it:
+    //   INTERRUPT (a violet cast is up): unchanged — stops the cast, Flux + Hourglass + Borrowed Time, cooldown `cd`.
+    //   PIERCE (no violet cast): pierceDmg to the target and every add on the line, +pierceFrac Fractures on the boss,
+    //     TIME-LOCK (boss takes ×lockMul damage for lockDur s) — but the cooldown is the longer `pierceCd`.
+    lance: { cd: 20, range: 25, speed: 60, dmg: 250, flux: 30, hourglass: 15, borrowed: 6, borrowedRate: 1.3, root: 3, freeze: 0.6,
+             pierceCd: 32, pierceDmg: 700, pierceFrac: 2, lockDur: 5, lockMul: 1.2, pierceWidth: 1.4 },
     ult: { cost: 100, dur: 2.0, dmg: 4000, anchorDmg: 2400, timeScale: 0.2, hitStop: 0.12, trauma: 0.6, bloom: 0.7, converge: 360, slashes: 12 },
   },
   // keys shown on buttons + bindings (§6.1)
@@ -635,8 +667,8 @@ const CONFIG = {
   talents: [
     [ { id: 'afterimage', name: 'AFTERIMAGE', desc: 'Your Echo detonates for 400 in a 4 m radius when you Recall.', dmg: 400, radius: 4 },
       { id: 'tripleStep', name: 'TRIPLE STEP', desc: '3 dash charges. A Perfect Dodge also adds +1 Fracture.', charges: 3 } ],
-    [ { id: 'borrowedPlus', name: 'BORROWED TIME+', desc: 'Stasis Lance cooldown 14 s; haste lasts 9 s.', lanceCd: 14, borrowed: 9 },
-      { id: 'kintsugi', name: 'KINTSUGI', desc: 'Grand Shatter heals 12% and grants a 300 golden shield for 6 s.', heal: 0.12, shield: 300, shieldDur: 6 } ],
+    [ { id: 'borrowedPlus', name: 'BORROWED TIME+', desc: 'Stasis Lance cooldown 14 s (Pierce 24 s); haste lasts 9 s.', lanceCd: 14, pierceCd: 24, borrowed: 9 },
+      { id: 'kintsugi', name: 'KINTSUGI', desc: 'Grand Shatter heals 25% (not 17.5%) and grants a 300 golden shield for 6 s.', heal: 0.25, shield: 300, shieldDur: 6 } ],
   ],
 
   // ---------------------------------------------------------------- camera (§7)
@@ -691,8 +723,8 @@ const HINTS = {
   'Hammerfall': 'Step beside her, or dash through as the cone fills.',
   'Hymn of Stone': "Hide in a pillar's violet shadow.",
   'Fate — Converge': 'Stand on your Echo, or Recall to it.',
-  'Burning': 'Interrupt the cast with Stasis Lance, or Recall to recover.',
-  'Melee': 'Keep moving through telegraphs; recover chip damage with Recall.',
+  'Burning': 'Interrupt the cast with Stasis Lance (keep it ready for violet casts), then Shatter to heal back up.',
+  'Melee': 'Keep moving through telegraphs. Shatter heals you for every Fracture it spends: Rend, Rend, Shatter.',
   // Training Grounds
   'Pendulum Cleave': 'Step out of the cone to the side, or dash through it as it fills.',
   'Hail of Hours': 'Keep moving: one circle always lands on you. Do not fight in the pools.',
@@ -703,7 +735,7 @@ const HINTS = {
   'Quarter Hours': 'Watch the order the wedges light up.',
   'Severance': 'Cross to the other half of the arena.',
   'Chime of Stasis': 'Interrupt the violet cast with Stasis Lance (F).',
-  'Tremor': 'Rings cannot be outrun. Dash through each ring.',
+  'Tremor': 'Walk into the green gap, or Phase Step when the circle at your feet closes on you.',
   'Sundial Gaze': 'Violet: stand outside the dotted circle when it resolves.',
   'Ember Pool': 'Do not stand in burning pools.',
   'Fall': 'Stay on the platform.',
@@ -830,7 +862,7 @@ const ENCOUNTERS = [];
 function resetStats() {
   Game.stats = {
     damageDealt: 0, damageTaken: 0, perfectDodges: 0, interrupts: 0, interruptChances: 0,
-    grandShatters: 0, shatters: 0, fractureUptime: 0, recallHealing: 0, healing: 0, mechanicsFailed: 0,
+    grandShatters: 0, shatters: 0, fractureUptime: 0, shatterHealing: 0, pierces: 0, healing: 0, mechanicsFailed: 0,
     zeroHours: 0, deaths: 0, hitsTaken: 0,
   };
 }
@@ -1774,6 +1806,10 @@ const Audio = {
           this.noise({ type: 'bandpass', f: 300, f1: 2600, q: 1.2, a: 0.12, dur: 0.06, vol: 0.32 });
           this.tone({ f: 280, f1: 1400, a: 0.1, dur: 0.12, vol: 0.12, type: 'triangle', verb: true });
           break;
+        case 'pierce': this.tone({ f: 620, f1: 2480, glide: 0.16, type: 'triangle', dur: 0.2, vol: 0.12, verb: true }); this.noise({ type: 'highpass', f: 4200, dur: 0.18, vol: 0.12 }); break;
+        // shock-ring timing cue: a dry clock tick (ring k of n rises in pitch) — "dash NOW"
+        case 'ringTick': { const f = 1480 * (1 + 0.12 * (o.k || 0)); this.noise({ type: 'bandpass', f: 3200, q: 3, dur: 0.025, vol: 0.32 }); this.tone({ f, dur: 0.09, vol: 0.16 }); this.tone({ f: f * 2, dur: 0.05, vol: 0.05, delay: 0.01 }); break; }
+        case 'ringSafe': this.tone({ f: 990, dur: 0.12, vol: 0.06, type: 'triangle' }); this.tone({ f: 1320, dur: 0.14, vol: 0.05, type: 'triangle', delay: 0.05 }); break;
         case 'hurt': this.tone({ f: 120, f1: 50, dur: 0.22, vol: 0.32 }); this.noise({ type: 'lowpass', f: 1000, dur: 0.14, vol: 0.22 }); break;
         case 'heal': [660, 880, 1318.5].forEach((f, i) => this.tone({ f, dur: 0.32, vol: 0.06, delay: i * 0.06, verb: true })); break;
         case 'ultCharge':
@@ -2465,6 +2501,7 @@ const Particles = {
     o = o || {}; this._cols(colA, colB, o.intensity || 2);
     for (let k = 0; k < n; k++) {
       const a = (k / n) * TAU + fxRange(0, 0.2), sx = Math.sin(a), sz = Math.cos(a);
+      if (o.gapHalf && Math.abs(angDiff(a, o.gapDir)) < o.gapHalf) continue;      // notched ring (shock-ring gaps)
       this.emitRaw(pos.x + sx * radius, pos.y + (o.y || 0.15), pos.z + sz * radius, sx * speed, (o.up || 0) * fxRange(0.5, 1), sz * speed,
         life * fxRange(0.7, 1), size * fxRange(0.7, 1.1), o.sizeEnd != null ? o.sizeEnd : size * 0.3, this._ca, this._cb, o.gravity || 0, o.drag != null ? o.drag : 1.5);
     }
@@ -3286,6 +3323,7 @@ const Hazards = {
 function ringWillHit(h, x, z, dt) {
   // expanding donut with h.data.speed (m/s): will the ring band sweep over distance d within dt?
   const d = Math.hypot(x - h.x, z - h.z), sp = (h.data && h.data.speed) || 0;
+  if (h.data && h.data.gapDir != null && Math.abs(angDiff(Math.atan2(x - h.x, z - h.z), h.data.gapDir)) < h.data.gapHalf) return false;   // standing in its notch
   for (let s = 0.05; s <= dt + 1e-6; s += 0.05) { const R = h.r + sp * s, I = h.inner + sp * s; if (d <= R && d >= I) return true; }
   return false;
 }
@@ -3536,7 +3574,8 @@ class Player {
     this.buffer = { id: null, t: 0 };
     this.meleeT = 0; this.comboIdx = 0; this.needleT = 0; this.outOfMeleeT = 0;
     this.act = { type: null, t: 0, dur: 0 }; this.actW = 0; this.trailA = 0;
-    this.recallS = null; this.ult = null;
+    this.recallS = null; this.ult = null; this.recallInvT = 0; this.lastDashAt = -99;
+    this.lanceMode = 'interrupt'; this.lanceMax = CONFIG.abilities.lance.cd;   // mode of the last throw + the cooldown it set (HUD sweep)
     this.target = null; this.lastSource = null; this.lastHint = null;
     this.history = new PlayerHistory(C.historyHz, C.historySeconds);
     this.histAcc = 0;
@@ -3630,7 +3669,8 @@ class Player {
     this.echo.active = false; this.echo.pinned = false; this.echoModel.root.visible = false; this.echoRing.visible = false; this.markRing.visible = false;
     this.buffer.id = null; this.meleeT = 0.2; this.comboIdx = 0; this.needleT = 0.3; this.outOfMeleeT = 0;
     this.act.type = null; this.actW = 0; this.trailA = 0;
-    this.recallS = null; this.ult = null; this.lastSource = null; this.dead = false;
+    this.recallS = null; this.ult = null; this.lastSource = null; this.dead = false; this.recallInvT = 0; this.lastDashAt = -99;
+    this.lanceMode = 'interrupt'; this.lanceMax = this.lanceCd('interrupt');
     this.history.clear(); this.histAcc = 0;
     for (const g of this.ghosts) g.model.root.visible = false;
     this.root.visible = true;
@@ -3639,7 +3679,7 @@ class Player {
     this.trail.reset(this.baseWorld, this.tipWorld);
   }
 
-  get invuln() { return this.iframeT > 0 || this.invulnFlags > 0 || !!this.ult; }
+  get invuln() { return this.iframeT > 0 || this.invulnFlags > 0 || !!this.ult || !!this.recallS || this.recallInvT > 0; }
   get cdRate() { return this.hasStatus('borrowed') ? CONFIG.abilities.lance.borrowedRate : 1; }
   get stunned() { for (const s of this.statuses) if (STATUS_DEFS[s.id] && STATUS_DEFS[s.id].stun) return true; return false; }
   canAct() { return this.alive && !Game.inputLocked && !this.ult && !this.recallS && !this.stunned && (Game.state === 'fight'); }
@@ -3754,7 +3794,6 @@ class Player {
     let absorbed = 0;
     if (this.shield > 0) { absorbed = Math.min(this.shield, amt); this.shield -= absorbed; amt -= absorbed; if (this.shield <= 0) this.removeStatus('kintsugi'); }
     this.hp -= amt;
-    if (this.echo.active) this.echo.dmgSince += amt;
     Game.stats.damageTaken += amt; Game.stats.hitsTaken++;
     DmgNumbers.spawn(this.hitPointV(), amt + absorbed, 'taken');
     const C = CONFIG.player;
@@ -3827,13 +3866,14 @@ class Player {
     this.dashTo.set(this.pos.x + dx * D.dist, 0, this.pos.z + dz * D.dist);
     const R = Game.arena ? Game.arena.radius - CONFIG.player.radius : 1e9, rr = Math.hypot(this.dashTo.x, this.dashTo.z);
     if (rr > R) this.dashTo.multiplyScalar(R / rr);
-    this.dashing = true; this.dashT = 0; this.iframeT = D.iframes;
+    this.dashing = true; this.dashT = 0; this.iframeT = D.iframes; this.lastDashAt = Game.time;
     this.yaw = Math.atan2(dx, dz); this.snapT = 0;
     this.knockV.set(0, 0, 0);
     this.placeEcho();
     // Perfect-dodge lookahead (§9.6)
     Telegraphs.markPD(this.dashFrom.x, this.dashFrom.z, D.pdWindow, this.dashId);
     if (Hazards.anyWillHit(this.dashFrom.x, this.dashFrom.z, D.hazardLook)) this.grantPerfectDodge('hazard');
+    RingCue.onDash(this);      // shock rings: a dash started just before a ring reaches you dodges that ring outright
     // VFX
     this.playAct('dash', D.dur + 0.12);
     this.root.visible = false;
@@ -3900,6 +3940,20 @@ class Player {
     return hitBoss;
   }
 
+  /** HP a Shatter spending n Fractures would heal (0 for adds / no Fractures). Grand: + bonus (Kintsugi: its own total). */
+  shatterHealFor(n, grand) {
+    const A = CONFIG.abilities.shatter;
+    if (n <= 0) return 0;
+    if (grand && this.talentB === 'kintsugi') return this.maxHp * CONFIG.talents[1][1].heal;
+    return this.maxHp * (A.healPer * n + (grand ? A.grandHeal : 0));
+  }
+  /** what the next Shatter would heal right now (HUD preview), or 0 if Shatter is not usable */
+  pendingShatterHeal() {
+    const A = CONFIG.abilities.shatter, b = Game.boss;
+    if (this.flux < A.cost || this.cds.shatter.t > 0 || !b || this.shatterTarget() !== b) return 0;
+    return this.shatterHealFor(this.fractures, this.fractures >= CONFIG.player.fractureMax);
+  }
+
   doShatter() {
     const A = CONFIG.abilities.shatter;
     const tgt = this.shatterTarget(); if (!tgt) return;
@@ -3915,10 +3969,21 @@ class Player {
     if (tgt.onShatter) tgt.onShatter(n, grand);
     const hp = tgt.hitPoint || tgt.pos;
     Game.stats.shatters++;
+    // MEND: Shatter heals per Fracture spent (Grand Shatter: + a bonus). Green siphon from the boss into you.
+    const kin = grand && this.talentB === 'kintsugi';
+    const mend = this.shatterHealFor(n, grand);
+    if (mend > 0) {
+      const healed = this.heal(mend, grand ? 'Grand Shatter' : 'Shatter');
+      Game.stats.shatterHealing = (Game.stats.shatterHealing || 0) + healed;
+      if (healed > 0) {
+        _v2.set(this.pos.x, 1.3, this.pos.z);
+        Particles.line(hp, _v2, grand ? 34 : 14 + n * 4, 0xc8ffd8, 0x2bd96a, 0.45, 0.22, { vy: 0.3, intensity: 2.2, stagger: true });
+        Particles.converge(_v2, grand ? 40 : 16, 1.6, 0xd8ffe4, 0x3bff8a, 0.45, 0.2, { intensity: 2.2 });
+        sfx('heal');
+      }
+    }
     if (grand) {
-      const kin = this.talentB === 'kintsugi';
       const T = CONFIG.talents[1][1];
-      this.heal(this.maxHp * (kin ? T.heal : A.grandHeal), 'Grand Shatter');
       if (kin) { this.shield = T.shield; this.addStatus('kintsugi', T.shieldDur, { stacks: 1 }); }
       this.addHourglass(A.grandHourglass);
       TimeFX.hitStop(A.grandHitStop); CamRig.addTrauma(A.grandTrauma); Post.kickBloom(A.grandBloom, 0.25); Post.kickCA(0.004);
@@ -3953,8 +4018,7 @@ class Player {
     const A = CONFIG.abilities.recall, E = this.echo, s = this.recallS;
     this.pos.set(s.tx, 0, s.tz);
     this.recallS = null;
-    const heal = E.dmgSince * A.healFrac;
-    if (heal > 0) { const got = this.heal(heal, 'Recall'); Game.stats.recallHealing += got; }
+    this.recallInvT = A.invulnTail;             // untouchable while rewinding (recallS) and for a beat after landing
     if (this.hasStatus('entropy')) { this.removeStatus('entropy'); Stamp.show('CLEANSED', 'violet'); }
     GroundFX.ring(E.x, E.z, 0.2, 2.6, 0xbffbff, 0.45, 0.25, 3.0);
     Particles.burst(_v1.set(E.x, 1.0, E.z), 50, 0xbffbff, 0x2bd9ff, 5, 0.6, 0.2, 0, { intensity: 2.4 });
@@ -3970,26 +4034,86 @@ class Player {
     else E.dmgSince = 0;
   }
 
+  // ------------------------------------------------------------ STASIS LANCE: INTERRUPT or PIERCE
+  /** cooldown a throw in this mode sets (Borrowed Time+ shortens both) */
+  lanceCd(mode) {
+    const A = CONFIG.abilities.lance, T = this.talentB === 'borrowedPlus' ? CONFIG.talents[1][0] : null;
+    return mode === 'pierce' ? (T ? T.pierceCd : A.pierceCd) : (T ? T.lanceCd : A.cd);
+  }
+  /** 'interrupt' when a violet (interruptible) cast is up on the lance target or any lanceable part, else 'pierce' */
+  lanceModeNow(tgt) {
+    const b = Game.boss;
+    tgt = tgt || this.lanceTarget();
+    if (tgt && tgt.cast && tgt.cast.interruptible) return 'interrupt';
+    if (b && b.cast && b.cast.interruptible) return 'interrupt';
+    if (b && b.lanceGlow && b.lanceGlow()) return 'interrupt';
+    return 'pierce';
+  }
   doLance() {
     const A = CONFIG.abilities.lance;
     const tgt = this.lanceTarget(); if (!tgt) return;
-    this.cds.lance.t = this.talentB === 'borrowedPlus' ? CONFIG.talents[1][0].lanceCd : A.cd;
+    const mode = this.lanceModeNow(tgt);
+    this.lanceMode = mode; this.lanceMax = this.lanceCd(mode);
+    this.cds.lance.t = this.lanceMax;
     this.faceTarget(tgt);
     this.playAct('lance', 0.38);
     this.root.updateMatrixWorld(true);
     this.refs.handR.getWorldPosition(_v1);
+    const fx = this.pos.x, fz = this.pos.z;
     Projectiles.spawn({ kind: 'lance', x: _v1.x, y: _v1.y + 0.2, z: _v1.z, target: tgt, speed: A.speed, homing: true, friendly: true, life: 2,
-      onHit: (pr, t) => this.lanceHit(t) });
+      color: mode === 'pierce' ? 0xbff8ff : undefined,
+      onHit: (pr, t) => this.lanceHit(t, mode, fx, fz) });
     sfx('lance');
+    if (mode === 'pierce') sfx('pierce');
   }
-  lanceHit(t) {
+  lanceHit(t, mode, fx, fz) {
     const A = CONFIG.abilities.lance;
     if (!t || !t.alive) return;
-    if (t.onLanceHit) { const handled = t.onLanceHit(this); if (handled === true) return; if (handled === 'interrupted') { this.rewardInterrupt(t); return; } }
-    if (t.cast && t.cast.interruptible && t.interrupt && t.interrupt()) { this.rewardInterrupt(t); return; }
-    dealDamage(t, A.dmg, { kind: 'skill', source: 'Stasis Lance' });
+    const interrupted = () => {
+      // a Pierce that arrives on a fresh violet cast still interrupts: you get the short cooldown back
+      if (this.lanceMode === 'pierce') { const cd = this.lanceCd('interrupt'); this.cds.lance.t = Math.min(this.cds.lance.t, cd); this.lanceMax = cd; this.lanceMode = 'interrupt'; }
+      this.rewardInterrupt(t);
+    };
+    if (t.onLanceHit) { const handled = t.onLanceHit(this); if (handled === true) return; if (handled === 'interrupted') { interrupted(); return; } }
+    if (t.cast && t.cast.interruptible && t.interrupt && t.interrupt()) { interrupted(); return; }
+    if (mode !== 'pierce') {
+      // INTERRUPT throw whose cast ended before it landed: the old light hit
+      dealDamage(t, A.dmg, { kind: 'skill', source: 'Stasis Lance' });
+      if (t.isAdd) t.rootT = Math.max(t.rootT || 0, A.root);
+      Particles.burst(t.hitPoint || t.pos, 40, 0xe6d4ff, 0x7a3cff, 7, 0.6, 0.2, 0, { intensity: 2.4 });
+      return;
+    }
+    this.pierceHit(t, fx != null ? fx : this.pos.x, fz != null ? fz : this.pos.z);
+  }
+  /** PIERCE: heavy hit + Time-Lock on the target, +Fractures on the boss, and the same hit on every add along the line */
+  pierceHit(t, fx, fz) {
+    const A = CONFIG.abilities.lance, b = Game.boss;
+    const got = dealDamage(t, A.pierceDmg, { kind: 'skill', source: 'Piercing Lance' });
+    const locked = got > 0 && t === b && b.alive;          // an immune / shielded boss is not Time-Locked
+    if (locked) {
+      if (b.addStatus) b.addStatus('timelocked', A.lockDur, { stacks: 1 });
+      this.addFracture(A.pierceFrac);
+    }
     if (t.isAdd) t.rootT = Math.max(t.rootT || 0, A.root);
-    Particles.burst(t.hitPoint || t.pos, 40, 0xe6d4ff, 0x7a3cff, 7, 0.6, 0.2, 0, { intensity: 2.4 });
+    // everything else on the line from the throw to the target (and a little beyond) is skewered too
+    const tx = t.pos.x, tz = t.pos.z, dx = tx - fx, dz = tz - fz, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, reach = L + 6;
+    for (const a of Game.adds) {
+      if (a === t || !a.alive || a.targetable === false) continue;
+      const ax = a.pos.x - fx, az = a.pos.z - fz, along = ax * ux + az * uz;
+      if (along < 0 || along > reach) continue;
+      if (Math.abs(ax * uz - az * ux) <= A.pierceWidth + (a.radius || 0.5)) { dealDamage(a, A.pierceDmg, { kind: 'skill', source: 'Piercing Lance' }); a.rootT = Math.max(a.rootT || 0, A.root); }
+    }
+    // FX: a white-violet spear of light through the target, glass shards, a violet clock-ring on the floor
+    const yaw = Math.atan2(ux, uz), hp = t.hitPoint || t.pos;
+    Beams.flash(fx, 1.3, fz, yaw, reach, 0.9, 0xd8c8ff, 0.32);
+    Particles.burst(hp, 90, 0xf2ecff, 0x8a5cff, 9, 0.7, 0.22, -4, { spread: (t.radius || 1) * 0.7, intensity: 2.6 });
+    ShardFX.explode(hp, 14, 9, 0xd8c0ff, { spread: (t.radius || 1) * 0.6, scale: 0.4 });
+    GroundFX.ring(tx, tz, (t.radius || 1), (t.radius || 1) + 4, 0xb48cff, 0.5, 0.3, 3.0);
+    TimeFX.hitStop(0.05); CamRig.addTrauma(0.22); Post.kickCA(0.003);
+    if (locked) Stamp.show('TIME-LOCKED', 'violet');
+    sfx('interrupt');
+    Game.stats.pierces = (Game.stats.pierces || 0) + 1;
+    logEvent('pierce', { target: t.name || 'boss' });
   }
   rewardInterrupt(t) {
     const A = CONFIG.abilities.lance;
@@ -4111,6 +4235,7 @@ class Player {
       if (cd.dash.t <= 0) { cd.dash.charges++; cd.dash.t = cd.dash.charges < cd.dash.max ? CONFIG.abilities.dash.cd : 0; HUD.flashButton('dash'); }
     } else cd.dash.t = 0;
     if (this.iframeT > 0) this.iframeT -= dt;
+    if (this.recallInvT > 0) this.recallInvT -= dt;
     // fractures decay 8 s after the last Rend
     if (this.fractures > 0) { this.fractureT -= dt; Game.stats.fractureUptime += dt; if (this.fractureT <= 0) { this.fractures = 0; } }
     // echo
@@ -4832,6 +4957,7 @@ class BossEntity {
     if (this.hasStatus('harmonized')) m *= 1.2;
     if (this.hasStatus('overheat')) m *= 1.25;
     if (this.hasStatus('overexposed')) m *= 1.5;
+    if (this.hasStatus('timelocked')) m *= CONFIG.abilities.lance.lockMul;     // Piercing Lance
     return m;
   }
   get dmgDealtMul() { return 1 + CONFIG.boss.stokedMul * this.statusStacks('stoked'); }
@@ -4982,7 +5108,7 @@ const HUD = {
 
   init() {
     const ids = ['hud', 'bossbar', 'bb-name', 'bb-epithet', 'bb-frame', 'bb-chip', 'bb-fill', 'bb-ticks', 'bb-pct', 'bb-enrage', 'castbar', 'cb-fill', 'cb-name',
-      'cb-shards', 'playerpanel', 'statuses', 'hpbar', 'hp-chip', 'hp-fill', 'hp-shield', 'hp-text', 'fluxbar', 'flux-fill', 'hg-fill', 'pips', 'arrows', 'fpsbadge', 'abilities', 'joy-ghost', 'pausebtn'];
+      'cb-shards', 'playerpanel', 'statuses', 'hpbar', 'hp-chip', 'hp-fill', 'hp-heal', 'hp-shield', 'hp-text', 'fluxbar', 'flux-fill', 'hg-fill', 'pips', 'arrows', 'fpsbadge', 'abilities', 'joy-ghost', 'pausebtn'];
     for (const id of ids) this.el[id] = $(id);
     this.pips = Array.from(this.el.pips.querySelectorAll('i'));
     for (let i = 0; i < 8; i++) {
@@ -5064,6 +5190,7 @@ const HUD = {
       this.setScale(this.el['bb-chip'], 'bbc', this.bossChip);
       this.setText(this.el['bb-pct'], 'bbp', (Math.ceil(f * 1000) / 10).toFixed(1) + '%');
       this.setClass(this.el['bb-frame'], 'bbfr', 'shield', !!b.invuln);
+      this.setClass(this.el.bossbar, 'bbl', 'locked', !!(b.hasStatus && b.hasStatus('timelocked')));
       this.setClass(this.el['bb-frame'], 'bbfr', 'overheat', !!(b.hasStatus && (b.hasStatus('overheat') || b.hasStatus('overexposed'))));
       if (b.enrageAt > 0 && Game.diff.enrage) {
         const rem = b.enrageAt - Game.fightTime;
@@ -5089,6 +5216,12 @@ const HUD = {
       this.setScale(this.el['hp-fill'], 'hpf', f);
       this.setScale(this.el['hp-chip'], 'hpc', this.hpChip);
       this.setScale(this.el['hp-shield'], 'hps', p.shield / p.maxHp);
+      // green ghost: what your next Shatter would heal (only when Shatter is ready to use)
+      const ph = Math.min(1 - f, p.pendingShatterHeal() / p.maxHp), hq = ph > 0.002 ? Math.round(ph * 1000) : 0, hl = Math.round(f * 1000);
+      if (this.cache.hph !== hq || (hq && this.cache.hphl !== hl)) {
+        this.cache.hph = hq; this.cache.hphl = hl;
+        const e = this.el['hp-heal']; e.style.left = (hl / 10) + '%'; e.style.width = (hq / 10) + '%'; e.style.display = hq ? '' : 'none';
+      }
       this.setText(this.el['hp-text'], 'hpt', Math.ceil(p.hp) + (p.shield > 0 ? ' +' + Math.ceil(p.shield) : ''));
       this.setClass(this.el.hpbar, 'hpl', 'low', f < 0.3);
       this.setScale(this.el['flux-fill'], 'flx', p.flux / 100);
@@ -5176,10 +5309,20 @@ const HUD = {
     this.setBtn('shatter', cd.shatter.t / A.shatter.cd, cd.shatter.t, !canShatter || !act, canShatter && p.fractures >= 5 ? 'glow-gold' : null);
     this.setBtn('recall', cd.recall.t / A.recall.cd, cd.recall.t / rate, !p.echo.active || !act, null);
     const rs = this.btnState.recall; if (rs) this.setVar(rs.el, 'echoL', '--e', p.echo.active ? p.echo.life / p.echo.max : 0);
-    const lanceCd = p.talentB === 'borrowedPlus' ? CONFIG.talents[1][0].lanceCd : A.lance.cd;
-    let castInt = !!(b && b.cast && b.cast.interruptible);
-    if (!castInt && b && b.lanceGlow) castInt = !!b.lanceGlow();
-    this.setBtn('lance', cd.lance.t / lanceCd, cd.lance.t, !act, castInt && cd.lance.t <= 0 ? 'glow-violet' : null);
+    // Stasis Lance: the button says which throw you would make right now (INTERRUPT glows violet; PIERCE = the long-cooldown damage mode)
+    const lanceMax = p.lanceMax || p.lanceCd('interrupt'), lReady = cd.lance.t <= 0;
+    const castInt = p.lanceModeNow() === 'interrupt';
+    this.setBtn('lance', cd.lance.t / lanceMax, cd.lance.t, !act, castInt && lReady ? 'glow-violet' : null);
+    const ls = this.btnState.lance;
+    if (ls) {
+      if (!ls.tag) ls.tag = ls.el.querySelector('.tag');
+      const mode = !lReady || !act ? '' : castInt ? 'int' : 'pierce';
+      if (ls.mode !== mode) {
+        ls.mode = mode;
+        if (ls.tag) { ls.tag.className = 'tag ' + mode; ls.tag.textContent = mode === 'int' ? 'INTERRUPT' : mode === 'pierce' ? 'PIERCE · ' + Math.round(p.lanceCd('pierce')) + 's' : ''; }
+        ls.el.classList.toggle('mode-pierce', mode === 'pierce');
+      }
+    }
     const us = this.btnState.ult; if (us) this.setVar(us.el, 'ultG', '--g', p.hourglass / 100);
     this.setBtn('ult', 0, 0, p.hourglass < 100 || !act, p.hourglass >= 100 ? 'glow-gold' : null);
   },
@@ -5485,15 +5628,22 @@ const BossKit = {
     return hit;
   },
   /**
-   * Expanding shockwave ring hazard (the telegraph IS the ring). o: {x, z, speed(m/s)=10, width=1.2, maxR=22, dmg, source, color='red', onDone}
-   * One hit per ring (tickInterval 1 s), PD lookahead via ringWillHit. Returns the hazard.
+   * Expanding shockwave ring hazard (the telegraph IS the ring). o: {x, z, speed(m/s)=10, width=1.2, maxR=22, dmg, source, color='red', onDone,
+   *   gapDir? (world yaw of a safe NOTCH in the ring), gapDeg? (notch width), seq?/k? (a RingCue.sequence this is ring k of)}
+   * One hit per ring (tickInterval 1 s), PD lookahead via ringWillHit. A ring that belongs to a RingCue sequence gets the timing
+   * cue at the player's feet, its green gap lane, and the generous dash window (RingCue.onDash). Returns the hazard.
    */
   shockRing(o) {
     const sp = o.speed || 10, w = o.width || 1.2, maxR = o.maxR || 22;
-    return Hazards.spawn({ shape: 'donut', x: o.x, z: o.z, r: w, inner: 0, life: maxR / sp + 0.3, tickDmg: o.dmg, tickInterval: 1.0, color: o.color || 'red',
+    const gap = o.gapDir != null && o.gapDeg > 0;
+    const data = { speed: sp, gapDir: gap ? o.gapDir : null, gapHalf: gap ? o.gapDeg * DEG * 0.5 : 0 };
+    const h = Hazards.spawn({ shape: gap ? 'sector' : 'donut', x: o.x, z: o.z, r: w, inner: 0, angle: gap ? 360 - o.gapDeg : 90, rot: gap ? o.gapDir + Math.PI : 0,
+      life: maxR / sp + 0.3, tickDmg: o.dmg, tickInterval: 1.0, color: o.color || 'red',
       source: o.source || 'Shockwave', gentle: false, wide: true, fadeIn: 0.05, fadeOut: 0.2, avoidable: true, interior: 1.0,
-      data: { speed: sp }, willHit: ringWillHit, tag: o.tag,
+      data, willHit: ringWillHit, tag: o.tag,
       update: (h, dt) => { h.r += sp * dt; h.inner = Math.max(0, h.r - w); if (h.r >= maxR + w) { h.kill(); if (o.onDone) o.onDone(h); } if (o.update) o.update(h, dt); } });
+    if (h && o.seq) RingCue.attach(o.seq, o.k | 0, h);
+    return h;
   },
   /** rotating rect (beam / clock hand) hazard. o: {x,z,rot,angVel(rad/s),len,width,life,tickDmg,tickInterval,source,color,gentle,onUpdate} */
   rotatingRect(o) {
@@ -5523,6 +5673,190 @@ const BossKit = {
 };
 BossKit._shape = new AreaShape({ material: { uniforms: makeTelegraphMaterial().uniforms }, position: new THREE.Vector3(), rotation: new THREE.Euler() });
 BossKit._shape.refresh = () => {};
+
+// ---------------------------------------------------------------- RingCue: make shock rings readable and dodgeable
+/**
+ * A stomp's rings, planned up front so the player can read them before they exist:
+ *   seq = RingCue.sequence({x, z, maxR, speed, width, times:[s after now each ring spawns], gaps:[world yaw | null], gapDeg, grace})
+ *   then BossKit.shockRing({..., seq, k}) spawns ring k (at times[k]).
+ * What the player gets:
+ *   • GAP LANES — a green wedge on the floor for each ring's notch. Lane k is drawn only between ring k and the ring ahead of it,
+ *     so wherever you stand, the green you see is the gap of the NEXT ring to reach you (shown during the wind-up for ring 1).
+ *   • TIMING CIRCLE — at your feet: a cyan circle closes onto a fixed target ring as the next ring approaches; when they meet it
+ *     flashes white, a clock TICK plays and "DASH" appears. Standing inside a gap turns it green instead (no dash needed).
+ *   • DASH WINDOW — a Phase Step started up to `grace` s before a ring reaches you dodges that ring outright (whichever way you
+ *     dash) and counts as a Perfect Dodge (SLIPSTREAM: the charge comes back). Recall's rewind is untouchable too.
+ */
+const RingCue = {
+  seqs: [], meshA: null, meshT: null, el: null, _s: { x: 0, y: 0, z: 0 }, show: 0, state: '', lastTick: null,
+  LEAD: 1.5,         // s of warning the timing circle gives
+  WINDOW: 0.42,      // s before impact the circle reads DASH (inside the dash grace)
+  init() {
+    if (this.meshA) return;
+    const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
+    const mk = (col) => { const m = new THREE.Mesh(g, this.material(col)); m.renderOrder = 6; m.visible = false; m.frustumCulled = false; scene.add(m); return m; };
+    this.meshA = mk(0x7ff6ff); this.meshT = mk(0xdffcff);
+    this.el = document.createElement('div'); this.el.id = 'ringcue'; this.el.innerHTML = '<b></b><small></small>';
+    document.body.appendChild(this.el);
+  },
+  /** ground ring whose glow fades to zero inside its quad (the shared ground-ring material leaves a faint square edge on bright floors) */
+  material(col) {
+    return new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color(col) }, uR: { value: 1 }, uW: { value: 0.12 }, uAlpha: { value: 1 }, uIntensity: { value: 2 }, uFill: { value: 0 } },
+      vertexShader: BASIC_UV_VS,
+      fragmentShader: /* glsl */`
+        uniform vec3 uColor; uniform float uR, uW, uAlpha, uIntensity, uFill; varying vec2 vUv;
+        void main(){
+          float r = length((vUv - 0.5) * 2.0) * 1.25;            // 1.0 = the ring (plane is 2.5 × uR wide)
+          float dm = abs(r - 1.0) * uR;                           // metres from the ring line
+          float ring = 1.0 - smoothstep(uW * 0.5, uW * 0.5 + 0.03, dm);
+          float edge = 1.0 - smoothstep(1.05, 1.22, r);
+          float glow = exp(-dm * 5.0) * 0.3 * edge;
+          float fill = uFill * (1.0 - smoothstep(0.9, 1.0, r)) * 0.18;
+          gl_FragColor = vec4(uColor * uIntensity * (ring + glow + fill) * uAlpha, 1.0);
+        }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
+    });
+  },
+  sequence(o) {
+    const n = o.times.length, seq = { x: o.x, z: o.z, maxR: o.maxR, speed: o.speed, width: o.width || 1.2, t0: Game.time, times: o.times.slice(),
+      gaps: o.gaps || [], gapHalf: (o.gapDeg || 0) * DEG * 0.5, grace: o.grace != null ? o.grace : 0.5, n,
+      rings: new Array(n).fill(null), datas: new Array(n).fill(null), spawnedAt: new Array(n).fill(-1), dodged: new Array(n).fill(false),
+      passed: new Array(n).fill(false), lanes: [], dead: false };
+    for (let k = 0; k < n; k++) {
+      const gd = seq.gaps[k]; if (gd == null) continue;
+      const lane = Hazards.spawn({ shape: 'sector', x: seq.x, z: seq.z, r: 0.1, inner: 0, angle: o.gapDeg, rot: gd, life: Infinity, tickDmg: 0, color: 'green',
+        source: 'Gap', gentle: true, wide: true, fadeIn: 0.25, fadeOut: 0.25, interior: 0.35, tag: o.tag,
+        update: (h) => this.laneShape(seq, k, h) });
+      if (lane) { lane.data = { seq, k }; seq.lanes.push(lane); this.laneShape(seq, k, lane); }
+    }
+    this.seqs.push(seq);
+    return seq;
+  },
+  /** is ring k of seq alive right now (and not a recycled hazard)? */
+  ringOf(seq, k) { const h = seq.rings[k]; return h && h.active && !h.dying && h.data === seq.datas[k] ? h : null; },
+  laneShape(seq, k, h) {
+    const ring = this.ringOf(seq, k), spawned = seq.spawnedAt[k] >= 0;
+    if (spawned && !ring) { h.kill(); return; }
+    let outer;
+    if (k === 0) outer = seq.maxR;
+    else { const prev = this.ringOf(seq, k - 1); outer = prev ? prev.inner : (seq.spawnedAt[k - 1] >= 0 ? seq.maxR : 0); }
+    const inner = ring ? ring.r : 0;
+    h.inner = inner; h.r = Math.max(inner + 0.01, outer);
+    h.mesh.visible = outer - inner > 0.3;
+  },
+  attach(seq, k, h) {
+    seq.rings[k] = h; seq.datas[k] = h.data; seq.spawnedAt[k] = Game.time;
+    if (seq.dodged[k]) h.lockT = 99;            // already dodged by a dash that started before it spawned
+  },
+  /** absolute sim time ring k's leading edge reaches (px,pz); null if it has passed / will never come */
+  arrival(seq, k, px, pz) {
+    const d = Math.hypot(px - seq.x, pz - seq.z);
+    if (seq.spawnedAt[k] >= 0) {
+      const h = this.ringOf(seq, k); if (!h) return null;
+      if (h.inner > d + 0.25) return null;
+      return Game.time + Math.max(0, d - h.r) / seq.speed;
+    }
+    return seq.t0 + seq.times[k] + Math.max(0, d - seq.width) / seq.speed;
+  },
+  inGap(seq, k, px, pz) {
+    const gd = seq.gaps[k]; if (gd == null) return false;
+    const dx = px - seq.x, dz = pz - seq.z, d = Math.hypot(dx, dz);
+    const margin = (CONFIG.player.radius * 0.6 + CONFIG.telegraph.pad) / Math.max(d, 0.5);
+    return Math.abs(angDiff(Math.atan2(dx, dz), gd)) < seq.gapHalf - margin;
+  },
+  /** called by Player.startDash: every ring about to reach the dash's start point is dodged outright */
+  onDash(p) {
+    const now = Game.time, x = p.dashFrom.x, z = p.dashFrom.z;
+    for (const seq of this.seqs) {
+      if (seq.dead) continue;
+      for (let k = 0; k < seq.n; k++) {
+        if (seq.dodged[k]) continue;
+        const at = this.arrival(seq, k, x, z); if (at == null) continue;
+        if (at - now <= seq.grace) {
+          seq.dodged[k] = true;
+          const h = this.ringOf(seq, k); if (h) h.lockT = 99;
+          p.grantPerfectDodge('ring');
+        }
+      }
+    }
+  },
+  update() {
+    const now = Game.time;
+    for (let i = this.seqs.length - 1; i >= 0; i--) {
+      const seq = this.seqs[i];
+      let live = false;
+      for (let k = 0; k < seq.n; k++) {
+        if (seq.spawnedAt[k] < 0) { if (now < seq.t0 + seq.times[k] + 0.35) live = true; }      // a ring that never spawned (transition, death) ends the sequence
+        else if (this.ringOf(seq, k)) live = true;
+      }
+      if (!live || Game.state !== 'fight') { seq.dead = true; for (const l of seq.lanes) if (l.active && l.data && l.data.seq === seq) l.kill(); this.seqs.splice(i, 1); }
+    }
+    // a ring that just swept over you while you stood in its gap: a soft chime + green "GAP" (feedback that walking works)
+    const p = Game.player; if (!p || !p.alive) return;
+    for (const seq of this.seqs) for (let k = 0; k < seq.n; k++) {
+      if (seq.passed[k] || seq.spawnedAt[k] < 0) continue;
+      const h = this.ringOf(seq, k), d = Math.hypot(p.pos.x - seq.x, p.pos.z - seq.z);
+      if (h && h.inner > d) {
+        seq.passed[k] = true;
+        if (!seq.dodged[k] && this.inGap(seq, k, p.pos.x, p.pos.z)) { DmgNumbers.spawn(p.hitPointV(), 'GAP', 'heal'); sfx('ringSafe'); }
+      }
+    }
+  },
+  /** render-frame visuals: the timing circle + DASH label at the player's feet */
+  sync(dt) {
+    if (!this.meshA && !this.seqs.length) return;
+    this.init();
+    const p = Game.player, now = Game.time;
+    let best = null, bk = -1, bt = 1e9;
+    if (p && p.alive && Game.state === 'fight' && !CamRig.rail) {
+      for (const seq of this.seqs) for (let k = 0; k < seq.n; k++) {
+        if (seq.dodged[k]) continue;
+        const at = this.arrival(seq, k, p.pos.x, p.pos.z);
+        if (at != null && at - now < bt) { bt = at - now; best = seq; bk = k; }
+      }
+    }
+    const on = best && bt < this.LEAD;
+    this.show = damp(this.show, on ? 1 : 0, on ? 14 : 8, dt);
+    const A = this.meshA, T = this.meshT;
+    if (this.show < 0.02) { A.visible = T.visible = false; this.setLabel(''); this.lastTick = null; return; }
+    A.visible = T.visible = true;
+    const x = p.vis.x, z = p.vis.z;
+    const safe = on && this.inGap(best, bk, p.pos.x, p.pos.z);
+    const tta = on ? Math.max(0, bt) : 0, now2 = on && tta <= this.WINDOW;
+    const r0 = 0.95, rA = safe ? r0 : r0 + 2.6 * clamp01((tta - this.WINDOW * 0.5) / (this.LEAD - this.WINDOW * 0.5));
+    const uA = A.material.uniforms, uT = T.material.uniforms;
+    A.position.set(x, 0.06, z); A.scale.set(rA * 2.5, 1, rA * 2.5); uA.uR.value = rA; uA.uW.value = now2 ? 0.2 : 0.12;
+    T.position.set(x, 0.055, z); T.scale.set(r0 * 2.5, 1, r0 * 2.5); uT.uR.value = r0; uT.uW.value = 0.06;
+    const flash = now2 ? 0.75 + 0.25 * Math.sin(Game.realTime * 40) : 1;
+    if (safe) { uA.uColor.value.setRGB(0.35, 1, 0.6); uT.uColor.value.setRGB(0.35, 1, 0.6); }
+    else if (now2) { uA.uColor.value.setRGB(1, 1, 1); uT.uColor.value.setRGB(1, 1, 1); }
+    else { uA.uColor.value.setRGB(0.5, 0.96, 1); uT.uColor.value.setRGB(0.85, 0.98, 1); }
+    uA.uIntensity.value = (now2 ? 2.8 : safe ? 1.6 : 2.2) * flash * this.show; uA.uAlpha.value = 1; uA.uFill.value = now2 ? 0.5 : 0;
+    uT.uIntensity.value = (now2 ? 2.0 : 1.1) * this.show; uT.uAlpha.value = 1;
+    // DASH tick: once per ring, as it enters the window
+    if (on && now2 && !safe) {
+      const key = best.t0 + ':' + bk;
+      if (this.lastTick !== key) { this.lastTick = key; sfx('ringTick', { k: bk }); haptic(12); }
+    }
+    this.setLabel(!on ? '' : safe ? 'gap' : now2 ? 'dash' : '');
+    if (this.state && worldToScreen(_v4.set(x, 0, z), this._s)) this.el.style.transform = 'translate3d(' + this._s.x.toFixed(0) + 'px,' + (this._s.y + 34).toFixed(0) + 'px,0) translate(-50%,0)';
+  },
+  setLabel(st) {
+    if (st === this.state || !this.el) return;
+    this.state = st;
+    this.el.className = st ? 'on ' + st : '';
+    this.el.firstChild.textContent = st === 'dash' ? 'DASH' : st === 'gap' ? 'SAFE' : '';
+    this.el.lastChild.textContent = st === 'dash' && !Input.lastTouch ? 'SPACE' : '';
+  },
+  reset() {
+    for (const seq of this.seqs) seq.dead = true;
+    this.seqs.length = 0; this.show = 0; this.lastTick = null;
+    if (this.meshA) { this.meshA.visible = this.meshT.visible = false; }
+    this.setLabel('');
+  },
+};
 
 // ---------------------------------------------------------------- PoseRig
 /**
@@ -6019,7 +6353,13 @@ Object.assign(CONFIG.bosses[0], {
     cinderlings: { first: 4, every: 30, count: 3, hp: 800, speed: 1.7, size: 1.2 },   // QA: spec 2000 HP @ 2.2 m/s was unkillable solo (+30% STOKED every wave, unavoidable); they are also priority targets now
     inOut: { first: 9, every: 12, windup: 2.0, dmg: 450, ringInner: 6, eruptR: 7 },
     palm: { first: 5, every: 16, windup: 2.4, dmg: 600, trauma: 0.6 },
-    stomp: { first: 13, every: 16, count: 3, gap: 0.8, tell: 1.0, speed: 10, width: 1.2, dmg: 250 },
+    // SHOCKWAVE STOMP (playtest: "could never get past the expanding rings"). Was 3 rings 0.8 s apart at 10 m/s for 250, with
+    // 2 dash charges and a 1 s tell. Now every ring has a safe GAP (green lane on the floor), a timing circle + tick at your feet,
+    // and a 0.5 s dash window (RingCue). It escalates each time she uses it in a fight (Heroic starts one step in).
+    stomp: { first: 13, every: 16, tell: 1.6, width: 1.2, dmg: 180, gapDeg: 60, grace: 0.5,
+      waves: [ { count: 2, gap: 1.4, speed: 7, step: 0 },        // 1st: two slow rings, one shared gap
+               { count: 3, gap: 1.15, speed: 8, step: 0 },       // 2nd: three rings, one shared gap
+               { count: 3, gap: 1.0, speed: 9, step: 26 } ] },   // 3rd+: the gap walks 26° per ring: follow it, or dash
     p3IntervalMul: 0.85,
     overheat: { at: 0.10, dur: 6 },
     meltdown: { dur: 6, dps: 2000 },
@@ -6032,7 +6372,7 @@ Object.assign(HINTS, {
   'Forge Ring': 'Red donut: the safe spot is right beside Pyrrha.',
   'Eruption': 'Red circle around Pyrrha: get out, then come back.',
   "Titan's Palm": 'Cross the centre line to the safe half, or dash through on the last beat.',
-  'Shockwave Stomp': 'Rings cannot be outrun. Phase Step THROUGH each ring as it reaches you.',
+  'Shockwave Stomp': 'Each ring has a gap: stand in the green lane. Or Phase Step when the circle at your feet closes and ticks (any direction works).',
   'Meltdown': 'The forge melts at 3:45. Burst harder: Grand Shatters, Zero Hour, and Cinderlings detonated beside her.',
 });
 
@@ -7462,27 +7802,38 @@ class Pyrrha extends Boss {
     return 0;
   }
 
-  /** SHOCKWAVE STOMP (P3): three stomps 0.8 s apart; each ring expands at 10 m/s and cannot be outrun */
+  /** SHOCKWAVE STOMP (P3): 2–3 stomps; each ring expands from her and cannot be outrun — but it has a GAP (green lane on the floor),
+   *  and a timing circle at your feet closes + ticks when a dash would clear it. Escalates per use: see CONFIG mech.stomp.waves. */
   ab_stomp() {
     const S = this.M.stomp, x = this.pos.x, z = this.pos.z, off = Math.hypot(x, z);
-    Banner.show('SHOCKWAVE STOMP', 'Dash through the rings');
-    if (!Save.seenHint('stompHint')) Hint.show('Rings cannot be outrun: Phase Step THROUGH each ring as it reaches you.', 4.5);
+    const use = this.stompN | 0; this.stompN = use + 1;
+    const W = S.waves[Math.min(S.waves.length - 1, use + (this.heroic ? 1 : 0))];
+    const spd = W.speed * (this.story ? 0.85 : 1), maxR = this.arena.radius + off + 1;
+    // the gap opens beside you, never on you: a short walk sideways (first time: a very short one)
+    const p = Game.player, side = rand() < 0.5 ? -1 : 1;
+    const bearing = p ? Math.atan2(p.pos.x - x, p.pos.z - z) : rand() * TAU;
+    const g0 = bearing + side * (use === 0 ? randRange(28, 40) : randRange(40, 65)) * DEG;
+    const t0 = S.tell * this.windupMul, times = [], gaps = [];
+    for (let i = 0; i < W.count; i++) { times.push(t0 + i * W.gap); gaps.push(g0 + side * i * W.step * DEG); }
+    const seq = RingCue.sequence({ x, z, maxR, speed: spd, width: S.width, times, gaps, gapDeg: S.gapDeg, grace: S.grace });
+    Banner.show('SHOCKWAVE STOMP', W.step ? 'The gap moves: follow the green' : 'Stand in the green gap, or dash on the tick');
+    if (use === 0) Hint.show('RINGS: walk into the green gap — or Phase Step when the circle at your feet closes (you hear a tick).', 6, 'stompHint2');
+    else if (W.step && !this.hintStep) { this.hintStep = true; Hint.show('The gap shifts with every ring now: follow the green lane, or dash each tick.', 4.5, 'stompHint3'); }
     this.pose('stompUp', 7);
-    this.startCast('Shockwave Stomp', S.tell, { stingF: 147 });
+    this.startCast(W.count === 2 ? 'Shockwave Stomp ×2' : 'Shockwave Stomp ×3', S.tell, { stingF: 147 });
     Telegraphs.spawn({ shape: 'circle', x, z, r: 3, windup: S.tell, color: 'red', dmg: 0, sfx: null, noFlash: false });
-    const t0 = S.tell * this.windupMul;
-    for (let i = 0; i < S.count; i++) {
-      this.after(t0 + i * S.gap, () => {
+    for (let i = 0; i < W.count; i++) {
+      this.after(times[i], () => {
         this.pose('stompDown', 26);
         sfx('slam'); CamRig.addTrauma(0.3); Post.kickBloom(0.15, 0.2);
         Particles.burst(_v1.set(x, 0.3, z), 60, 0xffd0a0, PYR_DARK, 9, 0.7, 0.4, -12, { flat: true, intensity: 2 });
-        Particles.ring(_v1.set(x, 0, z), 1.0, 110, 0xffc070, 0xff2a04, S.speed, 2.3, 0.35, { up: 0.6, drag: 0, intensity: 2.2 });
-        BossKit.shockRing({ x, z, speed: S.speed, width: S.width, maxR: this.arena.radius + off + 1, dmg: S.dmg, source: 'Shockwave Stomp' });
-        if (i < S.count - 1) this.after(0.32, () => this.pose('stompUp', 14));
+        Particles.ring(_v1.set(x, 0, z), 1.0, 110, 0xffc070, 0xff2a04, spd, maxR / spd, 0.35, { up: 0.6, drag: 0, intensity: 2.2, gapDir: gaps[i], gapHalf: S.gapDeg * DEG * 0.5 });
+        BossKit.shockRing({ x, z, speed: spd, width: S.width, maxR, dmg: S.dmg, source: 'Shockwave Stomp', gapDir: gaps[i], gapDeg: S.gapDeg, seq, k: i });
+        if (i < W.count - 1) this.after(Math.min(0.32, W.gap * 0.4), () => this.pose('stompUp', 14));
         else this.after(0.5, () => this.pose('idle', 4));
       });
     }
-    return t0 + (S.count - 1) * S.gap + 0.7;
+    return t0 + (W.count - 1) * W.gap + 0.7;
   }
 
   /** OVERHEAT at 10%: the core goes white and she takes +25% damage for 6 s */
@@ -11467,7 +11818,7 @@ class Auren extends Boss {
       <div style="font-size:13px;letter-spacing:.4em;opacity:.7;margin-bottom:10px">THIS RUN · ${Game.diff.label}</div>
       ${row('Auren defeated in', fmtTime(t))}${row('Damage dealt', Math.round(S.damageDealt).toLocaleString())}${row('Damage taken', Math.round(S.damageTaken).toLocaleString())}
       ${row('Perfect Dodges', S.perfectDodges)}${row('Interrupts', S.interrupts + ' / ' + S.interruptChances)}${row('Grand Shatters', S.grandShatters)}
-      ${row('Zero Hours', S.zeroHours)}${row('Healing from Recall', Math.round(S.recallHealing))}${row('Mechanics failed', S.mechanicsFailed)}
+      ${row('Zero Hours', S.zeroHours)}${row('Healing from Shatter', Math.round(S.shatterHealing))}${row('Mechanics failed', S.mechanicsFailed)}
       <div style="height:44px"></div>
       <div style="font-size:13px;letter-spacing:.4em;opacity:.7;margin-bottom:10px">THE THREE THRONES · BEST TIMES</div>
       ${row('Pyrrha, the Forge-Warden', bt(0))}${row('Nerith, the Drowned Choir', bt(1))}${row('Auren, the Unwound Hour', bt(2) === '—' ? fmtTime(t) : bt(2))}
@@ -12717,20 +13068,24 @@ class TrainingDummy extends BossEntity {
     return 2.8;
   }
   ab_tremor() {
-    Banner.show('TREMOR', 'Dash through the rings');
+    // teaches Pyrrha's Shockwave Stomp: 3 slow rings sharing one gap (green lane), with the RingCue timing circle at your feet
+    Banner.show('TREMOR', 'Stand in the green gap, or dash on the tick');
+    if (!Save.seenHint('tremorHint2')) Hint.show('Rings: walk into the green gap, or Phase Step when the circle at your feet closes and ticks.', 5, null, this, 'Tremor');
     this.pose('slam');
-    const cx = this.pos.x, cz = this.pos.z;
+    const cx = this.pos.x, cz = this.pos.z, w = Game.diff.windup, p = Game.player;
+    const gd = (p ? Math.atan2(p.pos.x - cx, p.pos.z - cz) : 0) + (rand() < 0.5 ? -1 : 1) * randRange(30, 50) * DEG;
+    const times = [1.0 * w, 1.0 * w + 1.2, 1.0 * w + 2.4], gaps = [gd, gd, gd];
+    const seq = RingCue.sequence({ x: cx, z: cz, maxR: 23, speed: 8, width: 1.2, times, gaps, gapDeg: 60, grace: 0.5 });
     Telegraphs.spawn({ shape: 'circle', x: cx, z: cz, r: 3, windup: 1.0, color: 'red', dmg: 0, silent: false, sfx: null });
     for (let i = 0; i < 3; i++) {
-      Timers.after(1.0 * Game.diff.windup + i * 0.8, () => {
+      Timers.after(times[i], () => {
+        if (!this.alive || Game.boss !== this) return;
         this.slamFx(cx, cz, 0.5);
-        Hazards.spawn({ shape: 'donut', x: cx, z: cz, r: 1.2, inner: 0.0, life: 2.4, tickDmg: 250, tickInterval: 1.0, color: 'red', source: 'Tremor', gentle: false, wide: true, fadeIn: 0.05,
-          data: { speed: 10 }, willHit: ringWillHit,
-          update: (h, dt) => { h.r += 10 * dt; h.inner = Math.max(0, h.r - 1.2); if (h.r > 23) h.kill(); } });
+        BossKit.shockRing({ x: cx, z: cz, speed: 8, width: 1.2, maxR: 23, dmg: 150, source: 'Tremor', gapDir: gaps[i], gapDeg: 60, seq, k: i });
       });
     }
     this.startCast('Tremor', 1.0, {});
-    return 3.6;
+    return 4.4;
   }
   ab_gaze() {
     Banner.show('SUNDIAL GAZE', 'Leave the violet circle', { cls: 'violet' });
@@ -12907,7 +13262,7 @@ Object.assign(Game, {
   /** reset every pooled system (no allocation) */
   resetWorld() {
     TimeFX.clear(); Timers.clear();
-    Telegraphs.reset(); Hazards.reset(); Projectiles.reset(); Adds.reset();
+    Telegraphs.reset(); Hazards.reset(); RingCue.reset(); Projectiles.reset(); Adds.reset();
     Particles.clear(); Shards.clear(); Rubble.clear(); GroundFX.clear(); SlashFX.clear(); Beams.clear(); DmgNumbers.clear(); PointLights.reset();
     Post.setDesatHold(0); Post.desatPulseT = 0; Post.whiteout = 0; Post.lensStr = 0; Post.zoomBlur = 0; Post.sepia = 0; Post.tunnel = 0; Post.haze = 0; Post.hurt = 0;
     GLOBAL_U.uStreak.value = 0;
@@ -13087,7 +13442,7 @@ Object.assign(Game, {
     row('Interrupts', S.interrupts + ' / ' + S.interruptChances);
     row('Grand Shatters', S.grandShatters + '');
     row('Fracture uptime', Math.round(100 * S.fractureUptime / Math.max(1, t)) + '%');
-    row('Healing from Recall', Math.round(S.recallHealing) + '');
+    row('Healing from Shatter', Math.round(S.shatterHealing) + '');
     $('vic-title').textContent = boss ? boss.name + ' FALLS' : 'VICTORY';
     $('vic-rank').textContent = rank;
     Timers.after(0.4, () => { $('victory').classList.remove('hidden'); HUD.show(false); Hint.hide(); }, { real: true });
@@ -13214,6 +13569,7 @@ function simStep(dt) {
     Projectiles.update(dt);
     Telegraphs.update(dt);
     Hazards.update(dt);
+    RingCue.update(dt);
   }
   if (Game.arena && Game.arena.update) Game.arena.update(dt);
   if (Game.encounter && Game.encounter.update && Game.state !== 'title') Game.encounter.update(dt);
@@ -13236,6 +13592,7 @@ function renderFrame(rdt, alpha, sdt, noDraw) {
   Projectiles.syncVisual(alpha);
   Shards.update(sdt); Rubble.update(sdt);
   GroundFX.update(sdt); SlashFX.update(sdt); Beams.update(sdt);
+  RingCue.sync(rdt);
   if (!Game.paused) CamRig.update(rdt);
   PointLights.update(rdt);
   Particles.flush(Game.time + simAcc);
@@ -13350,7 +13707,7 @@ const __raid = window.__raid = {
   game: Game,
   config: CONFIG,
   /** module internals for tests / console poking */
-  get api() { return { THREE, Telegraphs, Hazards, Particles, ShardFX, GroundFX, SlashFX, CamRig, TimeFX, Post, Quality, Banner, Stamp, Hint, PhaseTitle, dealDamage, Audio, Adds, Projectiles, Input, HUD, scene, camera, renderer }; },
+  get api() { return { THREE, Telegraphs, Hazards, RingCue, Particles, ShardFX, GroundFX, SlashFX, CamRig, TimeFX, Post, Quality, Banner, Stamp, Hint, PhaseTitle, dealDamage, Audio, Adds, Projectiles, Input, HUD, scene, camera, renderer }; },
   /** training dummy: force its next ability ('cleave','hail','line','toll','sanctum','chime','quarters','pulse','tremor','severance','gaze','adds') */
   forceAbility(name) { const b = Game.boss; if (b && b['ab_' + name]) { b.forceNext = name; b.nextT = 0; } },
   pause(on) { if (on !== Game.paused) Game.togglePause(on); },
