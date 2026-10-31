@@ -1,0 +1,493 @@
+<!-- ================================================================
+     00_ui.html: HUD, menus, run screens, touch controls.
+     Gold on black with the court's accent; blood-red for the player.
+     ================================================================ -->
+<style>
+:root{
+  --gold:#ffd36b; --goldHot:#fff3cf; --goldDeep:#a8741f; --ink:#0d0a14; --void:#06040a; --blood:#c8322e;
+  --accent:#ff7a2a; --purple:#c070ff; --safe:#4fa8ff;
+  --serif:"Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --panel:rgba(14,8,16,.88); --line:rgba(255,211,107,.42); --s:1;
+}
+#ui{position:fixed;inset:0;pointer-events:none;z-index:10;font-family:var(--serif);color:#f1e7d2;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#ui *{box-sizing:border-box}
+#ui .hidden{display:none!important}
+#ui button{font-family:var(--serif);color:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.eng{background:linear-gradient(180deg,#fff7d8 0%,#ffd77a 38%,#b37a24 52%,#e9b553 64%,#fff0bd 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ------------------------------------------------------------ HUD */
+#hud{position:absolute;inset:0;opacity:0;transition:opacity .5s}
+#hud.on{opacity:1}
+#runStrip{position:absolute;left:calc(var(--sal) + 14px);top:calc(var(--sat) + 10px);font:600 13px var(--sans);letter-spacing:.1em;color:#f6e7bd;text-shadow:0 0 8px rgba(0,0,0,.9),0 0 2px #000;line-height:1.5}
+#runStrip .court{font:700 12px var(--serif);letter-spacing:.34em;color:var(--gold)}
+#runStrip .t{font-variant-numeric:tabular-nums}
+#runStrip .d{color:#ff9a8a;margin-left:10px}
+#runStrip .ed{display:flex;gap:4px;flex-wrap:wrap;max-width:180px;margin-top:3px}
+#runStrip .ed i{font-style:normal;width:20px;height:20px;border-radius:3px;border:1px solid rgba(255,211,107,.5);background:rgba(10,6,12,.7);display:flex;align-items:center;justify-content:center;font-size:12px;color:#ffe9b0}
+#runStrip .ed i.rare{border-color:#9fe8ff;color:#cff4ff}#runStrip .ed i.epic{border-color:#e0b0ff;color:#f0d8ff;box-shadow:0 0 6px rgba(200,140,255,.5)}
+
+#bossFrame{position:absolute;left:50%;top:calc(var(--sat) + 8px);transform:translateX(-50%);width:min(560px,64vw);text-align:center}
+#bossName{display:flex;justify-content:center;align-items:baseline;gap:10px;padding:0 4px 3px;white-space:nowrap;overflow:hidden}
+#bossName .n{font-size:16px;letter-spacing:.32em;font-weight:700;padding-left:.32em}
+#bossName .t{font-size:12px;font-style:italic;letter-spacing:.06em;color:#d8c79a;opacity:.85}
+.bar{position:relative;height:13px;border-radius:2px;background:rgba(6,4,10,.82);overflow:hidden;
+  box-shadow:0 0 0 1px rgba(255,211,107,.55),0 0 0 3px rgba(6,4,10,.75),0 0 0 4px rgba(255,211,107,.22),0 4px 16px rgba(0,0,0,.6)}
+.bar .fill,.bar .chunk{position:absolute;left:0;top:0;bottom:0;width:100%;transform-origin:0 50%}
+.bar .chunk{background:rgba(255,246,220,.75)}
+#bossFill{background:linear-gradient(180deg,rgba(255,255,255,.45),transparent 45%),linear-gradient(90deg,color-mix(in srgb,var(--accent) 60%,#1a0a0a),var(--accent));box-shadow:0 0 14px color-mix(in srgb,var(--accent) 70%,transparent)}
+#bossBar .ticks{position:absolute;inset:0}
+#bossBar .tick{position:absolute;top:-1px;bottom:-1px;width:2px;margin-left:-1px;background:#05030c;box-shadow:0 0 0 1px rgba(255,211,107,.7)}
+#bossBar .tick::after{content:"";position:absolute;left:-3px;top:-5px;border:4px solid transparent;border-top-color:var(--gold)}
+#bossBar .pct{position:absolute;right:6px;top:0;line-height:13px;font:600 10px var(--sans);color:#fff;text-shadow:0 0 3px #000,0 0 2px #000;letter-spacing:.05em}
+#bossBar.exposed #bossFill{filter:brightness(1.5) saturate(.5)}
+#bossBar.immune{opacity:.75}
+#castWrap{width:min(340px,60vw);margin:9px auto 0;opacity:0;transition:opacity .2s;position:relative}
+#castWrap.on{opacity:1}
+#castName{font-size:12.5px;letter-spacing:.28em;font-variant:small-caps;color:#fff3d6;text-shadow:0 0 6px #000,0 0 10px rgba(0,0,0,.8);margin-bottom:4px;padding-left:.28em}
+#castWrap .bar{height:8px}
+#castFill{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 50%,#223),var(--accent))}
+#castWrap.int .bar{box-shadow:0 0 0 1.5px #e9c0ff,0 0 0 3px rgba(6,4,10,.75),0 0 0 4px rgba(192,112,255,.6),0 0 18px rgba(192,112,255,.55)}
+#castWrap.int #castFill{background:linear-gradient(90deg,#4a1a7a,#c070ff,#f3dcff)}
+#castWrap .hint{display:none;font:700 10px var(--sans);letter-spacing:.3em;color:#f3dcff;margin-top:4px;text-shadow:0 0 8px rgba(192,112,255,.9),0 0 2px #000}
+#castWrap.int .hint{display:block;animation:gpulse .55s ease-in-out infinite alternate}
+@keyframes gpulse{from{opacity:.55}to{opacity:1}}
+
+#topRight{position:absolute;right:calc(var(--sar) + 10px);top:calc(var(--sat) + 8px);display:flex;gap:8px;pointer-events:auto}
+.icoBtn{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:rgba(10,6,12,.62);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;
+  box-shadow:inset 0 0 0 3px rgba(6,4,10,.6),inset 0 0 0 4px rgba(255,211,107,.15);touch-action:none}
+.icoBtn svg{width:18px;height:18px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round}
+.icoBtn:active{transform:scale(.92)}
+
+#chips{position:absolute;left:50%;transform:translateX(-50%);top:calc(var(--sat) + 70px);display:flex;gap:6px;justify-content:center;white-space:nowrap;max-width:calc(100vw - 24px);flex-wrap:wrap}
+#chips.cast{top:calc(var(--sat) + 118px)}
+.chip{font:700 10px var(--sans);letter-spacing:.24em;padding:4px 9px 4px 11px;border-radius:2px;color:#1a1204;background:linear-gradient(180deg,#fff1c2,#e0a83e);
+  box-shadow:0 0 12px rgba(255,211,107,.75),0 0 0 1px #5a3a08;opacity:0;transform:translateY(-4px) scale(.9);transition:opacity .15s,transform .15s}
+.chip:not(.on){position:absolute;visibility:hidden}
+.chip.on{opacity:1;transform:none}
+#chipExposed{background:linear-gradient(180deg,#fff,#d8b0ff);color:#2a0c3a;box-shadow:0 0 12px rgba(200,140,255,.8),0 0 0 1px #3a2a6a}
+#chipBurn{background:linear-gradient(180deg,#ffe0c0,#ff7a2a);color:#3a1204}
+#chipStag{background:linear-gradient(180deg,#fff,var(--accent));color:#04121a}
+#chipRites{background:linear-gradient(180deg,#fff,#ffb0a0);color:#3a0c0c}
+
+#phaseBanner{position:absolute;left:0;right:0;top:30%;text-align:center;opacity:0;transform:scale(1.06);transition:opacity .5s,transform 2.6s cubic-bezier(.2,.7,.2,1)}
+#phaseBanner.on{opacity:1;transform:scale(1)}
+#phaseBanner .k{font-size:13px;letter-spacing:.7em;padding-left:.7em;color:#e8d6a6;text-shadow:0 0 10px #000}
+#phaseBanner .n{font-size:clamp(30px,6.5vw,60px);letter-spacing:.24em;padding-left:.24em;font-weight:700;filter:drop-shadow(0 0 16px rgba(255,211,107,.45)) drop-shadow(0 2px 2px #000)}
+#phaseBanner .rule{width:min(380px,60vw);height:1px;margin:10px auto;background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+#say{position:absolute;left:50%;transform:translateX(-50%);top:calc(var(--sat) + 96px);width:min(560px,90vw);text-align:center;font-size:14px;font-style:italic;
+  letter-spacing:.04em;color:#f8ecc8;text-shadow:0 0 6px #000,0 0 12px #000,0 0 2px #000;opacity:0;transition:opacity .3s}
+#say.on{opacity:1}
+#deathNote{position:absolute;left:50%;top:40%;transform:translateX(-50%);font:italic 15px var(--serif);color:#ffb3a0;text-shadow:0 0 8px #000;opacity:0;transition:opacity .4s;text-align:center}
+#deathNote.on{opacity:1}
+
+#playerFrame{position:absolute;left:calc(var(--sal) + 14px);bottom:calc(var(--sab) + 14px);width:min(300px,30vw)}
+#playerFrame .row{display:flex;justify-content:space-between;align-items:baseline;font:600 10px var(--sans);letter-spacing:.2em;color:#e9d9ad;padding:0 2px 3px;text-shadow:0 0 4px #000}
+#playerFrame .row b{font:700 12px var(--sans);letter-spacing:.04em;color:#fff4d4}
+#hpBar{height:12px}
+#hpFill{background:linear-gradient(180deg,rgba(255,255,255,.4),transparent 50%),linear-gradient(90deg,#8a1a1a,#e04a3a 70%,#ff9a7a);box-shadow:0 0 12px rgba(255,90,60,.6)}
+#hpBar.low #hpFill{animation:gpulse .4s infinite alternate}
+#hpBar .shield{position:absolute;inset:0;border-radius:2px;box-shadow:inset 0 0 0 2px var(--goldHot),0 0 14px rgba(255,211,107,.9);opacity:0;transition:opacity .15s}
+#hpBar.shield .shield{opacity:1}
+#hpBar.hit{animation:hitShake .3s}
+@keyframes hitShake{0%,100%{transform:none}25%{transform:translateX(-3px)}75%{transform:translateX(3px)}}
+#ultBar{height:6px;margin-top:6px}
+#ultFill{background:linear-gradient(90deg,#5a3a0a,#ffd36b 60%,#fff)}
+#ultBar.full{box-shadow:0 0 0 1px #fff,0 0 0 3px rgba(6,4,10,.75),0 0 16px rgba(255,230,170,.9)}
+#ultBar.full #ultFill{animation:gpulse .4s infinite alternate}
+#playerFrame .nlab{text-align:center;font:700 9px var(--sans);letter-spacing:.34em;color:#ffe9b0;margin-top:3px;height:11px;text-shadow:0 0 4px #000}
+
+#keyHints{position:absolute;right:calc(var(--sar) + 14px);bottom:calc(var(--sab) + 112px);font:11px var(--sans);letter-spacing:.06em;color:#d9c89c;line-height:1.85;text-shadow:0 0 4px #000;text-align:right}
+#keyHints kbd{display:inline-block;min-width:20px;padding:0 5px;margin-right:2px;border-radius:3px;border:1px solid rgba(255,211,107,.5);background:rgba(10,6,12,.7);font:700 10px var(--sans);color:#ffe9b0;text-align:center}
+body.touch #keyHints{display:none}
+#practiceHelp{position:absolute;left:calc(var(--sal) + 14px);top:calc(var(--sat) + 46px);width:250px;font:12px var(--sans);color:#e8dab6;line-height:1.55;
+  background:rgba(10,6,12,.7);border:1px solid var(--line);padding:9px 12px;border-radius:3px;display:none;pointer-events:auto}
+#practiceHelp h4{margin:0 0 4px;font:700 12px var(--serif);letter-spacing:.3em;color:var(--gold)}
+#practiceHelp .dps{font:700 13px var(--sans);color:#fff3d0;margin-top:5px}
+#practiceHelp .x{float:right;cursor:pointer;color:var(--gold);font:700 14px var(--sans);margin:-4px -4px 0 0;padding:2px 6px}
+#hud.practice #practiceHelp{display:block}
+#hud.practice #practiceHelp.min{width:auto}
+#hud.practice #practiceHelp.min .body{display:none}
+body.touch #practiceHelp{width:200px;font-size:11px}
+
+/* --------------------------------------------------- skill bar + touch controls */
+#controls{position:absolute;inset:0;opacity:0;transition:opacity .4s;pointer-events:none}
+#controls.on{opacity:1}
+#controls.on .skill,#controls.on #stickZone{pointer-events:auto}
+#controls.on.cine{opacity:.32}
+#hud.cine #keyHints,#hud.cine #chips{opacity:0}
+.skill{position:absolute;touch-action:none;-webkit-user-select:none;user-select:none;cursor:pointer;border:0;padding:0;background:none}
+.plate{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 35%,rgba(90,30,40,.75),rgba(12,6,12,.85) 70%);
+  box-shadow:0 0 0 1.5px rgba(255,211,107,.65),0 0 0 4px rgba(6,4,10,.6),0 0 0 5px rgba(255,211,107,.22),0 6px 18px rgba(0,0,0,.55),inset 0 0 14px rgba(255,211,107,.12)}
+.skill.down .plate{box-shadow:0 0 0 2px var(--goldHot),0 0 0 4px rgba(6,4,10,.6),0 0 0 5px rgba(255,211,107,.5),0 0 22px rgba(255,211,107,.6),inset 0 0 18px rgba(255,211,107,.35)}
+.skill.down{transform:scale(.93)}
+.skill svg.ic{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);overflow:visible;width:52%;height:52%}
+.ic *{vector-effect:non-scaling-stroke}
+.skill{width:calc(var(--sz)*var(--s));height:calc(var(--sz)*var(--s));right:calc(var(--sar) + var(--rx)*var(--s));bottom:calc(var(--sab) + var(--by)*var(--s))}
+#sDash{--sz:84px;--rx:20px;--by:22px}
+#sBulwark{--sz:66px;--rx:120px;--by:16px}
+#sRebuke{--sz:66px;--rx:112px;--by:98px}
+#sMend{--sz:60px;--rx:40px;--by:126px}
+#sVerdict{--sz:64px;--rx:190px;--by:92px}
+.skill .cd{position:absolute;inset:0;border-radius:50%;background:conic-gradient(rgba(4,3,8,.78) calc(var(--cd,0)*360deg),transparent 0);pointer-events:none}
+.skill .cdt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 calc(15px*var(--s)) var(--sans);color:#fff4d4;text-shadow:0 0 4px #000,0 0 2px #000;pointer-events:none}
+.skill .key{position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);font:700 9px var(--sans);color:#1a1204;background:var(--gold);border-radius:3px;padding:1px 4px;box-shadow:0 0 0 1px #5a3a08;white-space:nowrap}
+body.touch .skill .key{display:none}
+.skill .nm{display:none}
+.skill .pips{position:absolute;top:9%;left:0;right:0;display:flex;justify-content:center;gap:4px;pointer-events:none}
+.skill .pips i{width:7px;height:7px;transform:rotate(45deg);background:rgba(255,211,107,.18);box-shadow:0 0 0 1px rgba(255,211,107,.6)}
+.skill .pips i.on{background:var(--goldHot);box-shadow:0 0 6px var(--gold),0 0 0 1px #5a3a08}
+.skill.cool svg.ic{opacity:.45}
+.skill.ready-flash .plate{animation:readyF .5s}
+@keyframes readyF{0%{box-shadow:0 0 0 2px #fff,0 0 30px #ffd36b}}
+#sBulwark .hold{position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(var(--goldHot) calc(var(--h,0)*360deg),transparent 0);
+  -webkit-mask:radial-gradient(circle,transparent 62%,#000 64%);mask:radial-gradient(circle,transparent 62%,#000 64%);opacity:0;pointer-events:none}
+#sBulwark.up .hold{opacity:1}
+#sBulwark .mult{position:absolute;left:50%;top:-16px;transform:translateX(-50%);font:700 10px var(--sans);color:#fff3cf;text-shadow:0 0 6px #000;white-space:nowrap;display:none}
+#sBulwark.up .mult{display:block}
+#sVerdict{opacity:.55}
+#sVerdict.ready{opacity:1;animation:ultP 1s ease-in-out infinite}
+#sVerdict.ready .plate{background:radial-gradient(circle at 50% 40%,rgba(255,246,220,.55),rgba(200,120,40,.6) 55%,rgba(30,8,10,.9))}
+@keyframes ultP{0%,100%{filter:drop-shadow(0 0 4px rgba(255,230,170,.6))}50%{filter:drop-shadow(0 0 18px rgba(255,240,200,1))}}
+#sVerdict .cd{background:conic-gradient(transparent calc(var(--m,0)*360deg),rgba(4,3,8,.72) 0)}
+#sRebuke.int .plate{box-shadow:0 0 0 2px #f3dcff,0 0 0 4px rgba(6,4,10,.6),0 0 0 5px rgba(192,112,255,.6),0 0 22px rgba(192,112,255,.8);animation:gpulse .4s infinite alternate}
+/* joystick */
+#stickZone{position:absolute;left:0;top:30%;bottom:0;width:50%;touch-action:none;display:none}
+body.touch #stickZone{display:block}
+#stick{position:absolute;width:calc(120px*var(--s));height:calc(120px*var(--s));border-radius:50%;border:1.5px solid rgba(255,211,107,.5);background:rgba(10,6,12,.45);left:calc(var(--sal) + 26px);bottom:calc(var(--sab) + 26px);opacity:.55;pointer-events:none;transition:opacity .2s}
+#stick.on{opacity:.95}
+#stick .knob{position:absolute;left:50%;top:50%;width:46%;height:46%;border-radius:50%;background:radial-gradient(circle at 50% 35%,#ffe9b0,#a8741f);box-shadow:0 0 14px rgba(255,211,107,.6);transform:translate(-50%,-50%)}
+/* desktop: one skill row with key hints */
+body:not(.touch) .skill{--s:.78}
+body:not(.touch) #sMend{--sz:60px;--rx:360px;--by:24px}
+body:not(.touch) #sBulwark{--sz:66px;--rx:274px;--by:22px}
+body:not(.touch) #sRebuke{--sz:66px;--rx:190px;--by:22px}
+body:not(.touch) #sVerdict{--sz:64px;--rx:106px;--by:22px}
+body:not(.touch) #sDash{--sz:74px;--rx:20px;--by:22px}
+body:not(.touch) #sBulwark .mult{top:-30px}
+body:not(.touch) .skill .nm{display:block;position:absolute;left:50%;top:-15px;transform:translateX(-50%);font:700 8px var(--sans);letter-spacing:.2em;color:#d9c89c;white-space:nowrap;text-shadow:0 0 3px #000}
+body:not(.touch) #controls{left:auto;right:calc(var(--sar) + 110px);width:420px;top:auto;height:120px;bottom:0}
+body:not(.touch) #controls.on .skill{pointer-events:auto}
+
+@media (orientation:portrait){
+  body.touch #playerFrame{left:calc(var(--sal) + 12px);bottom:calc(var(--sab) + 176px * var(--s) + 14px);width:min(300px,56vw)}
+  body.touch #bossFrame{left:calc(var(--sal) + 10px);right:calc(var(--sar) + 112px);width:auto;transform:none;top:calc(var(--sat) + 6px)}
+  body.touch #bossName{justify-content:flex-start;gap:7px}
+  body.touch #bossName .n{font-size:13px;letter-spacing:.22em;padding-left:0}
+  body.touch #bossName .t{font-size:10.5px}
+  body.touch #runStrip{left:auto;right:calc(var(--sar) + 14px);top:calc(var(--sat) + 58px);font-size:11px;text-align:right}
+  body.touch #runStrip .ed{justify-content:flex-end}
+  body.touch #castWrap{width:100%}
+  body.touch #chips,body.touch #chips.cast{top:auto;bottom:calc(var(--sab) + 176px * var(--s) + 74px);flex-wrap:nowrap;gap:4px}
+  body.touch .chip{font-size:8.5px;letter-spacing:.12em;padding:3px 6px 3px 7px}
+  body.touch #say{top:auto;bottom:calc(var(--sab) + 176px * var(--s) + 106px);font-size:13px}
+  body.touch #practiceHelp{top:calc(var(--sat) + 74px)}
+  body.touch #phaseBanner{top:calc(var(--sat) + 76px)}
+  body.touch #phaseBanner .n{font-size:clamp(26px,8vw,40px)}
+  body.touch #stickZone{top:40%}
+}
+@media (orientation:landscape){
+  #chips,#chips.cast{left:auto;right:calc(var(--sar) + 14px);top:calc(var(--sat) + 62px);transform:none;flex-direction:column;align-items:flex-end;flex-wrap:nowrap;max-width:none}
+  #say{left:calc(var(--sal) + 14px);transform:none;top:auto;bottom:calc(var(--sab) + 96px);width:min(300px,26vw);text-align:left}
+  body.touch #say{bottom:calc(var(--sab) + 150px * var(--s))}
+  body.touch #playerFrame{left:calc(var(--sal) + 150px);bottom:calc(var(--sab) + 8px);width:min(230px,26vw)}
+}
+@media (orientation:landscape) and (max-height:500px){
+  body.touch #bossFrame{transform:none;left:calc(50% - min(210px,25vw));width:min(420px,50vw)}
+  body.touch #castWrap{position:fixed;right:calc(var(--sar) + 12px);top:calc(var(--sat) + 58px);width:min(220px,24vw);margin:0}
+  body.touch #castName{text-align:right;letter-spacing:.16em;padding-left:0;font-size:11px}
+  body.touch #castWrap .hint{text-align:right;letter-spacing:.18em}
+  body.touch #chips,body.touch #chips.cast{top:calc(var(--sat) + 112px)}
+  body.touch .chip{font-size:9px;letter-spacing:.16em;padding:3px 7px 3px 8px}
+  #bossName .n{font-size:13px}#bossName .t{font-size:10.5px}
+  #phaseBanner{top:24%}
+  #say{font-size:12.5px}
+  #castWrap{margin-top:6px}
+  body.touch{--s:.86}
+  body.touch #runStrip{font-size:11px}
+}
+
+/* ------------------------------------------------------------ screens */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:auto;text-align:center;
+  padding:calc(var(--sat) + 14px) calc(var(--sar) + 14px) calc(var(--sab) + 14px) calc(var(--sal) + 14px);opacity:1;transition:opacity .45s}
+.screen.fade{opacity:0;pointer-events:none}
+.veil{background:radial-gradient(ellipse at 50% 45%,rgba(10,6,12,.35),rgba(3,2,6,.82) 75%)}
+.veil2{background:rgba(3,2,6,.62);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.panel{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:22px 26px;width:min(460px,92vw);max-height:calc(100% - 10px);overflow:auto;
+  box-shadow:inset 0 0 0 4px rgba(6,4,10,.8),inset 0 0 0 5px rgba(255,211,107,.18),0 0 60px rgba(0,0,0,.7);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.panel::before,.panel::after{content:"";position:absolute;width:9px;height:9px;transform:rotate(45deg);background:var(--gold);box-shadow:0 0 8px var(--gold);top:-5px;left:calc(50% - 4.5px)}
+.panel::after{top:auto;bottom:-5px}
+.panel h2{margin:0 0 4px;font-weight:700;letter-spacing:.38em;padding-left:.38em;font-size:20px}
+.panel .sub{font-style:italic;color:#cdb98a;font-size:13px;margin-bottom:14px}
+.rule{height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:12px auto;width:80%}
+.btn{pointer-events:auto;position:relative;min-width:180px;padding:11px 22px;border:1px solid rgba(255,211,107,.6);border-radius:2px;cursor:pointer;
+  background:linear-gradient(180deg,rgba(110,30,40,.55),rgba(20,8,12,.85));color:#ffe9b0;font-size:14px;letter-spacing:.3em;padding-left:calc(22px + .3em);
+  box-shadow:inset 0 0 0 3px rgba(6,4,10,.7),inset 0 0 0 4px rgba(255,211,107,.14),0 4px 14px rgba(0,0,0,.5);text-shadow:0 0 8px rgba(255,211,107,.45);transition:transform .08s,box-shadow .2s,background .2s}
+.btn:hover,.btn:focus-visible{background:linear-gradient(180deg,rgba(160,40,50,.65),rgba(30,10,16,.9));box-shadow:inset 0 0 0 3px rgba(6,4,10,.7),inset 0 0 0 4px rgba(255,211,107,.3),0 0 18px rgba(255,211,107,.25);outline:none}
+.btn:active{transform:scale(.97)}
+.btn.primary{border-color:var(--goldHot);font-size:16px;color:#fff3d0}
+.btn.small{min-width:0;padding:8px 14px;padding-left:calc(14px + .3em);font-size:12px}
+.btn[disabled]{opacity:.4;pointer-events:none}
+.btnCol{display:flex;flex-direction:column;gap:10px;align-items:center}
+.btnRow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+
+/* title */
+#scrTitle{background:radial-gradient(ellipse at 50% 46%,rgba(10,6,12,.05),rgba(3,2,6,.7) 78%)}
+#logo{position:relative;margin:0;font-size:clamp(40px,11vw,110px);font-weight:700;letter-spacing:.26em;padding-left:.26em;line-height:1;
+  filter:drop-shadow(0 0 22px rgba(255,190,80,.45)) drop-shadow(0 2px 1px rgba(0,0,0,.9))}
+#logoSub{position:relative;margin-top:12px;font-size:clamp(11px,2.2vw,16px);letter-spacing:.62em;padding-left:.62em;color:#e2cf9c;text-shadow:0 0 8px #000}
+#titleBtns{position:relative;margin-top:4vh}
+#titleFoot{position:absolute;bottom:calc(var(--sab) + 10px);left:0;right:0;font:11px var(--sans);color:#a99a78;letter-spacing:.12em}
+#fsTop{position:absolute;right:calc(var(--sar) + 10px);top:calc(var(--sat) + 10px);pointer-events:auto;z-index:3}
+#fsHint{position:absolute;right:calc(var(--sar) + 10px);top:calc(var(--sat) + 58px);max-width:250px;font:12px var(--sans);background:var(--panel);border:1px solid var(--line);padding:8px 11px;border-radius:3px;color:#f2e2b8;opacity:0;transition:opacity .3s;pointer-events:none;z-index:30}
+#fsHint.on{opacity:1}
+
+/* court select + draft cards */
+#cards,#draftCards{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:10px 0 18px;max-width:980px}
+.card{position:relative;width:min(250px,86vw);padding:16px 16px 14px;text-align:left;cursor:pointer;border:1px solid rgba(255,211,107,.45);border-radius:3px;
+  background:linear-gradient(170deg,rgba(70,22,36,.85),rgba(10,6,12,.92));box-shadow:inset 0 0 0 4px rgba(6,4,10,.75),inset 0 0 0 5px rgba(255,211,107,.14),0 8px 26px rgba(0,0,0,.6);transition:transform .15s,box-shadow .2s;--c:var(--gold)}
+.card:hover,.card:focus-visible{transform:translateY(-3px);box-shadow:inset 0 0 0 4px rgba(6,4,10,.75),inset 0 0 0 5px color-mix(in srgb,var(--c) 50%,transparent),0 0 26px color-mix(in srgb,var(--c) 35%,transparent);outline:none}
+.card.locked{opacity:.45;cursor:default}
+.card .num{font:700 11px var(--sans);letter-spacing:.3em;color:#c9b27a}
+.card .nm{font-size:21px;font-weight:700;letter-spacing:.2em;margin-top:6px}
+.card .ti{font-style:italic;color:#d8c79a;font-size:13px;margin-top:2px}
+.card .sw{display:flex;align-items:center;gap:8px;margin-top:12px;font:11px var(--sans);color:#bfb08a;letter-spacing:.1em}
+.card .sw i{width:26px;height:6px;background:var(--c);box-shadow:0 0 10px var(--c);border-radius:1px}
+.card .best{margin-top:10px;font:12px var(--sans);color:#f0dfb0;letter-spacing:.06em;min-height:16px}
+.card .clr{position:absolute;right:12px;top:12px;font:700 9px var(--sans);letter-spacing:.24em;color:#1a1204;background:linear-gradient(180deg,#fff1c2,#e0a83e);padding:3px 7px;border-radius:2px;display:none}
+.card.cleared .clr{display:block}
+.edict{width:min(230px,86vw);min-height:150px}
+.edict .ic{font-size:30px;line-height:1;color:var(--c);text-shadow:0 0 14px color-mix(in srgb,var(--c) 70%,transparent)}
+.edict .nm{font-size:18px;margin-top:8px;letter-spacing:.14em}
+.edict .rar{font:700 9px var(--sans);letter-spacing:.3em;margin-top:3px;color:#c9b27a}
+.edict.rare{--c:#9fe8ff}.edict.epic{--c:#e0b0ff}
+.edict .ds{font:12px/1.45 var(--sans);color:#e6d8b6;margin-top:10px}
+@media (max-height:560px){ #cards .card{padding:10px 12px;width:min(250px,30vw)} .card .nm{font-size:17px} .card .sw{margin-top:6px} .edict{min-height:0} }
+
+/* how to play */
+#howGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;width:min(940px,94vw);max-height:calc(100vh - 160px);overflow:auto;padding:4px;text-align:left;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.how{background:rgba(14,8,16,.9);border:1px solid rgba(255,211,107,.35);border-radius:3px;padding:10px 12px;box-shadow:inset 0 0 0 3px rgba(6,4,10,.7)}
+.how h4{margin:0 0 4px;font-size:13px;letter-spacing:.26em;color:var(--gold)}
+.how h4 kbd{float:right;font:700 9px var(--sans);letter-spacing:.06em;color:#1a1204;background:var(--gold);padding:1px 5px;border-radius:2px}
+.how p{margin:0;font:12px/1.45 var(--sans);color:#e6d8b6}
+.how .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;box-shadow:0 0 8px currentColor}
+
+/* settings */
+.setRow{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:10px 0;font-size:13px;letter-spacing:.14em;text-align:left}
+.setRow input[type=range]{width:150px;accent-color:#ffd36b}
+.seg{display:flex;border:1px solid rgba(255,211,107,.5);border-radius:2px;overflow:hidden}
+.seg button{background:transparent;border:0;color:#e2cf9c;padding:6px 9px;font:600 11px var(--sans);letter-spacing:.06em;cursor:pointer}
+#ui .seg button.on{background:linear-gradient(180deg,#fff1c2,#e0a83e);color:#1a1204}
+.tog{width:46px;height:24px;border-radius:12px;border:1px solid rgba(255,211,107,.6);background:rgba(6,4,10,.8);position:relative;cursor:pointer;padding:0}
+.tog::after{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#7a6a50;transition:left .15s,background .15s}
+.tog.on::after{left:25px;background:var(--gold);box-shadow:0 0 8px var(--gold)}
+
+/* court card (intro) */
+#scrIntro{pointer-events:auto;background:radial-gradient(ellipse at 50% 50%,rgba(3,2,6,.25),rgba(3,2,6,.6))}
+#scrIntro .k{font:700 11px var(--sans);letter-spacing:.6em;padding-left:.6em;color:#cdb98a}
+#scrIntro .n{font-size:clamp(40px,10vw,96px);font-weight:700;letter-spacing:.3em;padding-left:.3em;line-height:1.05;margin-top:8px;filter:drop-shadow(0 0 24px color-mix(in srgb,var(--accent) 55%,transparent)) drop-shadow(0 2px 1px #000)}
+#scrIntro .t{font-size:clamp(14px,2.8vw,22px);font-style:italic;letter-spacing:.2em;color:#f0e2bc;margin-top:8px;text-shadow:0 0 10px #000}
+#scrIntro .q{font-size:clamp(13px,2vw,17px);font-style:italic;color:#d9c89c;margin-top:16px;line-height:1.6;max-width:min(560px,86vw);text-shadow:0 0 8px #000}
+#scrIntro .rule{background:linear-gradient(90deg,transparent,var(--accent),transparent);width:min(520px,70vw)}
+#scrIntro .skip{position:absolute;bottom:calc(var(--sab) + 18px);left:0;right:0;font:11px var(--sans);letter-spacing:.3em;color:#a99a78}
+#scrIntro .in{animation:introIn 1.2s cubic-bezier(.2,.7,.2,1) both}
+@keyframes introIn{from{opacity:0;letter-spacing:.7em;filter:blur(8px)}to{opacity:1}}
+#beginFlash{position:absolute;left:0;right:0;top:40%;text-align:center;font-size:clamp(26px,6vw,52px);letter-spacing:.6em;padding-left:.6em;font-weight:700;opacity:0;pointer-events:none;transition:opacity .25s}
+#beginFlash.on{opacity:1}
+
+/* results / defeat */
+#scrDefeat h2{color:#ffb3a0}
+.grade{font-size:84px;font-weight:700;line-height:1;margin:6px 0;filter:drop-shadow(0 0 22px rgba(255,211,107,.6))}
+.resGrid{display:grid;grid-template-columns:1fr auto;gap:4px 18px;font:13px var(--sans);text-align:left;margin:10px auto;max-width:330px;color:#eadcb5}
+.resGrid b{font-weight:700;color:#fff3d0;text-align:right;font-variant-numeric:tabular-nums}
+.bk{margin:10px auto 4px;max-width:330px;text-align:left}
+.bk .r{display:grid;grid-template-columns:82px 1fr 52px;align-items:center;gap:8px;font:11px var(--sans);color:#d9c89c;margin:3px 0;letter-spacing:.06em}
+.bk .r i{height:6px;background:linear-gradient(90deg,#a8741f,#ffd36b);box-shadow:0 0 6px rgba(255,211,107,.5);border-radius:1px}
+.bk .r b{text-align:right;color:#fff3d0;font-variant-numeric:tabular-nums}
+.newBest{font:700 11px var(--sans);letter-spacing:.3em;color:#1a1204;background:linear-gradient(180deg,#fff1c2,#e0a83e);display:inline-block;padding:3px 8px;margin-top:4px;border-radius:2px}
+.edList{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:8px 0}
+.edList i{font-style:normal;font:12px var(--sans);padding:3px 8px;border:1px solid rgba(255,211,107,.5);border-radius:3px;color:#ffe9b0}
+#toast{position:absolute;left:50%;top:22%;transform:translate(-50%,-50%);padding:9px 18px;background:var(--panel);border:1px solid var(--line);border-radius:3px;font-size:14px;letter-spacing:.06em;opacity:0;transition:opacity .3s;max-width:88vw;text-align:center;z-index:40}
+#toast.on{opacity:1}
+@media (max-height:500px){ .panel{padding:14px 18px} .btnCol{gap:7px} .btn{padding:8px 18px;padding-left:calc(18px + .3em)} .grade{font-size:56px} .resGrid{font-size:12px} #titleBtns{margin-top:2vh} }
+</style>
+
+<div id="ui">
+  <!-- ------------------------------------------------ HUD -->
+  <div id="hud">
+    <div id="runStrip"><div class="court" id="rsCourt">COURT I</div><div><span class="t" id="rsTime">0:00</span><span class="d" id="rsDeaths"></span></div><div class="ed" id="rsEdicts"></div></div>
+    <div id="bossFrame">
+      <div id="bossName"><span class="n eng" id="bossNameN">BOSS</span><span class="t" id="bossNameT"></span></div>
+      <div class="bar" id="bossBar"><div class="chunk" id="bossChunk"></div><div class="fill" id="bossFill"></div><div class="ticks" id="bossTicks"></div><span class="pct" id="bossPct">100%</span></div>
+      <div id="castWrap"><div id="castName">Cast</div><div class="bar"><div class="fill" id="castFill"></div></div><div class="hint">REBUKE TO INTERRUPT</div></div>
+    </div>
+    <div id="chips"><span class="chip" id="chipExposed">EXPOSED</span><span class="chip" id="chipRip">RIPOSTE x3.0</span><span class="chip" id="chipBurn">BURNING</span><span class="chip" id="chipStag">STAGGERED</span><span class="chip" id="chipRites">LAST RITES SPENT</span></div>
+    <div id="say"></div>
+    <div id="deathNote"></div>
+    <div id="phaseBanner"><div class="k" id="phaseK">PHASE II</div><div class="rule"></div><div class="n eng" id="phaseN">Dusk</div></div>
+    <div id="beginFlash" class="eng">BEGIN</div>
+    <div id="playerFrame">
+      <div class="row"><span>THE REGICIDE</span><b id="hpText">100</b></div>
+      <div class="bar" id="hpBar"><div class="chunk" id="hpChunk"></div><div class="fill" id="hpFill"></div><div class="shield"></div></div>
+      <div class="bar" id="ultBar"><div class="fill" id="ultFill"></div></div>
+      <div class="nlab" id="ultLab">VERDICT 0%</div>
+    </div>
+    <div id="keyHints"><div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</div><div><kbd>Space</kbd> Dash &nbsp;<kbd>Q</kbd> hold Bulwark</div><div><kbd>E</kbd> Rebuke &nbsp;<kbd>F</kbd> Mend &nbsp;<kbd>R</kbd> Verdict</div></div>
+    <div id="practiceHelp"><span class="x" id="practiceX">–</span><h4>THE YARD</h4><div class="body">The Effigy cannot die and you cannot either. Every shape of the five courts, one at a time, with a hint. Rend is automatic in range.<div class="keys">Hold <b>Q</b> through a hit, then let go for a Riposte. <b>E</b> on a purple cast.</div></div>
+      <div class="dps" id="practiceDps">DPS 0</div></div>
+    <div id="topRight">
+      <button class="icoBtn" id="btnFs" aria-label="Fullscreen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+      <button class="icoBtn" id="btnPause" aria-label="Pause"><svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg></button>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------ controls -->
+  <div id="controls">
+    <div id="stickZone"><div id="stick"><div class="knob"></div></div></div>
+    <button class="skill" id="sMend" data-btn="mend" aria-label="Mend"><span class="plate"></span><span class="cd"></span>
+      <svg class="ic" viewBox="-12 -12 24 24"><path d="M0 -8v16M-8 0h16" fill="none" stroke="#5cff9a" stroke-width="3.2" stroke-linecap="round"/></svg>
+      <span class="pips"><i></i><i></i><i></i></span><span class="cdt"></span><span class="key">F</span><span class="nm">MEND</span></button>
+    <button class="skill" id="sBulwark" data-btn="bulwark" aria-label="Bulwark (hold)"><span class="plate"></span><span class="cd"></span><span class="hold"></span>
+      <svg class="ic" viewBox="-12 -12 24 24"><path d="M0 -9 L8 -6 V1 C8 5 4 8 0 10 C-4 8 -8 5 -8 1 V-6 Z" fill="rgba(255,211,107,.15)" stroke="#ffd36b" stroke-width="2.4" stroke-linejoin="round"/><path d="M0 -4v8" stroke="#fff3cf" stroke-width="2"/></svg>
+      <span class="cdt"></span><span class="mult">x3.0</span><span class="key">Q hold</span><span class="nm">BULWARK</span></button>
+    <button class="skill" id="sRebuke" data-btn="rebuke" aria-label="Rebuke"><span class="plate"></span><span class="cd"></span>
+      <svg class="ic" viewBox="-12 -12 24 24"><path d="M-9 8 L-2 -8 L5 8" fill="none" stroke="#c070ff" stroke-width="2.6" stroke-linejoin="round"/><path d="M-6 3 H2 M-7.5 6 H4" stroke="#f3dcff" stroke-width="1.8" stroke-linecap="round"/><path d="M6 -6 L10 -9 M7 0 L11 -1" stroke="#f3dcff" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="cdt"></span><span class="key">E</span><span class="nm">REBUKE</span></button>
+    <button class="skill" id="sVerdict" data-btn="verdict" aria-label="Verdict"><span class="plate"></span><span class="cd"></span>
+      <svg class="ic" viewBox="-12 -12 24 24"><path d="M0 -10 L2.5 -2 L10 -1 L4 4 L6 11 L0 7 L-6 11 L-4 4 L-10 -1 L-2.5 -2 Z" fill="rgba(255,243,207,.2)" stroke="#fff3cf" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span class="cdt"></span><span class="key">R</span><span class="nm">VERDICT</span></button>
+    <button class="skill" id="sDash" data-btn="dash" aria-label="Dash"><span class="plate"></span><span class="cd"></span>
+      <svg class="ic" viewBox="-12 -12 24 24"><path d="M-9 0 H6 M1 -6 L8 0 L1 6" fill="none" stroke="#ffd36b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M-9 -5 H-3 M-9 5 H-3" stroke="#ffd36b" stroke-width="2" stroke-linecap="round" opacity=".6"/></svg>
+      <span class="pips"><i></i><i></i><i></i></span><span class="cdt"></span><span class="key">Space</span><span class="nm">DASH</span></button>
+  </div>
+
+  <!-- ------------------------------------------------ title -->
+  <div id="scrTitle" class="screen hidden">
+    <h1 id="logo" class="eng">REGICIDE</h1>
+    <div id="logoSub">FIVE COURTS. ONE CROWN.</div>
+    <div id="titleBtns" class="btnCol">
+      <button class="btn primary" id="bNewRun">NEW RUN</button>
+      <button class="btn" id="bContinue">CONTINUE RUN</button>
+      <button class="btn" id="bSelect">COURT SELECT</button>
+      <button class="btn" id="bPractice">THE YARD</button>
+      <button class="btn" id="bHow">HOW TO PLAY</button>
+      <button class="btn" id="bSettings">SETTINGS</button>
+    </div>
+    <div id="titleFoot">Five bosses &middot; draft an Edict after each &middot; keyboard first</div>
+  </div>
+  <button class="icoBtn hidden" id="fsTop" aria-label="Fullscreen"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  <div id="fsHint">Use Share &rsaquo; Add to Home Screen for full screen</div>
+
+  <!-- ------------------------------------------------ court select -->
+  <div id="scrSelect" class="screen veil hidden">
+    <h2 class="eng" style="letter-spacing:.4em;padding-left:.4em">COURT SELECT</h2>
+    <div class="sub" id="selSub">Fight one court with the Edicts of your saved run.</div>
+    <div id="cards"></div>
+    <div class="btnRow"><button class="btn small" id="bSelBack">BACK</button></div>
+  </div>
+
+  <!-- ------------------------------------------------ how to play -->
+  <div id="scrHow" class="screen veil hidden">
+    <h2 class="eng" style="letter-spacing:.4em;padding-left:.4em">HOW TO PLAY</h2>
+    <div id="howGrid"></div>
+    <div class="btnRow" style="margin-top:12px"><button class="btn small" id="bHowBack">BACK</button></div>
+  </div>
+
+  <!-- ------------------------------------------------ settings -->
+  <div id="scrSettings" class="screen veil2 hidden">
+    <div class="panel">
+      <h2 class="eng">SETTINGS</h2>
+      <div class="rule"></div>
+      <div class="setRow"><span>MASTER</span><input type="range" min="0" max="1" step="0.05" id="setMaster"></div>
+      <div class="setRow"><span>MUSIC</span><input type="range" min="0" max="1" step="0.05" id="setMusic"></div>
+      <div class="setRow"><span>EFFECTS</span><input type="range" min="0" max="1" step="0.05" id="setSfx"></div>
+      <div class="setRow"><span>QUALITY</span><div class="seg" id="setQuality"><button data-v="auto">AUTO</button><button data-v="high">HIGH</button><button data-v="med">MED</button><button data-v="low">LOW</button></div></div>
+      <div class="setRow"><span>SCREEN SHAKE</span><button class="tog" id="setShake" aria-label="Screen shake"></button></div>
+      <div class="setRow"><span>DAMAGE NUMBERS</span><button class="tog" id="setNumbers" aria-label="Damage numbers"></button></div>
+      <div class="setRow"><span>HAPTICS</span><button class="tog" id="setHaptics" aria-label="Haptics"></button></div>
+      <div class="rule"></div>
+      <button class="btn small" id="bSetBack">DONE</button>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------ pause -->
+  <div id="scrPause" class="screen veil2 hidden">
+    <div class="panel">
+      <h2 class="eng">PAUSED</h2>
+      <div class="sub" id="pauseSub"></div>
+      <div class="btnCol">
+        <button class="btn primary" id="bResume">RESUME</button>
+        <button class="btn" id="bPRetry">RETRY PHASE</button>
+        <button class="btn" id="bPRestart">RESTART COURT</button>
+        <button class="btn" id="bPSettings">SETTINGS</button>
+        <button class="btn" id="bPFs">FULLSCREEN</button>
+        <button class="btn" id="bPQuit">QUIT TO MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------ court card (intro) -->
+  <div id="scrIntro" class="screen hidden">
+    <div class="k in" id="introK">COURT I &middot; THE COURT OF ASH</div>
+    <div class="n eng in" id="introN">VARRAK</div>
+    <div class="rule in"></div>
+    <div class="t in" id="introT">the Hearth Knight</div>
+    <div class="q in" id="introQ"></div>
+    <div class="skip">PRESS ANY KEY OR TAP TO BEGIN</div>
+  </div>
+
+  <!-- ------------------------------------------------ draft -->
+  <div id="scrDraft" class="screen veil hidden">
+    <h2 class="eng" style="letter-spacing:.4em;padding-left:.4em">CHOOSE AN EDICT</h2>
+    <div class="sub" id="draftSub">The court is yours. Take one decree with you.</div>
+    <div id="draftCards"></div>
+  </div>
+
+  <!-- ------------------------------------------------ defeat -->
+  <div id="scrDefeat" class="screen veil2 hidden">
+    <div class="panel">
+      <h2 class="eng">FALLEN</h2>
+      <div class="sub" id="defSub"></div>
+      <div class="resGrid" id="defGrid"></div>
+      <div class="btnCol">
+        <button class="btn primary" id="bRetryPhase">RETRY PHASE</button>
+        <button class="btn" id="bRetryCourt">RETRY COURT</button>
+        <button class="btn" id="bDefMenu">ABANDON</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------ victory (court) -->
+  <div id="scrVictory" class="screen veil2 hidden">
+    <div class="panel">
+      <h2 class="eng" id="vicH">COURT CLEARED</h2>
+      <div class="sub" id="vicSub"></div>
+      <div class="grade eng" id="vicGrade">S</div>
+      <div class="resGrid" id="vicGrid"></div>
+      <div class="bk" id="vicBk"></div>
+      <div id="vicBest"></div>
+      <div class="btnCol" style="margin-top:12px">
+        <button class="btn primary" id="bVicNext">CONTINUE</button>
+        <button class="btn" id="bVicMenu">MENU</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------ run results -->
+  <div id="scrResults" class="screen veil2 hidden">
+    <div class="panel">
+      <h2 class="eng">THE CROWN FALLS</h2>
+      <div class="sub">Five courts. The Hollow King is dead.</div>
+      <div class="grade eng" id="resGrade">CROWNED</div>
+      <div class="resGrid" id="resGrid"></div>
+      <div class="edList" id="resEdicts"></div>
+      <div id="resBest"></div>
+      <div class="btnCol" style="margin-top:12px">
+        <button class="btn primary" id="bResMenu">MENU</button>
+        <button class="btn" id="bResAgain">NEW RUN</button>
+      </div>
+    </div>
+  </div>
+  <div id="toast"></div>
+</div>
