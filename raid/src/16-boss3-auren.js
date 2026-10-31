@@ -1644,7 +1644,7 @@ class Auren extends Boss {
       <div style="font-size:13px;letter-spacing:.4em;opacity:.7;margin-bottom:10px">THIS RUN · ${Game.diff.label}</div>
       ${row('Auren defeated in', fmtTime(t))}${row('Damage dealt', Math.round(S.damageDealt).toLocaleString())}${row('Damage taken', Math.round(S.damageTaken).toLocaleString())}
       ${row('Perfect Dodges', S.perfectDodges)}${row('Interrupts', S.interrupts + ' / ' + S.interruptChances)}${row('Grand Shatters', S.grandShatters)}
-      ${row('Zero Hours', S.zeroHours)}${row('Healing from Recall', Math.round(S.recallHealing))}${row('Mechanics failed', S.mechanicsFailed)}
+      ${row('Zero Hours', S.zeroHours)}${row('Healing from Shatter', Math.round(S.shatterHealing))}${row('Mechanics failed', S.mechanicsFailed)}
       <div style="height:44px"></div>
       <div style="font-size:13px;letter-spacing:.4em;opacity:.7;margin-bottom:10px">THE THREE THRONES · BEST TIMES</div>
       ${row('Pyrrha, the Forge-Warden', bt(0))}${row('Nerith, the Drowned Choir', bt(1))}${row('Auren, the Unwound Hour', bt(2) === '—' ? fmtTime(t) : bt(2))}

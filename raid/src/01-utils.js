@@ -118,7 +118,7 @@ const ENCOUNTERS = [];
 function resetStats() {
   Game.stats = {
     damageDealt: 0, damageTaken: 0, perfectDodges: 0, interrupts: 0, interruptChances: 0,
-    grandShatters: 0, shatters: 0, fractureUptime: 0, recallHealing: 0, healing: 0, mechanicsFailed: 0,
+    grandShatters: 0, shatters: 0, fractureUptime: 0, shatterHealing: 0, pierces: 0, healing: 0, mechanicsFailed: 0,
     zeroHours: 0, deaths: 0, hitsTaken: 0,
   };
 }

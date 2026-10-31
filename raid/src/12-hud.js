@@ -16,7 +16,7 @@ const HUD = {
 
   init() {
     const ids = ['hud', 'bossbar', 'bb-name', 'bb-epithet', 'bb-frame', 'bb-chip', 'bb-fill', 'bb-ticks', 'bb-pct', 'bb-enrage', 'castbar', 'cb-fill', 'cb-name',
-      'cb-shards', 'playerpanel', 'statuses', 'hpbar', 'hp-chip', 'hp-fill', 'hp-shield', 'hp-text', 'fluxbar', 'flux-fill', 'hg-fill', 'pips', 'arrows', 'fpsbadge', 'abilities', 'joy-ghost', 'pausebtn'];
+      'cb-shards', 'playerpanel', 'statuses', 'hpbar', 'hp-chip', 'hp-fill', 'hp-heal', 'hp-shield', 'hp-text', 'fluxbar', 'flux-fill', 'hg-fill', 'pips', 'arrows', 'fpsbadge', 'abilities', 'joy-ghost', 'pausebtn'];
     for (const id of ids) this.el[id] = $(id);
     this.pips = Array.from(this.el.pips.querySelectorAll('i'));
     for (let i = 0; i < 8; i++) {
@@ -98,6 +98,7 @@ const HUD = {
       this.setScale(this.el['bb-chip'], 'bbc', this.bossChip);
       this.setText(this.el['bb-pct'], 'bbp', (Math.ceil(f * 1000) / 10).toFixed(1) + '%');
       this.setClass(this.el['bb-frame'], 'bbfr', 'shield', !!b.invuln);
+      this.setClass(this.el.bossbar, 'bbl', 'locked', !!(b.hasStatus && b.hasStatus('timelocked')));
       this.setClass(this.el['bb-frame'], 'bbfr', 'overheat', !!(b.hasStatus && (b.hasStatus('overheat') || b.hasStatus('overexposed'))));
       if (b.enrageAt > 0 && Game.diff.enrage) {
         const rem = b.enrageAt - Game.fightTime;
@@ -123,6 +124,12 @@ const HUD = {
       this.setScale(this.el['hp-fill'], 'hpf', f);
       this.setScale(this.el['hp-chip'], 'hpc', this.hpChip);
       this.setScale(this.el['hp-shield'], 'hps', p.shield / p.maxHp);
+      // green ghost: what your next Shatter would heal (only when Shatter is ready to use)
+      const ph = Math.min(1 - f, p.pendingShatterHeal() / p.maxHp), hq = ph > 0.002 ? Math.round(ph * 1000) : 0, hl = Math.round(f * 1000);
+      if (this.cache.hph !== hq || (hq && this.cache.hphl !== hl)) {
+        this.cache.hph = hq; this.cache.hphl = hl;
+        const e = this.el['hp-heal']; e.style.left = (hl / 10) + '%'; e.style.width = (hq / 10) + '%'; e.style.display = hq ? '' : 'none';
+      }
       this.setText(this.el['hp-text'], 'hpt', Math.ceil(p.hp) + (p.shield > 0 ? ' +' + Math.ceil(p.shield) : ''));
       this.setClass(this.el.hpbar, 'hpl', 'low', f < 0.3);
       this.setScale(this.el['flux-fill'], 'flx', p.flux / 100);
@@ -210,10 +217,20 @@ const HUD = {
     this.setBtn('shatter', cd.shatter.t / A.shatter.cd, cd.shatter.t, !canShatter || !act, canShatter && p.fractures >= 5 ? 'glow-gold' : null);
     this.setBtn('recall', cd.recall.t / A.recall.cd, cd.recall.t / rate, !p.echo.active || !act, null);
     const rs = this.btnState.recall; if (rs) this.setVar(rs.el, 'echoL', '--e', p.echo.active ? p.echo.life / p.echo.max : 0);
-    const lanceCd = p.talentB === 'borrowedPlus' ? CONFIG.talents[1][0].lanceCd : A.lance.cd;
-    let castInt = !!(b && b.cast && b.cast.interruptible);
-    if (!castInt && b && b.lanceGlow) castInt = !!b.lanceGlow();
-    this.setBtn('lance', cd.lance.t / lanceCd, cd.lance.t, !act, castInt && cd.lance.t <= 0 ? 'glow-violet' : null);
+    // Stasis Lance: the button says which throw you would make right now (INTERRUPT glows violet; PIERCE = the long-cooldown damage mode)
+    const lanceMax = p.lanceMax || p.lanceCd('interrupt'), lReady = cd.lance.t <= 0;
+    const castInt = p.lanceModeNow() === 'interrupt';
+    this.setBtn('lance', cd.lance.t / lanceMax, cd.lance.t, !act, castInt && lReady ? 'glow-violet' : null);
+    const ls = this.btnState.lance;
+    if (ls) {
+      if (!ls.tag) ls.tag = ls.el.querySelector('.tag');
+      const mode = !lReady || !act ? '' : castInt ? 'int' : 'pierce';
+      if (ls.mode !== mode) {
+        ls.mode = mode;
+        if (ls.tag) { ls.tag.className = 'tag ' + mode; ls.tag.textContent = mode === 'int' ? 'INTERRUPT' : mode === 'pierce' ? 'PIERCE · ' + Math.round(p.lanceCd('pierce')) + 's' : ''; }
+        ls.el.classList.toggle('mode-pierce', mode === 'pierce');
+      }
+    }
     const us = this.btnState.ult; if (us) this.setVar(us.el, 'ultG', '--g', p.hourglass / 100);
     this.setBtn('ult', 0, 0, p.hourglass < 100 || !act, p.hourglass >= 100 ? 'glow-gold' : null);
   },

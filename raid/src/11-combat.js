@@ -440,6 +440,7 @@ class BossEntity {
     if (this.hasStatus('harmonized')) m *= 1.2;
     if (this.hasStatus('overheat')) m *= 1.25;
     if (this.hasStatus('overexposed')) m *= 1.5;
+    if (this.hasStatus('timelocked')) m *= CONFIG.abilities.lance.lockMul;     // Piercing Lance
     return m;
   }
   get dmgDealtMul() { return 1 + CONFIG.boss.stokedMul * this.statusStacks('stoked'); }

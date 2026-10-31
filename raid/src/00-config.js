@@ -40,10 +40,19 @@ const CONFIG = {
             slip: { flux: 25, hourglass: 8, slowDur: 0.35, slowScale: 0.25, desat: 0.85, ca: 0.006, hitStop: 0.03 },
             fovKick: 4, ghosts: 5 },
     rend: { cd: 2.5, angle: 120, range: 6, dmg: 180, flux: 10, shardCount: 24, shardHold: 0.3 },
-    shatter: { cd: 1.0, cost: 50, base: 100, per: 150, grandMul: 1.5, grandHeal: 0.06, grandHourglass: 10,
+    // Shatter MENDS: every Fracture it spends heals healPer × max HP; a Grand Shatter adds grandHeal on top (5 × 2.5% + 5% = 17.5%).
+    // (Healing used to come from Recall: 40% of the damage taken since your last dash. Playtest: "felt odd" → it now rides the
+    //  button you already press for damage, shows as green numbers, and the HP bar previews it in green.)
+    shatter: { cd: 1.0, cost: 50, base: 100, per: 150, grandMul: 1.5, healPer: 0.025, grandHeal: 0.05, grandHourglass: 10,
                hitStop: 0.04, grandHitStop: 0.07, trauma: 0.15, grandTrauma: 0.3, grandBloom: 0.8 },
-    recall: { cd: 14, dur: 0.15, healFrac: 0.4 },
-    lance: { cd: 20, range: 25, speed: 60, dmg: 250, flux: 30, hourglass: 15, borrowed: 6, borrowedRate: 1.3, root: 3, freeze: 0.6 },
+    // Recall: rewind to your Echo. Untouchable while rewinding (+ invulnTail after landing); cleanses Entropy. No longer heals.
+    recall: { cd: 14, dur: 0.15, invulnTail: 0.2 },
+    // Stasis Lance has two modes, chosen when you throw it:
+    //   INTERRUPT (a violet cast is up): unchanged — stops the cast, Flux + Hourglass + Borrowed Time, cooldown `cd`.
+    //   PIERCE (no violet cast): pierceDmg to the target and every add on the line, +pierceFrac Fractures on the boss,
+    //     TIME-LOCK (boss takes ×lockMul damage for lockDur s) — but the cooldown is the longer `pierceCd`.
+    lance: { cd: 20, range: 25, speed: 60, dmg: 250, flux: 30, hourglass: 15, borrowed: 6, borrowedRate: 1.3, root: 3, freeze: 0.6,
+             pierceCd: 32, pierceDmg: 700, pierceFrac: 2, lockDur: 5, lockMul: 1.2, pierceWidth: 1.4 },
     ult: { cost: 100, dur: 2.0, dmg: 4000, anchorDmg: 2400, timeScale: 0.2, hitStop: 0.12, trauma: 0.6, bloom: 0.7, converge: 360, slashes: 12 },
   },
   // keys shown on buttons + bindings (§6.1)
@@ -81,8 +90,8 @@ const CONFIG = {
   talents: [
     [ { id: 'afterimage', name: 'AFTERIMAGE', desc: 'Your Echo detonates for 400 in a 4 m radius when you Recall.', dmg: 400, radius: 4 },
       { id: 'tripleStep', name: 'TRIPLE STEP', desc: '3 dash charges. A Perfect Dodge also adds +1 Fracture.', charges: 3 } ],
-    [ { id: 'borrowedPlus', name: 'BORROWED TIME+', desc: 'Stasis Lance cooldown 14 s; haste lasts 9 s.', lanceCd: 14, borrowed: 9 },
-      { id: 'kintsugi', name: 'KINTSUGI', desc: 'Grand Shatter heals 12% and grants a 300 golden shield for 6 s.', heal: 0.12, shield: 300, shieldDur: 6 } ],
+    [ { id: 'borrowedPlus', name: 'BORROWED TIME+', desc: 'Stasis Lance cooldown 14 s (Pierce 24 s); haste lasts 9 s.', lanceCd: 14, pierceCd: 24, borrowed: 9 },
+      { id: 'kintsugi', name: 'KINTSUGI', desc: 'Grand Shatter heals 25% (not 17.5%) and grants a 300 golden shield for 6 s.', heal: 0.25, shield: 300, shieldDur: 6 } ],
   ],
 
   // ---------------------------------------------------------------- camera (§7)
@@ -137,8 +146,8 @@ const HINTS = {
   'Hammerfall': 'Step beside her, or dash through as the cone fills.',
   'Hymn of Stone': "Hide in a pillar's violet shadow.",
   'Fate — Converge': 'Stand on your Echo, or Recall to it.',
-  'Burning': 'Interrupt the cast with Stasis Lance, or Recall to recover.',
-  'Melee': 'Keep moving through telegraphs; recover chip damage with Recall.',
+  'Burning': 'Interrupt the cast with Stasis Lance (keep it ready for violet casts), then Shatter to heal back up.',
+  'Melee': 'Keep moving through telegraphs. Shatter heals you for every Fracture it spends: Rend, Rend, Shatter.',
   // Training Grounds
   'Pendulum Cleave': 'Step out of the cone to the side, or dash through it as it fills.',
   'Hail of Hours': 'Keep moving: one circle always lands on you. Do not fight in the pools.',
@@ -149,7 +158,7 @@ const HINTS = {
   'Quarter Hours': 'Watch the order the wedges light up.',
   'Severance': 'Cross to the other half of the arena.',
   'Chime of Stasis': 'Interrupt the violet cast with Stasis Lance (F).',
-  'Tremor': 'Rings cannot be outrun. Dash through each ring.',
+  'Tremor': 'Walk into the green gap, or Phase Step when the circle at your feet closes on you.',
   'Sundial Gaze': 'Violet: stand outside the dotted circle when it resolves.',
   'Ember Pool': 'Do not stand in burning pools.',
   'Fall': 'Stay on the platform.',

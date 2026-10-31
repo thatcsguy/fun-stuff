@@ -243,7 +243,8 @@ class Player {
     this.buffer = { id: null, t: 0 };
     this.meleeT = 0; this.comboIdx = 0; this.needleT = 0; this.outOfMeleeT = 0;
     this.act = { type: null, t: 0, dur: 0 }; this.actW = 0; this.trailA = 0;
-    this.recallS = null; this.ult = null;
+    this.recallS = null; this.ult = null; this.recallInvT = 0; this.lastDashAt = -99;
+    this.lanceMode = 'interrupt'; this.lanceMax = CONFIG.abilities.lance.cd;   // mode of the last throw + the cooldown it set (HUD sweep)
     this.target = null; this.lastSource = null; this.lastHint = null;
     this.history = new PlayerHistory(C.historyHz, C.historySeconds);
     this.histAcc = 0;
@@ -337,7 +338,8 @@ class Player {
     this.echo.active = false; this.echo.pinned = false; this.echoModel.root.visible = false; this.echoRing.visible = false; this.markRing.visible = false;
     this.buffer.id = null; this.meleeT = 0.2; this.comboIdx = 0; this.needleT = 0.3; this.outOfMeleeT = 0;
     this.act.type = null; this.actW = 0; this.trailA = 0;
-    this.recallS = null; this.ult = null; this.lastSource = null; this.dead = false;
+    this.recallS = null; this.ult = null; this.lastSource = null; this.dead = false; this.recallInvT = 0; this.lastDashAt = -99;
+    this.lanceMode = 'interrupt'; this.lanceMax = this.lanceCd('interrupt');
     this.history.clear(); this.histAcc = 0;
     for (const g of this.ghosts) g.model.root.visible = false;
     this.root.visible = true;
@@ -346,7 +348,7 @@ class Player {
     this.trail.reset(this.baseWorld, this.tipWorld);
   }
 
-  get invuln() { return this.iframeT > 0 || this.invulnFlags > 0 || !!this.ult; }
+  get invuln() { return this.iframeT > 0 || this.invulnFlags > 0 || !!this.ult || !!this.recallS || this.recallInvT > 0; }
   get cdRate() { return this.hasStatus('borrowed') ? CONFIG.abilities.lance.borrowedRate : 1; }
   get stunned() { for (const s of this.statuses) if (STATUS_DEFS[s.id] && STATUS_DEFS[s.id].stun) return true; return false; }
   canAct() { return this.alive && !Game.inputLocked && !this.ult && !this.recallS && !this.stunned && (Game.state === 'fight'); }
@@ -461,7 +463,6 @@ class Player {
     let absorbed = 0;
     if (this.shield > 0) { absorbed = Math.min(this.shield, amt); this.shield -= absorbed; amt -= absorbed; if (this.shield <= 0) this.removeStatus('kintsugi'); }
     this.hp -= amt;
-    if (this.echo.active) this.echo.dmgSince += amt;
     Game.stats.damageTaken += amt; Game.stats.hitsTaken++;
     DmgNumbers.spawn(this.hitPointV(), amt + absorbed, 'taken');
     const C = CONFIG.player;
@@ -534,13 +535,14 @@ class Player {
     this.dashTo.set(this.pos.x + dx * D.dist, 0, this.pos.z + dz * D.dist);
     const R = Game.arena ? Game.arena.radius - CONFIG.player.radius : 1e9, rr = Math.hypot(this.dashTo.x, this.dashTo.z);
     if (rr > R) this.dashTo.multiplyScalar(R / rr);
-    this.dashing = true; this.dashT = 0; this.iframeT = D.iframes;
+    this.dashing = true; this.dashT = 0; this.iframeT = D.iframes; this.lastDashAt = Game.time;
     this.yaw = Math.atan2(dx, dz); this.snapT = 0;
     this.knockV.set(0, 0, 0);
     this.placeEcho();
     // Perfect-dodge lookahead (§9.6)
     Telegraphs.markPD(this.dashFrom.x, this.dashFrom.z, D.pdWindow, this.dashId);
     if (Hazards.anyWillHit(this.dashFrom.x, this.dashFrom.z, D.hazardLook)) this.grantPerfectDodge('hazard');
+    RingCue.onDash(this);      // shock rings: a dash started just before a ring reaches you dodges that ring outright
     // VFX
     this.playAct('dash', D.dur + 0.12);
     this.root.visible = false;
@@ -607,6 +609,20 @@ class Player {
     return hitBoss;
   }
 
+  /** HP a Shatter spending n Fractures would heal (0 for adds / no Fractures). Grand: + bonus (Kintsugi: its own total). */
+  shatterHealFor(n, grand) {
+    const A = CONFIG.abilities.shatter;
+    if (n <= 0) return 0;
+    if (grand && this.talentB === 'kintsugi') return this.maxHp * CONFIG.talents[1][1].heal;
+    return this.maxHp * (A.healPer * n + (grand ? A.grandHeal : 0));
+  }
+  /** what the next Shatter would heal right now (HUD preview), or 0 if Shatter is not usable */
+  pendingShatterHeal() {
+    const A = CONFIG.abilities.shatter, b = Game.boss;
+    if (this.flux < A.cost || this.cds.shatter.t > 0 || !b || this.shatterTarget() !== b) return 0;
+    return this.shatterHealFor(this.fractures, this.fractures >= CONFIG.player.fractureMax);
+  }
+
   doShatter() {
     const A = CONFIG.abilities.shatter;
     const tgt = this.shatterTarget(); if (!tgt) return;
@@ -622,10 +638,21 @@ class Player {
     if (tgt.onShatter) tgt.onShatter(n, grand);
     const hp = tgt.hitPoint || tgt.pos;
     Game.stats.shatters++;
+    // MEND: Shatter heals per Fracture spent (Grand Shatter: + a bonus). Green siphon from the boss into you.
+    const kin = grand && this.talentB === 'kintsugi';
+    const mend = this.shatterHealFor(n, grand);
+    if (mend > 0) {
+      const healed = this.heal(mend, grand ? 'Grand Shatter' : 'Shatter');
+      Game.stats.shatterHealing = (Game.stats.shatterHealing || 0) + healed;
+      if (healed > 0) {
+        _v2.set(this.pos.x, 1.3, this.pos.z);
+        Particles.line(hp, _v2, grand ? 34 : 14 + n * 4, 0xc8ffd8, 0x2bd96a, 0.45, 0.22, { vy: 0.3, intensity: 2.2, stagger: true });
+        Particles.converge(_v2, grand ? 40 : 16, 1.6, 0xd8ffe4, 0x3bff8a, 0.45, 0.2, { intensity: 2.2 });
+        sfx('heal');
+      }
+    }
     if (grand) {
-      const kin = this.talentB === 'kintsugi';
       const T = CONFIG.talents[1][1];
-      this.heal(this.maxHp * (kin ? T.heal : A.grandHeal), 'Grand Shatter');
       if (kin) { this.shield = T.shield; this.addStatus('kintsugi', T.shieldDur, { stacks: 1 }); }
       this.addHourglass(A.grandHourglass);
       TimeFX.hitStop(A.grandHitStop); CamRig.addTrauma(A.grandTrauma); Post.kickBloom(A.grandBloom, 0.25); Post.kickCA(0.004);
@@ -660,8 +687,7 @@ class Player {
     const A = CONFIG.abilities.recall, E = this.echo, s = this.recallS;
     this.pos.set(s.tx, 0, s.tz);
     this.recallS = null;
-    const heal = E.dmgSince * A.healFrac;
-    if (heal > 0) { const got = this.heal(heal, 'Recall'); Game.stats.recallHealing += got; }
+    this.recallInvT = A.invulnTail;             // untouchable while rewinding (recallS) and for a beat after landing
     if (this.hasStatus('entropy')) { this.removeStatus('entropy'); Stamp.show('CLEANSED', 'violet'); }
     GroundFX.ring(E.x, E.z, 0.2, 2.6, 0xbffbff, 0.45, 0.25, 3.0);
     Particles.burst(_v1.set(E.x, 1.0, E.z), 50, 0xbffbff, 0x2bd9ff, 5, 0.6, 0.2, 0, { intensity: 2.4 });
@@ -677,26 +703,86 @@ class Player {
     else E.dmgSince = 0;
   }
 
+  // ------------------------------------------------------------ STASIS LANCE: INTERRUPT or PIERCE
+  /** cooldown a throw in this mode sets (Borrowed Time+ shortens both) */
+  lanceCd(mode) {
+    const A = CONFIG.abilities.lance, T = this.talentB === 'borrowedPlus' ? CONFIG.talents[1][0] : null;
+    return mode === 'pierce' ? (T ? T.pierceCd : A.pierceCd) : (T ? T.lanceCd : A.cd);
+  }
+  /** 'interrupt' when a violet (interruptible) cast is up on the lance target or any lanceable part, else 'pierce' */
+  lanceModeNow(tgt) {
+    const b = Game.boss;
+    tgt = tgt || this.lanceTarget();
+    if (tgt && tgt.cast && tgt.cast.interruptible) return 'interrupt';
+    if (b && b.cast && b.cast.interruptible) return 'interrupt';
+    if (b && b.lanceGlow && b.lanceGlow()) return 'interrupt';
+    return 'pierce';
+  }
   doLance() {
     const A = CONFIG.abilities.lance;
     const tgt = this.lanceTarget(); if (!tgt) return;
-    this.cds.lance.t = this.talentB === 'borrowedPlus' ? CONFIG.talents[1][0].lanceCd : A.cd;
+    const mode = this.lanceModeNow(tgt);
+    this.lanceMode = mode; this.lanceMax = this.lanceCd(mode);
+    this.cds.lance.t = this.lanceMax;
     this.faceTarget(tgt);
     this.playAct('lance', 0.38);
     this.root.updateMatrixWorld(true);
     this.refs.handR.getWorldPosition(_v1);
+    const fx = this.pos.x, fz = this.pos.z;
     Projectiles.spawn({ kind: 'lance', x: _v1.x, y: _v1.y + 0.2, z: _v1.z, target: tgt, speed: A.speed, homing: true, friendly: true, life: 2,
-      onHit: (pr, t) => this.lanceHit(t) });
+      color: mode === 'pierce' ? 0xbff8ff : undefined,
+      onHit: (pr, t) => this.lanceHit(t, mode, fx, fz) });
     sfx('lance');
+    if (mode === 'pierce') sfx('pierce');
   }
-  lanceHit(t) {
+  lanceHit(t, mode, fx, fz) {
     const A = CONFIG.abilities.lance;
     if (!t || !t.alive) return;
-    if (t.onLanceHit) { const handled = t.onLanceHit(this); if (handled === true) return; if (handled === 'interrupted') { this.rewardInterrupt(t); return; } }
-    if (t.cast && t.cast.interruptible && t.interrupt && t.interrupt()) { this.rewardInterrupt(t); return; }
-    dealDamage(t, A.dmg, { kind: 'skill', source: 'Stasis Lance' });
+    const interrupted = () => {
+      // a Pierce that arrives on a fresh violet cast still interrupts: you get the short cooldown back
+      if (this.lanceMode === 'pierce') { const cd = this.lanceCd('interrupt'); this.cds.lance.t = Math.min(this.cds.lance.t, cd); this.lanceMax = cd; this.lanceMode = 'interrupt'; }
+      this.rewardInterrupt(t);
+    };
+    if (t.onLanceHit) { const handled = t.onLanceHit(this); if (handled === true) return; if (handled === 'interrupted') { interrupted(); return; } }
+    if (t.cast && t.cast.interruptible && t.interrupt && t.interrupt()) { interrupted(); return; }
+    if (mode !== 'pierce') {
+      // INTERRUPT throw whose cast ended before it landed: the old light hit
+      dealDamage(t, A.dmg, { kind: 'skill', source: 'Stasis Lance' });
+      if (t.isAdd) t.rootT = Math.max(t.rootT || 0, A.root);
+      Particles.burst(t.hitPoint || t.pos, 40, 0xe6d4ff, 0x7a3cff, 7, 0.6, 0.2, 0, { intensity: 2.4 });
+      return;
+    }
+    this.pierceHit(t, fx != null ? fx : this.pos.x, fz != null ? fz : this.pos.z);
+  }
+  /** PIERCE: heavy hit + Time-Lock on the target, +Fractures on the boss, and the same hit on every add along the line */
+  pierceHit(t, fx, fz) {
+    const A = CONFIG.abilities.lance, b = Game.boss;
+    const got = dealDamage(t, A.pierceDmg, { kind: 'skill', source: 'Piercing Lance' });
+    const locked = got > 0 && t === b && b.alive;          // an immune / shielded boss is not Time-Locked
+    if (locked) {
+      if (b.addStatus) b.addStatus('timelocked', A.lockDur, { stacks: 1 });
+      this.addFracture(A.pierceFrac);
+    }
     if (t.isAdd) t.rootT = Math.max(t.rootT || 0, A.root);
-    Particles.burst(t.hitPoint || t.pos, 40, 0xe6d4ff, 0x7a3cff, 7, 0.6, 0.2, 0, { intensity: 2.4 });
+    // everything else on the line from the throw to the target (and a little beyond) is skewered too
+    const tx = t.pos.x, tz = t.pos.z, dx = tx - fx, dz = tz - fz, L = Math.hypot(dx, dz) || 1, ux = dx / L, uz = dz / L, reach = L + 6;
+    for (const a of Game.adds) {
+      if (a === t || !a.alive || a.targetable === false) continue;
+      const ax = a.pos.x - fx, az = a.pos.z - fz, along = ax * ux + az * uz;
+      if (along < 0 || along > reach) continue;
+      if (Math.abs(ax * uz - az * ux) <= A.pierceWidth + (a.radius || 0.5)) { dealDamage(a, A.pierceDmg, { kind: 'skill', source: 'Piercing Lance' }); a.rootT = Math.max(a.rootT || 0, A.root); }
+    }
+    // FX: a white-violet spear of light through the target, glass shards, a violet clock-ring on the floor
+    const yaw = Math.atan2(ux, uz), hp = t.hitPoint || t.pos;
+    Beams.flash(fx, 1.3, fz, yaw, reach, 0.9, 0xd8c8ff, 0.32);
+    Particles.burst(hp, 90, 0xf2ecff, 0x8a5cff, 9, 0.7, 0.22, -4, { spread: (t.radius || 1) * 0.7, intensity: 2.6 });
+    ShardFX.explode(hp, 14, 9, 0xd8c0ff, { spread: (t.radius || 1) * 0.6, scale: 0.4 });
+    GroundFX.ring(tx, tz, (t.radius || 1), (t.radius || 1) + 4, 0xb48cff, 0.5, 0.3, 3.0);
+    TimeFX.hitStop(0.05); CamRig.addTrauma(0.22); Post.kickCA(0.003);
+    if (locked) Stamp.show('TIME-LOCKED', 'violet');
+    sfx('interrupt');
+    Game.stats.pierces = (Game.stats.pierces || 0) + 1;
+    logEvent('pierce', { target: t.name || 'boss' });
   }
   rewardInterrupt(t) {
     const A = CONFIG.abilities.lance;
@@ -818,6 +904,7 @@ class Player {
       if (cd.dash.t <= 0) { cd.dash.charges++; cd.dash.t = cd.dash.charges < cd.dash.max ? CONFIG.abilities.dash.cd : 0; HUD.flashButton('dash'); }
     } else cd.dash.t = 0;
     if (this.iframeT > 0) this.iframeT -= dt;
+    if (this.recallInvT > 0) this.recallInvT -= dt;
     // fractures decay 8 s after the last Rend
     if (this.fractures > 0) { this.fractureT -= dt; Game.stats.fractureUptime += dt; if (this.fractureT <= 0) { this.fractures = 0; } }
     // echo
