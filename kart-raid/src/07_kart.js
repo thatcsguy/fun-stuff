@@ -411,6 +411,9 @@
     // Branded (Boss 2): steer for the cleanse pylon
     let pyl = null;
     if (K.brand > 0 && G.gates && G.gates.list) { try { for (const g of G.gates.list()) if (g && g.kind === 'pylon' && !g.passed && !g.dead) { const x = T.ds(K.s, g.s); if (x > -2) { pyl = g; pyl._x = x; break; } } } catch (e) { } }
+    // Boss 1 arc gates: line up and keep the drift through them (K.botGates = false: ignore them, for balance tests)
+    let arcG = null;
+    if (K.botGates !== false && G.gates && G.gates.list) { try { for (const g of G.gates.list()) if (g && g.kind === 'arc' && !g.passed) { const x = T.ds(K.s, g.s); if (x > -2 && x < 170) { arcG = g; arcG._x = x; break; } } } catch (e) { } }
     // lane choice every 0.25 s
     bot.laneT -= dt;
     if (bot.laneT <= 0) {
@@ -423,12 +426,14 @@
         if (threatAt(K.s, K.s + 60, d, zones)) score -= 30;
         for (const p of T.pads) { const x = T.ds(K.s, p.s); if (x > 5 && x < 50 && p.lane === lane) score += 6; }
         if (pyl && pyl._x < 160) { const ld = T.laneD(lane, pyl.s); score += Math.max(0, 40 - Math.abs(ld - (pyl.d || 0)) * 10); }
+        if (arcG) { const ld = T.laneD(lane, arcG.s); score += Math.max(0, 25 - Math.abs(ld - (arcG.d || 0)) * 8); }
         if (score > bestScore) { bestScore = score; best = lane; }
       }
       bot.lane = best;
     }
     let dT = clamp(T.laneD(bot.lane, K.s + 15), -hd + 0.5, hd - 0.5);
     if (pyl && pyl._x < 70) dT = clamp(pyl.d || 0, -hd + 0.5, hd - 0.5);
+    if (arcG && arcG._x < 80) dT = clamp(arcG.d || 0, -hd + 0.5, hd - 0.5);
     const kAhead = T.curvature(K.s + 15), kNow = T.curvature(K.s);
     // steering: aim at target d with a lookahead, compensate curvature
     const look = Math.max(10, K.speed * 0.55);
@@ -442,6 +447,7 @@
       drift = true;
       // release at T2+ when the curve ends, or at T3
       if (K.driftTier >= 3 || (K.driftTier >= 2 && Math.abs(kAhead) < 0.004)) drift = false;
+      if (arcG && arcG._x < 60) drift = true;            // carry the charge through the gate
       if (Math.abs(kAhead) < 0.002 && K.driftTier < 2 && Math.abs(kNow) < 0.002) drift = false;
       if (pyl && pyl._x < 90 && Math.abs(dT - K.d) > 2) drift = false;   // line up for the pylon
       bot.wantDrift = false;
