@@ -107,15 +107,22 @@ const BossKit = {
     return hit;
   },
   /**
-   * Expanding shockwave ring hazard (the telegraph IS the ring). o: {x, z, speed(m/s)=10, width=1.2, maxR=22, dmg, source, color='red', onDone}
-   * One hit per ring (tickInterval 1 s), PD lookahead via ringWillHit. Returns the hazard.
+   * Expanding shockwave ring hazard (the telegraph IS the ring). o: {x, z, speed(m/s)=10, width=1.2, maxR=22, dmg, source, color='red', onDone,
+   *   gapDir? (world yaw of a safe NOTCH in the ring), gapDeg? (notch width), seq?/k? (a RingCue.sequence this is ring k of)}
+   * One hit per ring (tickInterval 1 s), PD lookahead via ringWillHit. A ring that belongs to a RingCue sequence gets the timing
+   * cue at the player's feet, its green gap lane, and the generous dash window (RingCue.onDash). Returns the hazard.
    */
   shockRing(o) {
     const sp = o.speed || 10, w = o.width || 1.2, maxR = o.maxR || 22;
-    return Hazards.spawn({ shape: 'donut', x: o.x, z: o.z, r: w, inner: 0, life: maxR / sp + 0.3, tickDmg: o.dmg, tickInterval: 1.0, color: o.color || 'red',
+    const gap = o.gapDir != null && o.gapDeg > 0;
+    const data = { speed: sp, gapDir: gap ? o.gapDir : null, gapHalf: gap ? o.gapDeg * DEG * 0.5 : 0 };
+    const h = Hazards.spawn({ shape: gap ? 'sector' : 'donut', x: o.x, z: o.z, r: w, inner: 0, angle: gap ? 360 - o.gapDeg : 90, rot: gap ? o.gapDir + Math.PI : 0,
+      life: maxR / sp + 0.3, tickDmg: o.dmg, tickInterval: 1.0, color: o.color || 'red',
       source: o.source || 'Shockwave', gentle: false, wide: true, fadeIn: 0.05, fadeOut: 0.2, avoidable: true, interior: 1.0,
-      data: { speed: sp }, willHit: ringWillHit, tag: o.tag,
+      data, willHit: ringWillHit, tag: o.tag,
       update: (h, dt) => { h.r += sp * dt; h.inner = Math.max(0, h.r - w); if (h.r >= maxR + w) { h.kill(); if (o.onDone) o.onDone(h); } if (o.update) o.update(h, dt); } });
+    if (h && o.seq) RingCue.attach(o.seq, o.k | 0, h);
+    return h;
   },
   /** rotating rect (beam / clock hand) hazard. o: {x,z,rot,angVel(rad/s),len,width,life,tickDmg,tickInterval,source,color,gentle,onUpdate} */
   rotatingRect(o) {
@@ -145,6 +152,190 @@ const BossKit = {
 };
 BossKit._shape = new AreaShape({ material: { uniforms: makeTelegraphMaterial().uniforms }, position: new THREE.Vector3(), rotation: new THREE.Euler() });
 BossKit._shape.refresh = () => {};
+
+// ---------------------------------------------------------------- RingCue: make shock rings readable and dodgeable
+/**
+ * A stomp's rings, planned up front so the player can read them before they exist:
+ *   seq = RingCue.sequence({x, z, maxR, speed, width, times:[s after now each ring spawns], gaps:[world yaw | null], gapDeg, grace})
+ *   then BossKit.shockRing({..., seq, k}) spawns ring k (at times[k]).
+ * What the player gets:
+ *   • GAP LANES — a green wedge on the floor for each ring's notch. Lane k is drawn only between ring k and the ring ahead of it,
+ *     so wherever you stand, the green you see is the gap of the NEXT ring to reach you (shown during the wind-up for ring 1).
+ *   • TIMING CIRCLE — at your feet: a cyan circle closes onto a fixed target ring as the next ring approaches; when they meet it
+ *     flashes white, a clock TICK plays and "DASH" appears. Standing inside a gap turns it green instead (no dash needed).
+ *   • DASH WINDOW — a Phase Step started up to `grace` s before a ring reaches you dodges that ring outright (whichever way you
+ *     dash) and counts as a Perfect Dodge (SLIPSTREAM: the charge comes back). Recall's rewind is untouchable too.
+ */
+const RingCue = {
+  seqs: [], meshA: null, meshT: null, el: null, _s: { x: 0, y: 0, z: 0 }, show: 0, state: '', lastTick: null,
+  LEAD: 1.5,         // s of warning the timing circle gives
+  WINDOW: 0.42,      // s before impact the circle reads DASH (inside the dash grace)
+  init() {
+    if (this.meshA) return;
+    const g = new THREE.PlaneGeometry(1, 1); g.rotateX(-Math.PI / 2);
+    const mk = (col) => { const m = new THREE.Mesh(g, this.material(col)); m.renderOrder = 6; m.visible = false; m.frustumCulled = false; scene.add(m); return m; };
+    this.meshA = mk(0x7ff6ff); this.meshT = mk(0xdffcff);
+    this.el = document.createElement('div'); this.el.id = 'ringcue'; this.el.innerHTML = '<b></b><small></small>';
+    document.body.appendChild(this.el);
+  },
+  /** ground ring whose glow fades to zero inside its quad (the shared ground-ring material leaves a faint square edge on bright floors) */
+  material(col) {
+    return new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color(col) }, uR: { value: 1 }, uW: { value: 0.12 }, uAlpha: { value: 1 }, uIntensity: { value: 2 }, uFill: { value: 0 } },
+      vertexShader: BASIC_UV_VS,
+      fragmentShader: /* glsl */`
+        uniform vec3 uColor; uniform float uR, uW, uAlpha, uIntensity, uFill; varying vec2 vUv;
+        void main(){
+          float r = length((vUv - 0.5) * 2.0) * 1.25;            // 1.0 = the ring (plane is 2.5 × uR wide)
+          float dm = abs(r - 1.0) * uR;                           // metres from the ring line
+          float ring = 1.0 - smoothstep(uW * 0.5, uW * 0.5 + 0.03, dm);
+          float edge = 1.0 - smoothstep(1.05, 1.22, r);
+          float glow = exp(-dm * 5.0) * 0.3 * edge;
+          float fill = uFill * (1.0 - smoothstep(0.9, 1.0, r)) * 0.18;
+          gl_FragColor = vec4(uColor * uIntensity * (ring + glow + fill) * uAlpha, 1.0);
+        }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
+    });
+  },
+  sequence(o) {
+    const n = o.times.length, seq = { x: o.x, z: o.z, maxR: o.maxR, speed: o.speed, width: o.width || 1.2, t0: Game.time, times: o.times.slice(),
+      gaps: o.gaps || [], gapHalf: (o.gapDeg || 0) * DEG * 0.5, grace: o.grace != null ? o.grace : 0.5, n,
+      rings: new Array(n).fill(null), datas: new Array(n).fill(null), spawnedAt: new Array(n).fill(-1), dodged: new Array(n).fill(false),
+      passed: new Array(n).fill(false), lanes: [], dead: false };
+    for (let k = 0; k < n; k++) {
+      const gd = seq.gaps[k]; if (gd == null) continue;
+      const lane = Hazards.spawn({ shape: 'sector', x: seq.x, z: seq.z, r: 0.1, inner: 0, angle: o.gapDeg, rot: gd, life: Infinity, tickDmg: 0, color: 'green',
+        source: 'Gap', gentle: true, wide: true, fadeIn: 0.25, fadeOut: 0.25, interior: 0.35, tag: o.tag,
+        update: (h) => this.laneShape(seq, k, h) });
+      if (lane) { lane.data = { seq, k }; seq.lanes.push(lane); this.laneShape(seq, k, lane); }
+    }
+    this.seqs.push(seq);
+    return seq;
+  },
+  /** is ring k of seq alive right now (and not a recycled hazard)? */
+  ringOf(seq, k) { const h = seq.rings[k]; return h && h.active && !h.dying && h.data === seq.datas[k] ? h : null; },
+  laneShape(seq, k, h) {
+    const ring = this.ringOf(seq, k), spawned = seq.spawnedAt[k] >= 0;
+    if (spawned && !ring) { h.kill(); return; }
+    let outer;
+    if (k === 0) outer = seq.maxR;
+    else { const prev = this.ringOf(seq, k - 1); outer = prev ? prev.inner : (seq.spawnedAt[k - 1] >= 0 ? seq.maxR : 0); }
+    const inner = ring ? ring.r : 0;
+    h.inner = inner; h.r = Math.max(inner + 0.01, outer);
+    h.mesh.visible = outer - inner > 0.3;
+  },
+  attach(seq, k, h) {
+    seq.rings[k] = h; seq.datas[k] = h.data; seq.spawnedAt[k] = Game.time;
+    if (seq.dodged[k]) h.lockT = 99;            // already dodged by a dash that started before it spawned
+  },
+  /** absolute sim time ring k's leading edge reaches (px,pz); null if it has passed / will never come */
+  arrival(seq, k, px, pz) {
+    const d = Math.hypot(px - seq.x, pz - seq.z);
+    if (seq.spawnedAt[k] >= 0) {
+      const h = this.ringOf(seq, k); if (!h) return null;
+      if (h.inner > d + 0.25) return null;
+      return Game.time + Math.max(0, d - h.r) / seq.speed;
+    }
+    return seq.t0 + seq.times[k] + Math.max(0, d - seq.width) / seq.speed;
+  },
+  inGap(seq, k, px, pz) {
+    const gd = seq.gaps[k]; if (gd == null) return false;
+    const dx = px - seq.x, dz = pz - seq.z, d = Math.hypot(dx, dz);
+    const margin = (CONFIG.player.radius * 0.6 + CONFIG.telegraph.pad) / Math.max(d, 0.5);
+    return Math.abs(angDiff(Math.atan2(dx, dz), gd)) < seq.gapHalf - margin;
+  },
+  /** called by Player.startDash: every ring about to reach the dash's start point is dodged outright */
+  onDash(p) {
+    const now = Game.time, x = p.dashFrom.x, z = p.dashFrom.z;
+    for (const seq of this.seqs) {
+      if (seq.dead) continue;
+      for (let k = 0; k < seq.n; k++) {
+        if (seq.dodged[k]) continue;
+        const at = this.arrival(seq, k, x, z); if (at == null) continue;
+        if (at - now <= seq.grace) {
+          seq.dodged[k] = true;
+          const h = this.ringOf(seq, k); if (h) h.lockT = 99;
+          p.grantPerfectDodge('ring');
+        }
+      }
+    }
+  },
+  update() {
+    const now = Game.time;
+    for (let i = this.seqs.length - 1; i >= 0; i--) {
+      const seq = this.seqs[i];
+      let live = false;
+      for (let k = 0; k < seq.n; k++) {
+        if (seq.spawnedAt[k] < 0) { if (now < seq.t0 + seq.times[k] + 0.35) live = true; }      // a ring that never spawned (transition, death) ends the sequence
+        else if (this.ringOf(seq, k)) live = true;
+      }
+      if (!live || Game.state !== 'fight') { seq.dead = true; for (const l of seq.lanes) if (l.active && l.data && l.data.seq === seq) l.kill(); this.seqs.splice(i, 1); }
+    }
+    // a ring that just swept over you while you stood in its gap: a soft chime + green "GAP" (feedback that walking works)
+    const p = Game.player; if (!p || !p.alive) return;
+    for (const seq of this.seqs) for (let k = 0; k < seq.n; k++) {
+      if (seq.passed[k] || seq.spawnedAt[k] < 0) continue;
+      const h = this.ringOf(seq, k), d = Math.hypot(p.pos.x - seq.x, p.pos.z - seq.z);
+      if (h && h.inner > d) {
+        seq.passed[k] = true;
+        if (!seq.dodged[k] && this.inGap(seq, k, p.pos.x, p.pos.z)) { DmgNumbers.spawn(p.hitPointV(), 'GAP', 'heal'); sfx('ringSafe'); }
+      }
+    }
+  },
+  /** render-frame visuals: the timing circle + DASH label at the player's feet */
+  sync(dt) {
+    if (!this.meshA && !this.seqs.length) return;
+    this.init();
+    const p = Game.player, now = Game.time;
+    let best = null, bk = -1, bt = 1e9;
+    if (p && p.alive && Game.state === 'fight' && !CamRig.rail) {
+      for (const seq of this.seqs) for (let k = 0; k < seq.n; k++) {
+        if (seq.dodged[k]) continue;
+        const at = this.arrival(seq, k, p.pos.x, p.pos.z);
+        if (at != null && at - now < bt) { bt = at - now; best = seq; bk = k; }
+      }
+    }
+    const on = best && bt < this.LEAD;
+    this.show = damp(this.show, on ? 1 : 0, on ? 14 : 8, dt);
+    const A = this.meshA, T = this.meshT;
+    if (this.show < 0.02) { A.visible = T.visible = false; this.setLabel(''); this.lastTick = null; return; }
+    A.visible = T.visible = true;
+    const x = p.vis.x, z = p.vis.z;
+    const safe = on && this.inGap(best, bk, p.pos.x, p.pos.z);
+    const tta = on ? Math.max(0, bt) : 0, now2 = on && tta <= this.WINDOW;
+    const r0 = 0.95, rA = safe ? r0 : r0 + 2.6 * clamp01((tta - this.WINDOW * 0.5) / (this.LEAD - this.WINDOW * 0.5));
+    const uA = A.material.uniforms, uT = T.material.uniforms;
+    A.position.set(x, 0.06, z); A.scale.set(rA * 2.5, 1, rA * 2.5); uA.uR.value = rA; uA.uW.value = now2 ? 0.2 : 0.12;
+    T.position.set(x, 0.055, z); T.scale.set(r0 * 2.5, 1, r0 * 2.5); uT.uR.value = r0; uT.uW.value = 0.06;
+    const flash = now2 ? 0.75 + 0.25 * Math.sin(Game.realTime * 40) : 1;
+    if (safe) { uA.uColor.value.setRGB(0.35, 1, 0.6); uT.uColor.value.setRGB(0.35, 1, 0.6); }
+    else if (now2) { uA.uColor.value.setRGB(1, 1, 1); uT.uColor.value.setRGB(1, 1, 1); }
+    else { uA.uColor.value.setRGB(0.5, 0.96, 1); uT.uColor.value.setRGB(0.85, 0.98, 1); }
+    uA.uIntensity.value = (now2 ? 2.8 : safe ? 1.6 : 2.2) * flash * this.show; uA.uAlpha.value = 1; uA.uFill.value = now2 ? 0.5 : 0;
+    uT.uIntensity.value = (now2 ? 2.0 : 1.1) * this.show; uT.uAlpha.value = 1;
+    // DASH tick: once per ring, as it enters the window
+    if (on && now2 && !safe) {
+      const key = best.t0 + ':' + bk;
+      if (this.lastTick !== key) { this.lastTick = key; sfx('ringTick', { k: bk }); haptic(12); }
+    }
+    this.setLabel(!on ? '' : safe ? 'gap' : now2 ? 'dash' : '');
+    if (this.state && worldToScreen(_v4.set(x, 0, z), this._s)) this.el.style.transform = 'translate3d(' + this._s.x.toFixed(0) + 'px,' + (this._s.y + 34).toFixed(0) + 'px,0) translate(-50%,0)';
+  },
+  setLabel(st) {
+    if (st === this.state || !this.el) return;
+    this.state = st;
+    this.el.className = st ? 'on ' + st : '';
+    this.el.firstChild.textContent = st === 'dash' ? 'DASH' : st === 'gap' ? 'SAFE' : '';
+    this.el.lastChild.textContent = st === 'dash' && !Input.lastTouch ? 'SPACE' : '';
+  },
+  reset() {
+    for (const seq of this.seqs) seq.dead = true;
+    this.seqs.length = 0; this.show = 0; this.lastTick = null;
+    if (this.meshA) { this.meshA.visible = this.meshT.visible = false; }
+    this.setLabel('');
+  },
+};
 
 // ---------------------------------------------------------------- PoseRig
 /**

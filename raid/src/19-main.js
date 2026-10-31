@@ -22,6 +22,7 @@ function simStep(dt) {
     Projectiles.update(dt);
     Telegraphs.update(dt);
     Hazards.update(dt);
+    RingCue.update(dt);
   }
   if (Game.arena && Game.arena.update) Game.arena.update(dt);
   if (Game.encounter && Game.encounter.update && Game.state !== 'title') Game.encounter.update(dt);
@@ -44,6 +45,7 @@ function renderFrame(rdt, alpha, sdt, noDraw) {
   Projectiles.syncVisual(alpha);
   Shards.update(sdt); Rubble.update(sdt);
   GroundFX.update(sdt); SlashFX.update(sdt); Beams.update(sdt);
+  RingCue.sync(rdt);
   if (!Game.paused) CamRig.update(rdt);
   PointLights.update(rdt);
   Particles.flush(Game.time + simAcc);
@@ -158,7 +160,7 @@ const __raid = window.__raid = {
   game: Game,
   config: CONFIG,
   /** module internals for tests / console poking */
-  get api() { return { THREE, Telegraphs, Hazards, Particles, ShardFX, GroundFX, SlashFX, CamRig, TimeFX, Post, Quality, Banner, Stamp, Hint, PhaseTitle, dealDamage, Audio, Adds, Projectiles, Input, HUD, scene, camera, renderer }; },
+  get api() { return { THREE, Telegraphs, Hazards, RingCue, Particles, ShardFX, GroundFX, SlashFX, CamRig, TimeFX, Post, Quality, Banner, Stamp, Hint, PhaseTitle, dealDamage, Audio, Adds, Projectiles, Input, HUD, scene, camera, renderer }; },
   /** training dummy: force its next ability ('cleave','hail','line','toll','sanctum','chime','quarters','pulse','tremor','severance','gaze','adds') */
   forceAbility(name) { const b = Game.boss; if (b && b['ab_' + name]) { b.forceNext = name; b.nextT = 0; } },
   pause(on) { if (on !== Game.paused) Game.togglePause(on); },

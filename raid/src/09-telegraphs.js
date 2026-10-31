@@ -287,6 +287,7 @@ const Hazards = {
 function ringWillHit(h, x, z, dt) {
   // expanding donut with h.data.speed (m/s): will the ring band sweep over distance d within dt?
   const d = Math.hypot(x - h.x, z - h.z), sp = (h.data && h.data.speed) || 0;
+  if (h.data && h.data.gapDir != null && Math.abs(angDiff(Math.atan2(x - h.x, z - h.z), h.data.gapDir)) < h.data.gapHalf) return false;   // standing in its notch
   for (let s = 0.05; s <= dt + 1e-6; s += 0.05) { const R = h.r + sp * s, I = h.inner + sp * s; if (d <= R && d >= I) return true; }
   return false;
 }

@@ -481,20 +481,24 @@ class TrainingDummy extends BossEntity {
     return 2.8;
   }
   ab_tremor() {
-    Banner.show('TREMOR', 'Dash through the rings');
+    // teaches Pyrrha's Shockwave Stomp: 3 slow rings sharing one gap (green lane), with the RingCue timing circle at your feet
+    Banner.show('TREMOR', 'Stand in the green gap, or dash on the tick');
+    if (!Save.seenHint('tremorHint2')) Hint.show('Rings: walk into the green gap, or Phase Step when the circle at your feet closes and ticks.', 5, null, this, 'Tremor');
     this.pose('slam');
-    const cx = this.pos.x, cz = this.pos.z;
+    const cx = this.pos.x, cz = this.pos.z, w = Game.diff.windup, p = Game.player;
+    const gd = (p ? Math.atan2(p.pos.x - cx, p.pos.z - cz) : 0) + (rand() < 0.5 ? -1 : 1) * randRange(30, 50) * DEG;
+    const times = [1.0 * w, 1.0 * w + 1.2, 1.0 * w + 2.4], gaps = [gd, gd, gd];
+    const seq = RingCue.sequence({ x: cx, z: cz, maxR: 23, speed: 8, width: 1.2, times, gaps, gapDeg: 60, grace: 0.5 });
     Telegraphs.spawn({ shape: 'circle', x: cx, z: cz, r: 3, windup: 1.0, color: 'red', dmg: 0, silent: false, sfx: null });
     for (let i = 0; i < 3; i++) {
-      Timers.after(1.0 * Game.diff.windup + i * 0.8, () => {
+      Timers.after(times[i], () => {
+        if (!this.alive || Game.boss !== this) return;
         this.slamFx(cx, cz, 0.5);
-        Hazards.spawn({ shape: 'donut', x: cx, z: cz, r: 1.2, inner: 0.0, life: 2.4, tickDmg: 250, tickInterval: 1.0, color: 'red', source: 'Tremor', gentle: false, wide: true, fadeIn: 0.05,
-          data: { speed: 10 }, willHit: ringWillHit,
-          update: (h, dt) => { h.r += 10 * dt; h.inner = Math.max(0, h.r - 1.2); if (h.r > 23) h.kill(); } });
+        BossKit.shockRing({ x: cx, z: cz, speed: 8, width: 1.2, maxR: 23, dmg: 150, source: 'Tremor', gapDir: gaps[i], gapDeg: 60, seq, k: i });
       });
     }
     this.startCast('Tremor', 1.0, {});
-    return 3.6;
+    return 4.4;
   }
   ab_gaze() {
     Banner.show('SUNDIAL GAZE', 'Leave the violet circle', { cls: 'violet' });

@@ -21,7 +21,13 @@ Object.assign(CONFIG.bosses[0], {
     cinderlings: { first: 4, every: 30, count: 3, hp: 800, speed: 1.7, size: 1.2 },   // QA: spec 2000 HP @ 2.2 m/s was unkillable solo (+30% STOKED every wave, unavoidable); they are also priority targets now
     inOut: { first: 9, every: 12, windup: 2.0, dmg: 450, ringInner: 6, eruptR: 7 },
     palm: { first: 5, every: 16, windup: 2.4, dmg: 600, trauma: 0.6 },
-    stomp: { first: 13, every: 16, count: 3, gap: 0.8, tell: 1.0, speed: 10, width: 1.2, dmg: 250 },
+    // SHOCKWAVE STOMP (playtest: "could never get past the expanding rings"). Was 3 rings 0.8 s apart at 10 m/s for 250, with
+    // 2 dash charges and a 1 s tell. Now every ring has a safe GAP (green lane on the floor), a timing circle + tick at your feet,
+    // and a 0.5 s dash window (RingCue). It escalates each time she uses it in a fight (Heroic starts one step in).
+    stomp: { first: 13, every: 16, tell: 1.6, width: 1.2, dmg: 180, gapDeg: 60, grace: 0.5,
+      waves: [ { count: 2, gap: 1.4, speed: 7, step: 0 },        // 1st: two slow rings, one shared gap
+               { count: 3, gap: 1.15, speed: 8, step: 0 },       // 2nd: three rings, one shared gap
+               { count: 3, gap: 1.0, speed: 9, step: 26 } ] },   // 3rd+: the gap walks 26° per ring: follow it, or dash
     p3IntervalMul: 0.85,
     overheat: { at: 0.10, dur: 6 },
     meltdown: { dur: 6, dps: 2000 },
@@ -34,7 +40,7 @@ Object.assign(HINTS, {
   'Forge Ring': 'Red donut: the safe spot is right beside Pyrrha.',
   'Eruption': 'Red circle around Pyrrha: get out, then come back.',
   "Titan's Palm": 'Cross the centre line to the safe half, or dash through on the last beat.',
-  'Shockwave Stomp': 'Rings cannot be outrun. Phase Step THROUGH each ring as it reaches you.',
+  'Shockwave Stomp': 'Each ring has a gap: stand in the green lane. Or Phase Step when the circle at your feet closes and ticks (any direction works).',
   'Meltdown': 'The forge melts at 3:45. Burst harder: Grand Shatters, Zero Hour, and Cinderlings detonated beside her.',
 });
 
@@ -1464,27 +1470,38 @@ class Pyrrha extends Boss {
     return 0;
   }
 
-  /** SHOCKWAVE STOMP (P3): three stomps 0.8 s apart; each ring expands at 10 m/s and cannot be outrun */
+  /** SHOCKWAVE STOMP (P3): 2–3 stomps; each ring expands from her and cannot be outrun — but it has a GAP (green lane on the floor),
+   *  and a timing circle at your feet closes + ticks when a dash would clear it. Escalates per use: see CONFIG mech.stomp.waves. */
   ab_stomp() {
     const S = this.M.stomp, x = this.pos.x, z = this.pos.z, off = Math.hypot(x, z);
-    Banner.show('SHOCKWAVE STOMP', 'Dash through the rings');
-    if (!Save.seenHint('stompHint')) Hint.show('Rings cannot be outrun: Phase Step THROUGH each ring as it reaches you.', 4.5);
+    const use = this.stompN | 0; this.stompN = use + 1;
+    const W = S.waves[Math.min(S.waves.length - 1, use + (this.heroic ? 1 : 0))];
+    const spd = W.speed * (this.story ? 0.85 : 1), maxR = this.arena.radius + off + 1;
+    // the gap opens beside you, never on you: a short walk sideways (first time: a very short one)
+    const p = Game.player, side = rand() < 0.5 ? -1 : 1;
+    const bearing = p ? Math.atan2(p.pos.x - x, p.pos.z - z) : rand() * TAU;
+    const g0 = bearing + side * (use === 0 ? randRange(28, 40) : randRange(40, 65)) * DEG;
+    const t0 = S.tell * this.windupMul, times = [], gaps = [];
+    for (let i = 0; i < W.count; i++) { times.push(t0 + i * W.gap); gaps.push(g0 + side * i * W.step * DEG); }
+    const seq = RingCue.sequence({ x, z, maxR, speed: spd, width: S.width, times, gaps, gapDeg: S.gapDeg, grace: S.grace });
+    Banner.show('SHOCKWAVE STOMP', W.step ? 'The gap moves: follow the green' : 'Stand in the green gap, or dash on the tick');
+    if (use === 0) Hint.show('RINGS: walk into the green gap — or Phase Step when the circle at your feet closes (you hear a tick).', 6, 'stompHint2');
+    else if (W.step && !this.hintStep) { this.hintStep = true; Hint.show('The gap shifts with every ring now: follow the green lane, or dash each tick.', 4.5, 'stompHint3'); }
     this.pose('stompUp', 7);
-    this.startCast('Shockwave Stomp', S.tell, { stingF: 147 });
+    this.startCast(W.count === 2 ? 'Shockwave Stomp ×2' : 'Shockwave Stomp ×3', S.tell, { stingF: 147 });
     Telegraphs.spawn({ shape: 'circle', x, z, r: 3, windup: S.tell, color: 'red', dmg: 0, sfx: null, noFlash: false });
-    const t0 = S.tell * this.windupMul;
-    for (let i = 0; i < S.count; i++) {
-      this.after(t0 + i * S.gap, () => {
+    for (let i = 0; i < W.count; i++) {
+      this.after(times[i], () => {
         this.pose('stompDown', 26);
         sfx('slam'); CamRig.addTrauma(0.3); Post.kickBloom(0.15, 0.2);
         Particles.burst(_v1.set(x, 0.3, z), 60, 0xffd0a0, PYR_DARK, 9, 0.7, 0.4, -12, { flat: true, intensity: 2 });
-        Particles.ring(_v1.set(x, 0, z), 1.0, 110, 0xffc070, 0xff2a04, S.speed, 2.3, 0.35, { up: 0.6, drag: 0, intensity: 2.2 });
-        BossKit.shockRing({ x, z, speed: S.speed, width: S.width, maxR: this.arena.radius + off + 1, dmg: S.dmg, source: 'Shockwave Stomp' });
-        if (i < S.count - 1) this.after(0.32, () => this.pose('stompUp', 14));
+        Particles.ring(_v1.set(x, 0, z), 1.0, 110, 0xffc070, 0xff2a04, spd, maxR / spd, 0.35, { up: 0.6, drag: 0, intensity: 2.2, gapDir: gaps[i], gapHalf: S.gapDeg * DEG * 0.5 });
+        BossKit.shockRing({ x, z, speed: spd, width: S.width, maxR, dmg: S.dmg, source: 'Shockwave Stomp', gapDir: gaps[i], gapDeg: S.gapDeg, seq, k: i });
+        if (i < W.count - 1) this.after(Math.min(0.32, W.gap * 0.4), () => this.pose('stompUp', 14));
         else this.after(0.5, () => this.pose('idle', 4));
       });
     }
-    return t0 + (S.count - 1) * S.gap + 0.7;
+    return t0 + (W.count - 1) * W.gap + 0.7;
   }
 
   /** OVERHEAT at 10%: the core goes white and she takes +25% damage for 6 s */

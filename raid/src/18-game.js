@@ -15,7 +15,7 @@ Object.assign(Game, {
   /** reset every pooled system (no allocation) */
   resetWorld() {
     TimeFX.clear(); Timers.clear();
-    Telegraphs.reset(); Hazards.reset(); Projectiles.reset(); Adds.reset();
+    Telegraphs.reset(); Hazards.reset(); RingCue.reset(); Projectiles.reset(); Adds.reset();
     Particles.clear(); Shards.clear(); Rubble.clear(); GroundFX.clear(); SlashFX.clear(); Beams.clear(); DmgNumbers.clear(); PointLights.reset();
     Post.setDesatHold(0); Post.desatPulseT = 0; Post.whiteout = 0; Post.lensStr = 0; Post.zoomBlur = 0; Post.sepia = 0; Post.tunnel = 0; Post.haze = 0; Post.hurt = 0;
     GLOBAL_U.uStreak.value = 0;
@@ -195,7 +195,7 @@ Object.assign(Game, {
     row('Interrupts', S.interrupts + ' / ' + S.interruptChances);
     row('Grand Shatters', S.grandShatters + '');
     row('Fracture uptime', Math.round(100 * S.fractureUptime / Math.max(1, t)) + '%');
-    row('Healing from Recall', Math.round(S.recallHealing) + '');
+    row('Healing from Shatter', Math.round(S.shatterHealing) + '');
     $('vic-title').textContent = boss ? boss.name + ' FALLS' : 'VICTORY';
     $('vic-rank').textContent = rank;
     Timers.after(0.4, () => { $('victory').classList.remove('hidden'); HUD.show(false); Hint.hide(); }, { real: true });

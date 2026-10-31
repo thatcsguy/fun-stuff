@@ -118,6 +118,7 @@ const Particles = {
     o = o || {}; this._cols(colA, colB, o.intensity || 2);
     for (let k = 0; k < n; k++) {
       const a = (k / n) * TAU + fxRange(0, 0.2), sx = Math.sin(a), sz = Math.cos(a);
+      if (o.gapHalf && Math.abs(angDiff(a, o.gapDir)) < o.gapHalf) continue;      // notched ring (shock-ring gaps)
       this.emitRaw(pos.x + sx * radius, pos.y + (o.y || 0.15), pos.z + sz * radius, sx * speed, (o.up || 0) * fxRange(0.5, 1), sz * speed,
         life * fxRange(0.7, 1), size * fxRange(0.7, 1.1), o.sizeEnd != null ? o.sizeEnd : size * 0.3, this._ca, this._cb, o.gravity || 0, o.drag != null ? o.drag : 1.5);
     }

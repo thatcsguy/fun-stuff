@@ -150,6 +150,10 @@ const Audio = {
           this.noise({ type: 'bandpass', f: 300, f1: 2600, q: 1.2, a: 0.12, dur: 0.06, vol: 0.32 });
           this.tone({ f: 280, f1: 1400, a: 0.1, dur: 0.12, vol: 0.12, type: 'triangle', verb: true });
           break;
+        case 'pierce': this.tone({ f: 620, f1: 2480, glide: 0.16, type: 'triangle', dur: 0.2, vol: 0.12, verb: true }); this.noise({ type: 'highpass', f: 4200, dur: 0.18, vol: 0.12 }); break;
+        // shock-ring timing cue: a dry clock tick (ring k of n rises in pitch) — "dash NOW"
+        case 'ringTick': { const f = 1480 * (1 + 0.12 * (o.k || 0)); this.noise({ type: 'bandpass', f: 3200, q: 3, dur: 0.025, vol: 0.32 }); this.tone({ f, dur: 0.09, vol: 0.16 }); this.tone({ f: f * 2, dur: 0.05, vol: 0.05, delay: 0.01 }); break; }
+        case 'ringSafe': this.tone({ f: 990, dur: 0.12, vol: 0.06, type: 'triangle' }); this.tone({ f: 1320, dur: 0.14, vol: 0.05, type: 'triangle', delay: 0.05 }); break;
         case 'hurt': this.tone({ f: 120, f1: 50, dur: 0.22, vol: 0.32 }); this.noise({ type: 'lowpass', f: 1000, dur: 0.14, vol: 0.22 }); break;
         case 'heal': [660, 880, 1318.5].forEach((f, i) => this.tone({ f, dur: 0.32, vol: 0.06, delay: i * 0.06, verb: true })); break;
         case 'ultCharge':
