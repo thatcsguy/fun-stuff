@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0f1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Flip 25</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #181b26; --back: #2a3050; --back2: #343c66;
+    --face: #f3f1ea; --text: #e8e9f0; --muted: #8b90a6; --accent: #7aa2ff;
+    --good: #3ddc84; --bad: #ff5d6c; --gold: #ffcf4a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    overscroll-behavior: none; }
+  body { display: flex; flex-direction: column; align-items: center;
+    padding: max(12px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom)); }
+  .wrap { width: 100%; max-width: 460px; display: flex; flex-direction: column; flex: 1; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+  h1 a { color: inherit; text-decoration: none; }
+  .pb { font-size: 13px; color: var(--muted); text-align: right; }
+  .pb b { color: var(--gold); font-variant-numeric: tabular-nums; }
+  .timer { font-size: 54px; font-weight: 700; text-align: center; margin: 10px 0 2px;
+    font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+  .status { text-align: center; color: var(--muted); font-size: 15px; height: 22px; margin-bottom: 10px; }
+  .status b { color: var(--text); }
+  .board { display: grid; gap: 8px; width: 100%; aspect-ratio: 1; }
+  .board.mem { grid-template-columns: repeat(4, 1fr); }
+  .board.num { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .c { border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    background: var(--back); position: relative; cursor: pointer; }
+  .mem .c { font-size: min(11vw, 46px); background: linear-gradient(145deg, var(--back2), var(--back)); }
+  .mem .c span { visibility: hidden; }
+  .mem .c.up { background: var(--face); transform: scale(1.04); }
+  .mem .c.up span { visibility: visible; }
+  .mem .c.ok { background: var(--face); opacity: .32; }
+  .mem .c.ok span { visibility: visible; }
+  .mem .c.miss { background: #f6d9dc; }
+  .num .c { background: var(--panel); border: 1px solid #2b3044; font-size: min(8vw, 32px); font-weight: 700;
+    font-variant-numeric: tabular-nums; }
+  .num .c.done { color: #3a3f55; background: #13151d; border-color: #191c27; }
+  .num .c.bad { animation: bad .25s; }
+  @keyframes bad { 0% { background: var(--bad); color: #fff; } 100% { background: var(--panel); } }
+  .num .c.good { animation: good .2s; }
+  @keyframes good { 0% { background: var(--good); color: #0f1117; } 100% { background: #13151d; } }
+  .foot { margin-top: 14px; display: flex; gap: 10px; }
+  button { font: inherit; border: 0; border-radius: 12px; padding: 14px 16px; font-size: 17px; font-weight: 600;
+    background: var(--panel); color: var(--text); flex: 1; cursor: pointer; }
+  button.primary { background: var(--accent); color: #0b0d14; }
+  .result { display: none; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding-top: 6px; }
+  .result.show { display: flex; }
+  .big { font-size: 64px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .newpb { color: var(--gold); font-weight: 700; font-size: 18px; height: 24px; }
+  .splits { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; margin: 8px 0; }
+  .splits div { background: var(--panel); border-radius: 12px; padding: 10px; }
+  .splits small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+  .splits b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .splits i { display: block; font-style: normal; color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .hist { width: 100%; text-align: left; color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .hist ol { margin: 4px 0 0; padding-left: 22px; font-variant-numeric: tabular-nums; }
+  .hist li.pbrow { color: var(--gold); }
+  .result button { width: 100%; flex: none; padding: 18px; font-size: 20px; margin-top: 6px; }
+  .reset { background: none; color: var(--muted); font-size: 13px; padding: 6px; font-weight: 400; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><a href="../">←</a> Flip 25</h1>
+    <div class="pb">Best <b id="pb">--</b></div>
+  </header>
+  <div class="timer" id="timer">0.00</div>
+  <div class="status" id="status">Tap any card to start the clock</div>
+  <div id="play">
+    <div class="board mem" id="board"></div>
+    <div class="foot"><button id="restart">Restart</button></div>
+  </div>
+  <div class="result" id="result">
+    <div class="big" id="final">0.00</div>
+    <div class="newpb" id="newpb"></div>
+    <div class="splits">
+      <div><small>Pairs</small><b id="sMem">0.00</b><i id="sMemB"></i></div>
+      <div><small>1 to 25</small><b id="sNum">0.00</b><i id="sNumB"></i></div>
+    </div>
+    <div class="hist"><span id="statsLine"></span><ol id="hist"></ol></div>
+    <button class="primary" id="again">Go again</button>
+    <button class="reset" id="wipe">Reset records</button>
+  </div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var KEY = 'flip25_v1';
+  var POOL = ['🍎','🍋','🍇','🍉','🥝','🍒','🌶️','🥕','🐸','🐙','🦊','🐝','🐳','🦄','🐢','🦀','⚽','🎲','🎈','🔔','⭐','🌙','🔥','💎','🌵','🍄','🚀','⏰','🎸','👑'];
+  var $ = function (id) { return document.getElementById(id); };
+  var board = $('board'), timerEl = $('timer'), statusEl = $('status');
+
+  var rec = load();
+  function load() {
+    try { var r = JSON.parse(localStorage.getItem(KEY)); if (r && r.runs) return r; } catch (e) {}
+    return { best: null, bestMem: null, bestNum: null, runs: [], played: 0 };
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(rec)); } catch (e) {} }
+
+  function fmt(ms) {
+    if (ms == null) return '--';
+    var s = ms / 1000;
+    if (s < 60) return s.toFixed(2);
+    var m = Math.floor(s / 60); var r = (s - m * 60).toFixed(2);
+    return m + ':' + (r < 10 ? '0' : '') + r;
+  }
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+
+  // ---- state ----
+  var phase, t0, tMem, raf, cards, first, missA, missB, missTimer, matched, next, wrong, flips, finishedAt;
+
+  function reset() {
+    cancelAnimationFrame(raf); clearTimeout(missTimer);
+    phase = 'ready'; t0 = 0; tMem = 0; first = missA = missB = null; matched = 0; next = 1; wrong = 0; flips = 0;
+    $('play').classList.remove('hidden'); $('result').classList.remove('show');
+    timerEl.classList.remove('hidden'); statusEl.classList.remove('hidden');
+    timerEl.textContent = '0.00';
+    statusEl.textContent = 'Tap any card to start the clock';
+    $('pb').textContent = fmt(rec.best);
+    var syms = shuffle(POOL.slice()).slice(0, 8);
+    var deck = shuffle(syms.concat(syms));
+    board.className = 'board mem';
+    board.innerHTML = '';
+    cards = deck.map(function (s, i) {
+      var el = document.createElement('div');
+      el.className = 'c'; el.dataset.i = i;
+      el.innerHTML = '<span>' + s + '</span>';
+      board.appendChild(el);
+      return { el: el, sym: s, ok: false };
+    });
+  }
+
+  function tick() {
+    timerEl.textContent = fmt(performance.now() - t0);
+    raf = requestAnimationFrame(tick);
+  }
+
+  function hideMiss() {
+    clearTimeout(missTimer);
+    if (missA) { missA.el.className = 'c'; missB.el.className = 'c'; }
+    missA = missB = null;
+  }
+
+  function tapCard(i) {
+    var c = cards[i];
+    if (phase === 'ready') { phase = 'mem'; t0 = performance.now(); tick(); statusEl.innerHTML = 'Find the <b>8 pairs</b>'; }
+    if (phase !== 'mem') return;
+    // any tap clears a showing mismatch instantly
+    if (missA) hideMiss();
+    if (c.ok || c === first) return;
+    flips++;
+    c.el.className = 'c up';
+    if (!first) { first = c; return; }
+    if (first.sym === c.sym) {
+      first.ok = c.ok = true;
+      first.el.className = 'c ok'; c.el.className = 'c ok';
+      first = null; matched++;
+      if (matched === 8) startNumbers();
+      else statusEl.innerHTML = '<b>' + (8 - matched) + '</b> pair' + (8 - matched === 1 ? '' : 's') + ' left';
+    } else {
+      missA = first; missB = c; first = null;
+      missA.el.className = 'c up miss'; missB.el.className = 'c up miss';
+      missTimer = setTimeout(hideMiss, 700);
+    }
+  }
+
+  function startNumbers() {
+    tMem = performance.now() - t0;
+    phase = 'num';
+    board.className = 'board num';
+    board.innerHTML = '';
+    var nums = shuffle(Array.from({ length: 25 }, function (_, k) { return k + 1; }));
+    cards = nums.map(function (n) {
+      var el = document.createElement('div');
+      el.className = 'c'; el.dataset.n = n; el.textContent = n;
+      board.appendChild(el);
+      return el;
+    });
+    statusEl.innerHTML = 'Tap <b>1</b> to <b>25</b> in order · next <b>1</b>';
+  }
+
+  function tapNum(el) {
+    if (phase !== 'num') return;
+    var n = +el.dataset.n;
+    if (n === next) {
+      el.className = 'c done good';
+      next++;
+      if (next > 25) return finish();
+      statusEl.innerHTML = 'Tap <b>1</b> to <b>25</b> in order · next <b>' + next + '</b>';
+    } else if (n > next) {
+      wrong++;
+      el.className = 'c';
+      void el.offsetWidth; // restart flash animation
+      el.className = 'c bad';
+    }
+  }
+
+  function finish() {
+    var total = performance.now() - t0;
+    cancelAnimationFrame(raf);
+    phase = 'done'; finishedAt = performance.now();
+    var numT = total - tMem;
+    var prevBest = rec.best, prevMem = rec.bestMem, prevNum = rec.bestNum;
+    var isPB = prevBest == null || total < prevBest;
+    if (isPB) rec.best = total;
+    if (prevMem == null || tMem < prevMem) rec.bestMem = tMem;
+    if (prevNum == null || numT < prevNum) rec.bestNum = numT;
+    rec.played++;
+    rec.runs.unshift({ t: Math.round(total), m: Math.round(tMem), n: Math.round(numT), w: wrong, f: flips });
+    rec.runs = rec.runs.slice(0, 50);
+    save();
+
+    $('play').classList.add('hidden'); timerEl.classList.add('hidden'); statusEl.classList.add('hidden');
+    $('result').classList.add('show');
+    $('final').textContent = fmt(total);
+    $('newpb').textContent = isPB ? (prevBest == null ? 'First run on the board!' : 'New best! ' + fmt(prevBest - total) + 's faster') : '+' + fmt(total - prevBest) + ' off your best';
+    $('sMem').textContent = fmt(tMem);
+    $('sMemB').textContent = (tMem <= rec.bestMem ? 'best split! ' : 'best ' + fmt(rec.bestMem) + ' · ') + flips + ' flips';
+    $('sNum').textContent = fmt(numT);
+    $('sNumB').textContent = (numT <= rec.bestNum ? 'best split! ' : 'best ' + fmt(rec.bestNum) + ' · ') + wrong + ' miss' + (wrong === 1 ? '' : 'es');
+    $('pb').textContent = fmt(rec.best);
+    var last10 = rec.runs.slice(0, 10).map(function (r) { return r.t; });
+    var avg = last10.reduce(function (a, b) { return a + b; }, 0) / last10.length;
+    $('statsLine').textContent = rec.played + ' run' + (rec.played === 1 ? '' : 's') + ' · avg of last ' + last10.length + ': ' + fmt(avg);
+    $('hist').innerHTML = rec.runs.slice(0, 5).map(function (r, k) {
+      return '<li' + (r.t === Math.round(rec.best) ? ' class="pbrow"' : '') + '>' + fmt(r.t) + (k === 0 ? ' (this run)' : '') + '</li>';
+    }).join('');
+  }
+
+  // pointerdown = no waiting for click/touchend
+  board.addEventListener('pointerdown', function (e) {
+    var el = e.target.closest('.c');
+    if (!el) return;
+    e.preventDefault();
+    if (phase === 'num') tapNum(el); else tapCard(+el.dataset.i);
+  });
+  board.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  document.addEventListener('dblclick', function (e) { e.preventDefault(); });
+  $('restart').addEventListener('click', reset);
+  $('again').addEventListener('click', function () {
+    if (performance.now() - finishedAt < 450) return; // swallow stray taps from the last number
+    reset();
+  });
+  $('wipe').addEventListener('click', function () {
+    if (!confirm('Erase your best times and history?')) return;
+    rec = { best: null, bestMem: null, bestNum: null, runs: [], played: 0 };
+    save(); reset();
+  });
+  window.__flip = { get phase() { return phase; }, get cards() { return cards; }, get rec() { return rec; } };
+
+  reset();
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(function () {});
+})();
+</script>
+</body>
+</html>
