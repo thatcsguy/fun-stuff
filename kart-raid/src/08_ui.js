@@ -79,6 +79,7 @@
     const S = save.settings;
     if (G.input) { G.input.driftAssist = S.assist === null || S.assist === undefined ? G.isTouch : !!+S.assist; G.input.autoThrottle = !!+S.throttle; }
     G.cam.shakeMult = +S.shake ? 0.4 : 1; G.settings.reduceShake = !!+S.shake;
+    if (G.cam.setPreset && G.cam.preset !== (S.cam || 'far')) G.cam.setPreset(S.cam || 'far');
     G.settings.thickPatterns = !!+S.patterns;
     if (G.track && G.track.uniforms && G.track.uniforms.uThick) G.track.uniforms.uThick.value = G.settings.thickPatterns ? 1 : 0;
     try { G.audio?.mute?.(!!+S.mute); } catch (e) { }
@@ -87,14 +88,14 @@
   }
   function refreshSettingsUI() {
     const S = save.settings;
-    const cur = { quality: S.quality || 'auto', mute: String(+S.mute || 0), assist: String(G.input?.driftAssist ? 1 : 0), throttle: String(+S.throttle ? 1 : 0), shake: String(+S.shake ? 1 : 0), patterns: String(+S.patterns ? 1 : 0) };
+    const cur = { quality: S.quality || 'auto', mute: String(+S.mute || 0), assist: String(G.input?.driftAssist ? 1 : 0), throttle: String(+S.throttle ? 1 : 0), shake: String(+S.shake ? 1 : 0), patterns: String(+S.patterns ? 1 : 0), cam: S.cam || 'far' };
     document.querySelectorAll('[data-set]').forEach(g => { const k = g.dataset.set; g.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('on', b.dataset.v === cur[k])); });
     document.querySelectorAll('[data-range]').forEach(r => { try { const v = G.audio?.getVolume?.(r.dataset.range); r.value = v ?? 0.8; } catch (e) { } });
     document.querySelectorAll('[data-diff]').forEach(b => { b.classList.toggle('on', b.dataset.diff === (S.diff || 'raid')); if (b.dataset.diff === 'mythic') b.disabled = !save.cleared; });
   }
   function setSetting(k, v) {
     const S = save.settings;
-    if (k === 'quality') { S.quality = v; applyQuality(); } else if (k === 'assist') S.assist = +v; else S[k] = +v;
+    if (k === 'quality') { S.quality = v; applyQuality(); } else if (k === 'assist') S.assist = +v; else if (k === 'cam') S.cam = v; else S[k] = +v;
     applySettings(); persist(); refreshSettingsUI(); sfx('uiClick');
   }
 
@@ -468,7 +469,7 @@
     if (we > 0) {   // blend into the chase camera behind the kart
       V.a.copy(kp).addScaledVector(V.t, -G.cam.dist).addScaledVector(V.up, G.cam.height);
       V.c.lerp(V.a, we);
-      V.a.copy(kp).addScaledVector(V.t, G.cam.lookAhead).addScaledVector(V.up, 0.9);
+      V.a.copy(kp).addScaledVector(V.t, G.cam.lookAhead).addScaledVector(V.up, G.cam.lookUp ?? 0.9);
       V.q.lerp(V.a, we);
     }
     cam.position.copy(V.c); cam.up.set(0, 1, 0); cam.lookAt(V.q);
@@ -744,7 +745,7 @@
   ENTER.paused = (d, prev) => {
     if (prev !== 'paused') flow.pausedFrom = FIGHTISH[prev] ? prev : 'fight';
     G.time.paused = true;
-    $('pause-help').innerHTML = touchUI() ? '' : 'E ITEM &middot; ESC PAUSE &middot; GRAZE DANGER EDGES FOR FLUX';
+    $('pause-help').innerHTML = touchUI() ? '' : 'E ITEM &middot; C CAMERA &middot; ESC PAUSE &middot; GRAZE DANGER EDGES FOR FLUX';
     const pc = $('pause-ctl'); if (pc) pc.innerHTML = controlsHTML();
   };
   LEAVE.paused = (next) => { if (next !== 'defeat') G.time.paused = false; };
@@ -855,6 +856,10 @@
     const c = e.code, st = flow.state;
     if (E.settings.classList.contains('open')) { if (c === 'Escape') ACT.closesettings(); return; }
     if (G.params.debug) debugKey(e);
+    // C: cycle the chase camera (FAR default / MID / NEAR); saved like the settings row
+    if (c === 'KeyC' && G.cam.cyclePreset && (FIGHTISH[st] || st === 'paused' || st === 'briefing')) {
+      const n = G.cam.cyclePreset(); save.settings.cam = n; persist(); refreshSettingsUI(); toast('CAMERA: ' + n.toUpperCase()); return;
+    }
     if (c === 'Escape' || c === 'KeyP') {
       if (st === 'paused') { resume(); e.preventDefault(); return; }
       if (FIGHTISH[st]) { pauseGame(); e.preventDefault(); return; }

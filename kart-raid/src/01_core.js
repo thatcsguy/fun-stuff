@@ -252,7 +252,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
         // chromatic aberration (radial) + speed radial blur
         float ca = uCA * (.35 + rad * 1.3);
         vec3 col = vec3(texture2D(tDiffuse, uv + cdir * ca * 2.).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - cdir * ca * 2.).b);
-        float bs = uSpeed * uSpeed * .024 * smoothstep(.28, .75, rad);   // edges only: keeps the boss / side threats readable at speed
+        float bs = uSpeed * uSpeed * .017 * smoothstep(.32, .8, rad);   // edges only: keeps the boss / side threats readable at speed
         if (bs > .0005) {
           vec3 acc = col; float wsum = 1.;
           for (int i = 1; i <= 6; i++) { if (float(i) > uTaps) break; float k = float(i) / uTaps;
@@ -415,14 +415,23 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
   const vnoise = (x, seed) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return (nh(i + seed * 57) * (1 - u) + nh(i + 1 + seed * 57) * u) * 2 - 1; };
   const noise3 = (t, seed) => vnoise(t, seed) * 0.57 + vnoise(t * 2.1, seed + 7) * 0.29 + vnoise(t * 4.3, seed + 13) * 0.14;
 
+  const CAM_PRESETS = {
+    // far: the kart sits in the lower third, the road reads ~150 m ahead and both track edges stay in view
+    far: { dist: 10.5, height: 5.4, lookAhead: 18, lookUp: 1.1, spdDist: 1.4, spdHeight: 0.2, fov: 70, yawMax: 0.45, yawCast: 0.7 },
+    mid: { dist: 8.0, height: 3.6, lookAhead: 14, lookUp: 1.1, spdDist: 1.1, spdHeight: 0.25, fov: 70, yawMax: 0.55, yawCast: 0.8 },
+    near: { dist: 5.9, height: 2.15, lookAhead: 9, lookUp: 0.9, spdDist: 0.9, spdHeight: 0.25, fov: 70, yawMax: 0.62, yawCast: 0.85 },
+  };
+  G.CAM_PRESETS = CAM_PRESETS;
   const cam = G.cam = {
     mode: 'chase', trauma: 0, shakeMult: 1, fovBase: 70, fov: 70,
-    dist: 5.9, height: 2.15, lookAhead: 9,
+    // chase framing. Default 'far' preset: high and back enough that telegraphs 40-120 m ahead and hazards at the
+    // track edges are readable with time to react (the old tight framing is kept as 'near'). See CAM_PRESETS / setPreset.
+    dist: 10.5, height: 5.4, lookAhead: 18, lookUp: 1.1, spdDist: 1.4, spdHeight: 0.2, preset: 'far',
     kick: { amt: 0, t: 0, dur: 0 }, pull: { amt: 0, t: 0, dur: 0 }, boss: { w: 0, t: 0, dur: 0 },
     cinematic: null, cinT: 0, swing: 0,
     // persistent boss framing in fights: the view yaws toward the boss (max bossYawMax rad, more during casts) and the
     // camera swings part of that to the outside so kart, road ahead and boss share the frame. 0 disables.
-    bossFrame: 1, bossYawMax: 0.62, bossYawCast: 0.85, bossYaw: 0, bossLift: 0,
+    bossFrame: 1, bossYawMax: 0.45, bossYawCast: 0.7, bossYaw: 0, bossLift: 0,
     orbit: { target: new THREE.Vector3(), radius: 40, height: 14, speed: 0.25, angle: 0 },
     shake(tr) { cam.trauma = Math.min(1, cam.trauma + tr * cam.shakeMult); },
     kickFov(deg, dur = 0.4) { cam.kick.amt = Math.max(cam.kick.amt * (1 - cam.kick.t / Math.max(cam.kick.dur, 1e-3)), deg); cam.kick.t = 0; cam.kick.dur = dur; },
@@ -432,6 +441,16 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
     setOrbit(target, radius = 40, height = 14, speed = 0.25) { cam.orbit.target.copy(target); cam.orbit.radius = radius; cam.orbit.height = height; cam.orbit.speed = speed; cam.mode = 'orbit'; },
     punch(dir, amt = 0.12) { cv.punchV.addScaledVector(dir, amt * 18); },
     snap() { cam._snap = true; },   // teleport camera to target next update (no smoothing)
+    // chase presets: far (default, readable), mid, near (the original tight framing)
+    setPreset(name) {
+      const p = CAM_PRESETS[name] || CAM_PRESETS.far;
+      cam.preset = CAM_PRESETS[name] ? name : 'far';
+      cam.dist = p.dist; cam.height = p.height; cam.lookAhead = p.lookAhead; cam.lookUp = p.lookUp; cam.spdDist = p.spdDist; cam.spdHeight = p.spdHeight; cam.fovBase = p.fov;
+      cam.bossYawMax = p.yawMax; cam.bossYawCast = p.yawCast;
+      G.emit?.('cam:preset', { name: cam.preset });
+      return cam.preset;
+    },
+    cyclePreset() { const n = Object.keys(CAM_PRESETS); return cam.setPreset(n[(n.indexOf(cam.preset) + 1) % n.length]); },
     update(rdt) {
       const k = G.kart;
       const kh = cam.kick; kh.t += rdt; const kickNow = kh.t < kh.dur ? kh.amt * (1 - kh.t / kh.dur) * (1 - kh.t / kh.dur) : 0;
@@ -473,11 +492,11 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
         cv.q.setFromAxisAngle(cv.up, cam.swing + cam.bossYaw * 0.45); cv.a.copy(cv.fwd).applyQuaternion(cv.q);
         const spd = Math.max(0, Math.min(1, (k.speed || 0) / 50));
         const pl = cam.pull; pl.t += rdt; const pullNow = pl.t < pl.dur ? pl.amt * Math.sin(Math.PI * Math.min(1, pl.t / pl.dur)) : 0;
-        const dist = cam.dist + spd * 0.9 + (k.boosting ? 0.5 : 0) + pullNow;
-        const ht = cam.height - spd * 0.25 + pullNow * 0.4;
+        const dist = cam.dist + spd * cam.spdDist + (k.boosting ? 0.6 : 0) + pullNow;
+        const ht = cam.height - spd * cam.spdHeight + pullNow * 0.4;
         cv.pos.copy(k.renderPos).addScaledVector(cv.a, -dist).addScaledVector(cv.up, ht);
         cv.q.setFromAxisAngle(cv.up, cam.swing + cam.bossYaw); cv.b.copy(cv.fwd).applyQuaternion(cv.q);
-        cv.look.copy(k.renderPos).addScaledVector(cv.b, cam.lookAhead).addScaledVector(cv.up, 0.9 + cam.bossLift * 2.2);
+        cv.look.copy(k.renderPos).addScaledVector(cv.b, cam.lookAhead).addScaledVector(cv.up, cam.lookUp + cam.bossLift * 2.2);
         // optional boss framing
         const bw = cam.boss; bw.t += rdt;
         if (bw.t < bw.dur && G.boss && G.boss.root) {
