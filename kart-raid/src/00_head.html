@@ -678,4 +678,57 @@ body.debug #debug{display:block}
 </div>
 <div id="fade"></div>
 <div id="debug"></div>
+<!-- fullscreen toggle (self-contained). Position via the CSS vars on #fsToggle. -->
+<style>
+#fsToggle{position:fixed;z-index:9000;width:40px;height:40px;border-radius:20px;border:1px solid rgba(255,255,255,.28);background:rgba(10,10,20,.45);
+  display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  top:calc(env(safe-area-inset-top,0px) + var(--fs-top,8px));right:calc(env(safe-area-inset-right,0px) + var(--fs-right,8px));opacity:.75}
+#fsToggle:hover{opacity:1}
+#fsToggle svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+#fsToggle .x{display:none}#fsToggle.on .x{display:block}#fsToggle.on .o{display:none}
+#fsHintBox{position:fixed;z-index:9001;left:50%;top:calc(env(safe-area-inset-top,0px) + 56px);transform:translateX(-50%);max-width:86vw;padding:9px 14px;border-radius:10px;
+  background:rgba(10,10,20,.88);color:#fff;font:13px/1.35 system-ui,sans-serif;text-align:center;opacity:0;pointer-events:none;transition:opacity .25s}
+#fsHintBox.on{opacity:1}
+</style>
+<button id="fsToggle" aria-label="Toggle fullscreen" title="Fullscreen" tabindex="-1"><svg viewBox="0 0 24 24"><path class="o" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><path class="x" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></button>
+<div id="fsHintBox"></div>
+<script>
+(() => {
+  const btn = document.getElementById('fsToggle'), hint = document.getElementById('fsHintBox');
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = () => window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  function showHint(msg) { hint.textContent = msg; hint.classList.add('on'); clearTimeout(showHint.h); showHint.h = setTimeout(() => hint.classList.remove('on'), 3800); }
+  function sync() { btn.classList.toggle('on', !!fsEl()); if (standalone()) btn.style.display = 'none'; }
+  function toggle(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    btn.blur(); // never keep focus: Space/Enter are game keys
+    try {
+      if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+      const de = document.documentElement, req = de.requestFullscreen || de.webkitRequestFullscreen;
+      // iPhone browsers (Safari and Chrome iOS are both WebKit) have no element fullscreen
+      if (req && !/iPhone|iPod/.test(navigator.userAgent)) {
+        const p = req.call(de, { navigationUI: 'hide' });
+        if (p && p.then) p.then(() => { try { if (matchMedia('(pointer: coarse)').matches && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch (er) {} }).catch(() => showHint('Full screen was blocked by the browser'));
+        return;
+      }
+    } catch (er) { /* fall through */ }
+    showHint(isIOS ? 'iPhone: tap Share, then Add to Home Screen, and launch it from there for full screen' : 'Full screen is not available in this browser');
+  }
+  btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+  btn.addEventListener('mousedown', (e) => e.stopPropagation());
+  btn.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+  btn.addEventListener('click', toggle);
+  document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync);
+  sync();
+})();
+</script>
+<style>
+/* fullscreen toggle placement: under the ENRAGE timer (fight) and the title SETTINGS button; on touch phones it hides
+   while driving (Android goes fullscreen on the first touch anyway) and shows on title / briefing / pause / results */
+#fsToggle{--fs-top:76px;--fs-right:14px}
+body.touch[data-mode="fight"] #fsToggle,body.touch[data-mode="countdown"] #fsToggle,body.touch[data-mode="warp"] #fsToggle,
+body.touch[data-mode="intro"] #fsToggle,body.touch[data-mode="tutorial"] #fsToggle,body.touch[data-mode="finale"] #fsToggle{display:none}
+body[data-mode="boot"] #fsToggle{display:none}
+</style>
 <script type="module">

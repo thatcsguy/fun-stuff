@@ -627,14 +627,15 @@
     palm(b, p) { palmStrike(b, p); },
 
     // ---- P1/P2: Palm Rake. Three slams in a row, each blocking two of the three lanes on the kart's line at its
-    // own instant (1.0 s apart). The open lane moves one lane at a time, so the dodge is a slalom: read the
+    // own instant (1.2 s apart). The open lane moves one lane at a time, so the dodge is a slalom: read the
     // gaps (or brake / boost to shift the timing). ----
     rake(b) {
       const k = K(), Tr = T();
-      const v = clamp(k.sdot || 0, 24, 42);
+      // slams land on your cruising line: speeds below cruise are assumed to recover toward it
+      const v = clamp(Math.max(k.sdot || 0, Math.min(G.cfg.vTop, (k.sdot || 0) + 6)), 24, 44);
       const curLane = Math.abs(k.d) < 3 ? 0 : Math.sign(k.d);
       let open = curLane;
-      const LEN = 24, T0 = 2.0, DT = 1.0;
+      const LEN = 30, T0 = 2.0, DT = 1.2;
       callout('PALM RAKE - FIND THE GAP!', 'danger');
       G.ui?.hint?.('b1rake', 'WEAVE THROUGH THE OPEN LANE', 'EACH SLAM LEAVES ONE LANE CLEAR · A/D TO SWITCH', 4.5);
       sfx('roar', { pitch: 1.15, vol: 0.5 });
@@ -648,6 +649,7 @@
         const blocks = open === 0 ? [{ d: -6, wid: 6.2 }, { d: 6, wid: 6.2 }] : [{ d: -open * 3, wid: 12.4 }];
         // the open lane gets a gold "safe" strip so the gap reads at a glance
         tele({ shape: 'rect', kind: 'gold', len: LEN, wid: 5, d: Tr.laneD(open, sc), s: sc, windup: tr, exact: true, visualOnly: true, src: 'rakeGap' });
+        { const od = Tr.laneD(open, sc); for (const e of [-1, 1]) { const pd = open === 0 ? e * 3.1 : (e === -open ? od + e * 3.1 : null); if (pd == null) continue; addPost(Tr.wrap(sc - LEN / 2), pd, 3.2, tr); addPost(Tr.wrap(sc + LEN / 2), pd, 2.2, tr); } }
         let first = true;
         for (const bl of blocks) {
           const h = tele({ shape: 'rect', kind: 'damage', len: LEN, wid: bl.wid, d: bl.d, s: sc, windup: tr - 0.12, exact: true, dmg: 20, knock: 3, src: 'rake' });
@@ -903,7 +905,8 @@
   // into the furnace (110 / 160 / 230 dmg by tier) and SHORTS it for 5-7 s: armor off, shoulder vents open (x1.5).
   // Drive through without a charge: nothing ("NO CHARGE"). Missing the gate: nothing. ~2 gates a lap, curves only.
   // =================================================================
-  const ARMOR = 0.6, GATE_R = 3.2, GATE_HW = 3.65, GATE_H = 5.6;
+  const SHORT_COL = new THREE.Color(0.25, 1.1, 1.3);
+  const ARMOR = 0.45, GATE_R = 3.2, GATE_HW = 3.65, GATE_H = 6.8;
   const GATE_DMG = [0, 110, 160, 230], GATE_STAG = [0, 0.06, 0.10, 0.15], GATE_SHORT = [0, 5, 6, 7];
   const arc = { mesh: null, curtainU: null, floorU: null, g: null, cd: 2.5, lane: 0, n: 0, told: 0, zapT: 0, fxT: 0, warned: false,
     capL: new THREE.Vector3(), capR: new THREE.Vector3(), mid: new THREE.Vector3(), col: new THREE.Color() };
@@ -929,6 +932,13 @@
           float a = (.1 + streak * .55 * scan + top * .3) * edge * base * uA * smoothstep(5., 16., vD);
           gl_FragColor = vec4(uCol * a, 1.); }` }));
     curtain.renderOrder = 3; g.add(curtain);
+    // sky beams over both pylons: the gate reads from the far side of the bowl
+    const beamGeo = new THREE.CylinderGeometry(0.22, 0.75, 34, 10, 1, true).translate(0, GATE_H + 1.2 + 17, 0);
+    const beamMat = new THREE.ShaderMaterial({ uniforms: arc.curtainU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      vertexShader: `varying float vY; varying float vD; void main(){ vY = uv.y; vec4 wp = modelMatrix * vec4(position, 1.); vD = distance(cameraPosition, wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp; }`,
+      fragmentShader: `uniform float uTime, uA; uniform vec3 uCol; varying float vY; varying float vD;
+        void main(){ float a = (1. - vY) * (1. - vY) * (.55 + .45 * sin(vY * 30. - uTime * 8.)) * uA * smoothstep(12., 40., vD) * .8; gl_FragColor = vec4(uCol * a, 1.); }` });
+    for (const sx of [-1, 1]) { const bm = new THREE.Mesh(beamGeo, beamMat); bm.position.x = sx * GATE_HW; bm.renderOrder = 3; g.add(bm); }
     arc.floorU = { uTime: arc.curtainU.uTime, uA: arc.curtainU.uA, uCol: arc.curtainU.uCol };
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(GATE_R * 2, 22).rotateX(-Math.PI / 2).translate(0, 0.12, 4), new THREE.ShaderMaterial({
       uniforms: arc.floorU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexShader: near,
@@ -944,6 +954,27 @@
     floor.renderOrder = 2; g.add(floor);
     g.visible = false;
     arc.mesh = g; group.add(g);
+  }
+  // gap posts for PALM RAKE: gold light posts at both edges of each slam's open lane, rising with the windup
+  const posts = { mesh: null, list: [] };
+  function buildPosts(group) {
+    const geo = new THREE.BoxGeometry(0.4, 1, 0.4).translate(0, 0.5, 0);
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.7, 0.35), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+    posts.mesh = new THREE.InstancedMesh(geo, mat, 24); posts.mesh.count = 0; posts.mesh.frustumCulled = false; posts.list.length = 0;
+    group.add(posts.mesh);
+  }
+  function addPost(s, d, h, life) { if (posts.list.length < 24) posts.list.push({ s, d, h, t: 0, life }); }
+  function updatePosts(dt) {
+    if (!posts.mesh) return;
+    const Tr = T(); let n = 0;
+    for (let i = posts.list.length - 1; i >= 0; i--) { const p = posts.list[i]; p.t += dt; if (p.t > p.life + 0.3) posts.list.splice(i, 1); }
+    for (const p of posts.list) {
+      const grow = sm(p.t / 0.5), fade = 1 - sm((p.t - p.life) / 0.3);
+      const f = Tr.frame(p.s, F); V.a.copy(f.p).addScaledVector(f.r, p.d);
+      V.m.makeBasis(f.r, f.n, V.z.copy(f.t).negate()); V.q.setFromRotationMatrix(V.m);
+      posts.mesh.setMatrixAt(n++, V.m.compose(V.a, V.q, V.s.set(1, Math.max(0.01, p.h * grow * fade), 1)));
+    }
+    posts.mesh.count = n; posts.mesh.instanceMatrix.needsUpdate = true; posts.mesh.visible = n > 0;
   }
   const laneOpen = (lane, s) => {
     // a lane is open when no permanent / live lava zone covers its centre at s
@@ -993,13 +1024,14 @@
     if (!charge || b.state !== 'fight') {
       G.fx?.burst?.('fizz', k.worldPos, { count: 24 }); sfx('fizz');
       callout('NO CHARGE - DRIFT THROUGH!', 'danger');
+      G.emit('b1:gate', { charge: 0, dealt: 0 });
       G.ui?.hint?.('b1nocharge', 'HOLD DRIFT AS YOU CROSS THE GATE', 'THE GATE ONLY FIRES WITH A DRIFT CHARGE OR A BOOST', 4.5);
       return;
     }
     const m = b.mem;
     rig.coreNode.getWorldPosition(V.a);
     const col = charge >= 3 ? 0xd890ff : charge === 2 ? 0xffc070 : 0x9ff8ff;
-    for (let i = 0; i < charge + 1; i++) b.after(i * 0.07, () => { if (rig && arc.mesh) { rig.coreNode.getWorldPosition(V.c); G.fx?.lightning?.(i % 2 ? arc.capR : arc.capL, V.c, { color: col, width: 1.0 + charge * 0.35, life: 0.32, branches: 3 }); } }, true);
+    for (let i = 0; i < charge + 1; i++) b.after(i * 0.07, () => { if (rig && arc.mesh) { rig.coreNode.getWorldPosition(V.c); G.fx?.lightning?.(i % 2 ? arc.capR : arc.capL, V.c, { color: col, width: 0.5 + charge * 0.15, life: 0.3, branches: 2 }); } }, true);
     G.fx?.burst?.('lightningStrike', arc.mid, { color: col });
     G.fx?.shockwave?.(k.worldPos, { color: col, radius: 14, dur: 0.4 });
     G.post?.flash?.('#7ff6ff', 0.16, 4); G.cam.shake(0.25); G.time.hitstop(50);
@@ -1040,7 +1072,7 @@
     if (m.shortT > 0) {
       m.shortT -= dt;
       const kk = Math.min(1, m.shortT) * (0.75 + 0.25 * Math.sin(G.time.now * 30));
-      rig.brass.emissive.lerp(V.e.set(0.25, 1.1, 1.3), kk * 0.6);
+      rig.brass.emissive.lerp(SHORT_COL, kk * 0.6);
       arc.fxT -= dt;
       if (arc.fxT <= 0) {
         arc.fxT = 0.09;
@@ -1060,7 +1092,7 @@
     if (m.slowT > 2.2 && m.duckCD <= 0) {
       m.duckCD = 2.6;
       callout('KEEP MOVING!', 'danger');
-      palmStrike(b, { s: k.s, d: k.d, wid: 10, noRamp: true });
+      palmStrike(b, { d: k.d, wid: 10, noRamp: true });   // lead:'resolve' lands it where a slow / reversing kart will be
     }
   }
 
@@ -1069,6 +1101,7 @@
   // =================================================================
   const def = {
     id: 1, name: 'BRASSHOLLOW', title: 'the Furnace Sumo', music: 'boss1',
+    targetTime: 130,
     tips: [
       'His brass is <b>ARMORED</b>. <b>DRIFT through the ARC GATE</b> in each curve to short it out, then release: volleys hit the open vents.',
       'PALM RAKE leaves one lane open per slam: <b>steer through the gaps</b>. Stand still and he flattens you.',
@@ -1085,11 +1118,11 @@
     buildScenery(group, track) {
       buildScenery(group, track);
       rams.build(group, rig.brass);
-      buildGate(group); arc.g = null;
+      buildGate(group); arc.g = null; buildPosts(group);
     },
     boss: {
       // 8500 (spec 7000): with Comet fixed at a flat 900 the bot still killed 7000 HP in 86-102 s against the 2:15 target
-      hp: 8500, minWindup: 1.6, softEnrage: 210, hardEnrage: 255, staggerDur: 6, staggerDecayMult: 0.85, deathDur: 4.4, camFocusY: 14,
+      hp: 11000, minWindup: 1.6, softEnrage: 225, hardEnrage: 270, staggerDur: 6, staggerDecayMult: 0.85, deathDur: 4.4, camFocusY: 14,
       attackNames: ['palm', 'vents', 'rake', 'stomp', 'bellows', 'piston', 'spill', 'oil', 'breath', 'palm2', 'heatwave'],
       attacks,
       create(b) {
@@ -1108,12 +1141,12 @@
           { id: 'ventL', node: rig.ventNodeL, mult: 1.5, weak: true, isExposed: (bb) => bb.mem.ventsOpenT > 0 || bb.staggered },
           { id: 'ventR', node: rig.ventNodeR, mult: 1.5, weak: true, isExposed: (bb) => bb.mem.ventsOpenT > 0 || bb.staggered },
           // armored crack in P2/P3 (targetable, ×0.75; ×1.25 while shorted), fully exposed when staggered (×2 via framework)
-          { id: 'core', node: rig.coreNode, mult: 2.0, weak: true, isExposed: (bb) => bb.staggered || bb.phase >= 1, getMult: (bb) => bb.staggered ? 2.0 : bb.mem.shortT > 0 ? 1.25 : 0.75 },
+          { id: 'core', node: rig.coreNode, mult: 2.0, weak: true, isExposed: (bb) => bb.staggered || bb.phase >= 1, getMult: (bb) => bb.staggered ? 2.0 : bb.mem.shortT > 0 ? 1.4 : 0.75 },
         ];
       },
       onStart(b) {
         b.mem.stomps = 0; b.mem.coreHits = 0; b.mem.ventsOpenT = 0; b.mem.enrStompT = 6; b.mem.shortT = 0; b.mem.slowT = 0; b.mem.duckCD = 0; b.mem.gates = 0;
-        gateRemove(); arc.cd = 2.5; arc.lane = 0; arc.n = 0;
+        gateRemove(); arc.cd = 2.5; arc.lane = 0; arc.n = 0; posts.list.length = 0;
         rams.reset(); G.rings.clear();
         if (rig) { rig.dead = false; for (const o of rig.upper) o.visible = true; for (const a of rig.arms) { a.mode = 'rest'; a.palm.visible = true; a.rod.visible = false; } rig.tremble = 0; rig.scenery.lavaU.uRise.value = 0; rig.scenery.lava.position.y = -1.7; }
       },
@@ -1128,7 +1161,7 @@
         }
       },
       onStagger(b) {
-        for (const a of rig.arms) returnArm(a); rig.inhale = 0; rig.inhaling = false; rams.reset(); sfx('steam');
+        for (const a of rig.arms) returnArm(a); rig.inhale = 0; rig.inhaling = false; rams.reset(); posts.list.length = 0; sfx('steam');
         G.cam.lookAtBoss?.(0.15, 1.0);   // light touch: the core's stagger framing already yaws toward the boss
         b.after(0.7, () => { if (b.staggered) callout(K().flux >= 100 ? 'COMET THE CORE!' : 'HIT THE CORE!', 'break'); });
       },
@@ -1189,6 +1222,7 @@
         shortFx(b, dt);
         gateUpdate(b, dt);
         stallCheck(b, dt);
+        updatePosts(dt);
         rig.inhale = rig.inhaling ? Math.min(1, (b.cast?.t || 0) / (b.cast?.dur || BELLOWS_DUR)) : rig.inhale * Math.max(0, 1 - dt * 3);
         if (b.state !== 'fight') return;
         // soft enrage: extra stomps every 6 s
