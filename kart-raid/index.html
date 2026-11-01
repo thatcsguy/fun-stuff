@@ -669,6 +669,7 @@ body.debug #debug{display:block}
       <div class="set-row">SFX VOLUME<input type="range" min="0" max="1" step="0.05" data-range="sfx"></div>
       <div class="set-row">DRIFT ASSIST<div class="opts" data-set="assist"><button class="seg-btn" data-v="1">ON</button><button class="seg-btn" data-v="0">OFF</button></div></div>
       <div class="set-row">AUTO-THROTTLE<div class="opts" data-set="throttle"><button class="seg-btn" data-v="1">ON</button><button class="seg-btn" data-v="0">OFF</button></div></div>
+      <div class="set-row">CAMERA<div class="opts" data-set="cam"><button class="seg-btn" data-v="far">FAR</button><button class="seg-btn" data-v="mid">MID</button><button class="seg-btn" data-v="near">NEAR</button></div></div>
       <div class="set-row">REDUCE SHAKE<div class="opts" data-set="shake"><button class="seg-btn" data-v="0">OFF</button><button class="seg-btn" data-v="1">ON</button></div></div>
       <div class="set-row">THICK PATTERNS<div class="opts" data-set="patterns"><button class="seg-btn" data-v="0">OFF</button><button class="seg-btn" data-v="1">ON</button></div></div>
     </div>
@@ -677,6 +678,59 @@ body.debug #debug{display:block}
 </div>
 <div id="fade"></div>
 <div id="debug"></div>
+<!-- fullscreen toggle (self-contained). Position via the CSS vars on #fsToggle. -->
+<style>
+#fsToggle{position:fixed;z-index:9000;width:40px;height:40px;border-radius:20px;border:1px solid rgba(255,255,255,.28);background:rgba(10,10,20,.45);
+  display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent;
+  top:calc(env(safe-area-inset-top,0px) + var(--fs-top,8px));right:calc(env(safe-area-inset-right,0px) + var(--fs-right,8px));opacity:.75}
+#fsToggle:hover{opacity:1}
+#fsToggle svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+#fsToggle .x{display:none}#fsToggle.on .x{display:block}#fsToggle.on .o{display:none}
+#fsHintBox{position:fixed;z-index:9001;left:50%;top:calc(env(safe-area-inset-top,0px) + 56px);transform:translateX(-50%);max-width:86vw;padding:9px 14px;border-radius:10px;
+  background:rgba(10,10,20,.88);color:#fff;font:13px/1.35 system-ui,sans-serif;text-align:center;opacity:0;pointer-events:none;transition:opacity .25s}
+#fsHintBox.on{opacity:1}
+</style>
+<button id="fsToggle" aria-label="Toggle fullscreen" title="Fullscreen" tabindex="-1"><svg viewBox="0 0 24 24"><path class="o" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><path class="x" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg></button>
+<div id="fsHintBox"></div>
+<script>
+(() => {
+  const btn = document.getElementById('fsToggle'), hint = document.getElementById('fsHintBox');
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = () => window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+  function showHint(msg) { hint.textContent = msg; hint.classList.add('on'); clearTimeout(showHint.h); showHint.h = setTimeout(() => hint.classList.remove('on'), 3800); }
+  function sync() { btn.classList.toggle('on', !!fsEl()); if (standalone()) btn.style.display = 'none'; }
+  function toggle(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    btn.blur(); // never keep focus: Space/Enter are game keys
+    try {
+      if (fsEl()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+      const de = document.documentElement, req = de.requestFullscreen || de.webkitRequestFullscreen;
+      // iPhone browsers (Safari and Chrome iOS are both WebKit) have no element fullscreen
+      if (req && !/iPhone|iPod/.test(navigator.userAgent)) {
+        const p = req.call(de, { navigationUI: 'hide' });
+        if (p && p.then) p.then(() => { try { if (matchMedia('(pointer: coarse)').matches && screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); } catch (er) {} }).catch(() => showHint('Full screen was blocked by the browser'));
+        return;
+      }
+    } catch (er) { /* fall through */ }
+    showHint(isIOS ? 'iPhone: tap Share, then Add to Home Screen, and launch it from there for full screen' : 'Full screen is not available in this browser');
+  }
+  btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+  btn.addEventListener('mousedown', (e) => e.stopPropagation());
+  btn.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+  btn.addEventListener('click', toggle);
+  document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync);
+  sync();
+})();
+</script>
+<style>
+/* fullscreen toggle placement: under the ENRAGE timer (fight) and the title SETTINGS button; on touch phones it hides
+   while driving (Android goes fullscreen on the first touch anyway) and shows on title / briefing / pause / results */
+#fsToggle{--fs-top:76px;--fs-right:14px}
+body.touch[data-mode="fight"] #fsToggle,body.touch[data-mode="countdown"] #fsToggle,body.touch[data-mode="warp"] #fsToggle,
+body.touch[data-mode="intro"] #fsToggle,body.touch[data-mode="tutorial"] #fsToggle,body.touch[data-mode="finale"] #fsToggle{display:none}
+body[data-mode="boot"] #fsToggle{display:none}
+</style>
 <script type="module">
 
 // =====================================================================
@@ -933,7 +987,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
         // chromatic aberration (radial) + speed radial blur
         float ca = uCA * (.35 + rad * 1.3);
         vec3 col = vec3(texture2D(tDiffuse, uv + cdir * ca * 2.).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - cdir * ca * 2.).b);
-        float bs = uSpeed * uSpeed * .024 * smoothstep(.28, .75, rad);   // edges only: keeps the boss / side threats readable at speed
+        float bs = uSpeed * uSpeed * .017 * smoothstep(.32, .8, rad);   // edges only: keeps the boss / side threats readable at speed
         if (bs > .0005) {
           vec3 acc = col; float wsum = 1.;
           for (int i = 1; i <= 6; i++) { if (float(i) > uTaps) break; float k = float(i) / uTaps;
@@ -1096,14 +1150,23 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
   const vnoise = (x, seed) => { const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f); return (nh(i + seed * 57) * (1 - u) + nh(i + 1 + seed * 57) * u) * 2 - 1; };
   const noise3 = (t, seed) => vnoise(t, seed) * 0.57 + vnoise(t * 2.1, seed + 7) * 0.29 + vnoise(t * 4.3, seed + 13) * 0.14;
 
+  const CAM_PRESETS = {
+    // far: the kart sits in the lower third, the road reads ~150 m ahead and both track edges stay in view
+    far: { dist: 10.5, height: 5.4, lookAhead: 18, lookUp: 1.1, spdDist: 1.4, spdHeight: 0.2, fov: 70, yawMax: 0.45, yawCast: 0.7 },
+    mid: { dist: 8.0, height: 3.6, lookAhead: 14, lookUp: 1.1, spdDist: 1.1, spdHeight: 0.25, fov: 70, yawMax: 0.55, yawCast: 0.8 },
+    near: { dist: 5.9, height: 2.15, lookAhead: 9, lookUp: 0.9, spdDist: 0.9, spdHeight: 0.25, fov: 70, yawMax: 0.62, yawCast: 0.85 },
+  };
+  G.CAM_PRESETS = CAM_PRESETS;
   const cam = G.cam = {
     mode: 'chase', trauma: 0, shakeMult: 1, fovBase: 70, fov: 70,
-    dist: 5.9, height: 2.15, lookAhead: 9,
+    // chase framing. Default 'far' preset: high and back enough that telegraphs 40-120 m ahead and hazards at the
+    // track edges are readable with time to react (the old tight framing is kept as 'near'). See CAM_PRESETS / setPreset.
+    dist: 10.5, height: 5.4, lookAhead: 18, lookUp: 1.1, spdDist: 1.4, spdHeight: 0.2, preset: 'far',
     kick: { amt: 0, t: 0, dur: 0 }, pull: { amt: 0, t: 0, dur: 0 }, boss: { w: 0, t: 0, dur: 0 },
     cinematic: null, cinT: 0, swing: 0,
     // persistent boss framing in fights: the view yaws toward the boss (max bossYawMax rad, more during casts) and the
     // camera swings part of that to the outside so kart, road ahead and boss share the frame. 0 disables.
-    bossFrame: 1, bossYawMax: 0.62, bossYawCast: 0.85, bossYaw: 0, bossLift: 0,
+    bossFrame: 1, bossYawMax: 0.45, bossYawCast: 0.7, bossYaw: 0, bossLift: 0,
     orbit: { target: new THREE.Vector3(), radius: 40, height: 14, speed: 0.25, angle: 0 },
     shake(tr) { cam.trauma = Math.min(1, cam.trauma + tr * cam.shakeMult); },
     kickFov(deg, dur = 0.4) { cam.kick.amt = Math.max(cam.kick.amt * (1 - cam.kick.t / Math.max(cam.kick.dur, 1e-3)), deg); cam.kick.t = 0; cam.kick.dur = dur; },
@@ -1113,6 +1176,16 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
     setOrbit(target, radius = 40, height = 14, speed = 0.25) { cam.orbit.target.copy(target); cam.orbit.radius = radius; cam.orbit.height = height; cam.orbit.speed = speed; cam.mode = 'orbit'; },
     punch(dir, amt = 0.12) { cv.punchV.addScaledVector(dir, amt * 18); },
     snap() { cam._snap = true; },   // teleport camera to target next update (no smoothing)
+    // chase presets: far (default, readable), mid, near (the original tight framing)
+    setPreset(name) {
+      const p = CAM_PRESETS[name] || CAM_PRESETS.far;
+      cam.preset = CAM_PRESETS[name] ? name : 'far';
+      cam.dist = p.dist; cam.height = p.height; cam.lookAhead = p.lookAhead; cam.lookUp = p.lookUp; cam.spdDist = p.spdDist; cam.spdHeight = p.spdHeight; cam.fovBase = p.fov;
+      cam.bossYawMax = p.yawMax; cam.bossYawCast = p.yawCast;
+      G.emit?.('cam:preset', { name: cam.preset });
+      return cam.preset;
+    },
+    cyclePreset() { const n = Object.keys(CAM_PRESETS); return cam.setPreset(n[(n.indexOf(cam.preset) + 1) % n.length]); },
     update(rdt) {
       const k = G.kart;
       const kh = cam.kick; kh.t += rdt; const kickNow = kh.t < kh.dur ? kh.amt * (1 - kh.t / kh.dur) * (1 - kh.t / kh.dur) : 0;
@@ -1154,11 +1227,11 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
         cv.q.setFromAxisAngle(cv.up, cam.swing + cam.bossYaw * 0.45); cv.a.copy(cv.fwd).applyQuaternion(cv.q);
         const spd = Math.max(0, Math.min(1, (k.speed || 0) / 50));
         const pl = cam.pull; pl.t += rdt; const pullNow = pl.t < pl.dur ? pl.amt * Math.sin(Math.PI * Math.min(1, pl.t / pl.dur)) : 0;
-        const dist = cam.dist + spd * 0.9 + (k.boosting ? 0.5 : 0) + pullNow;
-        const ht = cam.height - spd * 0.25 + pullNow * 0.4;
+        const dist = cam.dist + spd * cam.spdDist + (k.boosting ? 0.6 : 0) + pullNow;
+        const ht = cam.height - spd * cam.spdHeight + pullNow * 0.4;
         cv.pos.copy(k.renderPos).addScaledVector(cv.a, -dist).addScaledVector(cv.up, ht);
         cv.q.setFromAxisAngle(cv.up, cam.swing + cam.bossYaw); cv.b.copy(cv.fwd).applyQuaternion(cv.q);
-        cv.look.copy(k.renderPos).addScaledVector(cv.b, cam.lookAhead).addScaledVector(cv.up, 0.9 + cam.bossLift * 2.2);
+        cv.look.copy(k.renderPos).addScaledVector(cv.b, cam.lookAhead).addScaledVector(cv.up, cam.lookUp + cam.bossLift * 2.2);
         // optional boss framing
         const bw = cam.boss; bw.t += rdt;
         if (bw.t < bw.dur && G.boss && G.boss.root) {
@@ -6041,6 +6114,9 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
     // Branded (Boss 2): steer for the cleanse pylon
     let pyl = null;
     if (K.brand > 0 && G.gates && G.gates.list) { try { for (const g of G.gates.list()) if (g && g.kind === 'pylon' && !g.passed && !g.dead) { const x = T.ds(K.s, g.s); if (x > -2) { pyl = g; pyl._x = x; break; } } } catch (e) { } }
+    // Boss 1 arc gates: line up and keep the drift through them (K.botGates = false: ignore them, for balance tests)
+    let arcG = null;
+    if (K.botGates !== false && G.gates && G.gates.list) { try { for (const g of G.gates.list()) if (g && g.kind === 'arc' && !g.passed) { const x = T.ds(K.s, g.s); if (x > -2 && x < 170) { arcG = g; arcG._x = x; break; } } } catch (e) { } }
     // lane choice every 0.25 s
     bot.laneT -= dt;
     if (bot.laneT <= 0) {
@@ -6053,12 +6129,14 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
         if (threatAt(K.s, K.s + 60, d, zones)) score -= 30;
         for (const p of T.pads) { const x = T.ds(K.s, p.s); if (x > 5 && x < 50 && p.lane === lane) score += 6; }
         if (pyl && pyl._x < 160) { const ld = T.laneD(lane, pyl.s); score += Math.max(0, 40 - Math.abs(ld - (pyl.d || 0)) * 10); }
+        if (arcG) { const ld = T.laneD(lane, arcG.s); score += Math.max(0, 25 - Math.abs(ld - (arcG.d || 0)) * 8); }
         if (score > bestScore) { bestScore = score; best = lane; }
       }
       bot.lane = best;
     }
     let dT = clamp(T.laneD(bot.lane, K.s + 15), -hd + 0.5, hd - 0.5);
     if (pyl && pyl._x < 70) dT = clamp(pyl.d || 0, -hd + 0.5, hd - 0.5);
+    if (arcG && arcG._x < 80) dT = clamp(arcG.d || 0, -hd + 0.5, hd - 0.5);
     const kAhead = T.curvature(K.s + 15), kNow = T.curvature(K.s);
     // steering: aim at target d with a lookahead, compensate curvature
     const look = Math.max(10, K.speed * 0.55);
@@ -6072,6 +6150,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
       drift = true;
       // release at T2+ when the curve ends, or at T3
       if (K.driftTier >= 3 || (K.driftTier >= 2 && Math.abs(kAhead) < 0.004)) drift = false;
+      if (arcG && arcG._x < 60) drift = true;            // carry the charge through the gate
       if (Math.abs(kAhead) < 0.002 && K.driftTier < 2 && Math.abs(kNow) < 0.002) drift = false;
       if (pyl && pyl._x < 90 && Math.abs(dT - K.d) > 2) drift = false;   // line up for the pylon
       bot.wantDrift = false;
@@ -6900,6 +6979,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
     const S = save.settings;
     if (G.input) { G.input.driftAssist = S.assist === null || S.assist === undefined ? G.isTouch : !!+S.assist; G.input.autoThrottle = !!+S.throttle; }
     G.cam.shakeMult = +S.shake ? 0.4 : 1; G.settings.reduceShake = !!+S.shake;
+    if (G.cam.setPreset && G.cam.preset !== (S.cam || 'far')) G.cam.setPreset(S.cam || 'far');
     G.settings.thickPatterns = !!+S.patterns;
     if (G.track && G.track.uniforms && G.track.uniforms.uThick) G.track.uniforms.uThick.value = G.settings.thickPatterns ? 1 : 0;
     try { G.audio?.mute?.(!!+S.mute); } catch (e) { }
@@ -6908,14 +6988,14 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
   }
   function refreshSettingsUI() {
     const S = save.settings;
-    const cur = { quality: S.quality || 'auto', mute: String(+S.mute || 0), assist: String(G.input?.driftAssist ? 1 : 0), throttle: String(+S.throttle ? 1 : 0), shake: String(+S.shake ? 1 : 0), patterns: String(+S.patterns ? 1 : 0) };
+    const cur = { quality: S.quality || 'auto', mute: String(+S.mute || 0), assist: String(G.input?.driftAssist ? 1 : 0), throttle: String(+S.throttle ? 1 : 0), shake: String(+S.shake ? 1 : 0), patterns: String(+S.patterns ? 1 : 0), cam: S.cam || 'far' };
     document.querySelectorAll('[data-set]').forEach(g => { const k = g.dataset.set; g.querySelectorAll('.seg-btn').forEach(b => b.classList.toggle('on', b.dataset.v === cur[k])); });
     document.querySelectorAll('[data-range]').forEach(r => { try { const v = G.audio?.getVolume?.(r.dataset.range); r.value = v ?? 0.8; } catch (e) { } });
     document.querySelectorAll('[data-diff]').forEach(b => { b.classList.toggle('on', b.dataset.diff === (S.diff || 'raid')); if (b.dataset.diff === 'mythic') b.disabled = !save.cleared; });
   }
   function setSetting(k, v) {
     const S = save.settings;
-    if (k === 'quality') { S.quality = v; applyQuality(); } else if (k === 'assist') S.assist = +v; else S[k] = +v;
+    if (k === 'quality') { S.quality = v; applyQuality(); } else if (k === 'assist') S.assist = +v; else if (k === 'cam') S.cam = v; else S[k] = +v;
     applySettings(); persist(); refreshSettingsUI(); sfx('uiClick');
   }
 
@@ -7289,7 +7369,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
     if (we > 0) {   // blend into the chase camera behind the kart
       V.a.copy(kp).addScaledVector(V.t, -G.cam.dist).addScaledVector(V.up, G.cam.height);
       V.c.lerp(V.a, we);
-      V.a.copy(kp).addScaledVector(V.t, G.cam.lookAhead).addScaledVector(V.up, 0.9);
+      V.a.copy(kp).addScaledVector(V.t, G.cam.lookAhead).addScaledVector(V.up, G.cam.lookUp ?? 0.9);
       V.q.lerp(V.a, we);
     }
     cam.position.copy(V.c); cam.up.set(0, 1, 0); cam.lookAt(V.q);
@@ -7565,7 +7645,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
   ENTER.paused = (d, prev) => {
     if (prev !== 'paused') flow.pausedFrom = FIGHTISH[prev] ? prev : 'fight';
     G.time.paused = true;
-    $('pause-help').innerHTML = touchUI() ? '' : 'E ITEM &middot; ESC PAUSE &middot; GRAZE DANGER EDGES FOR FLUX';
+    $('pause-help').innerHTML = touchUI() ? '' : 'E ITEM &middot; C CAMERA &middot; ESC PAUSE &middot; GRAZE DANGER EDGES FOR FLUX';
     const pc = $('pause-ctl'); if (pc) pc.innerHTML = controlsHTML();
   };
   LEAVE.paused = (next) => { if (next !== 'defeat') G.time.paused = false; };
@@ -7676,6 +7756,10 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
     const c = e.code, st = flow.state;
     if (E.settings.classList.contains('open')) { if (c === 'Escape') ACT.closesettings(); return; }
     if (G.params.debug) debugKey(e);
+    // C: cycle the chase camera (FAR default / MID / NEAR); saved like the settings row
+    if (c === 'KeyC' && G.cam.cyclePreset && (FIGHTISH[st] || st === 'paused' || st === 'briefing')) {
+      const n = G.cam.cyclePreset(); save.settings.cam = n; persist(); refreshSettingsUI(); toast('CAMERA: ' + n.toUpperCase()); return;
+    }
     if (c === 'Escape' || c === 'KeyP') {
       if (st === 'paused') { resume(); e.preventDefault(); return; }
       if (FIGHTISH[st]) { pauseGame(); e.preventDefault(); return; }
@@ -8766,6 +8850,43 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
     // ---- P1/P2: Palm Strike (rect, lead) ----
     palm(b, p) { palmStrike(b, p); },
 
+    // ---- P1/P2: Palm Rake. Three slams in a row, each blocking two of the three lanes on the kart's line at its
+    // own instant (1.2 s apart). The open lane moves one lane at a time, so the dodge is a slalom: read the
+    // gaps (or brake / boost to shift the timing). ----
+    rake(b) {
+      const k = K(), Tr = T();
+      // slams land on your cruising line: speeds below cruise are assumed to recover toward it
+      const v = clamp(Math.max(k.sdot || 0, Math.min(G.cfg.vTop, (k.sdot || 0) + 6)), 24, 44);
+      const curLane = Math.abs(k.d) < 3 ? 0 : Math.sign(k.d);
+      let open = curLane;
+      const LEN = 30, T0 = 2.0, DT = 1.2;
+      callout('PALM RAKE - FIND THE GAP!', 'danger');
+      G.ui?.hint?.('b1rake', 'WEAVE THROUGH THE OPEN LANE', 'EACH SLAM LEAVES ONE LANE CLEAR · A/D TO SWITCH', 4.5);
+      sfx('roar', { pitch: 1.15, vol: 0.5 });
+      for (let i = 0; i < 3; i++) {
+        const tr = T0 + DT * i, sc = Tr.wrap(k.s + v * tr);
+        // adjacent lane each step, never the lane you are in for the first slam, avoiding lava
+        let opts = [-1, 0, 1].filter(l => Math.abs(l - open) === 1 && laneOpen(l, sc));
+        if (!opts.length) opts = [-1, 0, 1].filter(l => laneOpen(l, sc));
+        if (!opts.length) opts = [0];
+        open = opts[(G.rng() * opts.length) | 0];
+        const blocks = open === 0 ? [{ d: -6, wid: 6.2 }, { d: 6, wid: 6.2 }] : [{ d: -open * 3, wid: 12.4 }];
+        // the open lane gets a gold "safe" strip so the gap reads at a glance
+        tele({ shape: 'rect', kind: 'gold', len: LEN, wid: 5, d: Tr.laneD(open, sc), s: sc, windup: tr, exact: true, visualOnly: true, src: 'rakeGap' });
+        { const od = Tr.laneD(open, sc); for (const e of [-1, 1]) { const pd = open === 0 ? e * 3.1 : (e === -open ? od + e * 3.1 : null); if (pd == null) continue; addPost(Tr.wrap(sc - LEN / 2), pd, 3.2, tr); addPost(Tr.wrap(sc + LEN / 2), pd, 2.2, tr); } }
+        let first = true;
+        for (const bl of blocks) {
+          const h = tele({ shape: 'rect', kind: 'damage', len: LEN, wid: bl.wid, d: bl.d, s: sc, windup: tr - 0.12, exact: true, dmg: 20, knock: 3, src: 'rake' });
+          if (first) {
+            first = false;
+            const arm = rig.arms[i % 2];
+            b.after(Math.max(0.05, tr - 0.5), () => { if (h.state !== 'fade' && h.state !== 'done') launchPalm(arm, sc, bl.d + (bl.wid > 7 ? 0 : 0), 0.5, 0.45, { scale: 1.9 }); }, false);
+          }
+        }
+      }
+      raiseArm(rig.arms[0], 0.4); raiseArm(rig.arms[1], 0.4);
+    },
+
     // ---- P1: Steam Vents (3 geysers ahead) -> shoulder vents open (weak x1.5) ----
     vents(b) {
       const k = K(), lanes = [-1, 0, 1].sort(() => G.rng() - 0.5);
@@ -9002,14 +9123,213 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
   };
 
   // =================================================================
+  // ARC GATES (driving decides the damage)
+  // Brasshollow's brass hull is ARMORED (bolts x0.6 on the body). Twin copper pylons with a live arc between them
+  // stand on one lane of the next curve. Drive through while DRIFTING (or boosting): the gate dumps your charge
+  // into the furnace (110 / 160 / 230 dmg by tier) and SHORTS it for 5-7 s: armor off, shoulder vents open (x1.5).
+  // Drive through without a charge: nothing ("NO CHARGE"). Missing the gate: nothing. ~2 gates a lap, curves only.
+  // =================================================================
+  const SHORT_COL = new THREE.Color(0.25, 1.1, 1.3);
+  const ARMOR = 0.45, GATE_R = 3.2, GATE_HW = 3.65, GATE_H = 6.8;
+  const GATE_DMG = [0, 110, 160, 230], GATE_STAG = [0, 0.06, 0.10, 0.15], GATE_SHORT = [0, 5, 6, 7];
+  const arc = { mesh: null, curtainU: null, floorU: null, g: null, cd: 2.5, lane: 0, n: 0, told: 0, zapT: 0, fxT: 0, warned: false,
+    capL: new THREE.Vector3(), capR: new THREE.Vector3(), mid: new THREE.Vector3(), col: new THREE.Color() };
+  function buildGate(group) {
+    const merge = G.addons.BufferGeometryUtils.mergeGeometries;
+    const copper = new THREE.MeshStandardMaterial({ color: '#c9783c', metalness: 0.9, roughness: 0.32, emissive: new THREE.Color('#ff6a1a'), emissiveIntensity: 0.35, envMapIntensity: 1.4 });
+    const pylon = merge([new THREE.CylinderGeometry(0.3, 0.46, GATE_H, 10).translate(0, GATE_H / 2, 0), new THREE.BoxGeometry(1.5, 0.55, 1.5).translate(0, 0.27, 0),
+      new THREE.CylinderGeometry(0.62, 0.62, 0.35, 12).translate(0, GATE_H + 0.1, 0)]);
+    const coil = merge([0, 1, 2].map(i => new THREE.TorusGeometry(0.55 - i * 0.06, 0.09, 6, 18).rotateX(Math.PI / 2).translate(0, GATE_H - 1.9 + i * 0.6, 0).toNonIndexed()).concat([new THREE.SphereGeometry(0.5, 12, 10).translate(0, GATE_H + 0.75, 0).toNonIndexed()]));
+    const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.5, 2.2, 2.6) });
+    const g = new THREE.Group(); g.name = 'arcGate';
+    for (const sx of [-1, 1]) { const m = new THREE.Mesh(pylon, copper); m.position.x = sx * GATE_HW; g.add(m); const c = new THREE.Mesh(coil, glow); c.position.x = sx * GATE_HW; g.add(c); }
+    const near = `varying vec2 vUv; varying float vD; void main(){ vUv = uv; vec4 wp = modelMatrix * vec4(position, 1.); vD = distance(cameraPosition, wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp; }`;
+    arc.curtainU = { uTime: { value: 0 }, uA: { value: 1 }, uCol: { value: new THREE.Color(0.5, 1.6, 1.9) } };
+    const curtain = new THREE.Mesh(new THREE.PlaneGeometry(GATE_HW * 2, GATE_H).translate(0, GATE_H / 2, 0), new THREE.ShaderMaterial({
+      uniforms: arc.curtainU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, vertexShader: near,
+      fragmentShader: `uniform float uTime, uA; uniform vec3 uCol; varying vec2 vUv; varying float vD;
+        void main(){
+          float edge = smoothstep(.0, .07, vUv.x) * smoothstep(1., .93, vUv.x);
+          float streak = pow(.5 + .5 * sin(vUv.x * 55. + sin(vUv.y * 7. + uTime * 9.) * 2.5), 8.);
+          float scan = .55 + .45 * sin(vUv.y * 22. - uTime * 15.);
+          float top = smoothstep(.6, 1., vUv.y), base = smoothstep(.0, .12, vUv.y);
+          float a = (.1 + streak * .55 * scan + top * .3) * edge * base * uA * smoothstep(5., 16., vD);
+          gl_FragColor = vec4(uCol * a, 1.); }` }));
+    curtain.renderOrder = 3; g.add(curtain);
+    // sky beams over both pylons: the gate reads from the far side of the bowl
+    const beamGeo = new THREE.CylinderGeometry(0.22, 0.75, 34, 10, 1, true).translate(0, GATE_H + 1.2 + 17, 0);
+    const beamMat = new THREE.ShaderMaterial({ uniforms: arc.curtainU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      vertexShader: `varying float vY; varying float vD; void main(){ vY = uv.y; vec4 wp = modelMatrix * vec4(position, 1.); vD = distance(cameraPosition, wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp; }`,
+      fragmentShader: `uniform float uTime, uA; uniform vec3 uCol; varying float vY; varying float vD;
+        void main(){ float a = (1. - vY) * (1. - vY) * (.55 + .45 * sin(vY * 30. - uTime * 8.)) * uA * smoothstep(12., 40., vD) * .8; gl_FragColor = vec4(uCol * a, 1.); }` });
+    for (const sx of [-1, 1]) { const bm = new THREE.Mesh(beamGeo, beamMat); bm.position.x = sx * GATE_HW; bm.renderOrder = 3; g.add(bm); }
+    arc.floorU = { uTime: arc.curtainU.uTime, uA: arc.curtainU.uA, uCol: arc.curtainU.uCol };
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(GATE_R * 2, 22).rotateX(-Math.PI / 2).translate(0, 0.12, 4), new THREE.ShaderMaterial({
+      uniforms: arc.floorU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, vertexShader: near,
+      fragmentShader: `uniform float uTime, uA; uniform vec3 uCol; varying vec2 vUv; varying float vD;
+        void main(){
+          float x = abs(vUv.x - .5) * 2.;
+          float ch = fract(vUv.y * 5.5 - x * .9 - uTime * 1.6);
+          float chev = smoothstep(.0, .08, ch) * smoothstep(.42, .3, ch);
+          float rail = smoothstep(.82, .97, x) * (1. - smoothstep(.97, 1., x));
+          float fade = smoothstep(0., .25, vUv.y) * smoothstep(1., .55, vUv.y);
+          float a = (chev * .5 + rail * .9) * fade * uA * smoothstep(3., 12., vD);
+          gl_FragColor = vec4(uCol * a, 1.); }` }));
+    floor.renderOrder = 2; g.add(floor);
+    g.visible = false;
+    arc.mesh = g; group.add(g);
+  }
+  // gap posts for PALM RAKE: gold light posts at both edges of each slam's open lane, rising with the windup
+  const posts = { mesh: null, list: [] };
+  function buildPosts(group) {
+    const geo = new THREE.BoxGeometry(0.4, 1, 0.4).translate(0, 0.5, 0);
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.7, 0.35), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+    posts.mesh = new THREE.InstancedMesh(geo, mat, 24); posts.mesh.count = 0; posts.mesh.frustumCulled = false; posts.list.length = 0;
+    group.add(posts.mesh);
+  }
+  function addPost(s, d, h, life) { if (posts.list.length < 24) posts.list.push({ s, d, h, t: 0, life }); }
+  function updatePosts(dt) {
+    if (!posts.mesh) return;
+    const Tr = T(); let n = 0;
+    for (let i = posts.list.length - 1; i >= 0; i--) { const p = posts.list[i]; p.t += dt; if (p.t > p.life + 0.3) posts.list.splice(i, 1); }
+    for (const p of posts.list) {
+      const grow = sm(p.t / 0.5), fade = 1 - sm((p.t - p.life) / 0.3);
+      const f = Tr.frame(p.s, F); V.a.copy(f.p).addScaledVector(f.r, p.d);
+      V.m.makeBasis(f.r, f.n, V.z.copy(f.t).negate()); V.q.setFromRotationMatrix(V.m);
+      posts.mesh.setMatrixAt(n++, V.m.compose(V.a, V.q, V.s.set(1, Math.max(0.01, p.h * grow * fade), 1)));
+    }
+    posts.mesh.count = n; posts.mesh.instanceMatrix.needsUpdate = true; posts.mesh.visible = n > 0;
+  }
+  const laneOpen = (lane, s) => {
+    // a lane is open when no permanent / live lava zone covers its centre at s
+    const Tr = T(), d = Tr.laneD(lane, s);
+    for (const z of G.zones.list()) if (z.type === 'lava' && Tr.inRange(s, z.s0, z.s1) && d + 2 > z.d0 && d - 2 < z.d1) return false;
+    return true;
+  };
+  function gateRemove(why) {
+    const g = arc.g; arc.g = null; arc.warned = false;
+    if (g) { try { G.gates.remove(g); } catch (e) { } }
+    if (arc.mesh) arc.mesh.visible = false;
+    if (why === 'miss' && G.fx) { G.fx.burst?.('fizz', arc.mid, { count: 20 }); }
+  }
+  function gateSpawn(b) {
+    const k = K(), Tr = T(), span = Math.PI * RAD;
+    let best = null;
+    for (const c0 of [S_E0, S_W0]) {
+      const s = Tr.wrap(c0 + span * (0.28 + G.rng() * 0.44));
+      const fwd = ((s - k.s) % Tr.L + Tr.L) % Tr.L;
+      if (fwd >= 85 && (!best || fwd < best.fwd)) best = { s, fwd };
+    }
+    if (!best) return;
+    const lanes = [-1, 0, 1].filter(l => l !== arc.lane && laneOpen(l, best.s));
+    if (!lanes.length) { arc.cd = 1; return; }
+    const lane = lanes[(G.rng() * lanes.length) | 0]; arc.lane = lane;
+    const d = Tr.laneD(lane, best.s);
+    arc.g = G.gates.add({ s: best.s, d, r: GATE_R, kind: 'arc', mesh: arc.mesh, src: 'arcGate', onPass: (boosting) => gatePass(b, boosting) });
+    const f = Tr.frame(best.s, F);
+    arc.mesh.position.copy(f.p).addScaledVector(f.r, d);
+    V.z.copy(f.t).negate(); V.m.makeBasis(f.r, f.n, V.z); arc.mesh.quaternion.setFromRotationMatrix(V.m);
+    arc.mesh.visible = true; arc.mesh.updateMatrixWorld(true);
+    arc.capL.set(-GATE_HW, GATE_H + 0.75, 0).applyMatrix4(arc.mesh.matrixWorld);
+    arc.capR.set(GATE_HW, GATE_H + 0.75, 0).applyMatrix4(arc.mesh.matrixWorld);
+    arc.mid.lerpVectors(arc.capL, arc.capR, 0.5);
+    arc.n++;
+    sfx('chime', { pan: G.audio?.panFor?.(arc.mid) || 0, vol: 0.6 });
+    if (arc.n === 1) {
+      G.ui?.hint?.('b1gate', 'DRIFT THROUGH THE ARC GATE', 'BRASS ARMOR BLOCKS BOLTS · A CHARGED GATE SHORTS IT OUT', 5.5);
+      callout('ARC GATE AHEAD!', 'gold');
+    }
+  }
+  function gatePass(b, boosting) {
+    const k = K();
+    const charge = k.drifting ? Math.max(1, k.driftTier) : boosting ? 2 : 0;
+    arc.g = null; arc.warned = false; arc.cd = 1.2;
+    if (arc.mesh) arc.mesh.visible = false;
+    if (!charge || b.state !== 'fight') {
+      G.fx?.burst?.('fizz', k.worldPos, { count: 24 }); sfx('fizz');
+      callout('NO CHARGE - DRIFT THROUGH!', 'danger');
+      G.emit('b1:gate', { charge: 0, dealt: 0 });
+      G.ui?.hint?.('b1nocharge', 'HOLD DRIFT AS YOU CROSS THE GATE', 'THE GATE ONLY FIRES WITH A DRIFT CHARGE OR A BOOST', 4.5);
+      return;
+    }
+    const m = b.mem;
+    rig.coreNode.getWorldPosition(V.a);
+    const col = charge >= 3 ? 0xd890ff : charge === 2 ? 0xffc070 : 0x9ff8ff;
+    for (let i = 0; i < charge + 1; i++) b.after(i * 0.07, () => { if (rig && arc.mesh) { rig.coreNode.getWorldPosition(V.c); G.fx?.lightning?.(i % 2 ? arc.capR : arc.capL, V.c, { color: col, width: 0.5 + charge * 0.15, life: 0.3, branches: 2 }); } }, true);
+    G.fx?.burst?.('lightningStrike', arc.mid, { color: col });
+    G.fx?.shockwave?.(k.worldPos, { color: col, radius: 14, dur: 0.4 });
+    G.post?.flash?.('#7ff6ff', 0.16, 4); G.cam.shake(0.25); G.time.hitstop(50);
+    sfx('thunder', { vol: 0.8 }); sfx('boltHit', { pitch: 0.8 });
+    const dealt = G.combat.damageBoss(GATE_DMG[charge], { source: 'gate', flat: true, targetId: 'core', pos: V.a, tier: charge });
+    b.addStagger(GATE_STAG[charge]);
+    k.addFlux(5 + charge * 3, 'gate');
+    const was = m.shortT > 0;
+    m.shortT = Math.max(m.shortT, GATE_SHORT[charge]); m.ventsOpenT = Math.max(m.ventsOpenT, m.shortT);
+    m.gates = (m.gates || 0) + 1;
+    callout(charge >= 3 ? 'SUPERCONDUCT!' : 'OVERLOAD!', charge >= 3 ? 'perfect' : 'gold');
+    if (!was) b.after(0.45, () => callout('ARMOR DOWN - FIRE!', 'break'), true);
+    G.ui?.hint?.('b1short', 'SHORTED! ARMOR DOWN', 'RELEASE YOUR DRIFT NOW: VOLLEYS HIT THE OPEN VENTS', 4);
+    G.emit('b1:gate', { charge, dealt });
+  }
+  function gateUpdate(b, dt) {
+    const k = K(), m = b.mem;
+    if (arc.g && G.gates.list().indexOf(arc.g) < 0) { arc.g = null; if (arc.mesh) arc.mesh.visible = false; }   // cleared by a phase change
+    const can = b.state === 'fight' && b.enrage < 2 && !k.cometActive;
+    if (!can) { if (arc.g) gateRemove(); return; }
+    if (!arc.g) { arc.cd -= dt; if (arc.cd <= 0) { arc.cd = 1.5; gateSpawn(b); } return; }
+    const Tr = T(), ahead = Tr.ds(k.s, arc.g.s);
+    if (ahead < -4) { gateRemove('miss'); arc.cd = 1.0; return; }
+    // the gate takes the colour of the charge you would dump into it
+    const charge = k.drifting ? Math.max(1, k.driftTier) : k.boosting ? 2 : 0;
+    if (charge) arc.col.set(G.cfg.tierColor[charge - 1]).multiplyScalar(1.7); else arc.col.setRGB(0.55, 0.85, 1.0);
+    arc.curtainU.uCol.value.lerp(arc.col, Math.min(1, dt * 10));
+    arc.curtainU.uA.value = charge ? 1.15 : 0.75;
+    arc.curtainU.uTime.value = G.time.now;
+    arc.zapT -= dt;
+    if (arc.zapT <= 0) { arc.zapT = 0.07 + Math.random() * 0.06; G.fx?.lightning?.(arc.capL, arc.capR, { color: 0xbff8ff, width: 0.4, life: 0.12, branches: 1 }); }
+    // coaching for the first gates: say "DRIFT" in time
+    if (!arc.warned && ahead < 75 && ahead > 20) { arc.warned = true; if (!k.drifting && arc.n <= 4) callout('HOLD DRIFT THROUGH THE GATE!', 'info'); }
+  }
+  // shorted look: cyan crawl over the hull
+  function shortFx(b, dt) {
+    const m = b.mem; if (!rig) return;
+    if (m.shortT > 0) {
+      m.shortT -= dt;
+      const kk = Math.min(1, m.shortT) * (0.75 + 0.25 * Math.sin(G.time.now * 30));
+      rig.brass.emissive.lerp(SHORT_COL, kk * 0.6);
+      arc.fxT -= dt;
+      if (arc.fxT <= 0) {
+        arc.fxT = 0.09;
+        const ns = [rig.ventNodeL, rig.ventNodeR, rig.coreNode, rig.bodyNode, rig.head];
+        ns[(Math.random() * ns.length) | 0].getWorldPosition(V.a); ns[(Math.random() * ns.length) | 0].getWorldPosition(V.b);
+        V.b.x += (Math.random() - 0.5) * 8; V.b.y += (Math.random() - 0.5) * 6;
+        G.fx?.lightning?.(V.a, V.b, { color: 0x9ff8ff, width: 0.6, life: 0.12, branches: 1 });
+      }
+    }
+  }
+  // standing still is not a strategy: a slow kart gets palmed every 2.6 s
+  function stallCheck(b, dt) {
+    const k = K(), m = b.mem;
+    if (b.state !== 'fight' || k.frozen || k.wrecked || k.cometActive || b.staggered || b.invulnT > 0 || b.enrage >= 2) { m.slowT = 0; return; }
+    if (Math.abs(k.speed) < 9) m.slowT += dt; else m.slowT = Math.max(0, m.slowT - dt * 2);
+    m.duckCD -= dt;
+    if (m.slowT > 2.2 && m.duckCD <= 0) {
+      m.duckCD = 2.6;
+      callout('KEEP MOVING!', 'danger');
+      palmStrike(b, { d: k.d, wid: 10, noRamp: true });   // lead:'resolve' lands it where a slow / reversing kart will be
+    }
+  }
+
+  // =================================================================
   // DEFINITION
   // =================================================================
   const def = {
     id: 1, name: 'BRASSHOLLOW', title: 'the Furnace Sumo', music: 'boss1',
+    targetTime: 130,
     tips: [
-      'Release a drift to fire. VIOLET sparks deal the most and <b>interrupt</b> purple cast bars.',
-      'HOP (tap DRIFT) over purple shockwaves.',
-      'Skim the edge of red zones to GRAZE for Flux. Full Flux + BREAK = COMET.',
+      'His brass is <b>ARMORED</b>. <b>DRIFT through the ARC GATE</b> in each curve to short it out, then release: volleys hit the open vents.',
+      'PALM RAKE leaves one lane open per slam: <b>steer through the gaps</b>. Stand still and he flattens you.',
+      'VIOLET drifts <b>interrupt</b> purple cast bars. HOP (tap DRIFT) over shockwaves.',
     ],
     arena: {
       name: 'EMBER BOWL', sky: 'ember', palette: { base: '#16100d', line: '#33f6ff', edge: '#ff6a1a', accent: '#ffc93a' },
@@ -9022,16 +9342,17 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
     buildScenery(group, track) {
       buildScenery(group, track);
       rams.build(group, rig.brass);
+      buildGate(group); arc.g = null; buildPosts(group);
     },
     boss: {
       // 8500 (spec 7000): with Comet fixed at a flat 900 the bot still killed 7000 HP in 86-102 s against the 2:15 target
-      hp: 8500, minWindup: 1.6, softEnrage: 210, hardEnrage: 255, staggerDur: 6, staggerDecayMult: 0.85, deathDur: 4.4, camFocusY: 14,
-      attackNames: ['palm', 'vents', 'stomp', 'bellows', 'piston', 'spill', 'oil', 'breath', 'palm2', 'heatwave'],
+      hp: 11000, minWindup: 1.6, softEnrage: 225, hardEnrage: 270, staggerDur: 6, staggerDecayMult: 0.85, deathDur: 4.4, camFocusY: 14,
+      attackNames: ['palm', 'vents', 'rake', 'stomp', 'bellows', 'piston', 'spill', 'oil', 'breath', 'palm2', 'heatwave'],
       attacks,
       create(b) {
         if (!rig) return;
         b.root = rig.root; b.rig = rig;
-        b.mem = { ventsOpenT: 0, stomps: 0, coreHits: 0, coreHitT: -9, perm: [] };
+        b.mem = { ventsOpenT: 0, stomps: 0, coreHits: 0, coreHitT: -9, perm: [], shortT: 0, slowT: 0, duckCD: 0, gates: 0 };
         rig.dead = false; rig.standTarget = 0; rig.standK = 0;
         for (const o of rig.upper) o.visible = true;
         for (const a of rig.arms) { a.mode = 'rest'; a.palm.visible = true; }
@@ -9039,15 +9360,17 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
       targets(b) {
         if (!rig) return [];
         return [
-          { id: 'body', node: rig.bodyNode, mult: 1.0, always: true },
+          // brass armor: bolts on the hull x0.6 unless an ARC GATE has shorted him
+          { id: 'body', node: rig.bodyNode, mult: 1.0, always: true, getMult: (bb) => bb.mem.shortT > 0 ? 1.0 : ARMOR },
           { id: 'ventL', node: rig.ventNodeL, mult: 1.5, weak: true, isExposed: (bb) => bb.mem.ventsOpenT > 0 || bb.staggered },
           { id: 'ventR', node: rig.ventNodeR, mult: 1.5, weak: true, isExposed: (bb) => bb.mem.ventsOpenT > 0 || bb.staggered },
-          // armored crack in P2/P3 (targetable, ×0.75), fully exposed when staggered (×2 via framework)
-          { id: 'core', node: rig.coreNode, mult: 2.0, weak: true, isExposed: (bb) => bb.staggered || bb.phase >= 1, getMult: (bb) => bb.staggered ? 2.0 : 0.75 },   // armored crack: x0.75 until a BREAK
+          // armored crack in P2/P3 (targetable, ×0.75; ×1.25 while shorted), fully exposed when staggered (×2 via framework)
+          { id: 'core', node: rig.coreNode, mult: 2.0, weak: true, isExposed: (bb) => bb.staggered || bb.phase >= 1, getMult: (bb) => bb.staggered ? 2.0 : bb.mem.shortT > 0 ? 1.4 : 0.75 },
         ];
       },
       onStart(b) {
-        b.mem.stomps = 0; b.mem.coreHits = 0; b.mem.ventsOpenT = 0; b.mem.enrStompT = 6;
+        b.mem.stomps = 0; b.mem.coreHits = 0; b.mem.ventsOpenT = 0; b.mem.enrStompT = 6; b.mem.shortT = 0; b.mem.slowT = 0; b.mem.duckCD = 0; b.mem.gates = 0;
+        gateRemove(); arc.cd = 2.5; arc.lane = 0; arc.n = 0; posts.list.length = 0;
         rams.reset(); G.rings.clear();
         if (rig) { rig.dead = false; for (const o of rig.upper) o.visible = true; for (const a of rig.arms) { a.mode = 'rest'; a.palm.visible = true; a.rod.visible = false; } rig.tremble = 0; rig.scenery.lavaU.uRise.value = 0; rig.scenery.lava.position.y = -1.7; }
       },
@@ -9062,7 +9385,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
         }
       },
       onStagger(b) {
-        for (const a of rig.arms) returnArm(a); rig.inhale = 0; rig.inhaling = false; rams.reset(); sfx('steam');
+        for (const a of rig.arms) returnArm(a); rig.inhale = 0; rig.inhaling = false; rams.reset(); posts.list.length = 0; sfx('steam');
         G.cam.lookAtBoss?.(0.15, 1.0);   // light touch: the core's stagger framing already yaws toward the boss
         b.after(0.7, () => { if (b.staggered) callout(K().flux >= 100 ? 'COMET THE CORE!' : 'HIT THE CORE!', 'break'); });
       },
@@ -9070,7 +9393,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
       onSoftEnrage(b) { b.mem.enrStompT = 3; },
       onHardEnrage(b) {
         // enrage is already 2 here, so breath's VENTING follow-up and every startStagger are suppressed (06_combat)
-        G.tele.clear();
+        G.tele.clear(); gateRemove(); b.mem.shortT = 0;
         if (b.staggered) b.endStagger(true);
         b.clearTimers();
         const Tr = T();
@@ -9083,7 +9406,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
       },
       onWipe(b) { if (rig) rig.laugh = 2; },
       onDeath(b) {
-        rig.dead = true; rig.tremble = 1; rams.reset(); G.rings.clear();
+        rig.dead = true; rig.tremble = 1; rams.reset(); G.rings.clear(); gateRemove(); b.mem.shortT = 0;
         for (const a of rig.arms) returnArm(a);
         b.mem.exploded = false;
         // real cinematic: framed on the boss from the kart's side, then a wide pull-out when the furnace blows
@@ -9120,6 +9443,10 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
         animate(b, dt);
         rams.update(dt);
         if (!rig) return;
+        shortFx(b, dt);
+        gateUpdate(b, dt);
+        stallCheck(b, dt);
+        updatePosts(dt);
         rig.inhale = rig.inhaling ? Math.min(1, (b.cast?.t || 0) / (b.cast?.dur || BELLOWS_DUR)) : rig.inhale * Math.max(0, 1 - dt * 3);
         if (b.state !== 'fight') return;
         // soft enrage: extra stomps every 6 s
@@ -9129,10 +9456,10 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
       },
       phases: [
         { name: 'WARM-UP BOUT', at: 1.0, loop: 20, jitter: 0.5,
-          rotation: [{ t: 0, a: 'palm' }, { t: 4, a: 'vents' }, { t: 10, a: 'palm' }, { t: 14, a: 'stomp' }, { t: 17, a: 'bellows', cast: true }],
+          rotation: [{ t: 0, a: 'palm' }, { t: 4, a: 'vents' }, { t: 9, a: 'rake' }, { t: 14, a: 'stomp' }, { t: 17, a: 'bellows', cast: true }],
           enter(b) { b.mem.stomps = 0; rig.standTarget = 0; setupPermanent(b); } },
         { name: 'STOKE THE FURNACE', at: 0.60, loop: 24, jitter: 0.5,
-          rotation: [{ t: 0, a: 'piston' }, { t: 4, a: 'palm' }, { t: 7, a: 'spill' }, { t: 12, a: 'oil' }, { t: 16, a: 'palm' }, { t: 20, a: 'bellows', cast: true }],
+          rotation: [{ t: 0, a: 'piston' }, { t: 4, a: 'palm' }, { t: 7, a: 'spill' }, { t: 12, a: 'oil' }, { t: 15.5, a: 'rake' }, { t: 20, a: 'bellows', cast: true }],
           enter(b, o) {
             rig.standTarget = 0; b.mem.coreHits = 0;
             setupPermanent(b);
@@ -9153,7 +9480,7 @@ const G = window.G = { THREE, addons: { EffectComposer, RenderPass, UnrealBloomP
           } },
       ],
       idle(b, dt) { },
-      dispose(b) { rams.reset(); },
+      dispose(b) { rams.reset(); gateRemove(); },
     },
   };
   G.bosses[0] = def;
