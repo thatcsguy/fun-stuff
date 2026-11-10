@@ -6,7 +6,7 @@ const Hz = (() => {
   const geo = new THREE.PlaneGeometry(2, 2); geo.rotateX(-PI / 2); geo.userData.shared = true;
   const VERT = 'uniform float uBound; varying vec2 vP; void main(){ vP=position.xz*uBound; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }';
   const FRAG = `
-    uniform int uType; uniform float uR1,uR0,uArc,uLen,uW,uProg,uFire,uStyle,uTime,uAlpha; uniform vec3 uCol; varying vec2 vP;
+    uniform int uType; uniform float uR1,uR0,uArc,uLen,uW,uProg,uFire,uStyle,uTime,uAlpha,uBound; uniform vec3 uCol; varying vec2 vP;
     void main(){
       float len=length(vP), d, f;
       if (uType==0){ d=len-uR1; f=len/max(uR1,1e-3); }
@@ -135,12 +135,20 @@ const Hz = (() => {
 // ---------- bullets ----------
 const Bul = (() => {
   const MAX = 700, list = [];
-  const g = new THREE.SphereGeometry(1, 10, 8), mesh = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff }), MAX);
+  // core: white-hot centre fading to the bullet colour at the rim; tail: additive streak stretched along the velocity
+  const BULV = `varying vec3 vC; varying float vF;
+    void main(){ vC = instanceColor; mat4 mw = modelMatrix * instanceMatrix; vec4 wp = mw * vec4(position, 1.0);
+      vec3 n = mat3(mw) * normal; n /= max(length(n), 1e-5); vec3 v = cameraPosition - wp.xyz; v /= max(length(v), 1e-5);
+      vF = clamp(dot(n, v), 0.0, 1.0); gl_Position = projectionMatrix * viewMatrix * wp; }`;
+  const BULF = `varying vec3 vC; varying float vF; void main(){ float k = pow(vF, 2.5); gl_FragColor = vec4(mix(vC * 1.25, vec3(1.25) + vC * 0.55, k), 1.0); }`;
+  const g = new THREE.SphereGeometry(1, 12, 9), mesh = new THREE.InstancedMesh(g, new THREE.ShaderMaterial({ vertexShader: BULV, fragmentShader: BULF }), MAX);
+  const tail = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending }), MAX);
+  const Q = new THREE.Quaternion(), YAX = new THREE.Vector3(0, 1, 0), TP = new THREE.Vector3(), TS = new THREE.Vector3();
   const dg = new THREE.CircleGeometry(1, 16); dg.rotateX(-PI / 2);
   const disc = new THREE.InstancedMesh(dg, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }), MAX);
-  mesh.frustumCulled = disc.frustumCulled = false; mesh.count = disc.count = 0; disc.renderOrder = 9;
-  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3); disc.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3);
-  FX.root.add(mesh); FX.root.add(disc);
+  mesh.frustumCulled = disc.frustumCulled = tail.frustumCulled = false; mesh.count = disc.count = tail.count = 0; disc.renderOrder = 9; tail.renderOrder = 12;
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3); disc.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3); tail.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3);
+  FX.root.add(mesh); FX.root.add(disc); FX.root.add(tail);
   const M = new THREE.Matrix4(), col = new THREE.Color();
   // fire({x,z,dir,speed,r,dmg,color,life,y,accel,turn (rad/s homing),curve (rad/s), onUpdate(b,dt)})
   function fire(o) { if (list.length >= MAX) return null; const b = Object.assign({ y: 1.1, r: 0.38, dmg: 90, color: (G.boss && G.boss.def.telegraph) || 0xff5a2a, life: 8, speed: 8, dir: 0, t: 0, accel: 0, turn: 0, curve: 0, tag: 'phase' }, o); list.push(b); return b; }
@@ -160,14 +168,16 @@ const Bul = (() => {
       if (dead) { list[i] = list[list.length - 1]; list.pop(); }
     }
     if (G.headless) return;
-    const n = list.length; mesh.count = disc.count = n;
+    const n = list.length; mesh.count = disc.count = tail.count = n;
     for (let i = 0; i < n; i++) {
       const b = list[i], s = b.r * (b.t < 0.15 ? b.t / 0.15 : 1);
       M.makeScale(s, s, s); M.setPosition(b.x, b.y, b.z); mesh.setMatrixAt(i, M);
       M.makeScale(s * 1.5, 1, s * 1.5); M.setPosition(b.x, 0.06, b.z); disc.setMatrixAt(i, M);
-      col.set(b.color); disc.setColorAt(i, col); col.multiplyScalar(2.6); mesh.setColorAt(i, col);
+      const tl = Math.min(4, 0.4 + b.speed * 0.09); Q.setFromAxisAngle(YAX, b.dir); TS.set(s * 0.75, s * 0.75, s * 0.75 + s * tl);
+      TP.set(b.x - Math.sin(b.dir) * s * tl * 0.85, b.y, b.z - Math.cos(b.dir) * s * tl * 0.85); M.compose(TP, Q, TS); tail.setMatrixAt(i, M);
+      col.set(b.color); disc.setColorAt(i, col); tail.setColorAt(i, col); mesh.setColorAt(i, col);
     }
-    if (n) { mesh.instanceMatrix.needsUpdate = disc.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = disc.instanceColor.needsUpdate = true; }
+    if (n) { mesh.instanceMatrix.needsUpdate = disc.instanceMatrix.needsUpdate = tail.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = disc.instanceColor.needsUpdate = tail.instanceColor.needsUpdate = true; }
   }
   function clear(tag) { if (!tag) list.length = 0; else for (let i = list.length - 1; i >= 0; i--) if (list[i].tag === tag) list.splice(i, 1); }
   function clearNear(x, z, r) { let n = 0; for (let i = list.length - 1; i >= 0; i--) { const b = list[i]; if (Math.hypot(b.x - x, b.z - z) < r) { FX.burst(b.x, b.y, b.z, { n: 5, color: b.color, speed: [1, 4], life: [0.2, 0.5] }); list.splice(i, 1); n++; } } return n; }

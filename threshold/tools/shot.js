@@ -8,7 +8,7 @@ const { launch } = require('./harness.js');
   await page.evaluate('document.getElementById("fade").style.transition="none"');
   if (js) { const r = await page.evaluate(js); if (r !== undefined) console.log(JSON.stringify(r)); }
   await page.evaluate((n) => new Promise((res) => { let k = 0; const f = () => { if (++k >= n) res(); else requestAnimationFrame(f); }; requestAnimationFrame(f); }), +(frames || 3));
-  await page.screenshot({ path: out });
+  await page.screenshot({ path: out, timeout: 300000 });
   console.log(JSON.stringify(await page.evaluate('window.__game.state()')));
   await browser.close();
 })();
