@@ -20,7 +20,7 @@ const Hz = (() => {
       float front=(uStyle<0.5) ? (1.0-smoothstep(0.0,0.06,abs(f-uProg)))*step(uProg,0.999) : 0.0;
       float pulse=0.5+0.5*sin(uTime*9.0);
       float a=inside*(0.13+0.25*fill+0.1*pulse*smoothstep(0.75,1.0,uProg))+edge*0.9+front*0.45*inside;
-      if (uStyle>0.5 && uStyle<1.5){ a=inside*(0.16+0.07*sin(uTime*3.0+len*1.5))+edge*0.8; }
+      if (uStyle>0.5 && uStyle<1.5){ float rp=0.5+0.5*sin(len*3.2-uTime*2.4); float dg=smoothstep(-1.2,0.0,d); a=inside*(0.05+0.09*rp*rp+0.12*dg)+edge*0.8; } // marks: soft inner gradient + slow ripple
       if (uStyle>1.5){ float st=0.5+0.5*sin((vP.x+vP.y)*3.0-uTime*4.0); a=inside*(0.12+0.16*st)+edge*0.9; }
       // very large shapes (arena-wide novas) get a lighter interior so they don't flood the frame; the edge stays bright
       a-=inside*(a-edge*0.9-front*0.45*inside)*0.45*smoothstep(7.0,16.0,uBound);
