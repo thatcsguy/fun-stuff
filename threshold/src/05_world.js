@@ -24,7 +24,7 @@ const Cam = {
     const lx = lerp(this.focus.x, this.cLook.x, w), ly = lerp(this.focus.y, this.cLook.y, w), lz = lerp(this.focus.z, this.cLook.z, w);
     if (this.shakeAmt > 0.001) { const s = this.shakeAmt * 0.3; camera.position.x += (vrand() - 0.5) * s; camera.position.y += (vrand() - 0.5) * s; camera.position.z += (vrand() - 0.5) * s; this.shakeAmt *= Math.exp(-rdt * 6); }
     camera.lookAt(lx, ly, lz);
-    this.fadeOccluders(rdt, lx, ly, lz);
+    if (G.player) this.fadeOccluders(rdt, G.player.pos.x, G.player.pos.y + 1.2, G.player.pos.z); // fade what hides the player, never the look target itself
     const f = lerp(this.fov, this.cFov, w); if (Math.abs(camera.fov - f) > 0.01) { camera.fov = f; camera.updateProjectionMatrix(); }
   },
   // generator: fly the cinematic camera from (p0,l0) to (p1,l1) over dur seconds. Arrays [x,y,z].
