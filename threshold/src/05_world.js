@@ -14,6 +14,9 @@ const Cam = {
     let px = this.focus.x - Math.sin(this.yaw) * cp * this.dist, py = this.focus.y + sp * this.dist, pz = this.focus.z - Math.cos(this.yaw) * cp * this.dist;
     if (G.arena && G.arena.camLimit) { const q = G.arena.camLimit(px, py, pz, this.focus); px = q.x; py = q.y; pz = q.z; }
     if (py < 0.35 && this.focus.y > 0) py = 0.35;
+    // keep the camera out of the boss: slide it toward the focus until it clears the boss's body radius
+    const B = G.boss; if (B && B.alive !== false && B.group && B.group.visible !== false) { const rr = (B.radius || 1) + 0.9, top = B.pos.y + (B.def.aimY || 3) * 1.6;
+      for (let i = 0; i < 8 && py < top && Math.hypot(px - B.pos.x, pz - B.pos.z) < rr; i++) { px = lerp(px, this.focus.x, 0.25); py = lerp(py, this.focus.y, 0.25); pz = lerp(pz, this.focus.z, 0.25); } }
     this.cineW = this.cine ? Math.min(1, this.cineW + rdt * 2.5) : Math.max(0, this.cineW - rdt * 1.4);
     if (this.cine) { this.cPos.copy(this.cine.pos); this.cLook.copy(this.cine.look); this.cFov = this.cine.fov || 50; }
     const w = smooth(this.cineW);
