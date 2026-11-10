@@ -98,7 +98,7 @@ class Player {
     this.target = null; this.buffs = []; this.stats = { dmg: 0, taken: 0, heals: 0 };
     this.sk = cls.skills.map((s) => ({ def: s, cd: 0, charges: s.charges || 1, uses: s.limited || Infinity }));
     this.model = buildHero(cls); this.group = this.model.group;
-    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color(cls.color).multiplyScalar(1.6), transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color(cls.color).multiplyScalar(1.1), transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.ring.rotation.x = -PI / 2; this.ring.renderOrder = 11; this.ring.visible = false;
     this.aimP = new V3(); this.hint = ''; this.hintT = 0; this.lastHurt = -10; this.attackFaceT = 0;
   }

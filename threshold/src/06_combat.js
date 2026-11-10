@@ -6,32 +6,38 @@ const Hz = (() => {
   const geo = new THREE.PlaneGeometry(2, 2); geo.rotateX(-PI / 2); geo.userData.shared = true;
   const VERT = 'uniform float uBound; varying vec2 vP; void main(){ vP=position.xz*uBound; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }';
   const FRAG = `
-    uniform int uType; uniform float uR1,uR0,uArc,uLen,uW,uProg,uFire,uStyle,uTime,uAlpha; uniform vec3 uCol; varying vec2 vP;
+    uniform int uType; uniform float uR1,uR0,uArc,uLen,uW,uProg,uFire,uStyle,uTime,uAlpha,uBound; uniform vec3 uCol; varying vec2 vP;
     void main(){
       float len=length(vP), d, f;
-      if (uType==0){ d=len-uR1; f=len/uR1; }
-      else if (uType==1){ d=max(len-uR1,uR0-len); f=(len-uR0)/(uR1-uR0); }
-      else if (uType==2){ float an=abs(atan(vP.x,vP.y)); d=max(max(len-uR1,uR0-len),(an-uArc*0.5)*max(len,0.3)); f=(len-uR0)/(uR1-uR0); }
-      else { d=max(abs(vP.x)-uW*0.5,max(-vP.y,vP.y-uLen)); f=vP.y/uLen; }
-      if (d>0.06) discard;
+      if (uType==0){ d=len-uR1; f=len/max(uR1,1e-3); }
+      else if (uType==1){ d=max(len-uR1,uR0-len); f=(len-uR0)/max(uR1-uR0,1e-3); }
+      else if (uType==2){ float an=abs(atan(vP.x,vP.y+1e-5)); d=max(max(len-uR1,uR0-len),(an-uArc*0.5)*max(len,0.3)); f=(len-uR0)/max(uR1-uR0,1e-3); }
+      else { d=max(abs(vP.x)-uW*0.5,max(-vP.y,vP.y-uLen)); f=vP.y/max(uLen,1e-3); }
+      if (d>0.2) discard;
       float edge=smoothstep(-0.22,-0.02,d)*(1.0-smoothstep(0.0,0.06,d));
       float inside=1.0-smoothstep(-0.02,0.0,d);
       float fill=(uStyle<0.5) ? step(f,uProg) : 0.0;
       float front=(uStyle<0.5) ? (1.0-smoothstep(0.0,0.06,abs(f-uProg)))*step(uProg,0.999) : 0.0;
       float pulse=0.5+0.5*sin(uTime*9.0);
       float a=inside*(0.13+0.25*fill+0.1*pulse*smoothstep(0.75,1.0,uProg))+edge*0.9+front*0.45*inside;
-      if (uStyle>0.5 && uStyle<1.5){ a=inside*(0.16+0.07*sin(uTime*3.0+len*1.5))+edge*0.8; }
+      if (uStyle>0.5 && uStyle<1.5){ float rp=0.5+0.5*sin(len*3.2-uTime*2.4); float dg=smoothstep(-1.2,0.0,d); a=inside*(0.05+0.09*rp*rp+0.12*dg)+edge*0.8; } // marks: soft inner gradient + slow ripple
       if (uStyle>1.5){ float st=0.5+0.5*sin((vP.x+vP.y)*3.0-uTime*4.0); a=inside*(0.12+0.16*st)+edge*0.9; }
-      vec3 col=mix(uCol,vec3(1.0),uFire*0.7)*(1.0+uFire*3.0+edge*0.8+front);
-      a=clamp(a+uFire*inside*0.7,0.0,1.0)*uAlpha;
-      gl_FragColor=vec4(col*a,a);
+      // very large shapes (arena-wide novas) get a lighter interior so they don't flood the frame; the edge stays bright
+      a-=inside*(a-edge*0.9-front*0.45*inside)*0.45*smoothstep(7.0,16.0,uBound);
+      vec3 col=mix(uCol,vec3(1.0),uFire*0.3)*(1.0+uFire*0.9+edge*0.8+front);
+      a=clamp(a+uFire*inside*0.35,0.0,1.0)*uAlpha;
+      // premultiplied: rgb adds light, alpha dims what is behind. A dark rim just outside the edge and a light dim inside keep
+      // the shape readable on bright floors and through bloom.
+      float rim=smoothstep(0.2,0.04,d)*step(0.0,d);
+      float dim=clamp((rim*0.55+inside*0.22)*uAlpha*(1.0-uFire),0.0,0.85);
+      gl_FragColor=vec4(max(col*a,vec3(0.0)),dim);
     }`;
   function getMesh() {
     let m = free.pop();
     if (!m) {
       m = new THREE.Mesh(geo, new THREE.ShaderMaterial({
         uniforms: { uType: { value: 0 }, uR1: { value: 1 }, uR0: { value: 0 }, uArc: { value: 1 }, uLen: { value: 1 }, uW: { value: 1 }, uProg: { value: 0 }, uFire: { value: 0 }, uStyle: { value: 0 }, uTime: { value: 0 }, uAlpha: { value: 1 }, uBound: { value: 1 }, uCol: { value: new THREE.Color() } },
-        vertexShader: VERT, fragmentShader: FRAG.replace(/vP\.y/g, 'vP.y'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+        vertexShader: VERT, fragmentShader: FRAG.replace(/vP\.y/g, 'vP.y'), transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
       }));
       m.renderOrder = 10; m.material.userData.shared = true; FX.root.add(m);
     }
@@ -52,16 +58,17 @@ const Hz = (() => {
     const s = h.shape, m = h.mesh, u = m.material.uniforms;
     u.uType.value = TYPE[s.type];
     let bound = 1;
-    if (s.type === 'circle') { u.uR1.value = s.r; bound = s.r + 0.2; }
-    else if (s.type === 'donut') { u.uR1.value = s.r1; u.uR0.value = s.r0; bound = s.r1 + 0.2; }
-    else if (s.type === 'cone') { u.uR1.value = s.r; u.uR0.value = s.r0 || 0; u.uArc.value = s.arc; bound = s.r + 0.2; }
-    else { u.uLen.value = s.len; u.uW.value = s.w; bound = Math.max(s.len, s.w) + 0.2; }
+    if (s.type === 'circle') { u.uR1.value = s.r; bound = s.r + 0.3; }
+    else if (s.type === 'donut') { u.uR1.value = s.r1; u.uR0.value = s.r0; bound = s.r1 + 0.3; }
+    else if (s.type === 'cone') { u.uR1.value = s.r; u.uR0.value = s.r0 || 0; u.uArc.value = s.arc; bound = s.r + 0.3; }
+    else { u.uLen.value = s.len; u.uW.value = s.w; bound = Math.max(s.len, s.w) + 0.3; }
     u.uBound.value = bound; m.scale.setScalar(bound); m.position.set(s.x, (G.arena ? G.arena.floorY || 0 : 0) + 0.05 + (h.lift || 0), s.z); m.rotation.y = s.dir || 0;
   }
   // The shader's local frame: x = right of dir, y(vP.y) = along dir. PlaneGeometry rotated flat maps local +Z to -vP.y, so flip here.
+  function attach(h) { h.mesh = getMesh(); const u = h.mesh.material.uniforms; u.uCol.value.set(h.color); u.uStyle.value = h.state === 'zone' ? (h.zoneStyle || 2) : h.style; u.uProg.value = sat(h.t / Math.max(h.delay, 1e-3)); u.uFire.value = 0; u.uAlpha.value = h.alpha; syncMesh(h); }
   function add(shape, delay, dmg, o = {}) {
     const h = Object.assign({ shape, delay, t: 0, dmg, blockable: true, color: (G.boss && G.boss.def.telegraph) || 0xff5a2a, tag: 'phase', state: 'tele', fireT: 0, dur: 0, style: 0, alpha: 1 }, o);
-    if (!G.headless) { h.mesh = getMesh(); const u = h.mesh.material.uniforms; u.uCol.value.set(h.color); u.uStyle.value = h.style; u.uProg.value = 0; u.uFire.value = 0; u.uAlpha.value = h.alpha; syncMesh(h); }
+    if (!G.headless) attach(h);
     list.push(h); if (!h.silent && delay > 0.25) Sound.sfx('warn', 0.6);
     return h;
   }
@@ -82,6 +89,7 @@ const Hz = (() => {
     } else if (h.onMiss) h.onMiss(h);
   }
   function update(dt) {
+    if (!G.headless) for (const h of list) if (!h.mesh && h.state !== 'done') attach(h); // hazards created during a headless fast-forward get their decal now
     for (let i = list.length - 1; i >= 0; i--) {
       const h = list[i];
       if (h.state === 'done') { list.splice(i, 1); continue; }
@@ -129,12 +137,20 @@ const Hz = (() => {
 // ---------- bullets ----------
 const Bul = (() => {
   const MAX = 700, list = [];
-  const g = new THREE.SphereGeometry(1, 10, 8), mesh = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff }), MAX);
+  // core: white-hot centre fading to the bullet colour at the rim; tail: additive streak stretched along the velocity
+  const BULV = `varying vec3 vC; varying float vF;
+    void main(){ vC = instanceColor; mat4 mw = modelMatrix * instanceMatrix; vec4 wp = mw * vec4(position, 1.0);
+      vec3 n = mat3(mw) * normal; n /= max(length(n), 1e-5); vec3 v = cameraPosition - wp.xyz; v /= max(length(v), 1e-5);
+      vF = clamp(dot(n, v), 0.0, 1.0); gl_Position = projectionMatrix * viewMatrix * wp; }`;
+  const BULF = `varying vec3 vC; varying float vF; void main(){ float k = pow(vF, 2.5); gl_FragColor = vec4(mix(vC * 1.25, vec3(1.25) + vC * 0.55, k), 1.0); }`;
+  const g = new THREE.SphereGeometry(1, 12, 9), mesh = new THREE.InstancedMesh(g, new THREE.ShaderMaterial({ vertexShader: BULV, fragmentShader: BULF }), MAX);
+  const tail = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending }), MAX);
+  const Q = new THREE.Quaternion(), YAX = new THREE.Vector3(0, 1, 0), TP = new THREE.Vector3(), TS = new THREE.Vector3();
   const dg = new THREE.CircleGeometry(1, 16); dg.rotateX(-PI / 2);
   const disc = new THREE.InstancedMesh(dg, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }), MAX);
-  mesh.frustumCulled = disc.frustumCulled = false; mesh.count = disc.count = 0; disc.renderOrder = 9;
-  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3); disc.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3);
-  FX.root.add(mesh); FX.root.add(disc);
+  mesh.frustumCulled = disc.frustumCulled = tail.frustumCulled = false; mesh.count = disc.count = tail.count = 0; disc.renderOrder = 9; tail.renderOrder = 12;
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3); disc.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3); tail.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3);
+  FX.root.add(mesh); FX.root.add(disc); FX.root.add(tail);
   const M = new THREE.Matrix4(), col = new THREE.Color();
   // fire({x,z,dir,speed,r,dmg,color,life,y,accel,turn (rad/s homing),curve (rad/s), onUpdate(b,dt)})
   function fire(o) { if (list.length >= MAX) return null; const b = Object.assign({ y: 1.1, r: 0.38, dmg: 90, color: (G.boss && G.boss.def.telegraph) || 0xff5a2a, life: 8, speed: 8, dir: 0, t: 0, accel: 0, turn: 0, curve: 0, tag: 'phase' }, o); list.push(b); return b; }
@@ -154,14 +170,16 @@ const Bul = (() => {
       if (dead) { list[i] = list[list.length - 1]; list.pop(); }
     }
     if (G.headless) return;
-    const n = list.length; mesh.count = disc.count = n;
+    const n = list.length; mesh.count = disc.count = tail.count = n;
     for (let i = 0; i < n; i++) {
       const b = list[i], s = b.r * (b.t < 0.15 ? b.t / 0.15 : 1);
       M.makeScale(s, s, s); M.setPosition(b.x, b.y, b.z); mesh.setMatrixAt(i, M);
       M.makeScale(s * 1.5, 1, s * 1.5); M.setPosition(b.x, 0.06, b.z); disc.setMatrixAt(i, M);
-      col.set(b.color); disc.setColorAt(i, col); col.multiplyScalar(2.6); mesh.setColorAt(i, col);
+      const tl = Math.min(4, 0.4 + b.speed * 0.09); Q.setFromAxisAngle(YAX, b.dir); TS.set(s * 0.75, s * 0.75, s * 0.75 + s * tl);
+      TP.set(b.x - Math.sin(b.dir) * s * tl * 0.85, b.y, b.z - Math.cos(b.dir) * s * tl * 0.85); M.compose(TP, Q, TS); tail.setMatrixAt(i, M);
+      col.set(b.color); disc.setColorAt(i, col); tail.setColorAt(i, col); mesh.setColorAt(i, col);
     }
-    if (n) { mesh.instanceMatrix.needsUpdate = disc.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = disc.instanceColor.needsUpdate = true; }
+    if (n) { mesh.instanceMatrix.needsUpdate = disc.instanceMatrix.needsUpdate = tail.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = disc.instanceColor.needsUpdate = tail.instanceColor.needsUpdate = true; }
   }
   function clear(tag) { if (!tag) list.length = 0; else for (let i = list.length - 1; i >= 0; i--) if (list[i].tag === tag) list.splice(i, 1); }
   function clearNear(x, z, r) { let n = 0; for (let i = list.length - 1; i >= 0; i--) { const b = list[i]; if (Math.hypot(b.x - x, b.z - z) < r) { FX.burst(b.x, b.y, b.z, { n: 5, color: b.color, speed: [1, 4], life: [0.2, 0.5] }); list.splice(i, 1); n++; } } return n; }

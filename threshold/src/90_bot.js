@@ -61,6 +61,8 @@ window.__game = {
     try { while (n-- > 0) { Bot.update(dt); G.step(dt * G.timeScale); if (stopOnEnd && (G.state === 'dead' || G.state === 'win') && tail-- <= 0) break; } } finally { G.headless = false; }
     return this.state();
   },
+  // Run `sec` seconds of frames with effects on but without rendering, so a screenshot taken next shows live particles and telegraphs.
+  warm(sec = 1.5) { const dt = 1 / 60; for (let i = Math.round(sec * 60); i > 0; i--) { G.rt += dt; G.rdt = dt; for (const f of Hooks.frame) f(dt, 0); G.step(dt * G.timeScale); for (const f of Hooks.frame) f(dt, 1); Post.update(dt); } return this.state(); },
   setPhase(i) { const b = G.boss; b.hp = b.maxHp * b.def.phases[i].at - 1; },
   hurtBoss(frac) { const b = G.boss; b.hp = Math.max(1, b.hp - b.maxHp * frac); },
   kill() { G.boss.damage(1e9); },

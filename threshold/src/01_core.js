@@ -113,7 +113,7 @@ G.q = QUALITY[Settings.q] || QUALITY.high;
 
 const FinalShader = {
   uniforms: {
-    tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: 0.9 }, uChroma: { value: 0.0015 }, uGrain: { value: 0.035 },
+    tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: 0.9 }, uChroma: { value: 0.0015 }, uGrain: { value: 0.022 },
     uSat: { value: 1 }, uTint: { value: new THREE.Color(1, 1, 1) }, uLift: { value: new THREE.Color(0, 0, 0) },
     uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uPulse: { value: 0 }, uContrast: { value: 1 },
   },
