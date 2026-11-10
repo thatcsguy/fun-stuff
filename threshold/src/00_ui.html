@@ -1,0 +1,91 @@
+<body>
+<canvas id="c" tabindex="0"></canvas>
+<div id="hurtv"></div>
+
+<div id="hud">
+  <div id="bossframe">
+    <div class="bn"><span id="bname"></span><small id="bhp"></small></div>
+    <div class="bar" id="bbar"><div class="lag"></div><div class="fill"></div></div>
+    <div class="bar cast" id="bcast"><div class="fill"></div><div class="cn"></div></div>
+  </div>
+  <div id="tgtframe">
+    <div class="bn" id="tname"></div>
+    <div class="bar" id="tbar"><div class="fill"></div></div>
+    <div class="bar cast" id="tcast"><div class="fill"></div><div class="cn"></div></div>
+  </div>
+  <div id="enrage"></div>
+  <div id="nums"></div>
+  <div id="hint"></div>
+  <div id="buffs"></div>
+  <div id="playerframe">
+    <div class="bar" id="pcast"><div class="fill"></div><div class="cn"></div></div>
+    <div id="pips"></div>
+    <div class="bar" id="pbar"><div class="fill"></div><div class="shield"></div><div class="hpt"></div></div>
+  </div>
+  <div id="hotbar"></div>
+</div>
+
+<div id="title-card"><div class="num"></div><div class="rule"></div><div class="nm"></div><div class="rule"></div><div class="sub"></div></div>
+
+<div id="menu" class="screen hidden">
+  <div class="logo">THRESHOLD</div>
+  <div class="tag">Five doors. No two alike.</div>
+  <h2>Choose who walks through</h2>
+  <div id="classes"></div>
+  <h2>Choose a door</h2>
+  <div id="doors"></div>
+  <div class="row"><button class="btn nav" id="btn-settings">Settings &amp; controls</button><button class="btn nav" id="btn-fs">Fullscreen</button></div>
+  <div class="foot">Built for keyboard + mouse or a controller. Fights can be taken in any order. Nothing carries over but what you learn.</div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <h1>PAUSED</h1>
+  <button class="btn nav primary" data-act="resume">Resume</button>
+  <button class="btn nav" data-act="restart">Restart fight</button>
+  <button class="btn nav" data-act="settings">Settings &amp; controls</button>
+  <button class="btn nav" data-act="quit">Leave</button>
+</div>
+
+<div id="death" class="screen hidden">
+  <h2 id="death-sub">You fell</h2>
+  <h1 id="death-title">DEFEAT</h1>
+  <div class="stat-line" id="death-stats"></div>
+  <button class="btn nav primary" data-act="restart">Try again</button>
+  <button class="btn nav" data-act="quit">Leave</button>
+</div>
+
+<div id="victory" class="screen hidden">
+  <h2 id="vic-sub">The door closes behind you</h2>
+  <h1 id="vic-title">VICTORY</h1>
+  <div class="stat-line" id="vic-stats"></div>
+  <button class="btn nav primary" data-act="quit">Back to the doors</button>
+  <button class="btn nav" data-act="restart">Fight again</button>
+</div>
+
+<div id="settings" class="screen hidden">
+  <h1>SETTINGS</h1>
+  <div class="panel">
+    <label>Master volume</label><input type="range" id="set-vol" min="0" max="100">
+    <label>Music</label><input type="range" id="set-mus" min="0" max="100">
+    <label>Mouse sensitivity</label><input type="range" id="set-sens" min="10" max="300">
+    <label>Controller camera speed</label><input type="range" id="set-psens" min="10" max="300">
+    <label>Invert camera Y</label><input type="checkbox" id="set-inv">
+    <label>Graphics</label><select id="set-q"><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select>
+  </div>
+  <div class="keys">
+    <b>Keyboard + mouse</b><br>
+    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>Space</kbd> jump &nbsp; hold <kbd>Left mouse</kbd> turn camera &nbsp; hold <kbd>Right mouse</kbd> turn camera and character &nbsp; both buttons run forward<br>
+    <kbd>Wheel</kbd> zoom &nbsp; <kbd>Tab</kbd> or click to change target &nbsp; <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>Q</kbd><kbd>E</kbd><kbd>R</kbd><kbd>F</kbd> skills (also <kbd>4</kbd>-<kbd>7</kbd>, or click the bar) &nbsp; <kbd>Esc</kbd> pause<br>
+    <b>Controller</b><br>
+    <kbd>L stick</kbd> move &nbsp; <kbd>R stick</kbd> camera &nbsp; <kbd>RT</kbd><kbd>RB</kbd><kbd>Y</kbd> attacks &nbsp; <kbd>A</kbd> mobility &nbsp; <kbd>B</kbd> defensive &nbsp; <kbd>X</kbd> interrupt &nbsp; <kbd>LB</kbd> heal<br>
+    <kbd>LT</kbd> jump &nbsp; <kbd>D-pad ◀ ▶</kbd> change target &nbsp; <kbd>R3</kbd> reset camera &nbsp; <kbd>Start</kbd> pause
+  </div>
+  <button class="btn nav primary" data-act="back">Back</button>
+</div>
+
+<div id="fade"></div>
+<div id="dbg"></div>
+<div id="boot-err"></div>
+<script>
+window.addEventListener('error', function (e) { var b = document.getElementById('boot-err'); if (b) { b.style.display = 'block'; b.textContent += (e.message || e) + '\n'; } });
+</script>
