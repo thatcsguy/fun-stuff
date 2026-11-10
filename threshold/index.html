@@ -24,7 +24,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 #title-card{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;
   opacity:0;transition:opacity .8s ease}
 #title-card.show{opacity:1}
-#title-card .num{font-family:var(--serif);letter-spacing:.6em;font-size:15px;color:var(--accent);padding-left:.6em;text-shadow:0 0 18px rgba(0,0,0,.9)}
+#title-card .tnum{font-family:var(--serif);letter-spacing:.6em;font-size:15px;color:var(--accent);padding-left:.6em;text-shadow:0 0 18px rgba(0,0,0,.9)}
 #title-card .nm{font-family:var(--serif);font-size:clamp(34px,6vw,84px);letter-spacing:.14em;color:#fff;text-shadow:0 0 40px rgba(0,0,0,.95),0 2px 0 rgba(0,0,0,.6);margin:6px 0;text-align:center}
 #title-card .sub{font-family:var(--serif);font-style:italic;font-size:clamp(14px,1.6vw,22px);color:var(--accent2);opacity:.9;text-shadow:0 0 16px #000}
 #title-card .rule{width:min(46vw,520px);height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);margin:10px 0}
@@ -174,7 +174,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
   <div id="hotbar"></div>
 </div>
 
-<div id="title-card"><div class="num"></div><div class="rule"></div><div class="nm"></div><div class="rule"></div><div class="sub"></div></div>
+<div id="title-card"><div class="tnum"></div><div class="rule"></div><div class="nm"></div><div class="rule"></div><div class="sub"></div></div>
 
 <div id="menu" class="screen hidden">
   <div class="logo">THRESHOLD</div>
@@ -776,7 +776,7 @@ const FX = (() => {
       fragmentShader: `
         varying vec4 vCol; varying float vT;
         void main(){ vec2 c = gl_PointCoord-0.5; float d = length(c)*2.0; if (d > 1.0) discard;
-          float a = ${additive ? 'pow(1.0-d,1.6)' : 'smoothstep(1.0,0.35,d)'} * (1.0 - smoothstep(0.6,1.0,vT)) * vCol.a;
+          float a = ${additive ? 'pow(clamp(1.0-d,0.0,1.0),1.6)' : 'smoothstep(1.0,0.35,d)'} * (1.0 - smoothstep(0.6,1.0,vT)) * vCol.a;
           gl_FragColor = vec4(vCol.rgb${additive ? '*a' : ''}, a); }`,
       transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
     });
@@ -840,7 +840,7 @@ const FX = (() => {
   pool('pillar', 20, () => new THREE.Mesh(cylGeo, new THREE.ShaderMaterial({
     uniforms: { uC: { value: new THREE.Color() }, uA: { value: 1 } },
     vertexShader: 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv=uv; vec4 mv=modelViewMatrix*vec4(position,1.0); vN=normalize(normalMatrix*normal); vV=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }',
-    fragmentShader: 'uniform vec3 uC; uniform float uA; varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ float f=abs(dot(normalize(vN),normalize(vV))); float a=pow(1.0-vUv.y,1.5)*(0.25+0.75*f*f)*uA; gl_FragColor=vec4(uC*a,a); }',
+    fragmentShader: 'uniform vec3 uC; uniform float uA; varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ float f=abs(dot(normalize(vN),normalize(vV))); float a=pow(clamp(1.0-vUv.y,0.0,1.0),1.5)*(0.25+0.75*f*f)*uA; gl_FragColor=vec4(uC*a,a); }',
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   })));
   function pillar(x, z, o = {}) {
@@ -1097,7 +1097,7 @@ const W = (() => {
         float fbm(vec2 p){ float a=0.5,s=0.0; for(int i=0;i<5;i++){ s+=a*n2(p); p=p*2.03+vec2(1.7,9.2); a*=0.5; } return s; }
         void main(){
           vec3 d=normalize(vD); float h=d.y;
-          vec3 col = h>0.0 ? mix(uHor,uTop,pow(h,uExp)) : mix(uHor,uBot,pow(min(1.0,-h*2.5),0.6));
+          vec3 col = h>0.0 ? mix(uHor,uTop,pow(clamp(h,0.0,1.0),uExp)) : mix(uHor,uBot,pow(min(1.0,-h*2.5),0.6));
           float sd=max(0.0,dot(d,uSunDir));
           if (uNeb>0.0){ vec2 q=d.xz/(abs(d.y)+0.6)*1.4; float n=fbm(q*1.5+3.0), m=fbm(q*3.0-7.0); col+=uNeb*(uNebA*pow(n,2.5)*2.2+uNebB*pow(m,3.0)*2.4); }
           if (uStars>0.0){ vec3 gp=d*170.0; vec3 g=floor(gp); vec3 fp=fract(gp)-0.5; float s=h31(g); float tw=0.75+0.25*sin(uTime*2.0+s*90.0); float disc=smoothstep(0.42,0.0,length(fp)); col+=uStars*step(0.972,s)*disc*disc*tw*mix(vec3(1.0,0.82,0.65),vec3(0.75,0.86,1.0),h31(g+3.0))*(0.5+h31(g+7.0)*3.0)*smoothstep(-0.05,0.2,abs(h)+uNeb); }
@@ -1944,7 +1944,7 @@ const UI = (() => {
   }
   function fade(on) { el.fade.classList.toggle('clear', !on); }
   function titleCard(num, name, sub, color) {
-    el.card.querySelector('.num').textContent = num; el.card.querySelector('.nm').textContent = name; el.card.querySelector('.sub').textContent = sub || '';
+    el.card.querySelector('.tnum').textContent = num; el.card.querySelector('.nm').textContent = name; el.card.querySelector('.sub').textContent = sub || '';
     document.documentElement.style.setProperty('--accent', color || '#e8c77a'); el.card.classList.add('show');
   }
   function hideCard() { el.card.classList.remove('show'); }
@@ -2205,7 +2205,7 @@ const Game = (() => {
   const curtainMat = (color, a = 0.5) => new THREE.ShaderMaterial({
     uniforms: { uC: { value: new THREE.Color(color) }, uA: { value: a }, uT: { value: 0 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader: 'uniform vec3 uC; uniform float uA,uT; varying vec2 vUv; void main(){ float a=(pow(1.0-vUv.y,2.2)*0.9+0.08+step(vUv.y,0.03)*2.0)*uA*(0.85+0.15*sin(vUv.x*40.0+uT*6.0+vUv.y*30.0)); gl_FragColor=vec4(uC*a*2.0,a); }',
+    fragmentShader: 'uniform vec3 uC; uniform float uA,uT; varying vec2 vUv; void main(){ float a=(pow(clamp(1.0-vUv.y,0.0,1.0),2.2)*0.9+0.08+step(vUv.y,0.03)*2.0)*uA*(0.85+0.15*sin(vUv.x*40.0+uT*6.0+vUv.y*30.0)); gl_FragColor=vec4(uC*a*2.0,a); }',
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   });
 

@@ -23,7 +23,7 @@
   const curtainMat = (color, a = 0.5) => new THREE.ShaderMaterial({
     uniforms: { uC: { value: new THREE.Color(color) }, uA: { value: a }, uT: { value: 0 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader: 'uniform vec3 uC; uniform float uA,uT; varying vec2 vUv; void main(){ float a=(pow(1.0-vUv.y,2.2)*0.9+0.08+step(vUv.y,0.03)*2.0)*uA*(0.85+0.15*sin(vUv.x*40.0+uT*6.0+vUv.y*30.0)); gl_FragColor=vec4(uC*a*2.0,a); }',
+    fragmentShader: 'uniform vec3 uC; uniform float uA,uT; varying vec2 vUv; void main(){ float a=(pow(clamp(1.0-vUv.y,0.0,1.0),2.2)*0.9+0.08+step(vUv.y,0.03)*2.0)*uA*(0.85+0.15*sin(vUv.x*40.0+uT*6.0+vUv.y*30.0)); gl_FragColor=vec4(uC*a*2.0,a); }',
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   });
 

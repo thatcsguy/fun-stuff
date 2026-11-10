@@ -105,7 +105,7 @@ const W = (() => {
         float fbm(vec2 p){ float a=0.5,s=0.0; for(int i=0;i<5;i++){ s+=a*n2(p); p=p*2.03+vec2(1.7,9.2); a*=0.5; } return s; }
         void main(){
           vec3 d=normalize(vD); float h=d.y;
-          vec3 col = h>0.0 ? mix(uHor,uTop,pow(h,uExp)) : mix(uHor,uBot,pow(min(1.0,-h*2.5),0.6));
+          vec3 col = h>0.0 ? mix(uHor,uTop,pow(clamp(h,0.0,1.0),uExp)) : mix(uHor,uBot,pow(min(1.0,-h*2.5),0.6));
           float sd=max(0.0,dot(d,uSunDir));
           if (uNeb>0.0){ vec2 q=d.xz/(abs(d.y)+0.6)*1.4; float n=fbm(q*1.5+3.0), m=fbm(q*3.0-7.0); col+=uNeb*(uNebA*pow(n,2.5)*2.2+uNebB*pow(m,3.0)*2.4); }
           if (uStars>0.0){ vec3 gp=d*170.0; vec3 g=floor(gp); vec3 fp=fract(gp)-0.5; float s=h31(g); float tw=0.75+0.25*sin(uTime*2.0+s*90.0); float disc=smoothstep(0.42,0.0,length(fp)); col+=uStars*step(0.972,s)*disc*disc*tw*mix(vec3(1.0,0.82,0.65),vec3(0.75,0.86,1.0),h31(g+3.0))*(0.5+h31(g+7.0)*3.0)*smoothstep(-0.05,0.2,abs(h)+uNeb); }
