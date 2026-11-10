@@ -24,8 +24,8 @@ const Hz = (() => {
       if (uStyle>1.5){ float st=0.5+0.5*sin((vP.x+vP.y)*3.0-uTime*4.0); a=inside*(0.12+0.16*st)+edge*0.9; }
       // very large shapes (arena-wide novas) get a lighter interior so they don't flood the frame; the edge stays bright
       a-=inside*(a-edge*0.9-front*0.45*inside)*0.45*smoothstep(7.0,16.0,uBound);
-      vec3 col=mix(uCol,vec3(1.0),uFire*0.45)*(1.0+uFire*1.6+edge*0.8+front);
-      a=clamp(a+uFire*inside*0.45,0.0,1.0)*uAlpha;
+      vec3 col=mix(uCol,vec3(1.0),uFire*0.3)*(1.0+uFire*0.9+edge*0.8+front);
+      a=clamp(a+uFire*inside*0.35,0.0,1.0)*uAlpha;
       // premultiplied: rgb adds light, alpha dims what is behind. A dark rim just outside the edge and a light dim inside keep
       // the shape readable on bright floors and through bloom.
       float rim=smoothstep(0.2,0.04,d)*step(0.0,d);
