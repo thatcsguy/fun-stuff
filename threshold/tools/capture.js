@@ -23,7 +23,8 @@ const fs = require('fs'), path = require('path');
         if (g.G.boss && g.G.boss.hp < g.G.boss.maxHp * 0.02) g.G.boss.hp = g.G.boss.maxHp * 0.5; }, ff);
       if (k === +per - 1 && +per > 1) await page.evaluate(() => { const g = window.__game, C = g.Cam, p = g.G.player, b = g.G.boss, V = p.pos.constructor;
         const dx = b.pos.x - p.pos.x, dz = b.pos.z - p.pos.z, d = Math.hypot(dx, dz) || 1, ux = dx / d, uz = dz / d, h = Math.max(b.def.aimY || 3, 2);
-        C.cine = { pos: new V(p.pos.x - ux * 9, p.pos.y + 3 + h * 0.8, p.pos.z - uz * 9), look: new V(b.pos.x - ux * 2, b.pos.y + h * 0.7, b.pos.z - uz * 2), fov: d > 25 ? 40 : 55 };
+        const back = 9 + (b.radius || 1) * 2.5 + h; C.cine = { pos: new V(p.pos.x - ux * back, p.pos.y + 4 + h * 1.1, p.pos.z - uz * back), look: new V(b.pos.x, b.pos.y + h * 0.6, b.pos.z), fov: 52 };
+        const A = g.G.arena; if (A && A.camLimit) { const q = A.camLimit(C.cine.pos.x, C.cine.pos.y, C.cine.pos.z, C.cine.look); C.cine.pos.set(q.x, q.y, q.z); } // stay inside walled arenas
         g.warm(0.8); });
       const t0 = Date.now(); await frames(3);
       const f = path.join(out, `${boss}_p${ph}_${k}.png`); await page.screenshot({ path: f, timeout: 300000 }); files.push(f);
