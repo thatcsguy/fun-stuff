@@ -21,6 +21,7 @@ const Cam = {
     const lx = lerp(this.focus.x, this.cLook.x, w), ly = lerp(this.focus.y, this.cLook.y, w), lz = lerp(this.focus.z, this.cLook.z, w);
     if (this.shakeAmt > 0.001) { const s = this.shakeAmt * 0.3; camera.position.x += (vrand() - 0.5) * s; camera.position.y += (vrand() - 0.5) * s; camera.position.z += (vrand() - 0.5) * s; this.shakeAmt *= Math.exp(-rdt * 6); }
     camera.lookAt(lx, ly, lz);
+    this.fadeOccluders(rdt, lx, ly, lz);
     const f = lerp(this.fov, this.cFov, w); if (Math.abs(camera.fov - f) > 0.01) { camera.fov = f; camera.updateProjectionMatrix(); }
   },
   // generator: fly the cinematic camera from (p0,l0) to (p1,l1) over dur seconds. Arrays [x,y,z].
@@ -29,7 +30,36 @@ const Cam = {
     while (t < dur) { t += G.dt; const k = smooth(t / dur); c.pos.set(lerp(p0[0], p1[0], k), lerp(p0[1], p1[1], k), lerp(p0[2], p1[2], k)); c.look.set(lerp(l0[0], l1[0], k), lerp(l0[1], l1[1], k), lerp(l0[2], l1[2], k)); if (this.cine !== c) return; yield; }
   },
   release() { this.cine = null; },
+  // Meshes with userData.fadeOcclude = true fade out while they sit between the camera and what it looks at (pillars, tree
+  // canopies, a giant boss's limbs). The fade sets the mesh's own material(s) transparent, so give such meshes their own
+  // material; an InstancedMesh fades as a whole. userData.fadeMin sets how far it fades (default 0.18).
+  occ: [], occScan: 0,
+  fadeOccluders(rdt, lx, ly, lz) {
+    if (G.headless) return;
+    if ((this.occScan -= rdt) <= 0) { this.occScan = 1; this.occ.length = 0; scene.traverse((o) => { if (o.isMesh && o.userData.fadeOcclude) this.occ.push(o); }); }
+    if (!this.occ.length) return;
+    const c = camera.position, sx = lx - c.x, sy = ly - c.y, sz = lz - c.z, sl2 = Math.max(sx * sx + sy * sy + sz * sz, 1e-6);
+    for (const o of this.occ) {
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+      const bs = o.geometry.boundingSphere; _occV.copy(bs.center).applyMatrix4(o.matrixWorld);
+      const r = bs.radius * Math.max(o.matrixWorld.getMaxScaleOnAxis(), 1e-4);
+      const k = clamp(((_occV.x - c.x) * sx + (_occV.y - c.y) * sy + (_occV.z - c.z) * sz) / sl2, 0, 1);
+      const dx = c.x + sx * k - _occV.x, dy = c.y + sy * k - _occV.y, dz = c.z + sz * k - _occV.z;
+      const hit = o.visible && k < 0.97 && dx * dx + dy * dy + dz * dz < r * r * 0.7;
+      const ud = o.userData, target = hit ? (ud.fadeMin === undefined ? 0.18 : ud.fadeMin) : 1;
+      ud.fadeA = damp(ud.fadeA === undefined ? 1 : ud.fadeA, target, 8, rdt);
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      const fading = ud.fadeA < 0.995;
+      for (const m of mats) {
+        const mu = m.userData;
+        if (mu.fadeBase === undefined) { mu.fadeBase = m.opacity; mu.fadeT = m.transparent; mu.fadeDW = m.depthWrite; mu.fading = false; }
+        if (mu.fading !== fading) { mu.fading = fading; m.transparent = fading || mu.fadeT; m.depthWrite = fading ? false : mu.fadeDW; m.needsUpdate = true; }
+        m.opacity = mu.fadeBase * ud.fadeA;
+      }
+    }
+  },
 };
+const _occV = new THREE.Vector3();
 Hooks.frame.push((rdt, stage) => { if (stage === 1) Cam.update(rdt); });
 
 const W = (() => {

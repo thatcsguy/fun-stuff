@@ -9,11 +9,11 @@ const Hz = (() => {
     uniform int uType; uniform float uR1,uR0,uArc,uLen,uW,uProg,uFire,uStyle,uTime,uAlpha; uniform vec3 uCol; varying vec2 vP;
     void main(){
       float len=length(vP), d, f;
-      if (uType==0){ d=len-uR1; f=len/uR1; }
-      else if (uType==1){ d=max(len-uR1,uR0-len); f=(len-uR0)/(uR1-uR0); }
-      else if (uType==2){ float an=abs(atan(vP.x,vP.y)); d=max(max(len-uR1,uR0-len),(an-uArc*0.5)*max(len,0.3)); f=(len-uR0)/(uR1-uR0); }
-      else { d=max(abs(vP.x)-uW*0.5,max(-vP.y,vP.y-uLen)); f=vP.y/uLen; }
-      if (d>0.06) discard;
+      if (uType==0){ d=len-uR1; f=len/max(uR1,1e-3); }
+      else if (uType==1){ d=max(len-uR1,uR0-len); f=(len-uR0)/max(uR1-uR0,1e-3); }
+      else if (uType==2){ float an=abs(atan(vP.x,vP.y+1e-5)); d=max(max(len-uR1,uR0-len),(an-uArc*0.5)*max(len,0.3)); f=(len-uR0)/max(uR1-uR0,1e-3); }
+      else { d=max(abs(vP.x)-uW*0.5,max(-vP.y,vP.y-uLen)); f=vP.y/max(uLen,1e-3); }
+      if (d>0.2) discard;
       float edge=smoothstep(-0.22,-0.02,d)*(1.0-smoothstep(0.0,0.06,d));
       float inside=1.0-smoothstep(-0.02,0.0,d);
       float fill=(uStyle<0.5) ? step(f,uProg) : 0.0;
@@ -24,14 +24,18 @@ const Hz = (() => {
       if (uStyle>1.5){ float st=0.5+0.5*sin((vP.x+vP.y)*3.0-uTime*4.0); a=inside*(0.12+0.16*st)+edge*0.9; }
       vec3 col=mix(uCol,vec3(1.0),uFire*0.7)*(1.0+uFire*3.0+edge*0.8+front);
       a=clamp(a+uFire*inside*0.7,0.0,1.0)*uAlpha;
-      gl_FragColor=vec4(col*a,a);
+      // premultiplied: rgb adds light, alpha dims what is behind. A dark rim just outside the edge and a light dim inside keep
+      // the shape readable on bright floors and through bloom.
+      float rim=smoothstep(0.2,0.04,d)*step(0.0,d);
+      float dim=clamp((rim*0.55+inside*0.22)*uAlpha*(1.0-uFire),0.0,0.85);
+      gl_FragColor=vec4(max(col*a,vec3(0.0)),dim);
     }`;
   function getMesh() {
     let m = free.pop();
     if (!m) {
       m = new THREE.Mesh(geo, new THREE.ShaderMaterial({
         uniforms: { uType: { value: 0 }, uR1: { value: 1 }, uR0: { value: 0 }, uArc: { value: 1 }, uLen: { value: 1 }, uW: { value: 1 }, uProg: { value: 0 }, uFire: { value: 0 }, uStyle: { value: 0 }, uTime: { value: 0 }, uAlpha: { value: 1 }, uBound: { value: 1 }, uCol: { value: new THREE.Color() } },
-        vertexShader: VERT, fragmentShader: FRAG.replace(/vP\.y/g, 'vP.y'), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+        vertexShader: VERT, fragmentShader: FRAG.replace(/vP\.y/g, 'vP.y'), transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
       }));
       m.renderOrder = 10; m.material.userData.shared = true; FX.root.add(m);
     }
@@ -52,10 +56,10 @@ const Hz = (() => {
     const s = h.shape, m = h.mesh, u = m.material.uniforms;
     u.uType.value = TYPE[s.type];
     let bound = 1;
-    if (s.type === 'circle') { u.uR1.value = s.r; bound = s.r + 0.2; }
-    else if (s.type === 'donut') { u.uR1.value = s.r1; u.uR0.value = s.r0; bound = s.r1 + 0.2; }
-    else if (s.type === 'cone') { u.uR1.value = s.r; u.uR0.value = s.r0 || 0; u.uArc.value = s.arc; bound = s.r + 0.2; }
-    else { u.uLen.value = s.len; u.uW.value = s.w; bound = Math.max(s.len, s.w) + 0.2; }
+    if (s.type === 'circle') { u.uR1.value = s.r; bound = s.r + 0.3; }
+    else if (s.type === 'donut') { u.uR1.value = s.r1; u.uR0.value = s.r0; bound = s.r1 + 0.3; }
+    else if (s.type === 'cone') { u.uR1.value = s.r; u.uR0.value = s.r0 || 0; u.uArc.value = s.arc; bound = s.r + 0.3; }
+    else { u.uLen.value = s.len; u.uW.value = s.w; bound = Math.max(s.len, s.w) + 0.3; }
     u.uBound.value = bound; m.scale.setScalar(bound); m.position.set(s.x, (G.arena ? G.arena.floorY || 0 : 0) + 0.05 + (h.lift || 0), s.z); m.rotation.y = s.dir || 0;
   }
   // The shader's local frame: x = right of dir, y(vP.y) = along dir. PlaneGeometry rotated flat maps local +Z to -vP.y, so flip here.
