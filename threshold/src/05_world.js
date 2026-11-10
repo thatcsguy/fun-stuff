@@ -264,10 +264,10 @@ const W = (() => {
     const U = { uTime: { value: 0 }, uBox: { value: new V3(...box) }, uVel: { value: new V3(...(o.vel || [0, -1, 0])) }, uSway: { value: o.sway || 0 }, uSize: { value: o.size || 0.2 }, uCol: { value: new THREE.Color(o.color || 0xffffff).multiplyScalar(o.mult || 1) }, uCenter: { value: new V3(...(o.center || [0, box[1] / 2, 0])) }, uScale: { value: 500 }, uAlpha: { value: o.alpha === undefined ? 1 : o.alpha } };
     const m = new THREE.Points(g, new THREE.ShaderMaterial({
       uniforms: U, transparent: true, depthWrite: false, blending: o.additive === false ? THREE.NormalBlending : THREE.AdditiveBlending,
-      vertexShader: `uniform float uTime,uSway,uSize,uScale; uniform vec3 uBox,uVel,uCenter; attribute float aSeed; varying float vS;
+      vertexShader: `uniform float uTime,uSway,uSize,uScale; uniform vec3 uBox,uVel,uCenter; attribute float aSeed; varying float vS; varying float vNear;
         void main(){ vec3 p=position+uVel*uTime*(0.6+aSeed*0.8); p.x+=sin(uTime*(0.5+aSeed)+aSeed*40.0)*uSway; p.z+=cos(uTime*(0.4+aSeed*0.7)+aSeed*70.0)*uSway;
-          p=mod(p,uBox)-uBox*0.5+uCenter; vS=aSeed; vec4 mv=modelViewMatrix*vec4(p,1.0); gl_PointSize=uSize*(0.5+aSeed)*uScale/max(0.1,-mv.z); gl_Position=projectionMatrix*mv; }`,
-      fragmentShader: `uniform vec3 uCol; uniform float uAlpha,uTime; varying float vS; void main(){ vec2 c=gl_PointCoord-0.5; ${o.streak ? 'float a=(1.0-smoothstep(0.0,0.08,abs(c.x)))*(1.0-abs(c.y)*2.0);' : 'float d=length(c)*2.0; if(d>1.0) discard; float a=pow(1.0-d,1.5);'} a*=uAlpha*(0.6+0.4*sin(uTime*(1.0+vS*3.0)+vS*50.0)); gl_FragColor=vec4(uCol*${o.additive === false ? '1.0' : 'a'},a); }`,
+          p=mod(p,uBox)-uBox*0.5+uCenter; vS=aSeed; vec4 mv=modelViewMatrix*vec4(p,1.0); gl_PointSize=uSize*(0.5+aSeed)*uScale/max(0.1,-mv.z); vNear=smoothstep(0.8,3.0,-mv.z); gl_Position=projectionMatrix*mv; }`,
+      fragmentShader: `uniform vec3 uCol; uniform float uAlpha,uTime; varying float vS; varying float vNear; void main(){ vec2 c=gl_PointCoord-0.5; ${o.streak ? 'float a=(1.0-smoothstep(0.0,0.08,abs(c.x)))*(1.0-abs(c.y)*2.0);' : 'float d=length(c)*2.0; if(d>1.0) discard; float a=pow(1.0-d,1.5);'} a*=vNear*uAlpha*(0.6+0.4*sin(uTime*(1.0+vS*3.0)+vS*50.0)); gl_FragColor=vec4(uCol*${o.additive === false ? '1.0' : 'a'},a); }`,
     }));
     m.frustumCulled = false; m.renderOrder = 15; m.onBeforeRender = () => { U.uTime.value = G.now; U.uScale.value = renderer.domElement.height * 0.5; };
     return m;

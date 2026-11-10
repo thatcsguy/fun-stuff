@@ -15,7 +15,7 @@ const FX = (() => {
     const mat = new THREE.ShaderMaterial({
       uniforms: { uTime: { value: 0 }, uScale: { value: 600 } },
       vertexShader: `
-        attribute vec3 aVel; attribute vec4 aData, aCol, aCol2; uniform float uTime, uScale; varying vec4 vCol; varying float vT;
+        attribute vec3 aVel; attribute vec4 aData, aCol, aCol2; uniform float uTime, uScale; varying vec4 vCol; varying float vT; varying float vNear;
         void main(){
           float age = uTime - aData.x; float t = age / aData.y; vT = t;
           if (t < 0.0 || t > 1.0) { gl_Position = vec4(2.0,2.0,2.0,1.0); gl_PointSize = 0.0; return; }
@@ -24,13 +24,13 @@ const FX = (() => {
           vec4 mv = modelViewMatrix * vec4(p,1.0);
           vCol = vec4(mix(aCol.rgb, aCol2.rgb, t), aCol.a);
           float s = aData.z * (t < 0.12 ? 0.5 + t*4.17 : 1.0 - smoothstep(0.55,1.0,t)*0.7);
-          gl_PointSize = s * uScale / max(0.1,-mv.z);
+          gl_PointSize = s * uScale / max(0.1,-mv.z); vNear = smoothstep(0.8, 3.0, -mv.z);
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: `
-        varying vec4 vCol; varying float vT;
+        varying vec4 vCol; varying float vT; varying float vNear;
         void main(){ vec2 c = gl_PointCoord-0.5; float d = length(c)*2.0; if (d > 1.0) discard;
-          float a = ${additive ? 'pow(clamp(1.0-d,0.0,1.0),1.6)' : 'smoothstep(1.0,0.35,d)'} * (1.0 - smoothstep(0.6,1.0,vT)) * vCol.a;
+          float a = ${additive ? 'pow(clamp(1.0-d,0.0,1.0),1.6)' : 'smoothstep(1.0,0.35,d)'} * (1.0 - smoothstep(0.6,1.0,vT)) * vCol.a * vNear;
           gl_FragColor = vec4(vCol.rgb${additive ? '*a' : ''}, a); }`,
       transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
     });
