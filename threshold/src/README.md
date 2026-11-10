@@ -1,6 +1,6 @@
 # THRESHOLD: sources
 
-A PC-first 3D raid game: five unrelated boss fights behind five doors, two classes, no progression.
+A PC-first 3D raid game: ten unrelated boss fights behind ten doors, two classes, no progression.
 `threshold/index.html` is **generated**. Edit the files in this folder and run `./build.sh`; never hand-edit `index.html`.
 
 ## Layout
@@ -33,7 +33,7 @@ Slot order is the same for every class: filler, spender, ultimate, mobility, def
 
 ## URL parameters
 
-`?boss=cathedral|leviathan|duelist|engine|titan`, `&class=duskblade|stormcaller`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`.
+`?boss=cathedral|leviathan|duelist|engine|titan|gorgon|theatre|wheel|express|winter`, `&class=duskblade|stormcaller`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`.
 
 ## Test hooks
 
