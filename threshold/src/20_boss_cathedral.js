@@ -5,7 +5,8 @@
   const NOTES = [50, 53, 57, 60, 62];
   const COLZ = (k) => -HZ + k * 6.8; // pillar z positions, k = 0..5; bays sit between them
   // window brightness / tint per phase (the jewel colours live in the textures, so they carry through every phase)
-  const WIN_TINT = [[1.0, 1.0, 1.12, 1.25], [1.3, 0.82, 0.82, 1.35], [1.2, 1.05, 0.95, 1.55]];
+  const WIN_TINT = [[1.0, 1.0, 1.12, 1.25], [1.3, 0.82, 0.82, 1.35], [1.1, 1.05, 1.1, 1.7]];
+  const PH_GLOW = [0x8a9cff, 0xff8a90, 0xfff0e0];
   const RAY_COLS = [0x3a58ff, 0xff2a48, 0x8a44ff, 0xff2a48, 0x3a58ff];
 
   // ---------- local geometry helpers ----------
@@ -120,15 +121,21 @@
     }
     const ta = canvasTex(a), te = canvasTex(e); for (const t of [ta, te]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 6); } return { map: ta, emissiveMap: te };
   }
-  function crackTex() {
-    const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'), r = mulberry(31);
-    x.fillStyle = '#000'; x.fillRect(0, 0, 256, 256); x.lineCap = 'round';
-    for (let k = 0; k < 14; k++) {
-      let px = r() * 256, py = 256; const pts = [[px, py]], top = 256 - 60 - r() * 190;
-      while (py > top) { py -= 8 + r() * 12; px += (r() - 0.5) * 18; pts.push([px, py]); }
-      for (const [w, a] of [[9, 0.22], [4, 0.6], [1.6, 1]]) { x.globalAlpha = a; x.strokeStyle = '#fff'; x.lineWidth = w; x.beginPath(); pts.forEach((p, i) => (i ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1]))); x.stroke(); }
+  // leaded glass panes for the gown's emissive: one column of panes per facet, each pane glowing a little differently, brighter low down
+  function paneTex() {
+    const W2 = 576, H2 = 256, c = document.createElement('canvas'); c.width = W2; c.height = H2; const x = c.getContext('2d'), r = mulberry(31);
+    const pal = ['#2a50ff', '#1a30c0', '#d01838', '#ff3050', '#ffb020', '#7a30e0', '#10a070', '#4a90ff', '#c02070'];
+    x.fillStyle = '#020104'; x.fillRect(0, 0, W2, H2);
+    const cw = W2 / 18, ch = H2 / 4, L = 5;
+    for (let i = 0; i < 18; i++) for (let j = 0; j < 4; j++) {
+      const x0 = i * cw + L / 2, y0 = j * ch + L / 2, w = cw - L, h = ch - L, col = pal[Math.floor(r() * pal.length)], col2 = pal[Math.floor(r() * pal.length)];
+      const g = x.createLinearGradient(0, y0, 0, y0 + h); g.addColorStop(0, col); g.addColorStop(1, col); x.globalAlpha = 0.65 + r() * 0.35;
+      if (r() < 0.5) { const m = y0 + h * (0.3 + r() * 0.4); x.fillStyle = col; x.beginPath(); x.moveTo(x0, y0); x.lineTo(x0 + w, y0); x.lineTo(x0 + w, m - h * 0.15); x.lineTo(x0, m + h * 0.15); x.closePath(); x.fill();
+        x.fillStyle = col2; x.beginPath(); x.moveTo(x0, m + h * 0.15 + L); x.lineTo(x0 + w, m - h * 0.15 + L); x.lineTo(x0 + w, y0 + h); x.lineTo(x0, y0 + h); x.closePath(); x.fill(); }
+      else { x.fillStyle = col; x.fillRect(x0, y0, w, h); }
+      x.globalAlpha = 1;
     }
-    x.globalAlpha = 1; const t = canvasTex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+    const t = canvasTex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
   }
 
   const curtainMat = (color, a = 0.5) => new THREE.ShaderMaterial({
@@ -144,10 +151,29 @@
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   });
   // soft coloured light pool on the floor where a shaft lands
-  const poolMat = (color, a) => new THREE.ShaderMaterial({
-    uniforms: { uC: { value: new THREE.Color(color) }, uA: { value: a } },
+  // the window's own glass, projected across the floor as a soft coloured light patch
+  const poolMat = (map, a) => new THREE.ShaderMaterial({
+    uniforms: { uMap: { value: map }, uA: { value: a } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-    fragmentShader: 'uniform vec3 uC; uniform float uA; varying vec2 vUv; void main(){ vec2 d=(vUv-0.5)*2.0; float r=clamp(dot(d,d),0.0,1.0); float a=uA*pow(max(1.0-r,0.0),2.0); gl_FragColor=vec4(uC*a,a); }',
+    fragmentShader: 'uniform sampler2D uMap; uniform float uA; varying vec2 vUv; void main(){ vec3 c=texture2D(uMap,vec2(vUv.y,1.0-vUv.x)).rgb; float e=smoothstep(0.0,0.15,vUv.x)*smoothstep(1.0,0.75,vUv.x)*smoothstep(0.0,0.1,vUv.y)*smoothstep(1.0,0.9,vUv.y); float a=uA*e; gl_FragColor=vec4(max(c,vec3(0.0))*a,a); }',
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  // cosmetic overlay on a lane that is about to fire: engraved stave, sound-wave bars streaming toward the player, a bright sweep that lands on fire
+  const laneFxMat = () => new THREE.ShaderMaterial({
+    uniforms: { uK: { value: 0 }, uA: { value: 0 }, uT: { value: 0 }, uC: { value: new THREE.Color(0xffd27a) } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader: `uniform float uK,uA,uT; uniform vec3 uC; varying vec2 vUv;
+      void main(){
+        float st=0.0; for(int i=0;i<5;i++){ st+=1.0-smoothstep(0.0,0.006,abs(vUv.x-(0.3+0.1*float(i)))); }
+        float row=floor(vUv.y*26.0+uT*4.0), f=fract(vUv.y*26.0+uT*4.0);
+        float amp=0.12+0.33*abs(sin(row*1.71)*sin(row*0.37+1.3));
+        float bar=step(f,0.22)*step(abs(vUv.x-0.5),amp);
+        float front=1.0-uK; float filled=step(front,vUv.y);
+        float d=(vUv.y-front)*28.0; float lead=exp(-d*d);
+        float edge=smoothstep(0.035,0.0,min(vUv.x,1.0-vUv.x));
+        float a=uA*clamp(st*0.35+bar*0.22*(0.4+0.6*filled)+lead*0.8+edge*0.45,0.0,2.0);
+        gl_FragColor=vec4(uC*a,min(a,1.0));
+      }`,
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
 
@@ -160,7 +186,7 @@
     const pa = W.bake(256, ashlar(6, 3, 7), { dark: 0x15131a, light: 0x6a6574, strength: 2 });
     for (const k in pa) pa[k].repeat.set(2, 10);
     const pierMat = new THREE.MeshStandardMaterial({ map: pa.map, normalMap: pa.normalMap, roughnessMap: pa.roughnessMap, roughness: 0.8 });
-    const ribMat = W.mat({ color: 0x5a5664, roughness: 0.7 });
+    const ribMat = W.mat({ color: 0x5a5664, roughness: 0.7, emissive: 0x4a58c0, emissiveIntensity: 0.16 }); S.ribMat = ribMat;
     S.stone = pierMat;
 
     for (const sx of [-1, 1]) { const wall = new THREE.Mesh(new THREE.BoxGeometry(1, 34, 46), wallMat); wall.position.set(sx * 14.6, 17, 0); wall.receiveShadow = true; g.add(wall); }
@@ -216,10 +242,10 @@
       for (let q = 0; q < 4; q++) { const a = q / 4 * TAU + PI / 4; frame.push(T(new THREE.TorusGeometry(0.26, 0.05, 4, 10), fx, 14.4 + Math.cos(a) * 0.4, z + Math.sin(a) * 0.4, 0, PI / 2)); }
       frame.push(T(new THREE.BoxGeometry(0.6, 0.3, 4.6), sx * 13.85, 3.3, z));
       for (const by of [6.0, 8.7]) frame.push(T(new THREE.BoxGeometry(0.06, 0.06, 3.9), fx, by, z));
+      { const pool = new THREE.Mesh(new THREE.PlaneGeometry(10, 4.0), poolMat(tex, 0.22)); pool.rotation.x = -PI / 2; pool.position.set(-sx * 4.0, 0.025, z); if (sx < 0) pool.rotation.z = PI; g.add(pool); S.pools.push(pool); }
       if (sx === 1) {
         const rc = RAY_COLS[k], pv = new THREE.Group(); pv.position.set(4.6, 5.6, z); pv.rotation.z = -1.05;
-        const ray = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 21), rayMat(rc, 0.08)); ray.rotation.y = PI / 2; ray.userData.base = new THREE.Color(rc); pv.add(ray); g.add(pv); S.rays.push(ray);
-        const pool = new THREE.Mesh(new THREE.PlaneGeometry(5.5, 4.2), poolMat(rc, 0.1)); pool.rotation.x = -PI / 2; pool.position.set(-4.2, 0.03, z); g.add(pool); S.pools.push(pool);
+        const ray = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 21), rayMat(rc, 0.06)); ray.rotation.y = PI / 2; ray.userData.base = new THREE.Color(rc); pv.add(ray); g.add(pv); S.rays.push(ray);
       }
     }
     const fm = new THREE.Mesh(merge(frame), ribMat); g.add(fm);
@@ -270,9 +296,10 @@
     for (const [sx, k] of [[-1, 1], [1, 2], [-1, 4], [1, 4]]) { const L = new THREE.PointLight(0xff9a48, 10, 9, 2); L.position.set(sx * 11.3, 2.3, COLZ(k)); g.add(L); S.candleL.push(L); }
 
     // organ: pipes + wood case with a carved cornice
-    const gold = W.mat({ color: 0xc9a050, roughness: 0.22, metalness: 1, envMapIntensity: 2 });
-    const wc = W.surface('wood', { size: 256, dark: 0x0e0604, light: 0x3a1e10, n: 8 }); for (const k in wc) wc[k].repeat.set(4, 1);
-    const wood = new THREE.MeshStandardMaterial({ map: wc.map, normalMap: wc.normalMap, roughness: 0.5 });
+    const gold = W.mat({ color: 0xb09a78, roughness: 0.18, metalness: 1, envMapIntensity: 1.6 });
+    const wc = W.surface('slabs', { size: 256, dark: 0x0a0504, light: 0x3a2214, n: 2, strength: 2 }); for (const k in wc) wc[k].repeat.set(6, 1);
+    const wood = new THREE.MeshStandardMaterial({ map: wc.map, normalMap: wc.normalMap, roughness: 0.55 });
+    S.organUp = new THREE.PointLight(0xffa860, 40, 16, 1.5); S.organUp.position.set(0, 7.6, -17.4); g.add(S.organUp);
     const caseG = [T(new THREE.BoxGeometry(26, 7, 3), 0, 3.5, -20.6), T(new THREE.BoxGeometry(27, 0.5, 3.6), 0, 7.1, -20.5), T(new THREE.BoxGeometry(27, 0.4, 3.6), 0, 0.2, -20.5)];
     for (let i = 0; i < 6; i++) { const x = -11 + i * 4.4; caseG.push(T(new THREE.BoxGeometry(0.5, 6.4, 0.3), x, 3.5, -19.05)); }
     for (let i = 0; i < 5; i++) { caseG.push(tube(archPts(LX(i) - 1.8, -19.0, LX(i) + 1.8, -19.0, 4.2, 2.3, 14), 0.1, 16, 5)); caseG.push(T(new THREE.ConeGeometry(0.5, 4, 6), LX(i) - 2.2, 9, -19.6)); }
@@ -299,27 +326,36 @@
   function buildMaestra(b) {
     const S = b.state, bg = b.group;
     S.rimC = new THREE.Color(RIM).multiplyScalar(0.42);
-    S.gownMat = withRim(new THREE.MeshStandardMaterial({ color: 0x170710, roughness: 0.82, metalness: 0.05, emissive: 0xff7a28, emissiveMap: crackTex(), emissiveIntensity: 0.15, side: THREE.DoubleSide }), S.rimC, 3.0);
-    S.gownMat.emissiveMap.repeat.set(3, 1);
-    const bone = withRim(W.mat({ color: 0x9c907c, roughness: 0.55 }), S.rimC, 3.4), dark = withRim(W.mat({ color: 0x0c060a, roughness: 0.7 }), S.rimC, 2.2);
+    // glass gown: flat-shaded faceted panes, leaded, lit from inside in the phase colour, held by bone bands and stays
+    S.glowC = new THREE.Color(0x4a5cff);
+    const pt = paneTex(); S.gownMat = withRim(new THREE.MeshStandardMaterial({ color: 0x3a3a48, map: pt, roughness: 0.08, metalness: 0.35, envMapIntensity: 1.6, flatShading: true, emissive: S.glowC, emissiveMap: pt, emissiveIntensity: 0.9, side: THREE.DoubleSide }), new THREE.Color(0xffffff).multiplyScalar(0.25), 2.2);
+    const bone = withRim(W.mat({ color: 0xa89c88, roughness: 0.5 }), S.rimC, 3.4), dark = withRim(W.mat({ color: 0x0c060a, roughness: 0.7 }), S.rimC, 2.2);
     const brass = W.mat({ color: 0x9a7a3a, roughness: 0.3, metalness: 1 });
     S.trim = new THREE.MeshStandardMaterial({ color: 0x6a5020, emissive: GOLD, emissiveIntensity: 0.3, metalness: 1, roughness: 0.3 });
-    S.core = new THREE.Group(); S.core.scale.setScalar(1.3); bg.add(S.core);
-    // layered gown: five ribbed bell tiers with scalloped hems
+    S.core = new THREE.Group(); S.core.scale.setScalar(1.05); bg.add(S.core);
     const tiers = [[2.35, 1.6, 0.15, 1.35, 9], [1.95, 1.25, 0.95, 1.2, 8], [1.6, 0.95, 1.7, 1.1, 7], [1.25, 0.7, 2.4, 1.0, 6], [0.92, 0.48, 3.05, 0.75, 6]], gown = [], bands = [];
-    for (const [rb, rt, y0, h, sc] of tiers) {
-      const geo = new THREE.CylinderGeometry(rt, rb, h, 72, 6, true), P = geo.attributes.position;
+    const SEG = 18;
+    tiers.forEach(([rb, rt, y0, h], ti) => {
+      const geo = new THREE.CylinderGeometry(rt, rb, h, SEG, 3, true), P = geo.attributes.position;
       for (let i = 0; i < P.count; i++) {
-        const x = P.getX(i), y = P.getY(i), z = P.getZ(i), th = Math.atan2(x, z), yy = y / h + 0.5;
-        const k = (1 + 0.1 * Math.sin(yy * PI)) * (1 + 0.04 * Math.cos(th * 24)) * (1 + 0.05 * (1 - yy) * Math.cos(th * sc));
-        const drop = yy < 0.2 ? (1 - yy / 0.2) * 0.2 * Math.pow(Math.abs(Math.sin(th * sc * 0.5)), 0.6) : 0;
-        P.setXYZ(i, x * k, y - drop, z * k);
+        const col = i % (SEG + 1), row = Math.floor(i / (SEG + 1)), x = P.getX(i), y = P.getY(i), z = P.getZ(i), yy = y / h + 0.5;
+        const j = W.hash2(col % SEG, row, 17 + ti), k = (1 + 0.1 * Math.sin(yy * PI)) * (1 + (j - 0.5) * 0.09);
+        const drop = row === 3 ? (col % 2) * 0.22 : 0; // shard points along the hem
+        P.setXYZ(i, x * k, y - drop + (row > 0 && row < 3 ? (j - 0.5) * 0.08 : 0), z * k);
       }
-      geo.computeVertexNormals(); T(geo, 0, y0 + h / 2, 0); gown.push(geo);
-      bands.push(T(new THREE.TorusGeometry(rt * 1.02, 0.035, 5, 48), 0, y0 + h, 0, PI / 2));
-    }
-    const gm = new THREE.Mesh(merge(gown), S.gownMat); gm.castShadow = true; S.core.add(gm);
-    S.core.add(new THREE.Mesh(merge(bands), S.trim));
+      geo.computeVertexNormals(); T(geo, 0, y0 + h / 2, 0, 0, ti * 0.35); if (ti === 0) { S.hem = new THREE.Mesh(merge([geo]), S.gownMat); S.hem.castShadow = true; } else gown.push(geo);
+      bands.push(T(new THREE.TorusGeometry(rt * 1.04, 0.055, 6, 36), 0, y0 + h, 0, PI / 2));
+      // vertical bone stays down each tier
+      for (let q = 0; q < 9; q++) { const a = q / 9 * TAU + ti * 0.35 + 0.17, r0 = rt * 1.06, r1 = rb * 1.06; bands.push(tube([new V3(Math.sin(a) * r0, y0 + h, Math.cos(a) * r0), new V3(Math.sin(a) * (r0 + r1) * 0.56, y0 + h * 0.5, Math.cos(a) * (r0 + r1) * 0.56), new V3(Math.sin(a) * r1, y0 + 0.02, Math.cos(a) * r1)], 0.028, 6, 4)); }
+    });
+    const gm = new THREE.Mesh(merge(gown), S.gownMat); gm.castShadow = true; S.core.add(gm); S.core.add(S.hem);
+    S.skirtL = new THREE.PointLight(0x8a9cff, 18, 7, 1.6); S.skirtL.position.set(0, 1.3, 0); S.core.add(S.skirtL);
+    // the hem's glass, shattered into orbiting shards in the last phase
+    { const n = 54, m = new THREE.InstancedMesh(T(new THREE.ConeGeometry(0.3, 0.9, 3), 0, 0, 0, 0, 0, 0, 1, 1, 0.22), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide }), n), r = mulberry(91), pal = [0x2a50ff, 0xd01838, 0xffb020, 0x7a30e0, 0x10a070, 0xff3050];
+      S.orb = []; const cc = new THREE.Color();
+      for (let i = 0; i < n; i++) { S.orb.push({ a: r() * TAU, r: 2.4 + r() * 1.8, y: 0.3 + r() * 2.2, w: (0.35 + r() * 0.5) * (r() < 0.25 ? -1 : 1), s: 0.6 + r() * 1.0, sp: r() * 5 }); m.setColorAt(i, cc.setHex(pal[i % pal.length]).multiplyScalar(1.3)); }
+      m.visible = false; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); S.core.add(m); S.orbMesh = m; }
+    const bandM = new THREE.Mesh(merge(bands), bone); S.core.add(bandM);
     // bodice: dark torso under a bone ribcage, spine, sternum, glowing heart inside
     const torso = new THREE.Mesh(new THREE.LatheGeometry([[0.01, 3.7], [0.46, 3.72], [0.4, 4.05], [0.5, 4.6], [0.6, 5.05], [0.5, 5.4], [0.22, 5.6], [0.01, 5.62]].map((p) => new THREE.Vector2(p[0], p[1])), 24), dark);
     torso.castShadow = true; S.core.add(torso);
@@ -333,41 +369,55 @@
     for (let v = 0; v < 4; v++) bones.push(T(new THREE.CylinderGeometry(0.075, 0.075, 0.09, 8), 0, 5.66 + v * 0.13, -0.02));
     const bm = new THREE.Mesh(merge(bones), bone); bm.castShadow = true; S.core.add(bm);
     S.heartMat = W.glow(0xffa040, 1.2); const heart = new THREE.Mesh(new THREE.SphereGeometry(0.26, 12, 10), S.heartMat); heart.position.set(0, 4.75, 0.3); S.core.add(heart); S.heart = heart;
-    // head: porcelain skull mask with dark sockets and ember pupils
+    // head: bone skull with brow, cheekbones, nasal cavity, teeth, hinged jaw, lit by its own small face light
     const head = new THREE.Group(); head.position.set(0, 6.3, 0.02); S.core.add(head); S.head = head;
-    const skull = new THREE.Mesh(new THREE.SphereGeometry(0.42, 22, 16), bone); skull.scale.set(0.82, 1.08, 0.92); skull.castShadow = true; head.add(skull);
-    const jaw = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 10), bone); jaw.scale.set(0.95, 0.75, 0.95); jaw.position.set(0, -0.3, 0.1); head.add(jaw);
+    const sk = [T(new THREE.SphereGeometry(0.42, 24, 18), 0, 0.04, -0.02, 0, 0, 0, 0.82, 1.0, 0.95)];
+    sk.push(T(new THREE.TorusGeometry(0.2, 0.05, 6, 16, PI), 0, 0.12, 0.27, 0, 0, 0, 1.6, 0.6, 1));
+    for (const sx of [-1, 1]) { sk.push(T(new THREE.SphereGeometry(0.1, 10, 8), sx * 0.22, -0.1, 0.24, 0, 0, 0, 1.0, 0.6, 0.8)); sk.push(T(new THREE.TorusGeometry(0.1, 0.028, 5, 14), sx * 0.14, 0.03, 0.32, 0, sx * 0.25)); }
+    sk.push(T(new THREE.BoxGeometry(0.34, 0.07, 0.2), 0, -0.24, 0.24), T(new THREE.SphereGeometry(0.22, 14, 10), 0, -0.34, 0.08, 0, 0, 0, 0.95, 0.6, 1.0));
+    const skull = new THREE.Mesh(merge(sk), bone); skull.castShadow = true; head.add(skull);
     const blk = W.mat({ color: 0x020102, roughness: 1 });
-    for (const sx of [-1, 1]) { const so = new THREE.Mesh(new THREE.SphereGeometry(0.105, 10, 8), blk); so.scale.set(1, 0.8, 0.5); so.position.set(sx * 0.14, 0.04, 0.34); head.add(so); }
-    const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), blk); mouth.scale.set(1, 0.5, 0.5); mouth.position.set(0, -0.3, 0.33); head.add(mouth);
-    S.eyes = W.glow(0xffd890, 3); for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 5), S.eyes); e.position.set(sx * 0.14, 0.04, 0.39); head.add(e); }
+    const holes = [];
+    for (const sx of [-1, 1]) holes.push(T(new THREE.SphereGeometry(0.1, 10, 8), sx * 0.14, 0.03, 0.31, 0, 0, 0, 1, 0.85, 0.5));
+    holes.push(T(new THREE.ConeGeometry(0.045, 0.12, 3), 0, -0.1, 0.36, PI), T(new THREE.BoxGeometry(0.3, 0.05, 0.05), 0, -0.29, 0.3));
+    head.add(new THREE.Mesh(merge(holes), blk));
+    const teeth = []; for (let q = 0; q < 8; q++) { const a = (q - 3.5) * 0.16; for (const ty of [-0.26, -0.32]) teeth.push(T(new THREE.BoxGeometry(0.03, 0.05, 0.03), Math.sin(a) * 0.17, ty, 0.2 + Math.cos(a) * 0.12)); }
+    head.add(new THREE.Mesh(merge(teeth), W.mat({ color: 0xe0d6c0, roughness: 0.4 })));
+    S.eyes = W.glow(0xffd890, 3); for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), S.eyes); e.position.set(sx * 0.14, 0.03, 0.37); head.add(e); }
+    S.faceL = new THREE.PointLight(0xd8dcff, 5, 4.5, 1.6); S.faceL.position.set(0, 6.9, 1.7); S.core.add(S.faceL);
     // hood / cowl behind the skull for a stronger silhouette
-    const cowl = new THREE.Mesh(new THREE.SphereGeometry(0.58, 18, 12, 0, TAU, 0, PI * 0.62), S.gownMat); cowl.scale.set(0.95, 1.15, 0.9); cowl.position.set(0, 6.35, -0.12); cowl.rotation.x = -0.25; S.core.add(cowl);
-    // halo crown of radiating organ pipes
-    const crown = new THREE.Group(); crown.position.set(0, 6.45, -0.42); S.core.add(crown); S.crown = crown; const cg = [], tips = [];
+    const cowl = new THREE.Mesh(new THREE.SphereGeometry(0.6, 18, 12, PI * 0.9, PI * 1.2, 0, PI * 0.7), dark); cowl.scale.set(0.95, 1.15, 0.9); cowl.position.set(0, 6.35, -0.12); cowl.rotation.x = -0.25; S.core.add(cowl);
+    // halo crown: brass ring of radiating organ pipes with glass shards between them
+    const crown = new THREE.Group(); crown.position.set(0, 6.45, -0.42); S.core.add(crown); S.crown = crown; const cg = [], tips = [], shards = [];
     cg.push(new THREE.TorusGeometry(0.95, 0.045, 6, 48), new THREE.TorusGeometry(0.62, 0.025, 5, 40));
     for (let i = 0; i < 15; i++) {
       const a = (i - 7) / 7 * 1.9, L = 0.55 + 1.15 * (1 - Math.abs(i - 7) / 7) + (i % 2) * 0.2, r = 0.05 + (1 - Math.abs(i - 7) / 7) * 0.03, d = 0.95 + L / 2;
       cg.push(T(new THREE.CylinderGeometry(r, r, L, 8), Math.sin(a) * d, Math.cos(a) * d, 0, 0, 0, -a));
       cg.push(T(new THREE.BoxGeometry(r * 2.4, 0.06, r * 2.4), Math.sin(a) * 1.0, Math.cos(a) * 1.0, 0, 0, 0, -a));
       tips.push(T(new THREE.ConeGeometry(r * 1.3, 0.22, 8), Math.sin(a) * (d + L / 2 + 0.1), Math.cos(a) * (d + L / 2 + 0.1), 0, 0, 0, -a));
+      if (i < 14) { const a2 = a + 0.135, L2 = 0.5 + 0.9 * (1 - Math.abs(i + 0.5 - 7) / 7), d2 = 0.95 + L2 / 2; shards.push(T(new THREE.ConeGeometry(0.07, L2, 4), Math.sin(a2) * d2, Math.cos(a2) * d2, 0.06, 0, 0.6, -a2, 1, 1, 0.45)); }
     }
     for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; cg.push(T(new THREE.CylinderGeometry(0.018, 0.018, 0.33, 4), Math.sin(a) * 0.78, Math.cos(a) * 0.78, 0, 0, 0, -a)); }
     crown.add(new THREE.Mesh(merge(cg), brass)); S.crownTip = new THREE.MeshStandardMaterial({ color: 0x2a1a08, emissive: GOLD, emissiveIntensity: 0.8, metalness: 1, roughness: 0.3 }); crown.add(new THREE.Mesh(merge(tips), S.crownTip));
-    // jointed, tapered arms; extra pairs unfold in later phases
+    S.shardMat = withRim(new THREE.MeshStandardMaterial({ color: 0x9aa8ff, roughness: 0.05, metalness: 0.2, flatShading: true, transparent: true, opacity: 0.8, emissive: S.glowC, emissiveIntensity: 0.5, envMapIntensity: 2.5 }), new THREE.Color(0xc0c8ff).multiplyScalar(0.8), 2.0);
+    crown.add(new THREE.Mesh(merge(shards), S.shardMat));
+    // jointed, tapered arms (paired forearm bones, knuckled fingers); extra pairs unfold in later phases
     S.batonTip = W.glow(0xfff0d0, 3.5); S.arms = [];
     const mkArm = (sx, sy, ph, tier, baton, sc) => {
       const sh = new THREE.Group(); sh.position.set(sx * 0.78, sy, 0); S.core.add(sh);
-      const ag = [T(new THREE.CylinderGeometry(0.1, 0.075, 1.5, 9), 0, -0.75, 0), T(new THREE.SphereGeometry(0.095, 8, 6), 0, -1.5, 0)];
+      const ag = [T(new THREE.CylinderGeometry(0.14, 0.085, 1.5, 9), 0, -0.75, 0), T(new THREE.SphereGeometry(0.13, 9, 7), 0, -0.05, 0), T(new THREE.SphereGeometry(0.075, 8, 6), 0.035, -1.47, 0), T(new THREE.SphereGeometry(0.075, 8, 6), -0.035, -1.47, 0)];
       sh.add(new THREE.Mesh(merge(ag), bone));
       const el = new THREE.Group(); el.position.y = -1.5; sh.add(el);
-      const fg = [T(new THREE.CylinderGeometry(0.075, 0.045, 1.45, 9), 0, -0.72, 0), T(new THREE.SphereGeometry(0.055, 6, 5), 0, -1.45, 0), T(new THREE.BoxGeometry(0.14, 0.2, 0.05), 0, -1.6, 0)];
-      for (let f = 0; f < 4; f++) fg.push(T(new THREE.ConeGeometry(0.018, 0.32, 4), (f - 1.5) * 0.04, -1.84, 0.02, 0.25 * (f - 1.5) * 0.2, 0, (f - 1.5) * 0.12));
+      const fg = [T(new THREE.CylinderGeometry(0.065, 0.042, 1.45, 7), 0.05, -0.72, 0, 0, 0, 0.02), T(new THREE.CylinderGeometry(0.058, 0.04, 1.45, 7), -0.05, -0.72, 0, 0, 0, -0.02), T(new THREE.SphereGeometry(0.06, 7, 5), 0, -1.45, 0, 0, 0, 0, 1.3, 0.8, 1), T(new THREE.BoxGeometry(0.15, 0.2, 0.05), 0, -1.6, 0)];
+      for (let f = 0; f < 4; f++) {
+        const fx = (f - 1.5) * 0.045, rz = (f - 1.5) * 0.1;
+        fg.push(T(new THREE.SphereGeometry(0.022, 6, 4), fx, -1.71, 0.01), T(new THREE.CylinderGeometry(0.017, 0.014, 0.16, 5), fx - Math.sin(rz) * 0.08, -1.8, 0.03, 0.3, 0, rz), T(new THREE.SphereGeometry(0.016, 5, 4), fx - Math.sin(rz) * 0.16, -1.88, 0.06), T(new THREE.ConeGeometry(0.014, 0.14, 4), fx - Math.sin(rz) * 0.2, -1.95, 0.1, 0.7, 0, rz));
+      }
       el.add(new THREE.Mesh(merge(fg), bone));
       if (baton) {
         const bt = new THREE.Group(); bt.position.set(0, -1.62, 0.04); bt.rotation.x = 1.25; el.add(bt);
-        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.03, 1.7, 6), brass); rod.position.y = -0.85; bt.add(rod);
-        const tip = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), S.batonTip); tip.position.y = -1.72; bt.add(tip);
+        const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.04, 1.7, 6), brass); rod.position.y = -0.85; bt.add(rod);
+        const tip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), S.batonTip); tip.position.y = -1.72; bt.add(tip); (S.tips = S.tips || []).push(tip);
       }
       sh.scale.setScalar(tier ? 0.001 : sc); sh.visible = !tier;
       S.arms.push({ sh, el, sx, ph, tier, sc, k: tier ? 0 : 1 });
@@ -389,14 +439,16 @@
   function build(b) {
     const g = G.world, S = b.state;
     const sky = W.sky({ top: 0x04071a, horizon: 0x18204c, bottom: 0x020308, stars: 1.0, sunDir: [0.75, 0.55, 0.1], sunColor: 0xa8b8ff, sunSize: 0.05, sunGlow: 0.5 }); g.add(sky); S.sky = sky; W.env(sky, 0.5);
-    scene.fog = new THREE.FogExp2(0x080a16, 0.012);
+    scene.fog = new THREE.FogExp2(0x0a0b1e, 0.013);
     S.hemi = W.hemi(g, 0x4a5a9a, 0x1a1210, 0.62);
     S.sun = W.sun(g, { dir: [0.8, 0.75, 0.12], color: 0x9fb2ff, intensity: 2.4, size: 26 });
-    S.organLight = new THREE.PointLight(0xffb060, 150, 60, 1.7); S.organLight.position.set(0, 9, -12); g.add(S.organLight);
+    S.organLight = new THREE.PointLight(0xffb070, 90, 50, 1.7); S.organLight.position.set(0, 6, -11); g.add(S.organLight);
     S.backLight = new THREE.PointLight(0x8090ff, 170, 50, 1.7); S.backLight.position.set(0, 10, 12); g.add(S.backLight);
+    S.vaultL = new THREE.PointLight(0x6a70d0, 90, 30, 1.4); S.vaultL.position.set(0, 26, -2); g.add(S.vaultL);
+    S.wallL = new THREE.PointLight(0x5868c0, 45, 22, 1.5); S.wallL.position.set(-7, 9, 4); g.add(S.wallL);
     // floor: polished dark marble, brass staff borders between lanes
     const fl = W.bake(512, marble(4), { dark: 0x09080e, light: 0x8a86a0, strength: 1.4 }); for (const k in fl) fl[k].repeat.set(3, 5);
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 44), new THREE.MeshStandardMaterial({ map: fl.map, normalMap: fl.normalMap, roughnessMap: fl.roughnessMap, roughness: 0.35, metalness: 0.2, envMapIntensity: 1.8 })); floor.rotation.x = -PI / 2; floor.receiveShadow = true; g.add(floor);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 44), new THREE.MeshStandardMaterial({ map: fl.map, normalMap: fl.normalMap, roughnessMap: fl.roughnessMap, roughness: 0.55, metalness: 0.15, envMapIntensity: 0.9 })); floor.rotation.x = -PI / 2; floor.receiveShadow = true; g.add(floor);
     const st = staffTex(); S.borders = [];
     for (let i = 0; i <= 5; i++) {
       const m = new THREE.MeshStandardMaterial({ map: st.map, emissiveMap: st.emissiveMap, emissive: GOLD, emissiveIntensity: 0.35, metalness: 0.9, roughness: 0.3 });
@@ -405,11 +457,25 @@
     S.inlay = new THREE.MeshStandardMaterial({ color: 0x5a4020, emissive: GOLD, emissiveIntensity: 0.35, metalness: 1, roughness: 0.3 });
     for (const z of [-HZ, HZ]) { const m = new THREE.Mesh(new THREE.BoxGeometry(22.4, 0.02, 0.16), S.inlay); m.position.set(0, 0.012, z); g.add(m); }
     buildNave(g, S);
+    S.dust = [W.motes({ n: 220, box: [9, 12, 30], color: 0xff3a58, size: 0.07, vel: [-0.12, -0.05, 0.02], sway: 0.4, center: [4, 6, 0], mult: 1.2 }), W.motes({ n: 220, box: [9, 12, 30], color: 0x4a6aff, size: 0.07, vel: [-0.1, -0.06, -0.02], sway: 0.4, center: [3, 7, 0], mult: 1.2 })];
+    for (const d of S.dust) { d.visible = false; g.add(d); }
     S.motes = W.motes({ n: 450, box: [26, 22, 40], color: 0xbfc8ff, size: 0.06, vel: [0.05, -0.08, 0.03], sway: 0.5, center: [0, 11, 0], mult: 0.7 }); g.add(S.motes);
     buildMaestra(b);
     S.walls = []; S.wallPool = [];
-    for (let w = 0; w < 5; w++) { const grp = new THREE.Group(); grp.visible = false; const panes = []; for (let i = 0; i < 5; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(LW - 0.1, 10), curtainMat([0x4a70ff, 0xa050ff, 0x30c8ff, 0xff6090, 0xffc24a][w % 5], 0.55)); m.position.set(LX(i), 5, 0); grp.add(m); panes.push(m); } g.add(grp); S.wallPool.push({ grp, panes }); }
+    for (let w = 0; w < 5; w++) { const grp = new THREE.Group(); grp.visible = false; const panes = []; for (let i = 0; i < 5; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(LW - 0.1, 14), curtainMat([0x4a70ff, 0xa050ff, 0x30c8ff, 0xff6090, 0xffc24a][w % 5], 0.55)); m.position.set(LX(i), 7, 0); grp.add(m); panes.push(m); } g.add(grp); S.wallPool.push({ grp, panes }); }
+    S.laneFx = []; for (let i = 0; i < 10; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(LW - 0.1, HZ * 2), laneFxMat()); m.rotation.x = -PI / 2; m.position.y = 0.05; m.renderOrder = 6; m.visible = false; g.add(m); S.laneFx.push({ m, t: 0, d: 1 }); }
+    // shattered glass hanging in the air (shown from the last phase)
+    { const n = 70, sh = new THREE.InstancedMesh(T(new THREE.ConeGeometry(0.14, 0.5, 3), 0, 0, 0, 0, 0, 0, 1, 1, 0.25), new THREE.MeshStandardMaterial({ color: 0xc8d0ff, roughness: 0.05, metalness: 0.3, flatShading: true, transparent: true, opacity: 0.85, emissive: 0xffe0b0, emissiveIntensity: 0.6, envMapIntensity: 3 }), n);
+      const r = mulberry(77); S.debris = []; for (let i = 0; i < n; i++) { const sx = r() < 0.5 ? -1 : 1; S.debris.push({ x: sx * (6 + r() * 6.5), y: 4 + r() * 15, z: -16 + r() * 32, s: 0.6 + r() * 1.4, a: r() * TAU, w: 0.3 + r() * 0.8 }); }
+      sh.visible = false; sh.frustumCulled = false; sh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); g.add(sh); S.debrisMesh = sh; }
     S.pipeHeat = [0, 0, 0, 0, 0]; S.intensity = 0; S.winPhase = 0; S.flame = 0;
+    // reflections: bake the lit nave itself (windows, candles, organ) into the environment map instead of the night sky
+    if (!G.headless) try {
+      const pm = new THREE.PMREMGenerator(renderer), prev = scene.environment; scene.environment = null;
+      G.world.position.set(0, -4, -2); G.world.updateMatrixWorld(true);
+      const rt = pm.fromScene(scene, 0.02, 0.3, 90); G.world.position.set(0, 0, 0); G.world.updateMatrixWorld(true); pm.dispose();
+      if (prev && prev.userData.owned) prev.dispose(); rt.texture.userData.owned = true; rt.texture.userData.shared = true; scene.environment = rt.texture; scene.environmentIntensity = 0.75;
+    } catch (e) { G.world.position.set(0, 0, 0); }
     return {
       edge: 'wall', spawn: { x: 0, z: 9 }, bossStart: { x: 0, z: -15.6, face: 0 },
       contains: (x, z) => Math.abs(x) <= HX && Math.abs(z) <= HZ,
@@ -421,11 +487,13 @@
   // ---- mechanics ----
   function playLane(b, i, loud) { const S = b.state; S.pipeHeat[i] = 1; Sound.note(NOTES[i] + (loud ? 0 : 12), 'organ', loud ? 0.9 : 0.5, loud ? 0.3 : 0.18); const t = S.pipeTop(i); FX.burst(t.x, t.y, t.z, { n: loud ? 16 : 6, color: GOLD, speed: [1, 4], up: 3, life: [0.4, 0.9], radius: 1.5 }); }
   function laneBlast(b, i) {
-    for (let k = 0; k < 4; k++) FX.pillar(LX(i), -13 + k * 8.5, { r: 1.8, h: 13, color: GOLD, dur: 0.5 });
+    for (let k = 0; k < 3; k++) FX.pillar(LX(i), -11 + k * 11, { r: 1.5, h: 8, color: LANE_TELL, dur: 0.45 });
     FX.burst(LX(i), 0.3, 0, { n: 30, color: GOLD, color2: 0xfff4d0, speed: [1, 5], up: 7, life: [0.4, 1], size: [0.2, 0.45], radius: 2 }); FX.burst(LX(i), 0.3, -10, { n: 16, color: GOLD, speed: [1, 5], up: 7, life: [0.4, 1], radius: 2 }); FX.burst(LX(i), 0.3, 10, { n: 16, color: GOLD, speed: [1, 5], up: 7, life: [0.4, 1], radius: 2 });
-    FX.light(LX(i), 3, G.player.pos.z, GOLD, 40, 0.4, 20); playLane(b, i, true); FX.shake(0.22);
+    FX.light(LX(i), 3, G.player.pos.z, GOLD, 22, 0.35, 16); playLane(b, i, true); FX.shake(0.22);
   }
-  const laneHz = (b, i, delay, dmg = 330) => Hz.rect(LX(i), -HZ, 0, HZ * 2, LW - 0.1, delay, dmg, { color: GOLD, quiet: true, silent: true, onFire: () => laneBlast(b, i) });
+  function laneFx(b, i, delay) { if (G.headless) return; const f = b.state.laneFx.find((q) => !q.m.visible); if (!f) return; f.t = 0; f.d = delay; f.m.position.x = LX(i); f.m.visible = true; }
+  const LANE_TELL = 0xc08a34;
+  const laneHz = (b, i, delay, dmg = 330) => { laneFx(b, i, delay); return Hz.rect(LX(i), -HZ, 0, HZ * 2, LW - 0.1, delay, dmg, { color: LANE_TELL, quiet: true, silent: true, onFire: () => laneBlast(b, i) }); };
   function* chord(b, n, pv, rp, tell = 0.42) {
     let seq = [], last = -1; for (let k = 0; k < n; k++) { let l; do { l = rndi(0, 4); } while (l === last); seq.push(l); last = l; }
     const r = yield* b.cast({ name: 'Chord', time: n * pv + 0.5, onTick: (k, cs) => { const idx = Math.floor(cs.t / pv); if (idx < n && idx !== cs.last) { cs.last = idx; playLane(b, seq[idx]); Hz.mark({ type: 'rect', x: LX(seq[idx]), z: -HZ, dir: 0, len: HZ * 2, w: LW - 0.1 }, pv * 0.8, { color: 0xfff0b0, alpha: 0.5 }); } } });
@@ -459,23 +527,23 @@
   }
   // chorister: hooded ivory robe, porcelain mask with an open singing mouth, sound rings pulsing from it
   function choristerMesh() {
-    const g = new THREE.Group(), rimC = new THREE.Color(0xffd890).multiplyScalar(0.6);
-    const robeM = withRim(new THREE.MeshStandardMaterial({ color: 0xd8ccb0, roughness: 0.75, emissive: 0x3a2a10, emissiveIntensity: 0.6, side: THREE.DoubleSide }), rimC, 2.5);
+    const g = new THREE.Group(), rimC = new THREE.Color(0xffd890).multiplyScalar(0.3);
+    const robeM = withRim(new THREE.MeshStandardMaterial({ color: 0xb8ac94, roughness: 0.8, emissive: 0x2a1c0a, emissiveIntensity: 0.25, side: THREE.DoubleSide }), rimC, 3.2);
     const geo = new THREE.CylinderGeometry(0.22, 0.8, 2.3, 32, 4, true), P = geo.attributes.position;
-    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), th = Math.atan2(x, z), k = 1 + 0.06 * Math.cos(th * 10) * (0.5 - y / 2.3); P.setXYZ(i, x * k, y, z * k); }
+    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), th = Math.atan2(x, z), k = 1 + 0.11 * Math.pow(Math.abs(Math.cos(th * 7)), 0.5) * (0.6 - y / 2.3) - 0.03; P.setXYZ(i, x * k, y, z * k); }
     geo.computeVertexNormals(); const robe = new THREE.Mesh(geo, robeM); robe.position.y = 1.2; g.add(robe);
     const hood = new THREE.Mesh(new THREE.SphereGeometry(0.36, 16, 12, 0, TAU, 0, PI * 0.7), robeM); hood.scale.set(0.9, 1.2, 1); hood.position.set(0, 2.5, -0.05); hood.rotation.x = -0.35; g.add(hood);
     const shadow = new THREE.Mesh(new THREE.SphereGeometry(0.27, 12, 10), W.mat({ color: 0x050307, roughness: 1 })); shadow.position.set(0, 2.45, 0.02); g.add(shadow);
     const mask = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10, -PI / 2, PI), W.mat({ color: 0xf2ece0, roughness: 0.3, emissive: 0x403020, emissiveIntensity: 0.5 })); mask.scale.set(0.85, 1.2, 0.5); mask.position.set(0, 2.42, 0.17); g.add(mask);
     const blk = W.mat({ color: 0x000000, roughness: 1 });
     for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 5), blk); e.scale.set(1.4, 0.7, 0.6); e.position.set(sx * 0.07, 2.5, 0.27); g.add(e); }
-    const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), W.glow(0xffd890, 2.2)); mouth.scale.set(0.8, 1.25, 0.4); mouth.position.set(0, 2.3, 0.26); g.add(mouth);
-    const halo = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.025, 6, 32), W.glow(GOLD, 2.4)); halo.position.set(0, 2.72, -0.28); g.add(halo);
-    const ringM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffe0a0).multiplyScalar(1.6), transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), W.glow(0xffd890, 1.4)); mouth.scale.set(0.8, 1.25, 0.4); mouth.position.set(0, 2.3, 0.26); g.add(mouth);
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.012, 4, 40), W.glow(GOLD, 1.8)); halo.position.set(0, 2.78, -0.42); g.add(halo);
+    const ringM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffe0a0).multiplyScalar(0.9), transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
     const rings = []; for (let k = 0; k < 3; k++) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.018, 4, 24), ringM.clone()); r.position.set(0, 2.3, 0.35); g.add(r); rings.push(r); }
     const book = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.36), W.mat({ color: 0x5a1020, roughness: 0.6 })); book.position.set(0, 1.55, 0.5); book.rotation.x = 0.5; g.add(book);
-    const page = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.02, 0.32), W.glow(0xfff0d0, 1.1)); page.position.set(0, 1.585, 0.49); page.rotation.x = 0.5; g.add(page);
-    const L = new THREE.PointLight(0xffd080, 10, 8, 1.6); L.position.set(0, 2, 0.6); g.add(L);
+    const page = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.02, 0.32), W.glow(0xfff0d0, 0.6)); page.position.set(0, 1.585, 0.49); page.rotation.x = 0.5; g.add(page);
+    const L = new THREE.PointLight(0xffd080, 6, 7, 1.6); L.position.set(0, 2, 0.8); g.add(L);
     g.userData.rings = rings; return g;
   }
   function spawnChorister(b, x, z) {
@@ -502,14 +570,14 @@
   function* setWindows(b, idx, dur = 2.5) {
     const S = b.state, tn = WIN_TINT[idx]; S.winPhase = idx;
     const from = S.windows.map((w) => w.material.color.clone()), to = new THREE.Color(tn[0], tn[1], tn[2]).multiplyScalar(tn[3]);
-    const a0 = S.rays[0].material.uniforms.uA.value, a1 = [0.08, 0.1, 0.12][idx], p0 = S.pools[0].material.uniforms.uA.value, p1 = [0.1, 0.12, 0.15][idx];
+    const a0 = S.rays[0].material.uniforms.uA.value, a1 = [0.07, 0.14, 0.2][idx], p0 = S.pools[0].material.uniforms.uA.value, p1 = [0.22, 0.28, 0.34][idx];
     yield* W.tween(dur, (k) => { S.windows.forEach((w, i) => W.colorLerp(w.material.color, from[i], to, k)); for (const r of S.rays) r.material.uniforms.uA.value = lerp(a0, a1, k); for (const p of S.pools) p.material.uniforms.uA.value = lerp(p0, p1, k); });
   }
 
   G.bosses.push({
-    id: 'cathedral', name: 'MAESTRA OSSIA', title: 'The Glass Cathedral', hint: 'A hymn', color: '#8f7bff', telegraph: GOLD,
+    id: 'cathedral', name: 'MAESTRA OSSIA', title: 'The Glass Cathedral', hint: 'A hymn', color: '#8f7bff', telegraph: LANE_TELL,
     hp: 26000, radius: 2.5, aimY: 5.4, enrage: 420,
-    post: { bloom: 0.55, threshold: 1.0, radius: 0.6, exposure: 1.0, vig: 1.0, sat: 1.1, contrast: 1.06, tint: [0.96, 0.98, 1.06] },
+    post: { bloom: 0.55, threshold: 1.0, radius: 0.6, exposure: 1.02, vig: 1.0, sat: 1.08, contrast: 1.06, tint: [0.92, 0.97, 1.1] },
     music: { bpm: 80, root: 38, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 0, 5, 4, 0, 3, 4, 4],
       layers: [
         { v: 'organ', pat: '0...............', oct: 0, len: 16, vol: 0.2 },
@@ -534,8 +602,11 @@
           yield* chord(b, 4, 0.55, 0.9); yield 1.2;
         }
       } },
-      { at: 0.68, *enter(b) {
-        const S = b.state; Sound.sfx('roar', 0.7, 1.6); S.strike = 1; S.intensity = 1; Co.start(setWindows(b, 1), 'fight'); Co.start(Post.lerpTo({ tint: [1.06, 0.95, 0.97], bloom: 0.6, contrast: 1.1 }, 2.5), 'fight');
+      { at: 0.68, skipTo(b) { // started past this phase: apply its look instantly (the next phase's enter overrides what it changes)
+        const S = b.state; S.intensity = Math.max(S.intensity, 1); S.organLight.color.set(0xff6040); S.rimC.set(0xa070ff).multiplyScalar(0.55); S.backLight.color.set(0xa05070); S.vaultL.color.set(0x903040);
+        for (const a of S.arms) if (a.tier <= 1) a.k = 1; for (const d of S.dust) d.visible = true;
+      }, *enter(b) {
+        const S = b.state; Sound.sfx('roar', 0.7, 1.6); S.strike = 1; S.intensity = 1; Co.start(setWindows(b, 1), 'fight'); Co.start(Post.lerpTo({ tint: [1.1, 0.92, 0.92], bloom: 0.58, contrast: 1.1 }, 2.5), 'fight'); S.backLight.color.set(0xa05070); S.vaultL.color.set(0x903040); for (const d of S.dust) d.visible = true;
         S.organLight.color.set(0xff6040); S.rimC.set(0xa070ff).multiplyScalar(0.55); FX.flash(0xff4030, 0.3, 1.5); FX.shake(0.6);
         for (let i = 0; i < 5; i++) { playLane(b, i, true); yield 0.22; } yield 1.2;
       }, *run(b) {
@@ -556,9 +627,9 @@
         Sound.sfx('shatter'); Sound.sfx('bigboom'); FX.flash(0xfff0d0, 0.5, 1.4); FX.shake(1.2);
         for (const w of S.windows) FX.burst(w.position.x * 0.96, w.position.y, w.position.z, { n: 50, color: 0xffd090, color2: 0xc03060, dir: [-Math.sign(w.position.x), -0.1, w.position.x === 0 ? -Math.sign(w.position.z) : 0], spread: 0.7, speed: [4, 18], grav: 9, life: [0.8, 2], size: [0.12, 0.35] });
         // escalate with colour and contrast, not brightness: cold violet counter-light against the gold lanes, dark floor
-        Co.start(setWindows(b, 2, 1.2), 'fight'); Co.start(Post.lerpTo({ tint: [1.04, 0.97, 1.04], bloom: 0.6, threshold: 1.1, exposure: 0.97, contrast: 1.14, sat: 1.18 }, 1.5), 'fight');
-        S.inlay.emissiveIntensity = 0.6; S.organLight.color.set(0xff9a40); S.hemi.color.set(0x4a36a0); S.hemi.groundColor.set(0x0a0610); S.hemi.intensity = 0.6;
-        S.backLight.color.set(0x7048ff); S.backLight.intensity = 220; S.rimC.set(0xb080ff).multiplyScalar(0.75); S.flame = 1; scene.fog.color.set(0x0a0716); scene.fog.density = 0.010;
+        Co.start(setWindows(b, 2, 1.2), 'fight'); Co.start(Post.lerpTo({ tint: [1.03, 0.98, 1.03], bloom: 0.62, threshold: 1.1, exposure: 1.0, contrast: 1.14, sat: 1.2 }, 1.5), 'fight'); S.debrisMesh.visible = true; for (const d of S.dust) d.visible = true; S.hem.visible = false; S.orbMesh.visible = true; FX.burst(b.pos.x, 1.2, b.pos.z, { n: 60, color: 0x4a6aff, color2: 0xff3050, speed: [3, 9], up: 3, life: [0.6, 1.4], size: [0.12, 0.3], radius: 2.5 });
+        S.inlay.emissiveIntensity = 0.6; S.organLight.color.set(0xffd0a0); S.hemi.color.set(0x6a58c0); S.ribMat.emissive.set(0x8a60ff); S.ribMat.emissiveIntensity = 0.3; S.hemi.groundColor.set(0x14100c); S.hemi.intensity = 0.6; S.vaultL.color.set(0xc8a0ff); S.vaultL.intensity = 120;
+        S.backLight.color.set(0x8070ff); S.backLight.intensity = 190; S.rimC.set(0xb080ff).multiplyScalar(0.75); S.flame = 1; scene.fog.color.set(0x100e12); scene.fog.density = 0.010;
         yield 1.4;
       }, *run(b) {
         let n = 0;
@@ -589,7 +660,7 @@
       const casting = b.castState ? 1 : 0, I = S.intensity; S.strike = Math.max(0, (S.strike || 0) - dt * 1.5);
       S.core.position.y = 0.5 + Math.sin(t * 1.1) * 0.18;
       S.head.rotation.set(-0.12 + Math.sin(t * 0.9) * 0.05 - S.strike * 0.15, Math.sin(t * 0.6) * 0.12, Math.sin(t * 0.7) * 0.05);
-      S.crown.rotation.z = Math.sin(t * 0.5) * 0.04;
+      S.crown.rotation.z = I >= 2 ? (S.crown.rotation.z + dt * 0.5) % TAU : Math.sin(t * 0.5) * 0.04;
       for (const a of S.arms) {
         a.k = Math.min(1, Math.max(0, a.k + (a.tier <= I ? dt * 0.8 : -dt * 2))); a.sh.visible = a.k > 0.01; if (!a.sh.visible) continue;
         const u = smooth(a.k), sw = Math.sin(t * (1.6 + I * 0.7) + a.ph), up = casting * 0.9 + S.strike * 1.2;
@@ -612,16 +683,23 @@
       S.staffA.rotation.y = S.ringA * 0.2; S.staffA.position.y = 3.3; S.staffB.position.y = 1.7; S.staffB.scale.setScalar(Math.max(0.001, sp));
       S.staffMat.opacity = 0.35 + casting * 0.3 + Math.max(0, Math.sin(t * 4)) * 0.1;
       // gown cracks open as she weakens; heart and crown follow
-      const crack = [0.12, 1.3, 2.6][I] * (0.85 + 0.15 * Math.sin(t * 2.3)) + casting * 0.4;
-      S.gownMat.emissiveIntensity = crack; S.gownMat.emissive.setHex(I >= 2 ? 0xffb050 : 0xff6a20);
-      S.heartMat.color.setHex(0xffa040).multiplyScalar(0.8 + I * 0.7 + casting * 0.8 + Math.sin(t * 4) * 0.2);
-      S.crownTip.emissiveIntensity = 0.6 + I * 0.5 + casting * 1.2;
+      const gl = [0.55, 0.85, 1.15][I] * (0.88 + 0.12 * Math.sin(t * 2.3)) + casting * 0.35, pc = PH_GLOW[I];
+      S.gownMat.emissiveIntensity = gl; S.gownMat.emissive.setHex(pc); S.shardMat.emissive.setHex(pc); S.shardMat.emissiveIntensity = 0.4 + I * 0.25 + casting * 0.5;
+      S.heartMat.color.setHex(pc).multiplyScalar(0.9 + I * 0.4 + casting * 0.8 + Math.sin(t * 4) * 0.2);
+      S.faceL.intensity = 5 + casting * 3 + S.strike * 4;
+      for (const f of S.laneFx) { if (!f.m.visible) continue; f.t += dt; const u = f.m.material.uniforms; u.uT.value = t; u.uK.value = Math.min(1, f.t / f.d);
+        u.uA.value = f.t < f.d ? smooth(f.t / 0.15) * 0.8 : Math.max(0, 1 - (f.t - f.d) / 0.3); if (f.t > f.d + 0.3) f.m.visible = false; }
+      if (S.debrisMesh.visible) { const dm = S.keyDummy; S.debris.forEach((d, i) => { dm.position.set(d.x + Math.sin(t * 0.3 + d.a) * 0.4, d.y + Math.sin(t * 0.5 + d.a * 2) * 0.5, d.z); dm.rotation.set(t * d.w + d.a, t * d.w * 0.7, d.a); dm.scale.setScalar(d.s); dm.updateMatrix(); S.debrisMesh.setMatrixAt(i, dm.matrix); }); dm.scale.setScalar(1); S.debrisMesh.instanceMatrix.needsUpdate = true; }
+      S.crownTip.emissiveIntensity = 0.6 + I * 0.7 + casting * 1.2 + (I >= 2 ? Math.max(0, Math.sin(t * 3)) * 1.2 : 0);
+      S.skirtL.color.setHex(pc); S.skirtL.intensity = 14 + I * 6 + casting * 6;
+      if (S.orbMesh.visible) { const dm = S.keyDummy; S.orb.forEach((o, i) => { const a = o.a + t * o.w; dm.position.set(Math.sin(a) * o.r, o.y + Math.sin(t * 1.3 + o.sp) * 0.25, Math.cos(a) * o.r); dm.rotation.set(t * 0.9 + o.sp, a, t * 0.6 + o.sp * 2); dm.scale.setScalar(o.s); dm.updateMatrix(); S.orbMesh.setMatrixAt(i, dm.matrix); }); dm.scale.setScalar(1); S.orbMesh.instanceMatrix.needsUpdate = true; }
+      if (S.tips && vrand() < dt * (8 + casting * 30 + S.strike * 30)) for (const tp of S.tips) if (tp.parent.parent.parent.visible) { tp.getWorldPosition(_tv); FX.burst(_tv.x, _tv.y, _tv.z, { n: 1, color: 0xfff0d0, color2: pc, speed: [0, 0.3], life: [0.3, 0.6], size: [0.08, 0.16] }); }
       S.batonTip.color.setHex(0xfff0d0).multiplyScalar(2 + casting * 2 + S.strike * 3);
-      for (let i = 0; i < 5; i++) { S.pipeHeat[i] = Math.max(0, S.pipeHeat[i] - dt * 1.6); S.pipeGlow[i].emissiveIntensity = 0.3 + I * 0.35 + S.pipeHeat[i] * 6; }
+      for (let i = 0; i < 5; i++) { S.pipeHeat[i] = Math.max(0, S.pipeHeat[i] - dt * 1.6); S.pipeGlow[i].emissiveIntensity = 0.12 + I * 0.12 + S.pipeHeat[i] * 2.5; }
       // brass lane borders pulse with the lanes she plays
       for (let i = 0; i <= 5; i++) { const h = Math.max(i > 0 ? S.pipeHeat[i - 1] : 0, i < 5 ? S.pipeHeat[i] : 0); S.borders[i].emissiveIntensity = 0.3 + I * 0.12 + h * 2.2 + Math.max(0, Math.sin(t * 2.1 - i * 0.6)) * 0.12; }
       S.trim.emissiveIntensity = 0.3 + I * 0.2 + casting * 1.0;
-      S.organLight.intensity = (I === 2 ? 230 : 150) * (0.9 + Math.sin(t * 7) * 0.04 + Math.sin(t * 13.3) * 0.03);
+      S.organLight.intensity = (I === 2 ? 120 : 90) * (0.9 + Math.sin(t * 7) * 0.04 + Math.sin(t * 13.3) * 0.03);
       for (let i = 0; i < S.candleL.length; i++) S.candleL[i].intensity = 10 * (0.85 + Math.sin(t * 11 + i * 2) * 0.08 + Math.sin(t * 23 + i) * 0.07);
       if (S.flame && vrand() < dt * 16) { const i = Math.floor(vrand() * 5), tp = S.pipeTop(i); FX.burst(tp.x + (vrand() - 0.5) * 3, tp.y - vrand() * 4, tp.z, { n: 2, color: 0xffa030, color2: 0xff3010, speed: [0.5, 2], up: 6, life: [0.5, 1.2], size: [0.25, 0.6] }); }
       if (S.flame && vrand() < dt * 10) FX.burst((vrand() - 0.5) * 22, 16 + vrand() * 6, (vrand() - 0.5) * 34, { n: 1, color: vrand() < 0.5 ? 0xff4060 : 0x6080ff, speed: [0, 0.5], grav: 2.5, life: [2, 4], size: [0.08, 0.18] });
