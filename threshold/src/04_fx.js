@@ -30,7 +30,7 @@ const FX = (() => {
       fragmentShader: `
         varying vec4 vCol; varying float vT;
         void main(){ vec2 c = gl_PointCoord-0.5; float d = length(c)*2.0; if (d > 1.0) discard;
-          float a = ${additive ? 'pow(1.0-d,1.6)' : 'smoothstep(1.0,0.35,d)'} * (1.0 - smoothstep(0.6,1.0,vT)) * vCol.a;
+          float a = ${additive ? 'pow(clamp(1.0-d,0.0,1.0),1.6)' : 'smoothstep(1.0,0.35,d)'} * (1.0 - smoothstep(0.6,1.0,vT)) * vCol.a;
           gl_FragColor = vec4(vCol.rgb${additive ? '*a' : ''}, a); }`,
       transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
     });
@@ -94,7 +94,7 @@ const FX = (() => {
   pool('pillar', 20, () => new THREE.Mesh(cylGeo, new THREE.ShaderMaterial({
     uniforms: { uC: { value: new THREE.Color() }, uA: { value: 1 } },
     vertexShader: 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv=uv; vec4 mv=modelViewMatrix*vec4(position,1.0); vN=normalize(normalMatrix*normal); vV=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }',
-    fragmentShader: 'uniform vec3 uC; uniform float uA; varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ float f=abs(dot(normalize(vN),normalize(vV))); float a=pow(1.0-vUv.y,1.5)*(0.25+0.75*f*f)*uA; gl_FragColor=vec4(uC*a,a); }',
+    fragmentShader: 'uniform vec3 uC; uniform float uA; varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ float f=abs(dot(normalize(vN),normalize(vV))); float a=pow(clamp(1.0-vUv.y,0.0,1.0),1.5)*(0.25+0.75*f*f)*uA; gl_FragColor=vec4(uC*a,a); }',
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
   })));
   function pillar(x, z, o = {}) {

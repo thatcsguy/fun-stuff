@@ -39,7 +39,7 @@ const UI = (() => {
   }
   function fade(on) { el.fade.classList.toggle('clear', !on); }
   function titleCard(num, name, sub, color) {
-    el.card.querySelector('.num').textContent = num; el.card.querySelector('.nm').textContent = name; el.card.querySelector('.sub').textContent = sub || '';
+    el.card.querySelector('.tnum').textContent = num; el.card.querySelector('.nm').textContent = name; el.card.querySelector('.sub').textContent = sub || '';
     document.documentElement.style.setProperty('--accent', color || '#e8c77a'); el.card.classList.add('show');
   }
   function hideCard() { el.card.classList.remove('show'); }
