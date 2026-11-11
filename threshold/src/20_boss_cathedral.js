@@ -781,7 +781,7 @@
     danger(b, x, z) { let best = Infinity; for (const w of b.state.walls) { if (laneOf(x) === w.gap) continue; const tt = (z - w.z) / w.v; if (tt > -0.1 && tt < best) best = Math.max(0, tt); } return best; },
     bot(b, p) {
       const add = G.ents.find((e) => e.isAdd && e.alive); const h = {};
-      if (add) { h.target = add; h.saveInterrupt = true; if (p.cls.id === 'duskblade') { const d = Math.hypot(p.pos.x - add.pos.x, p.pos.z - add.pos.z) || 1; h.x = add.pos.x + (p.pos.x - add.pos.x) / d * 2.2; h.z = add.pos.z + (p.pos.z - add.pos.z) / d * 2.2; } } else h.target = b;
+      if (add) { h.target = add; h.saveInterrupt = true; if (p.cls.melee) { const d = Math.hypot(p.pos.x - add.pos.x, p.pos.z - add.pos.z) || 1; h.x = add.pos.x + (p.pos.x - add.pos.x) / d * 2.2; h.z = add.pos.z + (p.pos.z - add.pos.z) / d * 2.2; } } else h.target = b;
       return h;
     },
   });

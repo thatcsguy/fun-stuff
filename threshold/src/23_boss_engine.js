@@ -653,11 +653,11 @@
     },
     bot(b, p) {
       const S = b.state, add = G.ents.find((e) => e.isAdd && e.alive), h = { avoid: (x, z) => { const i = tIdx(x, z); return i < 0 || !S.tiles[i].present; } };
-      if (add) { h.target = add; if (p.cls.id === 'duskblade') { const d = Math.hypot(p.pos.x - add.pos.x, p.pos.z - add.pos.z) || 1; h.x = add.pos.x + (p.pos.x - add.pos.x) / d * 2.2; h.z = add.pos.z + (p.pos.z - add.pos.z) / d * 2.2; } } else h.target = b;
-      const sw = S.sweep; if (sw && sw.t > 0 && (p.cls.id === 'duskblade' || b.def.danger(b, p.pos.x, p.pos.z) < 1.6)) {
+      if (add) { h.target = add; if (p.cls.melee) { const d = Math.hypot(p.pos.x - add.pos.x, p.pos.z - add.pos.z) || 1; h.x = add.pos.x + (p.pos.x - add.pos.x) / d * 2.2; h.z = add.pos.z + (p.pos.z - add.pos.z) / d * 2.2; } } else h.target = b;
+      const sw = S.sweep; if (sw && sw.t > 0 && (p.cls.melee || b.def.danger(b, p.pos.x, p.pos.z) < 1.6)) {
         const cx = h.x === undefined ? p.pos.x : h.x, cz = h.z === undefined ? p.pos.z : h.z, pa = Math.atan2(cx, cz); let best = 0, bd = 9;
         for (let k = 0; k < sw.n; k++) { const m = sw.a + (k + 0.5) / sw.n * TAU, d = Math.abs(angDiff(m, pa)); if (d < bd) { bd = d; best = m; } }
-        const r = add ? Math.max(3.2, Math.hypot(cx, cz)) : p.cls.id === 'duskblade' ? 4.3 : 7.5; if (!add || bd > 0.5) { h.x = Math.sin(best) * r; h.z = Math.cos(best) * r; h.w = 1.5; }
+        const r = add ? Math.max(3.2, Math.hypot(cx, cz)) : p.cls.melee ? 4.3 : 7.5; if (!add || bd > 0.5) { h.x = Math.sin(best) * r; h.z = Math.cos(best) * r; h.w = 1.5; }
       }
       return h;
     },

@@ -99,7 +99,7 @@
     // ---- understudies ----
     const cls = UI.selectedClass() || G.classes[0]; S.dolls = [];
     for (const mode of ['x', 'z']) {
-      const M = buildHero({ id: cls.id, look: { armor: 0xd9c9a4, cloth: mode === 'x' ? 0x7a1028 : 0x1c2a7a, glow: mode === 'x' ? ROSE : 0x5a9cff, hood: cls.look.hood } });
+      const M = buildHero({ id: cls.id, look: { armor: 0xd9c9a4, cloth: mode === 'x' ? 0x7a1028 : 0x1c2a7a, glow: mode === 'x' ? ROSE : 0x5a9cff, hood: cls.look.hood, hat: cls.look.hat, weapon: cls.look.weapon || (cls.id === 'duskblade' ? 'blade' : 'staff') } });
       g.add(M.group);
       const bar = new THREE.Group(); for (const r of [0, PI / 2]) { const q = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.07, 0.1), W.mat({ color: 0x3a2412 })); q.rotation.y = r; bar.add(q); } g.add(bar);
       const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(24), 3));
@@ -345,7 +345,7 @@
       for (const d of S.dolls) {
         if (!d.on) continue; const q = dpos(d, _b2), M = d.M, drop = (d.drop || 0) * 16;
         M.group.position.set(q.x, p.pos.y + drop, q.z); M.group.rotation.y = d.mode === 'x' ? -p.facing : PI - p.facing; M.group.scale.x = -1;
-        d.fake.moveSpeed = p.moveSpeed; d.fake.grounded = p.grounded; d.fake.casting = p.casting; d.fake.parryT = p.parryT; d.fake.flashT = p.flashT;
+        d.fake.moveSpeed = p.moveSpeed; d.fake.grounded = p.grounded; d.fake.casting = p.casting; d.fake.parryT = p.parryT; d.fake.rollT = p.rollT; d.fake.aimT = p.aimT; d.fake.loadT = p.loadT; d.fake.flashT = p.flashT;
         M.anim.swing = pm.anim.swing; M.anim.swingDur = pm.anim.swingDur; M.anim.swingKind = pm.anim.swingKind; M.update(dt, d.fake); if (pm.anim.swing > 0) M.anim.swing = pm.anim.swing;
         d.bar.position.set(q.x, 8.5 + drop + Math.sin(t * 2 + q.x) * 0.1, q.z); d.bar.rotation.y = M.group.rotation.y;
         const A = d.ln.geometry.attributes.position.array, tw = S.twang * 0.15; let k = 0;
@@ -378,7 +378,7 @@
     bot(b, p) {
       const S = b.state, h = {};
       if (S.black) return { x: S.black.q.x, z: S.black.q.z, w: 3 };
-      if (S.split) { const side = p.pos.z >= b.pos.z ? 1 : -1, off = p.cls.id === 'duskblade' ? b.radius + 1.7 : 6; let tz = b.pos.z + side * off; if (Math.abs(tz) > HZ - 1) tz = b.pos.z - side * off; h.x = -b.pos.x; h.z = tz; h.w = 1.5; }
+      if (S.split) { const side = p.pos.z >= b.pos.z ? 1 : -1, off = p.cls.melee ? b.radius + 1.7 : 6; let tz = b.pos.z + side * off; if (Math.abs(tz) > HZ - 1) tz = b.pos.z - side * off; h.x = -b.pos.x; h.z = tz; h.w = 1.5; }
       return h;
     },
   });

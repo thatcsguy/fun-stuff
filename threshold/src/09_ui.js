@@ -16,7 +16,7 @@ const UI = (() => {
     for (const c of G.classes) {
       const b = document.createElement('button'); b.className = 'cls nav' + (c === selectedClass() ? ' sel' : ''); b.style.setProperty('--c', c.color);
       const labels = Input.device === 'pad' ? SLOT_LABEL_PAD : SLOT_LABEL_KBM;
-      b.innerHTML = `<div class="cn">${c.name}</div><div class="cr">${c.role}</div><div class="sk">` + c.skills.map((s, i) => `<div class="ic">${svg(s.icon, c.color)}</div><div><kbd>${labels[i]}</kbd><b>${s.name}</b> ${s.desc}</div>`).join('') + '</div>';
+      b.innerHTML = `<div class="cn">${c.name}</div><div class="cr">${c.role}</div><div class="sk">` + c.skills.map((s, i) => !s ? '' : `<div class="ic">${svg(s.icon, c.color)}</div><div><kbd>${labels[i]}</kbd><b>${s.name}</b> ${s.desc}</div>`).join('') + '</div>';
       b.onclick = () => { Settings.cls = c.id; saveSettings(); Sound.sfx('uiok'); buildMenu(); };
       cw.appendChild(b);
     }
@@ -48,21 +48,27 @@ const UI = (() => {
     const p = G.player, c = p.cls, hb = $('#hotbar'); hb.innerHTML = ''; slots = [];
     document.documentElement.style.setProperty('--cls', c.color);
     for (const k of Object.keys(cache)) delete cache[k];
+    let sepDone = false;
     c.skills.forEach((s, i) => {
-      const d = document.createElement('div'); d.className = 'slot' + (i === 3 ? ' gsep' : ''); d.title = s.name + ': ' + s.desc;
-      d.innerHTML = `${svg(s.icon, c.color)}<span class="key"></span><div class="cdm"></div><div class="cdt"></div><span class="chg"></span>`;
+      if (!s) { slots.push(null); return; }
+      const gs = i >= 3 && !sepDone; if (gs) sepDone = true;
+      const d = document.createElement('div'); d.className = 'slot' + (gs ? ' gsep' : ''); d.title = s.name + ': ' + s.desc;
+      d.innerHTML = `<span class="ico">${svg(s.icon, c.color)}</span><span class="key"></span><div class="cdm"></div><div class="cdt"></div><span class="chg"></span>`;
       d.onmousedown = (e) => { e.stopPropagation(); if (G.state === 'fight') p.press(i); };
-      hb.appendChild(d); slots.push({ d, key: d.querySelector('.key'), cdm: d.querySelector('.cdm'), cdt: d.querySelector('.cdt'), chg: d.querySelector('.chg'), flash: 0 });
+      hb.appendChild(d); slots.push({ d, ico: d.querySelector('.ico'), key: d.querySelector('.key'), cdm: d.querySelector('.cdm'), cdt: d.querySelector('.cdt'), chg: d.querySelector('.chg'), flash: 0 });
     });
     deviceChanged();
-    const pips = $('#pips'); pips.innerHTML = ''; for (let i = 0; i < c.resource.max; i++) pips.appendChild(document.createElement('i'));
+    // class resource: pips (default), one bar (stamina), or the six chambers of a cylinder
+    const pips = $('#pips'), kind = c.resource.kind || 'pips'; pips.innerHTML = ''; pips.className = kind;
+    if (kind === 'bar') pips.innerHTML = '<div class="stam"><b></b><u></u></div>';
+    else for (let i = 0; i < c.resource.max; i++) pips.appendChild(document.createElement('i'));
     const b = G.boss, bar = $('#bbar'); bar.querySelectorAll('.tick').forEach((t) => t.remove());
     for (const ph of b.def.phases) if (ph.at < 1) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (ph.at * 100) + '%'; bar.appendChild(t); }
     $('#bname').textContent = b.def.name;
   }
   function deviceChanged() {
     const labels = Input.device === 'pad' ? SLOT_LABEL_PAD : SLOT_LABEL_KBM;
-    slots.forEach((s, i) => { s.key.textContent = labels[i]; });
+    slots.forEach((s, i) => { if (s) s.key.textContent = labels[i]; });
     if (cur === 'menu') buildMenu();
   }
   function castBar(key, node, cs) {
@@ -81,21 +87,24 @@ const UI = (() => {
     setSx('php', $('#pbar .fill'), p.hp / p.maxHp); setCls('plow', $('#pbar'), 'low', p.hp / p.maxHp < 0.35);
     setTxt('phpt', $('#pbar .hpt'), Math.ceil(p.hp) + ' / ' + p.maxHp);
     const sh = Math.round(sat(p.shield / p.maxHp) * 100); if (cache.sh !== sh) { cache.sh = sh; $('#pbar .shield').style.width = sh + '%'; }
-    const pips = $('#pips').children; for (let i = 0; i < pips.length; i++) setCls('pip' + i, pips[i], 'on', i < p.res);
+    const pw = $('#pips'), pips = pw.children, rk = p.cls.resource.kind || 'pips';
+    if (rk === 'bar') { const st = pips[0]; setSx('stam', st.firstElementChild, sat(p.res / p.resMax)); setCls('wind', st, 'wind', !!p.winded); setCls('open', st, 'open', p.opening > 0); }
+    else if (rk === 'cylinder') { const lw = p.armed ? 5 - p.streak : -1; for (let i = 0; i < pips.length; i++) { const v = (p.cyl[i] || '') + (i === 0 && p.cyl.length ? ' next' : '') + (i === lw ? ' lw' : ''); if (cache['ch' + i + 'c'] !== v) { cache['ch' + i + 'c'] = v; pips[i].className = v; } } }
+    else for (let i = 0; i < pips.length; i++) setCls('pip' + i, pips[i], 'on', i < p.res);
     const pc = $('#pcast'), c = p.casting; if (cache.pcon !== !!c) { cache.pcon = !!c; pc.style.opacity = c ? 1 : 0; }
     if (c) { setSx('pcf', pc.firstElementChild, sat(c.t / c.time)); setTxt('pcn', pc.lastElementChild, c.name); }
     for (let i = 0; i < slots.length; i++) {
-      const s = slots[i], st = p.sk[i], d = st.def, why = p.block(i);
+      const s = slots[i]; if (!s) continue; const st = p.sk[i], d = st.def, why = p.block(i);
       let frac = 0, txt = '';
       if (st.charges <= 0 && st.cd > 0) { frac = st.cd / d.cd; txt = st.cd > 9.5 ? String(Math.ceil(st.cd)) : st.cd.toFixed(st.cd < 3 ? 1 : 0); }
       else if (d.gcd !== false && p.gcd > 0) frac = p.gcd / p.gcdMax;
       setSx('cd' + i, s.cdm, sat(frac), 'Y'); setTxt('ct' + i, s.cdt, txt);
-      setCls('off' + i, s.d, 'off', why === 'res' || why === 'range' || why === 'target' || why === 'spent' || why === 'no' || (st.charges <= 0));
+      setCls('off' + i, s.d, 'off', why === 'res' || why === 'range' || why === 'target' || why === 'spent' || why === 'no' || /^[A-Z]/.test(why) || (st.charges <= 0));
       setTxt('ch' + i, s.chg, d.limited ? String(st.uses) : (d.charges > 1 ? String(st.charges) : ''));
-      const rdy = (i === 1 && p.res >= p.resMax) || (p.cls.id === 'stormcaller' && i === 0 && p.hasBuff('surge')) || (i === 5 && p.target && p.target.castState && p.target.castState.int && why === '');
+      const rdy = (d.rdy && d.rdy(p)) || (d.interrupt && p.target && p.target.castState && p.target.castState.int && why === '');
       setCls('rdy' + i, s.d, 'rdy', !!rdy);
-      const act = (i === 2 && (p.hasBuff('storm') || p.hasBuff('tempest'))) || (i === 4 && (p.parryT > 0 || p.shield > 0));
-      setCls('act' + i, s.d, 'act', !!act);
+      setCls('act' + i, s.d, 'act', !!(d.act && d.act(p)));
+      if (d.view) { const ic = d.view(p); if (cache['ic' + i] !== ic) { cache['ic' + i] = ic; s.ico.innerHTML = svg(ic, p.cls.color); } }
       if (s.flash > 0) { s.flash -= rdt; if (s.flash <= 0) s.d.classList.remove('press'); }
     }
     const bw = $('#buffs'), sig = p.buffs.map((q) => q.id).join(',');

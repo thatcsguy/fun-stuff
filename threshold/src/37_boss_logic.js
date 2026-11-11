@@ -282,7 +282,7 @@
     },
     bot(b, p) {
       const S = b.state, out = {}; if (!S.C || S.down > 0) return out;
-      const eb = effBits(S), sampled = S.exec && S.exec.out, now = sampled || evalC(S.C, eb).out, sol = sampled ? null : solveC(S.C, eb, S.bz), melee = p.cls.id === 'duskblade';
+      const eb = effBits(S), sampled = S.exec && S.exec.out, now = sampled || evalC(S.C, eb).out, sol = sampled ? null : solveC(S.C, eb, S.bz), melee = p.cls.melee;
       // where is the nearest output that will stay dark?
       let safe = null, sd = Infinity; now.forEach((v, zn) => { if (v) return; const x = clamp(p.pos.x, ZX[zn] - 4.5, ZX[zn] + 4.5), z = clamp(p.pos.z, ZN + 1.5, ZS - 2), d = Math.hypot(x - p.pos.x, z - p.pos.z); if (d < sd) { sd = d; safe = { x, z }; } });
       const left = S.exec ? S.exec.t : 99, must = safe && left < sd / 7 + 1.3;
