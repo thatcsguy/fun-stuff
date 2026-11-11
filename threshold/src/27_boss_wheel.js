@@ -307,7 +307,7 @@
     bot(b, p) {
       const S = b.state; for (const wv of S.waves) { const dd = Math.hypot(p.pos.x - wv.d.x, p.pos.z - wv.d.z), tt = (dd - wv.r) / 10.5; if (tt > 0 && tt < 0.2) p.jump(); }
       const rolling = S.balls.filter((q) => q.state === 'roll' || q.state === 'drop');
-      return { avoid: (x, z) => { const d = Math.hypot(x, z); return rolling.some((q) => Math.abs(d - q.r) < 1.9) || (p.cls.id !== 'duskblade' && d < 6); } };
+      return { avoid: (x, z) => { const d = Math.hypot(x, z); return rolling.some((q) => Math.abs(d - q.r) < 1.9) || (!p.cls.melee && d < 6); } };
     },
   });
 })();

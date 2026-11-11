@@ -4,7 +4,7 @@ const Bot = {
   update(dt) {
     const p = G.player, b = G.boss;
     if (!this.level || !p || !b || G.state !== 'fight' || !p.alive) { Input.bot = this.level && p ? { moveX: 0, moveZ: 0 } : null; return; }
-    const A = G.arena, def = b.def, melee = p.cls.id === 'duskblade', t = p.target || b;
+    const A = G.arena, def = b.def, melee = !!p.cls.melee, t = p.target || b;
     const hint = def.bot ? def.bot(b, p) || {} : {};
     const danger = (x, z) => { let th = Hz.threat(x, z); if (def.danger) th = Math.min(th, def.danger(b, x, z)); return th; };
     this.timer -= dt;
@@ -43,8 +43,11 @@ const Bot = {
     // rotation
     this.pressT -= dt; if (this.pressT > 0) return; this.pressT = [0, 0.25, 0.12, 0.05][this.level];
     const here = danger(p.pos.x, p.pos.z), cs = t.castState;
-    const ctx = { hp: p.hp / p.maxHp, danger: here < 0.3 && this.level >= 2, calm: here, wantInterrupt: !!(cs && cs.int && cs.t > (this.level >= 3 ? 0.3 : 0.8)), chase: gd < 1.5, holdFire: !!hint.holdFire, saveInterrupt: !!def.botSaveInterrupt || !!hint.saveInterrupt || this.level < 3 };
+    const ctx = { hp: p.hp / p.maxHp, danger: here < 0.3 && this.level >= 2, calm: here, wantInterrupt: !!(cs && cs.int && cs.t > (this.level >= 3 ? 0.3 : 0.8)), chase: gd < 1.5, holdFire: !!hint.holdFire, saveInterrupt: !!def.botSaveInterrupt || !!hint.saveInterrupt || this.level < 3,
+      zone: !!Hz.persist(p.pos.x, p.pos.z),
+      threat: (x, z) => (Hz.persist(x, z) || (hint.avoid && hint.avoid(x, z))) ? 0 : danger(x, z) };
     if (hint.target && p.target !== hint.target) p.target = hint.target;
+    if (ctx.holdFire) p.queue = -1; // a player told to stop does not let a buffered press go through
     p.cls.bot(p, ctx);
   },
 };

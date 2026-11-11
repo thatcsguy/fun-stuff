@@ -111,11 +111,25 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 #pips{display:flex;gap:5px;justify-content:center;height:12px}
 #pips i{flex:1;max-width:64px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.55);transform:skewX(-18deg);transition:all .12s}
 #pips i.on{background:var(--cls);box-shadow:0 0 10px var(--cls);border-color:#fff}
+#pips.bar{height:10px}
+#pips .stam{flex:1;position:relative;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.55);overflow:hidden}
+#pips .stam b{position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--cls) 70%,#000),var(--cls));transform-origin:left;box-shadow:0 0 10px var(--cls)}
+#pips .stam u{position:absolute;left:34%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.55)}
+#pips .stam.wind{border-color:#ff5040;animation:windp .35s infinite alternate}#pips .stam.wind b{background:#b02a20;box-shadow:none}
+#pips .stam.open{border-color:#fff;box-shadow:0 0 14px #ffe0a0}
+@keyframes windp{from{background:rgba(0,0,0,.55)}to{background:rgba(160,30,20,.55)}}
+#pips.cylinder{height:22px;gap:7px;align-items:center}
+#pips.cylinder i{flex:0 0 18px;max-width:none;width:18px;height:18px;border-radius:50%;transform:none;border:1px solid rgba(255,255,255,.28);background:rgba(0,0,0,.6);box-sizing:border-box}
+#pips.cylinder i.L{background:radial-gradient(circle at 35% 30%,#fff6dc,#d9a94a 60%,#7a5a20);border-color:#ffe2a8;box-shadow:0 0 7px #ffcf70}
+#pips.cylinder i.S{background:radial-gradient(circle at 35% 30%,#fff,#c9a0ff 55%,#5a3a9a);border-color:#ead4ff;box-shadow:0 0 9px #c08bff}
+#pips.cylinder i.V{background:radial-gradient(circle at 35% 30%,#eafff0,#50e08a 55%,#17703c);border-color:#b8ffd0;box-shadow:0 0 9px #50e08a}
+#pips.cylinder i.next{flex-basis:24px;width:24px;height:24px;border-width:2px;border-color:#fff}
+#pips.cylinder i.lw{outline:2px solid var(--cls);outline-offset:2px}
 #pcast{height:11px;opacity:0;transition:opacity .12s}
 #pcast .fill{background:linear-gradient(180deg,#ffe9a8,#d69b2b)}
 #hotbar{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);display:flex;gap:7px;pointer-events:auto}
 .slot{position:relative;width:60px;height:60px;border:1px solid rgba(255,255,255,.3);background:rgba(8,9,15,.82);display:flex;align-items:center;justify-content:center;overflow:hidden}
-.slot svg{width:36px;height:36px;transition:opacity .1s}
+.slot svg{width:36px;height:36px;transition:opacity .1s}.slot .ico{display:flex}
 .slot .key{position:absolute;left:3px;top:1px;font:700 11px ui-monospace,Consolas,monospace;color:#fff;text-shadow:0 1px 2px #000;z-index:3}
 .slot .cdm{position:absolute;inset:0;background:rgba(0,0,0,.72);transform-origin:bottom;transform:scaleY(0);z-index:1}
 .slot .cdt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 17px "Segoe UI",sans-serif;color:#fff;text-shadow:0 1px 3px #000;z-index:2}
@@ -226,7 +240,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
     <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>Space</kbd> jump &nbsp; hold <kbd>Left mouse</kbd> turn camera &nbsp; hold <kbd>Right mouse</kbd> turn camera and character &nbsp; both buttons run forward<br>
     <kbd>Wheel</kbd> zoom &nbsp; <kbd>Tab</kbd> or click to change target &nbsp; <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>Q</kbd><kbd>E</kbd><kbd>R</kbd><kbd>F</kbd> skills (also <kbd>4</kbd>-<kbd>7</kbd>, or click the bar) &nbsp; <kbd>Esc</kbd> pause<br>
     <b>Controller</b><br>
-    <kbd>L stick</kbd> move &nbsp; <kbd>R stick</kbd> camera &nbsp; <kbd>RT</kbd><kbd>RB</kbd><kbd>Y</kbd> attacks &nbsp; <kbd>A</kbd> mobility &nbsp; <kbd>B</kbd> defensive &nbsp; <kbd>X</kbd> interrupt &nbsp; <kbd>LB</kbd> heal<br>
+    <kbd>L stick</kbd> move &nbsp; <kbd>R stick</kbd> camera &nbsp; <kbd>RT</kbd><kbd>RB</kbd><kbd>Y</kbd><kbd>A</kbd><kbd>B</kbd><kbd>X</kbd><kbd>LB</kbd> skills, in hotbar order (each skill shows its button)<br>
     <kbd>LT</kbd> jump &nbsp; <kbd>D-pad ◀ ▶</kbd> change target &nbsp; <kbd>R3</kbd> reset camera &nbsp; <kbd>Start</kbd> pause
   </div>
   <button class="btn nav primary" data-act="back">Back</button>
@@ -1642,7 +1656,11 @@ function buildHero(cls) {
   add(torso, new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.035, 6, 20), trim), 0, 0.1, 0).rotation.x = PI / 2;
   const head = new THREE.Group(); head.position.y = 0.8; torso.add(head);
   add(head, new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 10), skin), 0, 0.06, 0);
-  if (C.hood) { const h = add(head, new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.42, 12, 1, true), cloth), 0, 0.13, -0.03); h.rotation.x = -0.25; add(head, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.03, 0.03), trim), 0, 0.07, 0.14); }
+  if (C.hat) { // wide-brimmed hat
+    const brim = add(head, new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.42, 0.025, 20), cloth), 0, 0.17, 0); brim.rotation.x = -0.08;
+    add(head, new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, 0.2, 14), cloth), 0, 0.27, 0); add(head, new THREE.Mesh(new THREE.CylinderGeometry(0.195, 0.195, 0.04, 14), trim), 0, 0.2, 0);
+    add(head, new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.1, 0.05), cloth), 0, -0.01, 0.13); add(head, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.025, 0.03), trim), 0, 0.08, 0.145);
+  } else if (C.hood) { const h = add(head, new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.42, 12, 1, true), cloth), 0, 0.13, -0.03); h.rotation.x = -0.25; add(head, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.03, 0.03), trim), 0, 0.07, 0.14); }
   else { add(head, new THREE.Mesh(new THREE.SphereGeometry(0.175, 14, 10, 0, TAU, 0, PI * 0.62), armor), 0, 0.07, 0); add(head, new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.035, 0.05), trim), 0, 0.07, 0.15); const cr = add(head, new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.3, 6), trim), 0, 0.3, -0.05); cr.rotation.x = -0.5; }
   const mkArm = (side) => {
     const sh = new THREE.Group(); sh.position.set(side * 0.31, 0.62, 0); torso.add(sh);
@@ -1670,7 +1688,22 @@ function buildHero(cls) {
   // weapon
   const weapon = new THREE.Group(); armR.hand.add(weapon);
   const glowMat = W.glow(C.glow, 3.2), wtip = new THREE.Object3D();
-  if (cls.id === 'duskblade') {
+  const kind = C.weapon || (cls.id === 'duskblade' ? 'blade' : 'staff');
+  if (kind === 'great') { // two-hander with a burning fuller
+    add(weapon, new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.036, 0.56, 8), skin), 0, 0, 0).rotation.x = PI / 2;
+    add(weapon, new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.07, 0.08), armor), 0, 0, 0.3); add(weapon, new THREE.Mesh(new THREE.OctahedronGeometry(0.07), armor), 0, 0, -0.32);
+    add(weapon, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.03, 1.7), W.mat({ color: 0x1c1a1a, roughness: 0.3, metalness: 1 })), 0, 0, 1.2);
+    const tipG = new THREE.ConeGeometry(0.1, 0.3, 4); tipG.rotateX(PI / 2); add(weapon, new THREE.Mesh(tipG, W.mat({ color: 0x1c1a1a, roughness: 0.3, metalness: 1 })), 0, 0, 2.2).scale.set(1, 0.16, 1);
+    add(weapon, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 1.6), glowMat), 0, 0, 1.18);
+    wtip.position.set(0, 0, 2.2); weapon.add(wtip); weapon.userData.ember = glowMat; weapon.userData.emberBase = glowMat.color.clone();
+  } else if (kind === 'gun') { // long revolver, built along +z
+    const gm = W.mat({ color: 0x24252e, roughness: 0.28, metalness: 1 });
+    add(weapon, new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.17, 0.075), W.mat({ color: 0x3a2416, roughness: 0.7 })), 0, -0.07, -0.02).rotation.x = 0.3;
+    const cy = add(weapon, new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.14, 6), gm), 0, 0.035, 0.1); cy.rotation.x = PI / 2; weapon.userData.drum = cy;
+    add(weapon, new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.026, 0.52, 8), gm), 0, 0.05, 0.43).rotation.x = PI / 2;
+    add(weapon, new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.3), gm), 0, 0.0, 0.3); add(weapon, new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.014, 0.5), glowMat), 0, 0.083, 0.43);
+    wtip.position.set(0, 0.05, 0.72); weapon.add(wtip);
+  } else if (kind === 'blade') {
     add(weapon, new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.34, 8), skin), 0, 0, 0.02).rotation.x = PI / 2;
     add(weapon, new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 0.05), armor), 0, 0, 0.2);
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.022, 1.25), W.mat({ color: 0x20202c, roughness: 0.2, metalness: 1 })); add(weapon, blade, 0, 0, 0.85);
@@ -1684,7 +1717,7 @@ function buildHero(cls) {
   }
   const aura = new THREE.PointLight(C.glow, 2.5, 7, 1.5); aura.position.y = 1.5; g.add(aura);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  const A = { run: 0, swing: 0, swingDur: 0.28, swingKind: 0, cast: 0, guard: 0, lean: 0 };
+  const A = { run: 0, swing: 0, swingDur: 0.28, swingKind: 0, cast: 0, guard: 0, lean: 0, aim: 0, load: 0 };
   function update(dt, p) {
     const sp = p.moveSpeed, moving = sp > 0.5 && p.grounded;
     A.run += dt * sp * 1.55; const s = Math.sin(A.run), c = Math.cos(A.run), amt = moving ? Math.min(1, sp / 7) : 0;
@@ -1697,7 +1730,13 @@ function buildHero(cls) {
     if (!p.grounded) { legL.hip.rotation.x = -0.5; legR.hip.rotation.x = 0.3; legL.knee.rotation.x = 0.9; legR.knee.rotation.x = 0.4; }
     let lx = s * 0.6 * A.lean, rx = -s * 0.6 * A.lean, lz = 0.08, rz = -0.08, le = -0.25 - A.lean * 0.5, re = -0.25 - A.lean * 0.5;
     A.cast = damp(A.cast, p.casting ? 1 : 0, 12, dt); A.guard = damp(A.guard, p.parryT > 0 ? 1 : 0, 20, dt);
-    if (cls.id === 'duskblade') { rx = lerp(rx, -0.5, 0.6); re = -0.6; weapon.rotation.set(-0.5, 0, 0); }
+    if (kind === 'blade') { rx = lerp(rx, -0.5, 0.6); re = -0.6; weapon.rotation.set(-0.5, 0, 0); }
+    else if (kind === 'great') { rx = lerp(rx, -0.45, 0.7); re = -0.75; weapon.rotation.set(-0.75, 0, 0.12); const e = weapon.userData.ember, hot = p.hasBuff && p.hasBuff('kindle'); e.color.copy(weapon.userData.emberBase).multiplyScalar(hot ? 2.3 + Math.sin(G.now * 17) * 0.5 : 1); }
+    else if (kind === 'gun') {
+      A.aim = damp(A.aim, p.aimT > 0 ? 1 : 0, 22, dt); A.load = damp(A.load, p.loadT > 0 ? 1 : 0, 18, dt);
+      rx = lerp(lerp(rx, -0.3, 0.75), -1.5, A.aim); re = lerp(-1.05, -0.05, A.aim); weapon.rotation.set(PI / 2, 0, 0);
+      if (A.load > 0.01) { rx = lerp(rx, -0.75, A.load); re = lerp(re, -1.5, A.load); lx = lerp(lx, -0.8, A.load); lz = lerp(lz, -0.5, A.load); le = lerp(le, -1.7, A.load); weapon.userData.drum.rotation.y += dt * 26 * A.load; }
+    }
     else { rx = lerp(rx, -0.7, 0.8); re = -0.3; weapon.rotation.set(0.75, 0, 0); if (weapon.userData.crystal) weapon.userData.crystal.rotation.y += dt * (2 + A.cast * 10); }
     if (A.cast > 0.01) { lx = lerp(lx, -1.5 + Math.sin(G.now * 14) * 0.05, A.cast); le = lerp(le, -0.4, A.cast); rx = lerp(rx, -1.9, A.cast); re = lerp(re, -0.2, A.cast); }
     if (A.guard > 0.01) { rx = lerp(rx, -1.3, A.guard); rz = lerp(rz, 0.9, A.guard); re = lerp(re, -1.2, A.guard); }
@@ -1706,14 +1745,19 @@ function buildHero(cls) {
       if (A.swingKind === 0) { rx = lerp(-2.4, 0.5, smooth(e)) * f + rx * (1 - f); rz = lerp(rz, -0.5, f); torso.rotation.y += f * 0.5; }
       else if (A.swingKind === 1) { rx = -1.2; rz = lerp(1.2, -1.3, smooth(e)) * f; torso.rotation.y += lerp(-0.6, 0.7, smooth(e)) * f; }
       else if (A.swingKind === 2) { rx = lerp(0.6, -2.6, smooth(e)) * f + rx * (1 - f); torso.rotation.y -= f * 0.4; }
+      else if (A.swingKind === 4) { rx -= f * 0.45; re -= f * 0.25; body.rotation.x -= f * 0.05; } // recoil
       else { rx = lerp(rx, -1.7, f); lx = lerp(lx, -1.7, f); re = -0.1; le = -0.1; body.rotation.x += f * 0.2; }
-      re = lerp(re, -0.15, f);
+      if (A.swingKind !== 4) re = lerp(re, -0.15, f);
     }
     if (p.pose === 'fall') { // skydiving: belly down, limbs spread
       body.rotation.x = 1.28 + Math.sin(G.now * 2.3) * 0.05 + A.lean * 0.12; body.position.set(0, 0.75, -0.95); body.rotation.z = Math.sin(G.now * 1.7) * 0.05;
       legL.hip.rotation.x = 0.25 + Math.sin(G.now * 5) * 0.05; legR.hip.rotation.x = 0.25 - Math.sin(G.now * 5) * 0.05; legL.knee.rotation.x = legR.knee.rotation.x = 0.7;
       if (A.swing <= 0 && A.cast < 0.05 && A.guard < 0.05) { lx = -2.3; rx = -2.3; lz = 0.75; rz = -0.75; le = re = -0.5; }
     }
+    if (p.rollT > 0) { // tumble
+      const k = 1 - p.rollT / 0.42; hips.rotation.x = smooth(sat(k)) * TAU; hips.position.y = 0.95 - Math.sin(sat(k) * PI) * 0.42;
+      legL.hip.rotation.x = legR.hip.rotation.x = -1.5; legL.knee.rotation.x = legR.knee.rotation.x = 1.9; lx = rx = -1.2; le = re = -1.6;
+    } else hips.rotation.x = 0;
     armL.sh.rotation.set(lx, 0, lz); armR.sh.rotation.set(rx, 0, rz); armL.el.rotation.x = le; armR.el.rotation.x = re;
     const flap = moving ? 0.5 + Math.sin(G.now * 9) * 0.12 : 0.08 + Math.sin(G.now * 1.3) * 0.03;
     for (let i = 0; i < cloak.length; i++) cloak[i].rotation.x = (i === 0 ? 0.12 + flap * 0.7 : flap * 0.3 + Math.sin(G.now * 7 - i) * 0.06 * amt) + (p.grounded && p.pose !== 'fall' ? 0 : 0.4);
@@ -1729,7 +1773,8 @@ class Player {
     this.kb = null; this.dash = null; this.rooted = 0; this.invuln = 0; this.parryT = 0; this.shield = 0; this.shieldT = 0; this.shieldMax = 1; this.dmgMul = 1; this.dmgTakenMul = 1; this.flashT = 0;
     this.res = 0; this.resMax = cls.resource.max; this.gcd = 0; this.gcdMax = 1; this.casting = null; this.queue = -1; this.queueT = 0; this.combo = 0;
     this.target = null; this.buffs = []; this.stats = { dmg: 0, taken: 0, heals: 0 };
-    this.sk = cls.skills.map((s) => ({ def: s, cd: 0, charges: s.charges || 1, uses: s.limited || Infinity }));
+    this.sk = cls.skills.map((s) => s ? { def: s, cd: 0, charges: s.charges || 1, uses: s.limited || Infinity } : null);
+    this.dodgeT = 0; this.rollT = 0; this.aimT = 0; this.loadT = 0; if (cls.init) cls.init(this);
     this.model = buildHero(cls); this.group = this.model.group;
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color(cls.color).multiplyScalar(1.1), transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.ring.rotation.x = -PI / 2; this.ring.renderOrder = 11; this.ring.visible = false;
@@ -1746,7 +1791,7 @@ class Player {
   inRange(s, t) { if (!s.range) return true; if (!t || !t.alive || !t.targetable) return false; return t.distTo(this.pos.x, this.pos.z) <= s.range + (s.melee ? 0 : 0); }
   // Why can't slot i be used right now? Returns '' when usable.
   block(i) {
-    const st = this.sk[i], s = st.def;
+    const st = this.sk[i]; if (!st) return 'none'; const s = st.def;
     if (!this.alive || this.falling) return 'dead';
     if (this.dash || this.kb) return 'busy';
     if (st.uses <= 0) return 'spent';
@@ -1759,10 +1804,10 @@ class Player {
     return '';
   }
   press(i) {
-    const why = this.block(i), st = this.sk[i]; if (!st) return;
+    const st = this.sk[i]; if (!st) return; const why = this.block(i);
     if (why === '') return this.begin(i);
     if (why === 'gcd' && (this.casting ? this.casting.time - this.casting.t : this.gcd) < 0.6) { this.queue = i; this.queueT = 0.7; }
-    else if (why === 'range') this.say('Out of range'); else if (why === 'target') this.say('No target');
+    else if (why === 'range') this.say('Out of range'); else if (why === 'target') this.say('No target'); else if (/^[A-Z]/.test(why)) this.say(why);
   }
   castTime(s) { return typeof s.cast === 'function' ? s.cast(this) : (s.cast || 0); }
   begin(i) {
@@ -1783,6 +1828,7 @@ class Player {
   hurt(amt, o = {}) {
     if (!this.alive || G.god || G.state !== 'fight') return 0;
     if (this.invuln > 0 && o.src !== 'fall') return 0;
+    if (o.blockable && this.dodgeT > 0) { if (this.cls.onDodge) this.cls.onDodge(this, o); return 0; } // roll i-frames: like a parry, they never beat an unblockable
     if (o.blockable && this.parryT > 0) { this.parryT = 0; this.cls.onParry(this, o); return 0; }
     amt = Math.round(amt * this.dmgTakenMul);
     if (o.kb && o.kb.dist) { const d = 0.38; this.kb = { vx: Math.sin(o.kb.dir) * o.kb.dist / d, vz: Math.cos(o.kb.dir) * o.kb.dist / d, t: d }; this.casting = null; }
@@ -1815,9 +1861,9 @@ class Player {
     this.flashT -= dt; if (this.hintT > 0) this.hintT -= dt;
     if (!this.alive) { this.deathT += dt; const k = Math.min(1, this.deathT / 0.7); this.model.body.rotation.x = -k * 1.45; this.model.body.position.y = -k * 0.1; if (this.falling) { this.vy -= 30 * dt; this.pos.y += this.vy * dt; } this.group.position.copy(this.pos); this.ring.visible = false; return; }
     // timers
-    if (this.gcd > 0) this.gcd -= dt; if (this.parryT > 0) this.parryT -= dt; if (this.invuln > 0) this.invuln -= dt; if (this.rooted > 0) this.rooted -= dt;
+    if (this.gcd > 0) this.gcd -= dt; if (this.parryT > 0) this.parryT -= dt; if (this.dodgeT > 0) this.dodgeT -= dt; if (this.rollT > 0) this.rollT -= dt; if (this.aimT > 0) this.aimT -= dt; if (this.loadT > 0) this.loadT -= dt; if (this.invuln > 0) this.invuln -= dt; if (this.rooted > 0) this.rooted -= dt;
     if (this.shieldT > 0) { this.shieldT -= dt; if (this.shieldT <= 0) this.shield = 0; } else this.shield = 0;
-    for (const st of this.sk) { const s = st.def; if (st.cd > 0) { st.cd -= dt; if (st.cd <= 0) { st.charges = Math.min(s.charges || 1, st.charges + 1); st.cd = st.charges < (s.charges || 1) ? s.cd : 0; } } }
+    for (const st of this.sk) { if (!st) continue; const s = st.def; if (st.cd > 0) { st.cd -= dt; if (st.cd <= 0) { st.charges = Math.min(s.charges || 1, st.charges + 1); st.cd = st.charges < (s.charges || 1) ? s.cd : 0; } } }
     for (let i = this.buffs.length - 1; i >= 0; i--) { const b = this.buffs[i]; b.t -= dt; if (b.t <= 0) { this.buffs.splice(i, 1); if (this.cls.onBuffEnd) this.cls.onBuffEnd(this, b.id); } }
     // target upkeep
     if (!this.target || !this.target.alive || !this.target.targetable) { let best = null, bd = 1e9; for (const e of G.ents) { if (!e.alive || !e.targetable) continue; const d = e.distTo(this.pos.x, this.pos.z) - (e.isBoss ? 0 : 3); if (d < bd) { bd = d; best = e; } } this.target = best; }
@@ -1866,7 +1912,7 @@ class Player {
     }
     // queue + hold-to-repeat
     if (this.queue >= 0) { this.queueT -= dt; if (this.queueT <= 0) this.queue = -1; else if (this.block(this.queue) === '') this.begin(this.queue); }
-    else if (!Input.bot && G.state === 'fight') { for (let i = 0; i < this.sk.length; i++) if (Input.slotHeld[i] && this.sk[i].def.gcd !== false && this.block(i) === '') { this.begin(i); break; } }
+    else if (!Input.bot && G.state === 'fight') { for (let i = 0; i < this.sk.length; i++) if (Input.slotHeld[i] && this.sk[i] && this.sk[i].def.gcd !== false && this.block(i) === '') { this.begin(i); break; } }
     if (this.cls.update) this.cls.update(this, dt);
     // visuals
     this.group.position.copy(this.pos); this.group.rotation.y = this.facing; this.model.update(dt, this);
@@ -1876,7 +1922,12 @@ class Player {
 }
 
 // ==== 08_classes.js ====
-// The two playable classes. Slot order is fixed: 0 filler, 1 spender, 2 ultimate, 3 mobility, 4 defensive, 5 interrupt, 6 heal.
+// The playable classes. A class has up to seven skills, in hotbar slots 0-6 (keys 1 2 3 Q E R F); a slot may be null.
+// Duskblade and Stormcaller fill all seven the same way (filler, spender, ultimate, mobility, defensive, interrupt, heal).
+// Ashwarden and Hexslinger deliberately do not: see the class contract in README.md for what a class must be able to do.
+// Skill fields: id, name, icon, desc, range, melee, cd, charges, limited, gcd (false = off the global cooldown), cast, moveCast(p),
+// usable(p, t) -> true | reason (a reason starting with a capital letter is shown to the player), start(p, t), fire(p, t, wasCast),
+// and for the HUD: rdy(p) (glow), act(p) (lit while active), interrupt (glow while the target casts something stoppable), view(p) (icon override).
 const ICON = {
   slash: 'M4 20C7 9 13 4 21 3 17 9 12 15 4 20Z',
   sever: 'M3 5 9 3 21 19 19 21ZM21 5 15 3 3 19 5 21Z',
@@ -1892,6 +1943,16 @@ const ICON = {
   pulse: 'M12 2A10 10 0 1 0 12 22 10 10 0 1 0 12 2ZM12 5A7 7 0 0 1 17.6 16.2L7.8 6.4A7 7 0 0 1 12 5ZM6.4 7.8 16.2 17.6A7 7 0 0 1 6.4 7.8Z',
   aegis: 'M12 2 21 7V17L12 22 3 17V7ZM12 5.5 6 9V15L12 18.5 18 15V9Z',
   mend: 'M9 3H15V9H21V15H15V21H9V15H3V9H9Z',
+  strike: 'M3 21 4.5 15.5 16 4 21 3 20 8 8.5 19.5Z',
+  heavy: 'M10 1H14V13L17.5 16.5 12 23 6.5 16.5 10 13ZM3 9 7 11V14L3 12ZM21 9 17 11V14L21 12Z',
+  kindle: 'M12 1C13 6 19 8.5 19 15A7 7 0 0 1 5 15C5 11.5 7.5 10 8.5 6.5 9.5 9 11 9.5 11 8 11 5.5 11 3 12 1ZM12 13C10 15 9.5 16 9.5 17.5A2.5 2.5 0 0 0 14.5 17.5C14.5 16 14 15 12 13Z',
+  roll: 'M12 4A8 8 0 1 0 20 12H17A5 5 0 1 1 12 7V10.5L18 5.5 12 0.5Z',
+  flask: 'M9 2H15V4.500H14V8.500L19 18A3 3 0 0 1 16.3 22H7.7A3 3 0 0 1 5 18L10 8.500V4.500H9ZM8.2 15 6.8 18.2A1.2 1.2 0 0 0 7.9 20H16.1A1.2 1.2 0 0 0 17.2 18.2L15.8 15Z',
+  shot: 'M11 1H13V5.100A7 7 0 0 1 18.9 11H23V13H18.900A7 7 0 0 1 13 18.900V23H11V18.900A7 7 0 0 1 5.1 13H1V11H5.100A7 7 0 0 1 11 5.100ZM12 8A4 4 0 1 0 12 16 4 4 0 1 0 12 8Z',
+  lead: 'M8.5 22V10C8.5 6 10.5 3 12 1.5 13.5 3 15.5 6 15.5 10V22Z',
+  silver: 'M8.5 22V10C8.5 6 10.5 3 12 1.5 13.5 3 15.5 6 15.5 10V22ZM12 9.5 10 13.5 12 17.5 14 13.5ZM2 12.5 6 10.5V16.5L2 14.5ZM22 12.5 18 10.5V16.5L22 14.5Z',
+  salve: 'M8.5 22V10C8.5 6 10.5 3 12 1.5 13.5 3 15.5 6 15.5 10V22ZM11 10V12.5H9.800V15H11V17.500H13V15H14.2V12.5H13V10Z',
+  spin: 'M12 3A9 9 0 0 1 21 12H18A6 6 0 0 0 12 6V9L7 4.5 12 0ZM12 21A9 9 0 0 1 3 12H6A6 6 0 0 0 12 18V15L17 19.5 12 24Z',
 };
 const MELEE = 3.4;
 function hitPoint(p, t, out) { const a = angTo(t.pos.x, t.pos.z, p.pos.x, p.pos.z), r = Math.min(t.radius, Math.hypot(p.pos.x - t.pos.x, p.pos.z - t.pos.z)); return out.set(t.pos.x + Math.sin(a) * r * 0.85, Math.min(t.pos.y + t.aimY, 1.4 + t.meleeY), t.pos.z + Math.cos(a) * r * 0.85); }
@@ -1899,7 +1960,7 @@ const _hp = new V3(), _h2 = new V3();
 
 // ============================== DUSKBLADE ==============================
 G.classes.push({
-  id: 'duskblade', name: 'DUSKBLADE', role: 'Melee. Builds Momentum, lives on the counter.', color: '#b98cff', hp: 1000, gcd: 1.0,
+  id: 'duskblade', name: 'DUSKBLADE', role: 'Melee. Builds Momentum, lives on the counter.', color: '#b98cff', hp: 1000, gcd: 1.0, melee: true,
   gcdOf: (p) => p.hasBuff('storm') ? 0.6 : 1.0,
   resource: { name: 'Momentum', max: 5 },
   look: { armor: 0x2c2640, cloth: 0x3d1c58, glow: 0xa868ff, hood: false },
@@ -1913,7 +1974,7 @@ G.classes.push({
         if (t && t.alive) { t.damage(dmg, { src: 'player' }); hitPoint(p, t, _hp); FX.burst(_hp.x, _hp.y, _hp.z, { n: 8 + step * 5, color: 0xc9a0ff, speed: [2, 8], life: [0.2, 0.5], size: [0.12, 0.35] }); Sound.sfx('hit', 0.7); }
         p.gain((step === 2 ? 2 : 1) + (p.hasBuff('storm') ? 1 : 0));
       } },
-    { id: 'sever', name: 'Sever', icon: 'sever', range: MELEE, melee: true, desc: 'Spend all Momentum in one cut. Far stronger at five.',
+    { id: 'sever', name: 'Sever', icon: 'sever', range: MELEE, melee: true, desc: 'Spend all Momentum in one cut. Far stronger at five.', rdy: (p) => p.res >= p.resMax,
       usable: (p) => p.res >= 1 || 'res',
       fire(p, t) {
         const m = p.res, dmg = 45 * m + (m >= 5 ? 50 : 0); p.res = 0; p.model.swing(1, 0.34); Sound.sfx(m >= 5 ? 'crit' : 'slash');
@@ -1921,7 +1982,7 @@ G.classes.push({
         FX.slash(p.pos.x + fx, 1.3, p.pos.z + fz, p.facing, { r: 3.4, color: 0xff5a9c, tilt: 0.6, dur: 0.3 }); FX.slash(p.pos.x + fx, 1.3, p.pos.z + fz, p.facing, { r: 3.4, color: 0xb070ff, tilt: -0.6, flip: true, dur: 0.3 });
         if (t && t.alive) { t.damage(dmg, { src: 'player', crit: m >= 5 }); hitPoint(p, t, _hp); FX.burst(_hp.x, _hp.y, _hp.z, { n: 10 + m * 7, color: 0xff7ab0, color2: 0xa060ff, speed: [3, 12], life: [0.3, 0.7] }); if (m >= 5) { FX.light(_hp.x, _hp.y, _hp.z, 0xff5a9c, 60, 0.3); FX.shake(0.25); } }
       } },
-    { id: 'storm', name: 'Bladestorm', icon: 'storm', cd: 80, gcd: false, desc: '10 s of frenzy: faster attacks, extra Momentum.',
+    { id: 'storm', name: 'Bladestorm', icon: 'storm', cd: 80, gcd: false, act: (p) => p.hasBuff('storm'), desc: '10 s of frenzy: faster attacks, extra Momentum.',
       fire(p) { p.addBuff('storm', 10, 'storm'); Sound.sfx('roar', 0.5, 2); FX.dome(p.pos.x, 1, p.pos.z, { r: 5, color: 0xb070ff }); FX.burst(p.pos.x, 1, p.pos.z, { n: 60, color: 0xb070ff, color2: 0xff5a9c, speed: [4, 12], life: [0.4, 1] }); } },
     { id: 'lunge', name: 'Lunge', icon: 'lunge', cd: 9, charges: 2, gcd: false, desc: 'Dash to your target. With no target in reach, dash where you are moving.',
       fire(p, t) {
@@ -1934,9 +1995,9 @@ G.classes.push({
         p.dash = { vx: Math.sin(dir) * dist / dur, vz: Math.cos(dir) * dist / dur, t: dur, done: (q) => { if ((far || toT) && t.alive && t.distTo(q.pos.x, q.pos.z) < MELEE + 0.6) { t.damage(40, { src: 'player' }); q.gain(1); q.model.swing(2, 0.2); hitPoint(q, t, _hp); FX.impact(_hp.x, _hp.y, _hp.z, 0xb070ff, 0.8); Sound.sfx('hit'); } } };
         Sound.sfx('dash'); FX.burst(p.pos.x, 1, p.pos.z, { n: 24, color: 0xb070ff, dir: [-Math.sin(dir), 0.1, -Math.cos(dir)], spread: 0.5, speed: [2, 9], life: [0.25, 0.6] });
       } },
-    { id: 'riposte', name: 'Riposte', icon: 'riposte', cd: 10, gcd: false, desc: 'Parry for a moment. A blocked hit deals no damage, fills Momentum and strikes back hard.',
+    { id: 'riposte', name: 'Riposte', icon: 'riposte', cd: 10, gcd: false, act: (p) => p.parryT > 0, desc: 'Parry for a moment. A blocked hit deals no damage, fills Momentum and strikes back hard.',
       fire(p) { p.parryT = 0.85; Sound.sfx('sword', 0.7); FX.ring(p.pos.x, p.pos.z, { r0: 1.6, r1: 0.6, color: 0xffffff, dur: 0.25 }); } },
-    { id: 'sunder', name: 'Sunder', icon: 'sunder', cd: 14, gcd: false, range: MELEE, melee: true, desc: 'Interrupts a cast. Always leaves the target Exposed (takes more damage).',
+    { id: 'sunder', name: 'Sunder', icon: 'sunder', cd: 14, gcd: false, range: MELEE, melee: true, interrupt: true, desc: 'Interrupts a cast. Always leaves the target Exposed (takes more damage).',
       fire(p, t) {
         p.model.swing(3, 0.3); Sound.sfx('hit', 1, 0.6); if (!t || !t.alive) return;
         t.damage(70, { src: 'player' }); t.exposed = 6; hitPoint(p, t, _hp); FX.impact(_hp.x, _hp.y, _hp.z, 0xffd070, 1.1);
@@ -1971,7 +2032,7 @@ G.classes.push({
   resource: { name: 'Static', max: 4 },
   look: { armor: 0x1c3344, cloth: 0x12344a, glow: 0x50d0ff, hood: true },
   skills: [
-    { id: 'bolt', name: 'Bolt', icon: 'bolt', range: 34, desc: 'Cast time. Heavy lightning that builds Static. You must stand still.',
+    { id: 'bolt', name: 'Bolt', icon: 'bolt', range: 34, rdy: (p) => p.hasBuff('surge'), desc: 'Cast time. Heavy lightning that builds Static. You must stand still.',
       cast: (p) => p.hasBuff('surge') ? 0 : p.hasBuff('tempest') ? 0.7 : 1.5, moveCast: (p) => p.hasBuff('tempest'),
       fire(p, t, wasCast) {
         if (!wasCast) p.dropBuff('surge');
@@ -1979,14 +2040,14 @@ G.classes.push({
         const a = p.hand(_h2); t.aim(_hp); _hp.x += (vrand() - 0.5) * t.radius * 0.6; _hp.y += (vrand() - 0.5) * 1.2;
         FX.lightning(a, _hp, { color: 0x9fe6ff, width: 0.13 }); FX.light(_hp.x, _hp.y, _hp.z, 0x70d0ff, 40, 0.25); t.damage(148, { src: 'player' }); p.gain(1);
       } },
-    { id: 'discharge', name: 'Discharge', icon: 'discharge', range: 34, desc: 'Instant. Releases all Static at once. Usable on the move.',
+    { id: 'discharge', name: 'Discharge', icon: 'discharge', range: 34, rdy: (p) => p.res >= p.resMax, desc: 'Instant. Releases all Static at once. Usable on the move.',
       usable: (p) => p.res >= 1 || 'res',
       fire(p, t) {
         const m = p.res, dmg = 70 * m + (m >= 4 ? 55 : 0); p.res = 0; p.model.swing(0, 0.3); Sound.sfx('zap'); if (!t || !t.alive) return;
         const a = p.hand(_h2); for (let i = 0; i < 1 + m; i++) { t.aim(_hp); _hp.x += (vrand() - 0.5) * t.radius; _hp.y += (vrand() - 0.5) * 2; _hp.z += (vrand() - 0.5) * t.radius; FX.lightning(a, _hp, { color: i % 2 ? 0xfff0a0 : 0x9fe6ff, width: 0.1 + m * 0.03, jag: 1.4 }); }
         t.aim(_hp); FX.dome(_hp.x, _hp.y, _hp.z, { r: 1.5 + m * 0.6, color: 0x9fe6ff, dur: 0.35 }); t.damage(dmg, { src: 'player', crit: m >= 4 }); if (m >= 4) FX.shake(0.25);
       } },
-    { id: 'tempest', name: 'Tempest', icon: 'tempest', cd: 80, gcd: false, desc: '10 s of storm: Bolt casts in half the time and while moving.',
+    { id: 'tempest', name: 'Tempest', icon: 'tempest', cd: 80, gcd: false, act: (p) => p.hasBuff('tempest'), desc: '10 s of storm: Bolt casts in half the time and while moving.',
       fire(p) { p.addBuff('tempest', 10, 'tempest'); Sound.sfx('thunder', 0.6); FX.pillar(p.pos.x, p.pos.z, { r: 0.9, h: 26, color: 0x70d0ff, dur: 0.7 }); FX.burst(p.pos.x, 1, p.pos.z, { n: 60, color: 0x9fe6ff, color2: 0xfff0a0, speed: [4, 12], life: [0.4, 1] }); } },
     { id: 'blink', name: 'Blink', icon: 'blink', cd: 11, charges: 2, gcd: false, desc: 'Teleport where you are moving. Your next Bolt is instant.',
       fire(p) {
@@ -1998,9 +2059,9 @@ G.classes.push({
         p.casting = null; p.addBuff('surge', 6, 'bolt'); Sound.sfx('blink');
         FX.beam(_hp.set(ox, 1.1, oz), _h2.set(p.pos.x, 1.1, p.pos.z), { color: 0x70d0ff, width: 0.3, dur: 0.3 }); FX.burst(p.pos.x, 1, p.pos.z, { n: 30, color: 0xffffff, color2: 0x70d0ff, speed: [2, 7], life: [0.3, 0.6] });
       } },
-    { id: 'aegis', name: 'Aegis', icon: 'aegis', cd: 20, gcd: false, desc: 'A 5 s barrier. If it absorbs a hit, you are filled with Static and your next Bolt is instant.',
+    { id: 'aegis', name: 'Aegis', icon: 'aegis', cd: 20, gcd: false, act: (p) => p.shield > 0, desc: 'A 5 s barrier. If it absorbs a hit, you are filled with Static and your next Bolt is instant.',
       fire(p) { p.shield = p.shieldMax = 450; p.shieldT = 5; p.addBuff('aegis', 5, 'aegis'); Sound.sfx('shield'); FX.dome(p.pos.x, 1.1, p.pos.z, { r: 1.6, r0: 2.6, color: 0x9fe6ff, dur: 0.4 }); } },
-    { id: 'pulse', name: 'Null Pulse', icon: 'pulse', cd: 15, gcd: false, range: 34, desc: 'Interrupts a cast. Also erases every projectile near you.',
+    { id: 'pulse', name: 'Null Pulse', icon: 'pulse', cd: 15, gcd: false, range: 34, interrupt: true, desc: 'Interrupts a cast. Also erases every projectile near you.',
       fire(p, t) {
         Sound.sfx('zap', 0.8, 0.6); const n = Bul.clearNear(p.pos.x, p.pos.z, 8); FX.ring(p.pos.x, p.pos.z, { r0: 0.5, r1: 8, color: 0xd0a0ff, dur: 0.4, width: 0.2 }); FX.dome(p.pos.x, 1, p.pos.z, { r: 8, color: 0xc090ff, dur: 0.35 });
         if (!t || !t.alive) return; t.aim(_hp); FX.beam(p.hand(_h2), _hp, { color: 0xd0a0ff, width: 0.22, dur: 0.3 }); t.damage(60, { src: 'player' });
@@ -2031,6 +2092,149 @@ G.classes.push({
   },
 });
 
+// ============================== ASHWARDEN ==============================
+// No cooldowns and no builder: one stamina bar pays for every swing and every roll, and refills on its own.
+// Overdrawing it leaves you Winded (nothing but the flask) until it climbs back. The roll passes through blockable hits.
+const AW = { STRIKE: 6, HEAVY: 34, ROLL: 24, REGEN: 20, WIND: 15, REACH: 9 };
+function awSpend(p, n) { p.res -= n; if (p.res < 0 && !p.winded) { p.winded = true; p.say('Winded'); Sound.sfx('steam', 0.5, 1.4); } }
+const awReady = (p) => p.winded ? 'Winded' : true;
+G.classes.push({
+  id: 'ashwarden', name: 'ASHWARDEN', role: 'Melee. No cooldowns: stamina pays for every swing and every roll.', color: '#ff9a4a', hp: 1000, gcd: 0.5, melee: true,
+  gcdOf: (p, s) => s.id === 'heavy' ? (p.opening > 0 ? 0.55 : 0.95) : s.id === 'flask' ? 1.0 : 0.5,
+  resource: { name: 'Stamina', max: 100, kind: 'bar' },
+  look: { armor: 0x3a332c, cloth: 0x5a1e0c, glow: 0xff7a2a, hood: false, weapon: 'great' },
+  init(p) { p.res = 100; p.winded = false; p.opening = 0; p.dodged = false; },
+  skills: [
+    { id: 'strike', name: 'Strike', icon: 'strike', range: MELEE, melee: true, desc: 'A quick cut. Cheap enough to swing forever.',
+      usable: awReady,
+      fire(p, t) {
+        const k = p.combo++ % 2; awSpend(p, AW.STRIKE); p.model.swing(k, 0.3); Sound.sfx('slash', 0.9, 0.72 + k * 0.08);
+        const fx = Math.sin(p.facing), fz = Math.cos(p.facing), hot = p.hasBuff('kindle');
+        FX.slash(p.pos.x + fx * 0.9, 1.3, p.pos.z + fz * 0.9, p.facing, { r: 3.3, color: hot ? 0xffc040 : 0xff8a3a, tilt: k ? -0.3 : 0.4, flip: !!k, dur: 0.24 });
+        if (t && t.alive) { t.damage(48, { src: 'player' }); hitPoint(p, t, _hp); FX.burst(_hp.x, _hp.y, _hp.z, { n: hot ? 16 : 9, color: 0xffb060, color2: 0xff5a20, speed: [2, 9], life: [0.2, 0.55], size: [0.12, 0.36], grav: 6 }); Sound.sfx('hit', 0.7, 0.8); }
+      } },
+    { id: 'heavy', name: 'Overhead', icon: 'heavy', range: MELEE + AW.REACH, interrupt: true, desc: 'Wind up, leap to the target, bring the blade down. Stops a cast, which refunds the stamina.',
+      usable: awReady, rdy: (p) => p.opening > 0,
+      cast: (p) => p.opening > 0 ? 0 : 0.5, moveCast: (p) => !p.dash && !p.kb,
+      start(p) { p.model.swing(2, 0.5); if (!G.headless) FX.ring(p.pos.x, p.pos.z, { r0: 2.2, r1: 0.5, color: 0xff8a3a, dur: 0.45, y: p.pos.y + 0.08 }); },
+      fire(p, t) {
+        const open = p.opening > 0; if (open) { p.opening = 0; p.dropBuff('opening'); } else awSpend(p, AW.HEAVY);
+        const land = (q) => {
+          q.model.swing(3, 0.34); if (!t || !t.alive || t.distTo(q.pos.x, q.pos.z) > MELEE + 0.9) return;
+          t.damage(open ? 260 : 172, { src: 'player', crit: open }); hitPoint(q, t, _hp); Sound.sfx(open ? 'crit' : 'hit', 1, 0.55);
+          FX.impact(_hp.x, _hp.y, _hp.z, open ? 0xffe0a0 : 0xff8a3a, open ? 1.5 : 1.1); FX.pillar(_hp.x, _hp.z, { r: 0.7, h: 7, color: 0xff7a2a, dur: 0.4 }); FX.shake(open ? 0.4 : 0.25);
+          if (t.interrupt()) { q.res = Math.min(q.resMax, q.res + AW.HEAVY); t.exposed = 6; }
+        };
+        if (!t || !t.alive) return land(p);
+        const d = t.distTo(p.pos.x, p.pos.z);
+        if (d <= MELEE - 0.6) return land(p);
+        if (d > MELEE + AW.REACH + 2) { p.model.swing(3, 0.34); return; }
+        const dir = angTo(p.pos.x, p.pos.z, t.pos.x, t.pos.z), A = G.arena; let dist = Math.max(0.3, Math.hypot(t.pos.x - p.pos.x, t.pos.z - p.pos.z) - t.radius - 1.6);
+        if (A && A.edge === 'fall') { while (dist > 0.5 && !A.contains(p.pos.x + Math.sin(dir) * dist, p.pos.z + Math.cos(dir) * dist)) dist -= 0.5; if (!A.contains(p.pos.x + Math.sin(dir) * dist, p.pos.z + Math.cos(dir) * dist)) dist = 0.01; }
+        const dur = clamp(dist / 36, 0.1, 0.26); p.facing = dir; p.dash = { vx: Math.sin(dir) * dist / dur, vz: Math.cos(dir) * dist / dur, t: dur, done: land }; Sound.sfx('dash', 0.7, 0.8);
+        FX.burst(p.pos.x, 1, p.pos.z, { n: 14, color: 0xff8a3a, dir: [-Math.sin(dir), 0.1, -Math.cos(dir)], spread: 0.5, speed: [2, 8], life: [0.2, 0.5] });
+      } },
+    { id: 'kindle', name: 'Kindle', icon: 'kindle', gcd: false, desc: 'Pour a flask on the blade instead of drinking it: 15 s of heavier blows and faster stamina.',
+      usable: (p) => p.hasBuff('kindle') ? 'no' : p.sk[6].uses > 0 || 'spent', act: (p) => p.hasBuff('kindle'),
+      fire(p) { p.sk[6].uses--; p.addBuff('kindle', 15, 'kindle'); Sound.sfx('roar', 0.5, 1.6); Sound.sfx('steam', 0.6, 0.7); FX.pillar(p.pos.x, p.pos.z, { r: 1.1, h: 9, color: 0xff7a2a, dur: 0.7, y: p.pos.y }); FX.burst(p.pos.x, p.pos.y + 1, p.pos.z, { n: 50, color: 0xffb040, color2: 0xff4a10, speed: [2, 9], up: 3, life: [0.4, 1.1] }); FX.light(p.pos.x, p.pos.y + 1.5, p.pos.z, 0xff7a2a, 50, 0.5); } },
+    { id: 'roll', name: 'Roll', icon: 'roll', gcd: false, desc: 'Tumble where you are moving. Hits pass through you mid-roll; dodging one makes your next Overhead instant, free and brutal.',
+      usable: (p) => p.rooted > 0 ? 'no' : awReady(p), act: (p) => p.dodgeT > 0,
+      fire(p) {
+        awSpend(p, AW.ROLL); const step = !p.moving, dir = step ? p.facing + PI : Math.atan2(p.intentX, p.intentZ), A = G.arena; let dist = step ? 1.7 : 5.4; // no direction held: a short hop back
+        if (A && A.edge === 'fall') { while (dist > 0.5 && !A.contains(p.pos.x + Math.sin(dir) * dist, p.pos.z + Math.cos(dir) * dist)) dist -= 0.5; if (!A.contains(p.pos.x + Math.sin(dir) * dist, p.pos.z + Math.cos(dir) * dist)) dist = 0.01; }
+        const dur = 0.42; if (!step) p.facing = dir; p.casting = null; p.dash = { vx: Math.sin(dir) * dist / dur, vz: Math.cos(dir) * dist / dur, t: dur }; p.dodgeT = 0.46; p.rollT = dur; p.dodged = false;
+        Sound.sfx('dash', 0.8, 0.7); FX.burst(p.pos.x, p.pos.y + 0.3, p.pos.z, { n: 12, smoke: true, color: 0x6a5a4a, color2: 0x2a2420, speed: [0.5, 2.5], life: [0.4, 0.9], size: [0.5, 1.2], alpha: 0.35 });
+      } },
+    null, null,
+    { id: 'flask', name: 'Ember Flask', icon: 'flask', limited: 4, cast: 1.0, moveCast: (p) => !p.dash && !p.kb, desc: 'Drink on the move (1 s) to heal 30%. Four per fight, shared with Kindle.',
+      fire(p) { p.heal(300); } },
+  ],
+  onParry() { },
+  onDodge(p) {
+    if (p.dodged) return; p.dodged = true; p.opening = 5; p.addBuff('opening', 5, 'heavy'); p.res = Math.min(p.resMax, Math.max(p.res, 0) + AW.ROLL); p.winded = false;
+    Sound.sfx('parry', 0.7, 1.3); FX.num(p.aim(), 'DODGED', 'note'); FX.ring(p.pos.x, p.pos.z, { r0: 0.6, r1: 3.2, color: 0xffd9a0, dur: 0.3, y: p.pos.y + 0.08 }); FX.flash(0xffc080, 0.1, 6);
+  },
+  update(p, dt) {
+    if (!p.dash) p.res = Math.min(p.resMax, p.res + AW.REGEN * (p.hasBuff('kindle') ? 1.5 : 1) * dt);
+    if (p.winded && p.res >= AW.WIND) p.winded = false;
+    if (p.opening > 0) p.opening -= dt;
+    p.dmgMul = p.hasBuff('kindle') ? 1.4 : 1;
+    if (!G.headless && p.hasBuff('kindle') && vrand() < dt * 30) { const h = p.hand(_h2); FX.burst(lerp(p.pos.x, h.x, vrand()), lerp(p.pos.y + 1, h.y, vrand()), lerp(p.pos.z, h.z, vrand()), { n: 1, color: 0xffb040, color2: 0xff4a10, speed: [0.3, 1.5], up: 2, life: [0.3, 0.7], size: [0.12, 0.3] }); }
+  },
+  bot(p, c) {
+    const t = p.target; if (!t) return; const d = t.distTo(p.pos.x, p.pos.z), cs = t.castState, flasks = p.sk[6].uses, b = G.boss;
+    if (c.danger && !c.zone && !p.dash && p.block(3) === '') return p.press(3); // rolling does nothing against ground that keeps burning
+    if (c.wantInterrupt && cs && cs.int && cs.time - cs.t > 0.7 && d <= MELEE + AW.REACH && !p.winded) { if (!p.casting) p.press(1); return; } // queues behind a swing in progress
+    if (c.hp < 0.45 && c.calm > 1.4 && !p.casting && p.block(6) === '') return p.press(6);
+    if (c.holdFire) { if (p.casting && p.sk[p.casting.i].def.id === 'heavy' && p.block(3) === '') p.press(3); return; } // a blow already winding up has to be rolled out of
+    if (p.casting) return;
+    if (flasks > 0 && c.hp > 0.6 && t.isBoss && !t.immune && d <= MELEE && b.hp / b.maxHp < 0.24 * flasks - 0.12 && p.block(2) === '') p.press(2);
+    if (d > MELEE + AW.REACH) return;
+    if (d > MELEE - 0.6) { // leap only onto ground that stays safe
+      const cd = Math.hypot(t.pos.x - p.pos.x, t.pos.z - p.pos.z) || 1, k = (t.radius + 1.6) / cd, lx = t.pos.x + (p.pos.x - t.pos.x) * k, lz = t.pos.z + (p.pos.z - t.pos.z) * k;
+      if (c.threat(lx, lz) < 2 || c.threat((lx + p.pos.x) / 2, (lz + p.pos.z) / 2) < 1 || !G.arena.contains(lx, lz)) { if (d <= MELEE && p.res > 8) p.press(0); return; }
+    }
+    if ((p.opening > 0 || (p.res >= 42 && !(cs && cs.int))) && p.block(1) === '') return p.press(1);
+    if (p.res > 8) p.press(0);
+  },
+});
+
+// ============================== HEXSLINGER ==============================
+// No cooldowns, no resource, nothing to build: a six-chamber cylinder that you fill one round at a time, in the order you
+// want to fire it. Everything the class can do (damage, the interrupt, the heal) is a round that has to be in the cylinder
+// first. Fully mobile. p.cyl is the queue, front first: 'L' lead, 'S' silver, 'V' salve.
+const HX = { RANGE: 34, NEAR: 6, FAR: 24, LEAD: [94, 66], SILVER: 55, SALVE: 185 };
+const hxLoad = (r) => (p) => {
+  p.cyl.push(r); p.loadT = 0.3; if (p.cyl.length >= 6) { p.armed = true; p.streak = 0; } else if (p.streak > 0) p.armed = false;
+  Sound.sfx('tick', 0.8, r === 'L' ? 1.1 : r === 'S' ? 1.5 : 0.8); if (!G.headless) { const h = p.hand(_h2); FX.burst(h.x, h.y, h.z, { n: 4, color: HX_COL[r], speed: [0.5, 2], life: [0.15, 0.35], size: [0.08, 0.2] }); }
+};
+const HX_COL = { L: 0xffe2a8, S: 0xd9b0ff, V: 0x70ffa8 };
+const hxRoom = (p) => p.cyl.length < 6 || 'Cylinder full';
+G.classes.push({
+  id: 'hexslinger', name: 'HEXSLINGER', role: 'Ranged, always moving. Six chambers, loaded by hand, fired in order.', color: '#ff7ad9', hp: 1000, gcd: 0.6,
+  gcdOf: (p, s) => s.id === 'fire' ? 0.6 : s.id === 'spin' ? 0.2 : 0.32,
+  resource: { name: 'Cylinder', max: 6, kind: 'cylinder' },
+  look: { armor: 0x2e2630, cloth: 0x3a1230, glow: 0xff5fd0, hat: true, weapon: 'gun' },
+  init(p) { p.cyl = ['L', 'L', 'L', 'L', 'L', 'L']; p.streak = 0; p.armed = true; },
+  skills: [
+    { id: 'fire', name: 'Fire', icon: 'shot', desc: 'Fire the next chamber. Lead hits harder up close. Empty a full cylinder without reloading and the sixth shot hits double.',
+      view: (p) => p.cyl[0] === 'S' ? 'silver' : p.cyl[0] === 'V' ? 'salve' : 'shot',
+      rdy: (p) => p.cyl[0] === 'S' && p.target && p.target.castState && p.target.castState.int,
+      usable(p, t) { const r = p.cyl[0]; if (!r) return 'Empty'; if (r === 'V') return true; if (!t || !t.alive || !t.targetable) return 'target'; return t.distTo(p.pos.x, p.pos.z) <= HX.RANGE || 'range'; },
+      fire(p, t) {
+        const r = p.cyl.shift(); p.streak++; const last = p.armed && p.streak >= 6; if (last) p.armed = false; p.aimT = 0.75; p.model.swing(4, 0.2);
+        if (r === 'V') { Sound.sfx('zap', 0.4, 1.8); p.heal(HX.SALVE); return; }
+        p.attackFaceT = 0.5; Sound.sfx('boom', last ? 0.9 : 0.55, r === 'S' ? 2.3 : last ? 1.2 : 1.7); if (!t || !t.alive) return;
+        const a = p.hand(_h2); t.aim(_hp); _hp.x += (vrand() - 0.5) * t.radius * 0.5; _hp.y += (vrand() - 0.5) * 0.9; const col = HX_COL[r];
+        FX.beam(a, _hp, { color: col, width: last ? 0.2 : 0.09, dur: last ? 0.28 : 0.14 }); FX.light(a.x, a.y, a.z, col, last ? 40 : 18, 0.12, 12);
+        FX.burst(a.x, a.y, a.z, { n: 6, color: col, dir: [Math.sin(p.facing), 0.05, Math.cos(p.facing)], spread: 0.35, speed: [4, 12], life: [0.08, 0.22], size: [0.1, 0.3] });
+        const mul = last ? 2 : 1;
+        if (r === 'L') { const d = t.distTo(p.pos.x, p.pos.z); t.damage(lerp(HX.LEAD[0], HX.LEAD[1], sat((d - HX.NEAR) / (HX.FAR - HX.NEAR))) * mul, { src: 'player', crit: last }); FX.burst(_hp.x, _hp.y, _hp.z, { n: last ? 22 : 7, color: col, speed: [2, last ? 14 : 8], life: [0.15, 0.45], size: [0.1, 0.32] }); }
+        else { t.damage(HX.SILVER * mul, { src: 'player', crit: last }); t.exposed = 6; FX.dome(_hp.x, _hp.y, _hp.z, { r: 1.6 + t.radius * 0.4, color: col, dur: 0.35 }); FX.ring(t.pos.x, t.pos.z, { r0: t.radius + 2.5, r1: t.radius + 0.3, color: col, dur: 0.4, y: t.pos.y + 0.1 }); t.interrupt(); }
+        if (last) { FX.shake(0.3); FX.impact(_hp.x, _hp.y, _hp.z, 0xffffff, 1.2); FX.num(_hp, 'LAST WORD', 'note'); }
+      } },
+    { id: 'lead', name: 'Load Lead', icon: 'lead', desc: 'Chamber a lead round: plain damage. Hold to keep loading.', usable: hxRoom, fire: hxLoad('L') },
+    { id: 'silver', name: 'Load Silver', icon: 'silver', desc: 'Chamber a silver round: weak, but it stops a cast and leaves the target Exposed.', usable: hxRoom, fire: hxLoad('S'),
+      rdy: (p) => p.cyl.length < 6 && p.cyl.indexOf('S') < 0 && p.target && p.target.castState && p.target.castState.int },
+    { id: 'spin', name: 'Spin', icon: 'spin', desc: 'Send the next round to the back, unfired.',
+      usable: (p) => p.cyl.length > 1 || 'no',
+      fire(p) { p.cyl.push(p.cyl.shift()); p.loadT = 0.18; Sound.sfx('tick', 0.6, 2); } },
+    null, null,
+    { id: 'salve', name: 'Load Salve', icon: 'salve', limited: 6, desc: 'Chamber a salve round: on its turn it heals you instead of firing. Six per fight.', usable: hxRoom, fire: hxLoad('V') },
+  ],
+  onParry() { },
+  bot(p, c) {
+    const t = p.target; if (!t) return; const q = p.cyl, iS = q.indexOf('S'), iV = q.indexOf('V'), fire = () => { if (q[0] === 'V' || !c.holdFire) p.press(0); };
+    if (c.wantInterrupt) { if (iS === 0) return p.press(0); if (iS > 0) return p.press(3); if (q.length < 6) return p.press(2); return fire(); }
+    if (c.hp < 0.5 && (iV >= 0 || p.sk[6].uses > 0)) { if (iV === 0) return p.press(0); if (iV > 0) return p.press(3); if (q.length < 6) return p.press(6); return fire(); }
+    if (!q.length) p.botLoad = true;
+    if (p.botLoad) { if (q.length >= 6) p.botLoad = false; else return p.press(iS < 0 && t.exposed < 2 && !q.length ? 2 : 1); }
+    if (q[0] === 'V' && c.hp > 0.8) { if (q.length > 1 && q.some((r) => r !== 'V')) return p.press(3); p.botLoad = true; return; }
+    if (c.holdFire) { if (q.length < 6 && !p.armed) p.press(1); return; }
+    fire();
+  },
+});
+
 // ==== 09_ui.js ====
 // UI: menu, HUD, screens, settings, gamepad/keyboard menu navigation.
 const UI = (() => {
@@ -2050,7 +2254,7 @@ const UI = (() => {
     for (const c of G.classes) {
       const b = document.createElement('button'); b.className = 'cls nav' + (c === selectedClass() ? ' sel' : ''); b.style.setProperty('--c', c.color);
       const labels = Input.device === 'pad' ? SLOT_LABEL_PAD : SLOT_LABEL_KBM;
-      b.innerHTML = `<div class="cn">${c.name}</div><div class="cr">${c.role}</div><div class="sk">` + c.skills.map((s, i) => `<div class="ic">${svg(s.icon, c.color)}</div><div><kbd>${labels[i]}</kbd><b>${s.name}</b> ${s.desc}</div>`).join('') + '</div>';
+      b.innerHTML = `<div class="cn">${c.name}</div><div class="cr">${c.role}</div><div class="sk">` + c.skills.map((s, i) => !s ? '' : `<div class="ic">${svg(s.icon, c.color)}</div><div><kbd>${labels[i]}</kbd><b>${s.name}</b> ${s.desc}</div>`).join('') + '</div>';
       b.onclick = () => { Settings.cls = c.id; saveSettings(); Sound.sfx('uiok'); buildMenu(); };
       cw.appendChild(b);
     }
@@ -2082,21 +2286,27 @@ const UI = (() => {
     const p = G.player, c = p.cls, hb = $('#hotbar'); hb.innerHTML = ''; slots = [];
     document.documentElement.style.setProperty('--cls', c.color);
     for (const k of Object.keys(cache)) delete cache[k];
+    let sepDone = false;
     c.skills.forEach((s, i) => {
-      const d = document.createElement('div'); d.className = 'slot' + (i === 3 ? ' gsep' : ''); d.title = s.name + ': ' + s.desc;
-      d.innerHTML = `${svg(s.icon, c.color)}<span class="key"></span><div class="cdm"></div><div class="cdt"></div><span class="chg"></span>`;
+      if (!s) { slots.push(null); return; }
+      const gs = i >= 3 && !sepDone; if (gs) sepDone = true;
+      const d = document.createElement('div'); d.className = 'slot' + (gs ? ' gsep' : ''); d.title = s.name + ': ' + s.desc;
+      d.innerHTML = `<span class="ico">${svg(s.icon, c.color)}</span><span class="key"></span><div class="cdm"></div><div class="cdt"></div><span class="chg"></span>`;
       d.onmousedown = (e) => { e.stopPropagation(); if (G.state === 'fight') p.press(i); };
-      hb.appendChild(d); slots.push({ d, key: d.querySelector('.key'), cdm: d.querySelector('.cdm'), cdt: d.querySelector('.cdt'), chg: d.querySelector('.chg'), flash: 0 });
+      hb.appendChild(d); slots.push({ d, ico: d.querySelector('.ico'), key: d.querySelector('.key'), cdm: d.querySelector('.cdm'), cdt: d.querySelector('.cdt'), chg: d.querySelector('.chg'), flash: 0 });
     });
     deviceChanged();
-    const pips = $('#pips'); pips.innerHTML = ''; for (let i = 0; i < c.resource.max; i++) pips.appendChild(document.createElement('i'));
+    // class resource: pips (default), one bar (stamina), or the six chambers of a cylinder
+    const pips = $('#pips'), kind = c.resource.kind || 'pips'; pips.innerHTML = ''; pips.className = kind;
+    if (kind === 'bar') pips.innerHTML = '<div class="stam"><b></b><u></u></div>';
+    else for (let i = 0; i < c.resource.max; i++) pips.appendChild(document.createElement('i'));
     const b = G.boss, bar = $('#bbar'); bar.querySelectorAll('.tick').forEach((t) => t.remove());
     for (const ph of b.def.phases) if (ph.at < 1) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (ph.at * 100) + '%'; bar.appendChild(t); }
     $('#bname').textContent = b.def.name;
   }
   function deviceChanged() {
     const labels = Input.device === 'pad' ? SLOT_LABEL_PAD : SLOT_LABEL_KBM;
-    slots.forEach((s, i) => { s.key.textContent = labels[i]; });
+    slots.forEach((s, i) => { if (s) s.key.textContent = labels[i]; });
     if (cur === 'menu') buildMenu();
   }
   function castBar(key, node, cs) {
@@ -2115,21 +2325,24 @@ const UI = (() => {
     setSx('php', $('#pbar .fill'), p.hp / p.maxHp); setCls('plow', $('#pbar'), 'low', p.hp / p.maxHp < 0.35);
     setTxt('phpt', $('#pbar .hpt'), Math.ceil(p.hp) + ' / ' + p.maxHp);
     const sh = Math.round(sat(p.shield / p.maxHp) * 100); if (cache.sh !== sh) { cache.sh = sh; $('#pbar .shield').style.width = sh + '%'; }
-    const pips = $('#pips').children; for (let i = 0; i < pips.length; i++) setCls('pip' + i, pips[i], 'on', i < p.res);
+    const pw = $('#pips'), pips = pw.children, rk = p.cls.resource.kind || 'pips';
+    if (rk === 'bar') { const st = pips[0]; setSx('stam', st.firstElementChild, sat(p.res / p.resMax)); setCls('wind', st, 'wind', !!p.winded); setCls('open', st, 'open', p.opening > 0); }
+    else if (rk === 'cylinder') { const lw = p.armed ? 5 - p.streak : -1; for (let i = 0; i < pips.length; i++) { const v = (p.cyl[i] || '') + (i === 0 && p.cyl.length ? ' next' : '') + (i === lw ? ' lw' : ''); if (cache['ch' + i + 'c'] !== v) { cache['ch' + i + 'c'] = v; pips[i].className = v; } } }
+    else for (let i = 0; i < pips.length; i++) setCls('pip' + i, pips[i], 'on', i < p.res);
     const pc = $('#pcast'), c = p.casting; if (cache.pcon !== !!c) { cache.pcon = !!c; pc.style.opacity = c ? 1 : 0; }
     if (c) { setSx('pcf', pc.firstElementChild, sat(c.t / c.time)); setTxt('pcn', pc.lastElementChild, c.name); }
     for (let i = 0; i < slots.length; i++) {
-      const s = slots[i], st = p.sk[i], d = st.def, why = p.block(i);
+      const s = slots[i]; if (!s) continue; const st = p.sk[i], d = st.def, why = p.block(i);
       let frac = 0, txt = '';
       if (st.charges <= 0 && st.cd > 0) { frac = st.cd / d.cd; txt = st.cd > 9.5 ? String(Math.ceil(st.cd)) : st.cd.toFixed(st.cd < 3 ? 1 : 0); }
       else if (d.gcd !== false && p.gcd > 0) frac = p.gcd / p.gcdMax;
       setSx('cd' + i, s.cdm, sat(frac), 'Y'); setTxt('ct' + i, s.cdt, txt);
-      setCls('off' + i, s.d, 'off', why === 'res' || why === 'range' || why === 'target' || why === 'spent' || why === 'no' || (st.charges <= 0));
+      setCls('off' + i, s.d, 'off', why === 'res' || why === 'range' || why === 'target' || why === 'spent' || why === 'no' || /^[A-Z]/.test(why) || (st.charges <= 0));
       setTxt('ch' + i, s.chg, d.limited ? String(st.uses) : (d.charges > 1 ? String(st.charges) : ''));
-      const rdy = (i === 1 && p.res >= p.resMax) || (p.cls.id === 'stormcaller' && i === 0 && p.hasBuff('surge')) || (i === 5 && p.target && p.target.castState && p.target.castState.int && why === '');
+      const rdy = (d.rdy && d.rdy(p)) || (d.interrupt && p.target && p.target.castState && p.target.castState.int && why === '');
       setCls('rdy' + i, s.d, 'rdy', !!rdy);
-      const act = (i === 2 && (p.hasBuff('storm') || p.hasBuff('tempest'))) || (i === 4 && (p.parryT > 0 || p.shield > 0));
-      setCls('act' + i, s.d, 'act', !!act);
+      setCls('act' + i, s.d, 'act', !!(d.act && d.act(p)));
+      if (d.view) { const ic = d.view(p); if (cache['ic' + i] !== ic) { cache['ic' + i] = ic; s.ico.innerHTML = svg(ic, p.cls.color); } }
       if (s.flash > 0) { s.flash -= rdt; if (s.flash <= 0) s.d.classList.remove('press'); }
     }
     const bw = $('#buffs'), sig = p.buffs.map((q) => q.id).join(',');
@@ -3236,7 +3449,7 @@ const Warm = (() => {
     danger(b, x, z) { let best = Infinity; for (const w of b.state.walls) { if (laneOf(x) === w.gap) continue; const tt = (z - w.z) / w.v; if (tt > -0.1 && tt < best) best = Math.max(0, tt); } return best; },
     bot(b, p) {
       const add = G.ents.find((e) => e.isAdd && e.alive); const h = {};
-      if (add) { h.target = add; h.saveInterrupt = true; if (p.cls.id === 'duskblade') { const d = Math.hypot(p.pos.x - add.pos.x, p.pos.z - add.pos.z) || 1; h.x = add.pos.x + (p.pos.x - add.pos.x) / d * 2.2; h.z = add.pos.z + (p.pos.z - add.pos.z) / d * 2.2; } } else h.target = b;
+      if (add) { h.target = add; h.saveInterrupt = true; if (p.cls.melee) { const d = Math.hypot(p.pos.x - add.pos.x, p.pos.z - add.pos.z) || 1; h.x = add.pos.x + (p.pos.x - add.pos.x) / d * 2.2; h.z = add.pos.z + (p.pos.z - add.pos.z) / d * 2.2; } } else h.target = b;
       return h;
     },
   });
@@ -5242,11 +5455,11 @@ const Warm = (() => {
     },
     bot(b, p) {
       const S = b.state, add = G.ents.find((e) => e.isAdd && e.alive), h = { avoid: (x, z) => { const i = tIdx(x, z); return i < 0 || !S.tiles[i].present; } };
-      if (add) { h.target = add; if (p.cls.id === 'duskblade') { const d = Math.hypot(p.pos.x - add.pos.x, p.pos.z - add.pos.z) || 1; h.x = add.pos.x + (p.pos.x - add.pos.x) / d * 2.2; h.z = add.pos.z + (p.pos.z - add.pos.z) / d * 2.2; } } else h.target = b;
-      const sw = S.sweep; if (sw && sw.t > 0 && (p.cls.id === 'duskblade' || b.def.danger(b, p.pos.x, p.pos.z) < 1.6)) {
+      if (add) { h.target = add; if (p.cls.melee) { const d = Math.hypot(p.pos.x - add.pos.x, p.pos.z - add.pos.z) || 1; h.x = add.pos.x + (p.pos.x - add.pos.x) / d * 2.2; h.z = add.pos.z + (p.pos.z - add.pos.z) / d * 2.2; } } else h.target = b;
+      const sw = S.sweep; if (sw && sw.t > 0 && (p.cls.melee || b.def.danger(b, p.pos.x, p.pos.z) < 1.6)) {
         const cx = h.x === undefined ? p.pos.x : h.x, cz = h.z === undefined ? p.pos.z : h.z, pa = Math.atan2(cx, cz); let best = 0, bd = 9;
         for (let k = 0; k < sw.n; k++) { const m = sw.a + (k + 0.5) / sw.n * TAU, d = Math.abs(angDiff(m, pa)); if (d < bd) { bd = d; best = m; } }
-        const r = add ? Math.max(3.2, Math.hypot(cx, cz)) : p.cls.id === 'duskblade' ? 4.3 : 7.5; if (!add || bd > 0.5) { h.x = Math.sin(best) * r; h.z = Math.cos(best) * r; h.w = 1.5; }
+        const r = add ? Math.max(3.2, Math.hypot(cx, cz)) : p.cls.melee ? 4.3 : 7.5; if (!add || bd > 0.5) { h.x = Math.sin(best) * r; h.z = Math.cos(best) * r; h.w = 1.5; }
       }
       return h;
     },
@@ -5815,7 +6028,7 @@ const Warm = (() => {
       if (S.lvl >= 1 && vrand() < dt * (S.lvl * 3)) { const a = vrand() * TAU, r = vrand() * 9; FX.burst(Math.sin(a) * r, -1, Math.cos(a) * r, { n: 10, color: FIRE, color2: 0xffe0a0, speed: [1, 4], up: 9 + S.lvl * 4, grav: 10, life: [0.8, 1.6], size: [0.3, 0.8] }); }
     },
     bot(b, p) {
-      const S = b.state, melee = p.cls.id === 'duskblade', r = melee ? 12.9 : 14.5;
+      const S = b.state, melee = p.cls.melee, r = melee ? 12.9 : 14.5;
       if (S.swp) return { x: Math.sin(S.swp.gap) * r, z: Math.cos(S.swp.gap) * r, w: 4 };
       const q = S.geodes.find((c) => c.alive && c.t > 0.8 && Hz.threat(Math.sin(c.a) * r, Math.cos(c.a) * r) > 2.5);
       if (q && S.stag <= 0 && (!S.pend || S.pend.t > S.pend.lock + 0.1)) return { x: Math.sin(q.a) * r, z: Math.cos(q.a) * r, w: 1.2 };
@@ -6351,7 +6564,7 @@ const Warm = (() => {
     // ---- understudies ----
     const cls = UI.selectedClass() || G.classes[0]; S.dolls = [];
     for (const mode of ['x', 'z']) {
-      const M = buildHero({ id: cls.id, look: { armor: 0xd9c9a4, cloth: mode === 'x' ? 0x7a1028 : 0x1c2a7a, glow: mode === 'x' ? ROSE : 0x5a9cff, hood: cls.look.hood } });
+      const M = buildHero({ id: cls.id, look: { armor: 0xd9c9a4, cloth: mode === 'x' ? 0x7a1028 : 0x1c2a7a, glow: mode === 'x' ? ROSE : 0x5a9cff, hood: cls.look.hood, hat: cls.look.hat, weapon: cls.look.weapon || (cls.id === 'duskblade' ? 'blade' : 'staff') } });
       g.add(M.group);
       const bar = new THREE.Group(); for (const r of [0, PI / 2]) { const q = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.07, 0.1), W.mat({ color: 0x3a2412 })); q.rotation.y = r; bar.add(q); } g.add(bar);
       const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(24), 3));
@@ -6597,7 +6810,7 @@ const Warm = (() => {
       for (const d of S.dolls) {
         if (!d.on) continue; const q = dpos(d, _b2), M = d.M, drop = (d.drop || 0) * 16;
         M.group.position.set(q.x, p.pos.y + drop, q.z); M.group.rotation.y = d.mode === 'x' ? -p.facing : PI - p.facing; M.group.scale.x = -1;
-        d.fake.moveSpeed = p.moveSpeed; d.fake.grounded = p.grounded; d.fake.casting = p.casting; d.fake.parryT = p.parryT; d.fake.flashT = p.flashT;
+        d.fake.moveSpeed = p.moveSpeed; d.fake.grounded = p.grounded; d.fake.casting = p.casting; d.fake.parryT = p.parryT; d.fake.rollT = p.rollT; d.fake.aimT = p.aimT; d.fake.loadT = p.loadT; d.fake.flashT = p.flashT;
         M.anim.swing = pm.anim.swing; M.anim.swingDur = pm.anim.swingDur; M.anim.swingKind = pm.anim.swingKind; M.update(dt, d.fake); if (pm.anim.swing > 0) M.anim.swing = pm.anim.swing;
         d.bar.position.set(q.x, 8.5 + drop + Math.sin(t * 2 + q.x) * 0.1, q.z); d.bar.rotation.y = M.group.rotation.y;
         const A = d.ln.geometry.attributes.position.array, tw = S.twang * 0.15; let k = 0;
@@ -6630,7 +6843,7 @@ const Warm = (() => {
     bot(b, p) {
       const S = b.state, h = {};
       if (S.black) return { x: S.black.q.x, z: S.black.q.z, w: 3 };
-      if (S.split) { const side = p.pos.z >= b.pos.z ? 1 : -1, off = p.cls.id === 'duskblade' ? b.radius + 1.7 : 6; let tz = b.pos.z + side * off; if (Math.abs(tz) > HZ - 1) tz = b.pos.z - side * off; h.x = -b.pos.x; h.z = tz; h.w = 1.5; }
+      if (S.split) { const side = p.pos.z >= b.pos.z ? 1 : -1, off = p.cls.melee ? b.radius + 1.7 : 6; let tz = b.pos.z + side * off; if (Math.abs(tz) > HZ - 1) tz = b.pos.z - side * off; h.x = -b.pos.x; h.z = tz; h.w = 1.5; }
       return h;
     },
   });
@@ -6946,7 +7159,7 @@ const Warm = (() => {
     bot(b, p) {
       const S = b.state; for (const wv of S.waves) { const dd = Math.hypot(p.pos.x - wv.d.x, p.pos.z - wv.d.z), tt = (dd - wv.r) / 10.5; if (tt > 0 && tt < 0.2) p.jump(); }
       const rolling = S.balls.filter((q) => q.state === 'roll' || q.state === 'drop');
-      return { avoid: (x, z) => { const d = Math.hypot(x, z); return rolling.some((q) => Math.abs(d - q.r) < 1.9) || (p.cls.id !== 'duskblade' && d < 6); } };
+      return { avoid: (x, z) => { const d = Math.hypot(x, z); return rolling.some((q) => Math.abs(d - q.r) < 1.9) || (!p.cls.melee && d < 6); } };
     },
   });
 })();
@@ -7254,7 +7467,7 @@ const Warm = (() => {
       // hop the couplings
       if (p.grounded && p.moving) for (let i = 0; i < 3; i++) { const a = S.cars[i], c = S.cars[i + 1]; if (!a.on || !c.on || a.loose || c.loose) continue; if ((p.intentZ > 0.3 && p.pos.z > a.z1 - 0.9 && p.pos.z <= a.z1 + 0.2) || (p.intentZ < -0.3 && p.pos.z < c.z0 + 0.9 && p.pos.z >= c.z0 - 0.2)) p.jump(); }
       const h = { avoid: (x, z) => Math.abs(x) > HW - 0.9 || (S.wind && !gapAt(S, x, z) && (() => { const c = carAt(S, x, z); return c && z > c.z1 - 1.2 && c === live(S)[live(S).length - 1]; })()) };
-      if (S.wind && p.cls.id !== 'duskblade') { const c = myCar(S); if (c) { h.x = clamp(p.pos.x, -3, 3); h.z = clamp(p.pos.z, c.z0 + c.off + 2, c.z1 + c.off - 4.5); } }
+      if (S.wind && !p.cls.melee) { const c = myCar(S); if (c) { h.x = clamp(p.pos.x, -3, 3); h.z = clamp(p.pos.z, c.z0 + c.off + 2, c.z1 + c.off - 4.5); } }
       if (S.wind) { const c = myCar(S); if (c && p.pos.z > c.z1 + c.off - 3.4) { p.casting = null; Bot.timer = 0; h.x = clamp(p.pos.x, -3, 3); h.z = c.z1 + c.off - 7; } }
       return h;
     },
@@ -10207,7 +10420,7 @@ const Warm = (() => {
     },
     bot(b, p) {
       const S = b.state, out = {}; if (!S.C || S.down > 0) return out;
-      const eb = effBits(S), sampled = S.exec && S.exec.out, now = sampled || evalC(S.C, eb).out, sol = sampled ? null : solveC(S.C, eb, S.bz), melee = p.cls.id === 'duskblade';
+      const eb = effBits(S), sampled = S.exec && S.exec.out, now = sampled || evalC(S.C, eb).out, sol = sampled ? null : solveC(S.C, eb, S.bz), melee = p.cls.melee;
       // where is the nearest output that will stay dark?
       let safe = null, sd = Infinity; now.forEach((v, zn) => { if (v) return; const x = clamp(p.pos.x, ZX[zn] - 4.5, ZX[zn] + 4.5), z = clamp(p.pos.z, ZN + 1.5, ZS - 2), d = Math.hypot(x - p.pos.x, z - p.pos.z); if (d < sd) { sd = d; safe = { x, z }; } });
       const left = S.exec ? S.exec.t : 99, must = safe && left < sd / 7 + 1.3;
@@ -10910,7 +11123,7 @@ const Bot = {
   update(dt) {
     const p = G.player, b = G.boss;
     if (!this.level || !p || !b || G.state !== 'fight' || !p.alive) { Input.bot = this.level && p ? { moveX: 0, moveZ: 0 } : null; return; }
-    const A = G.arena, def = b.def, melee = p.cls.id === 'duskblade', t = p.target || b;
+    const A = G.arena, def = b.def, melee = !!p.cls.melee, t = p.target || b;
     const hint = def.bot ? def.bot(b, p) || {} : {};
     const danger = (x, z) => { let th = Hz.threat(x, z); if (def.danger) th = Math.min(th, def.danger(b, x, z)); return th; };
     this.timer -= dt;
@@ -10949,8 +11162,11 @@ const Bot = {
     // rotation
     this.pressT -= dt; if (this.pressT > 0) return; this.pressT = [0, 0.25, 0.12, 0.05][this.level];
     const here = danger(p.pos.x, p.pos.z), cs = t.castState;
-    const ctx = { hp: p.hp / p.maxHp, danger: here < 0.3 && this.level >= 2, calm: here, wantInterrupt: !!(cs && cs.int && cs.t > (this.level >= 3 ? 0.3 : 0.8)), chase: gd < 1.5, holdFire: !!hint.holdFire, saveInterrupt: !!def.botSaveInterrupt || !!hint.saveInterrupt || this.level < 3 };
+    const ctx = { hp: p.hp / p.maxHp, danger: here < 0.3 && this.level >= 2, calm: here, wantInterrupt: !!(cs && cs.int && cs.t > (this.level >= 3 ? 0.3 : 0.8)), chase: gd < 1.5, holdFire: !!hint.holdFire, saveInterrupt: !!def.botSaveInterrupt || !!hint.saveInterrupt || this.level < 3,
+      zone: !!Hz.persist(p.pos.x, p.pos.z),
+      threat: (x, z) => (Hz.persist(x, z) || (hint.avoid && hint.avoid(x, z))) ? 0 : danger(x, z) };
     if (hint.target && p.target !== hint.target) p.target = hint.target;
+    if (ctx.holdFire) p.queue = -1; // a player told to stop does not let a buffered press go through
     p.cls.bot(p, ctx);
   },
 };

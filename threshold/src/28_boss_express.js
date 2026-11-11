@@ -300,7 +300,7 @@
       // hop the couplings
       if (p.grounded && p.moving) for (let i = 0; i < 3; i++) { const a = S.cars[i], c = S.cars[i + 1]; if (!a.on || !c.on || a.loose || c.loose) continue; if ((p.intentZ > 0.3 && p.pos.z > a.z1 - 0.9 && p.pos.z <= a.z1 + 0.2) || (p.intentZ < -0.3 && p.pos.z < c.z0 + 0.9 && p.pos.z >= c.z0 - 0.2)) p.jump(); }
       const h = { avoid: (x, z) => Math.abs(x) > HW - 0.9 || (S.wind && !gapAt(S, x, z) && (() => { const c = carAt(S, x, z); return c && z > c.z1 - 1.2 && c === live(S)[live(S).length - 1]; })()) };
-      if (S.wind && p.cls.id !== 'duskblade') { const c = myCar(S); if (c) { h.x = clamp(p.pos.x, -3, 3); h.z = clamp(p.pos.z, c.z0 + c.off + 2, c.z1 + c.off - 4.5); } }
+      if (S.wind && !p.cls.melee) { const c = myCar(S); if (c) { h.x = clamp(p.pos.x, -3, 3); h.z = clamp(p.pos.z, c.z0 + c.off + 2, c.z1 + c.off - 4.5); } }
       if (S.wind) { const c = myCar(S); if (c && p.pos.z > c.z1 + c.off - 3.4) { p.casting = null; Bot.timer = 0; h.x = clamp(p.pos.x, -3, 3); h.z = c.z1 + c.off - 7; } }
       return h;
     },

@@ -1,6 +1,6 @@
 # THRESHOLD: sources
 
-A PC-first 3D raid game: unrelated boss fights, one behind each door, two classes, no progression.
+A PC-first 3D raid game: unrelated boss fights, one behind each door, four classes, no progression.
 `threshold/index.html` is **generated**. Edit the files in this folder and run `./build.sh`; never hand-edit `index.html`.
 
 ## Layout
@@ -15,7 +15,7 @@ A PC-first 3D raid game: unrelated boss fights, one behind each door, two classe
 | `05_world.js` | `Cam` (orbit camera + cinematic shots) and `W` (procedural textures, sky, water, lava, lights, motes) |
 | `06_combat.js` | `Hz` telegraphed hazards, `Bul` bullets, `Ent` and `Boss` |
 | `07_player.js` | Procedural hero model, `Player` (movement, casting, GCD, buffs, dashes, damage) |
-| `08_classes.js` | The two classes and their autopilot rotations |
+| `08_classes.js` | The four classes and their autopilot rotations (see "Classes" below) |
 | `09_ui.js`, `10_game.js` | HUD/menus, fight lifecycle (including the hidden rehearsal at load), the hall-of-doors menu scene |
 | `11_warm.js` | Warm-up frame and light keeper that stop shader compiles mid-fight |
 | `2x_boss_*.js`, `3x_boss_*.js` | One file per boss. Adding a file here adds a door. See `BOSS_AUTHORING.md` |
@@ -30,11 +30,35 @@ Keyboard and mouse: WASD move (camera-relative), hold LMB to orbit the camera, h
 
 Controller: left stick move, right stick camera, `RT RB Y A B X LB` for the seven slots, LT jump, d-pad to cycle targets, R3 to reset the camera, Start to pause.
 
-Slot order is the same for every class: filler, spender, ultimate, mobility, defensive, interrupt, heal.
+Every class has up to seven skills in hotbar slots 0-6 (a slot can be empty). Duskblade and Stormcaller fill all seven the same way: filler, spender, ultimate, mobility, defensive, interrupt, heal. Ashwarden and Hexslinger do not follow that template.
+
+## Classes
+
+| Class | Shape | How it plays |
+| --- | --- | --- |
+| Duskblade | melee, 7 skills | Builds Momentum with a combo, spends it; Lunge, a parry that counters, three instant heals. |
+| Stormcaller | ranged, 7 skills | Stands still to cast Bolt, spends Static on the move; Blink, a barrier, three cast-time heals. |
+| Ashwarden | melee, 5 skills | No cooldowns. One stamina bar pays for Strike, the Overhead (a wind-up leap that is also the interrupt) and the Roll (passes through blockable hits; a dodged hit makes the next Overhead instant and free). Overdrawing stamina leaves you Winded. Four flasks, which can be drunk or poured on the blade (Kindle) for damage. |
+| Hexslinger | ranged, 5 skills | No cooldowns, no resource, fully mobile. A six-chamber cylinder loaded one round at a time and fired in order: lead (damage, stronger up close), silver (the interrupt, plus Exposed), salve (the heal, six per fight). The sixth shot of a full cylinder emptied without reloading hits double. Spin sends the next round to the back. |
+
+### What a class must be able to do
+
+The twenty fights assume these, so any new class has to provide them in some form (they do not have to be buttons of their own):
+
+- **Stop a cast.** Every door has an interruptible cast about once per rotation (2.4 to 3.4 s long, one of 9 s). The interrupt has to work on adds as well as the boss and has to reach: give it range or a gap closer. Roughly one every 14 s is enough.
+- **Heal about 1100 over a fight.** 1000 health, no regeneration, hits of 230 to 520. A cast-time or delayed heal is fine: every fight leaves 2 s gaps.
+- **About 110 to 140 damage per second on one target, and be able to point it at adds.** Enrage timers only need about half of that. No area damage is needed.
+- **Be clearly melee (reach 3.4) or clearly ranged (about 34).** Set `melee: true` on a melee class: boss autopilot hints and the autopilot's positioning read that flag.
+- **Deal damage in discrete hits with `src: 'player'`.** Several fights react to being hit (or to a cast starting on a specific target) rather than to damage totals.
+- Jumping belongs to the engine, not the class: do not change jump height or airtime.
+
+Optional: a dash (no fight needs one; the Ashwarden roll and leap and the Duskblade Lunge may cross gaps) and a defensive. Anything that negates a hit must only negate `blockable` hits, as `parryT`, `shield` and `dodgeT` in `Player.hurt` do: rule-breaking punishments are unblockable on purpose.
+
+HUD hooks on a skill: `rdy(p)` (glow), `act(p)` (lit while active), `interrupt: true` (glow while the target casts something stoppable), `view(p)` (icon override). `resource.kind` picks the resource display: pips (default), `'bar'` or `'cylinder'`. A `usable()` reason that starts with a capital letter is shown to the player as a hint.
 
 ## URL parameters
 
-`?boss=cathedral|leviathan|duelist|engine|titan|gorgon|theatre|wheel|express|winter|origami|lamp|chess|festival|fall`, `&class=duskblade|stormcaller`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`, `&strictmath` (testing only: out-of-domain shader math returns NaN and NaN pixels show bright magenta).
+`?boss=cathedral|leviathan|duelist|engine|titan|gorgon|theatre|wheel|express|winter|origami|lamp|chess|festival|fall`, `&class=duskblade|stormcaller|ashwarden|hexslinger`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`, `&strictmath` (testing only: out-of-domain shader math returns NaN and NaN pixels show bright magenta).
 
 Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `pit`.
 
@@ -44,7 +68,8 @@ Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `pit`.
 
 `../tools/` has Playwright scripts built on those hooks (they serve the repo locally and swap the CDN for a local three.js package, so they work offline):
 
-- `smoke.js <boss>`: every phase with both classes in god mode, reports script errors.
+- `smoke.js <boss>`: every phase with every class in god mode, reports script errors.
+- `matrix.js <class,class|all> [runs] [boss,boss]`: autopilot attempts for every door and class, one summary line each (wins, boss health left, dps). `GOD=1` checks instead that each class can finish every fight before the enrage.
 - `sim.js <boss> <class> <botLevel> [runs] [maxSec] [phase]`: full autopilot attempts.
 - `tank.js <boss> <class> <botLevel> [hpMult]`: one attempt with extra health, totals damage taken per mechanic.
 - `hits.js <boss> <class> <botLevel>`: one attempt, prints every hit taken.
@@ -53,7 +78,7 @@ Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `pit`.
 - `shot.js <query> <out.png> [evalJS] [frames]`: screenshot.
 - `diag.js <boss> <class> <expr> <seconds> [phase]`: autopilot run that prints `expr` (JS with `g, G, b, p, S` in scope) every half second, for tracing a mechanic.
 - `logicfuzz.js`: no browser; fuzzes the circuit generator of door `logic` (every circuit must be survivable).
-- `nanscan.js [boss ...]`: NaN audit (all doors if no args). Real GPUs turn out-of-domain shader math (`pow` of a negative, `normalize` of zero, ...) into NaN pixels that bloom spreads into black squares; SwiftShader hides most of these. This runs with `?strictmath`, which makes the sandbox return NaN the way a GPU does, plays every phase with both classes, and counts NaN pixels. Should print `ALL CLEAN`; door V (titan) may show an occasional 1-2 pixel hit on a `MeshStandardMaterial` at the screen edge, which comes from three.js's own flat-shading normal and is covered by the math guard below. Anything in the hundreds is a real bug (the Petal Storm bullet bug showed 600-900). `__game.nanScanBy()` names the mesh responsible. `NANSCAN_SAFE=1` runs it without `?strictmath`, to check the guards themselves.
+- `nanscan.js [boss ...]`: NaN audit (all doors if no args). Real GPUs turn out-of-domain shader math (`pow` of a negative, `normalize` of zero, ...) into NaN pixels that bloom spreads into black squares; SwiftShader hides most of these. This runs with `?strictmath`, which makes the sandbox return NaN the way a GPU does, plays every phase with every class, and counts NaN pixels. Should print `ALL CLEAN`; door V (titan) may show an occasional 1-2 pixel hit on a `MeshStandardMaterial` at the screen edge, which comes from three.js's own flat-shading normal and is covered by the math guard below. Anything in the hundreds is a real bug (the Petal Storm bullet bug showed 600-900). `__game.nanScanBy()` names the mesh responsible. `NANSCAN_SAFE=1` runs it without `?strictmath`, to check the guards themselves.
 
 Run them with `NODE_PATH=<global node_modules with playwright> THREE_DIR=<unpacked three@0.170.0 package> node tools/smoke.js titan`.
 

@@ -111,11 +111,25 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 #pips{display:flex;gap:5px;justify-content:center;height:12px}
 #pips i{flex:1;max-width:64px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.55);transform:skewX(-18deg);transition:all .12s}
 #pips i.on{background:var(--cls);box-shadow:0 0 10px var(--cls);border-color:#fff}
+#pips.bar{height:10px}
+#pips .stam{flex:1;position:relative;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.55);overflow:hidden}
+#pips .stam b{position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--cls) 70%,#000),var(--cls));transform-origin:left;box-shadow:0 0 10px var(--cls)}
+#pips .stam u{position:absolute;left:34%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.55)}
+#pips .stam.wind{border-color:#ff5040;animation:windp .35s infinite alternate}#pips .stam.wind b{background:#b02a20;box-shadow:none}
+#pips .stam.open{border-color:#fff;box-shadow:0 0 14px #ffe0a0}
+@keyframes windp{from{background:rgba(0,0,0,.55)}to{background:rgba(160,30,20,.55)}}
+#pips.cylinder{height:22px;gap:7px;align-items:center}
+#pips.cylinder i{flex:0 0 18px;max-width:none;width:18px;height:18px;border-radius:50%;transform:none;border:1px solid rgba(255,255,255,.28);background:rgba(0,0,0,.6);box-sizing:border-box}
+#pips.cylinder i.L{background:radial-gradient(circle at 35% 30%,#fff6dc,#d9a94a 60%,#7a5a20);border-color:#ffe2a8;box-shadow:0 0 7px #ffcf70}
+#pips.cylinder i.S{background:radial-gradient(circle at 35% 30%,#fff,#c9a0ff 55%,#5a3a9a);border-color:#ead4ff;box-shadow:0 0 9px #c08bff}
+#pips.cylinder i.V{background:radial-gradient(circle at 35% 30%,#eafff0,#50e08a 55%,#17703c);border-color:#b8ffd0;box-shadow:0 0 9px #50e08a}
+#pips.cylinder i.next{flex-basis:24px;width:24px;height:24px;border-width:2px;border-color:#fff}
+#pips.cylinder i.lw{outline:2px solid var(--cls);outline-offset:2px}
 #pcast{height:11px;opacity:0;transition:opacity .12s}
 #pcast .fill{background:linear-gradient(180deg,#ffe9a8,#d69b2b)}
 #hotbar{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);display:flex;gap:7px;pointer-events:auto}
 .slot{position:relative;width:60px;height:60px;border:1px solid rgba(255,255,255,.3);background:rgba(8,9,15,.82);display:flex;align-items:center;justify-content:center;overflow:hidden}
-.slot svg{width:36px;height:36px;transition:opacity .1s}
+.slot svg{width:36px;height:36px;transition:opacity .1s}.slot .ico{display:flex}
 .slot .key{position:absolute;left:3px;top:1px;font:700 11px ui-monospace,Consolas,monospace;color:#fff;text-shadow:0 1px 2px #000;z-index:3}
 .slot .cdm{position:absolute;inset:0;background:rgba(0,0,0,.72);transform-origin:bottom;transform:scaleY(0);z-index:1}
 .slot .cdt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:700 17px "Segoe UI",sans-serif;color:#fff;text-shadow:0 1px 3px #000;z-index:2}

@@ -88,9 +88,9 @@ Starting a fight builds the arena, then plays every phase once, invisibly and he
 
 ## Before shipping a boss
 
-1. `node tools/smoke.js <id>` must report `err=[]` for every phase and both classes.
-2. `node tools/sim.js <id> duskblade 3 3` and the same for `stormcaller`. The autopilot does not need to win, but look at what kills it with `tools/tank.js`: one mechanic dealing most of the damage usually means the telegraph is too short or there is no safe place.
+1. `node tools/smoke.js <id>` must report `err=[]` for every phase and every class.
+2. `node tools/matrix.js all 3 <id>` (or `tools/sim.js <id> <class> 3 3` for one class), then `GOD=1 node tools/matrix.js all 1 <id>` to confirm every class can finish before the enrage. The autopilot does not need to win, but look at what kills it with `tools/tank.js`: one mechanic dealing most of the damage usually means the telegraph is too short or there is no safe place.
 3. Take screenshots of each phase with `tools/shot.js "boss=<id>&skipintro=1&god=1&bot=3&phase=N"`.
-4. Check both classes can do the fight: the caster needs moments to stand still, the melee needs the boss reachable.
+4. Check every class can do the fight (README, "What a class must be able to do"): the caster needs moments to stand still, the melee classes need the boss reachable, and autopilot hints should read `p.cls.melee`, never a class id.
 5. `node tools/nanscan.js <id>` must print `ALL CLEAN`. A NaN pixel is invisible in the sandbox but shows as black squares on a real GPU (see README, Shader safety).
 6. `node tools/hitch.js <id>` lists no shader compiles after the fight starts.
