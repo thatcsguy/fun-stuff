@@ -334,6 +334,50 @@ function reportError(e) {
   console.error(e);
 }
 
+// ---------- shader math guard ----------
+// Real GPUs return NaN for pow() of a negative base, sqrt/log of a negative, normalize(vec3(0)), and so on.
+// One NaN pixel is harmless on its own, but bloom downsamples it into every mip and spreads it into a black square.
+// It also hides from tests: SwiftShader computes pow(-x,y) as pow(|x|,y), so it never shows up in the sandbox.
+// And clamping in the vertex shader is not enough: with MSAA, edge pixels extrapolate varyings past the triangle,
+// so a value clamped to [0,1] per vertex can still arrive slightly negative in the fragment shader.
+// So every shader the page compiles (ours, three.js built-ins, post passes) gets these functions remapped to
+// domain-safe versions. ?strictmath does the opposite: out-of-domain inputs return NaN on any GPU (used by tools/nanscan.js).
+const SHADER_GUARD = (() => {
+  const strict = QS.has('strictmath'), T = ['float', 'vec2', 'vec3', 'vec4'];
+  const NAN = (t) => t === 'float' ? 'uintBitsToFloat(0x7fc00000u)' : `${t}(uintBitsToFloat(0x7fc00000u))`;
+  const lt = (t, v) => t === 'float' ? `a < ${v}` : `any(lessThan(a, ${t}(${v})))`, gt = (t, v) => t === 'float' ? `a > ${v}` : `any(greaterThan(a, ${t}(${v})))`;
+  let src = '';
+  for (const t of T) {
+    const h = 'highp ' + t, n = NAN(t);
+    if (strict) src += `${h} thPow(${h} a, ${h} b){ return ${lt(t, '0.0')} ? ${n} : pow(a,b); }
+${h} thSqrt(${h} a){ return ${lt(t, '0.0')} ? ${n} : sqrt(a); }
+${h} thLog(${h} a){ return ${lt(t, '0.0')} ? ${n} : log(a); }
+${h} thLog2(${h} a){ return ${lt(t, '0.0')} ? ${n} : log2(a); }
+${h} thAcos(${h} a){ return (${gt(t, '1.0')}) || (${lt(t, '-1.0')}) ? ${n} : acos(a); }
+${h} thAsin(${h} a){ return (${gt(t, '1.0')}) || (${lt(t, '-1.0')}) ? ${n} : asin(a); }
+${h} thNorm(${h} a){ return dot(a,a) == 0.0 ? ${n} : normalize(a); }
+`;
+    else src += `${h} thPow(${h} a, ${h} b){ return pow(max(a,0.0),b); }
+${h} thSqrt(${h} a){ return sqrt(max(a,0.0)); }
+${h} thLog(${h} a){ return log(max(a,1e-30)); }
+${h} thLog2(${h} a){ return log2(max(a,1e-30)); }
+${h} thAcos(${h} a){ return acos(clamp(a,-1.0,1.0)); }
+${h} thAsin(${h} a){ return asin(clamp(a,-1.0,1.0)); }
+${h} thNorm(${h} a){ return a * inversesqrt(max(dot(a,a),1e-30)); }
+`;
+  }
+  src += '#define pow(a,b) thPow(a,b)\n#define sqrt(a) thSqrt(a)\n#define log(a) thLog(a)\n#define log2(a) thLog2(a)\n#define acos(a) thAcos(a)\n#define asin(a) thAsin(a)\n#define normalize(a) thNorm(a)\n';
+  const proto = window.WebGL2RenderingContext && WebGL2RenderingContext.prototype, orig = proto && proto.shaderSource;
+  let patched = 0;
+  if (orig) proto.shaderSource = function (sh, code) {
+    // GLSL ES 3.00 shaders only (all of three.js's WebGL2 materials and ours); insert after the first float precision statement
+    const m = /^\s*#version 300 es/.test(code) && (/^[ \t]*precision\s+\w+\s+float\s*;[^\n]*\n/m.exec(code) || /^[ \t]*#version[^\n]*\n/.exec(code));
+    if (m && code.indexOf('thPow(') < 0) { code = code.slice(0, m.index + m[0].length) + src + code.slice(m.index + m[0].length); patched++; }
+    return orig.call(this, sh, code);
+  };
+  return { strict, get patched() { return patched; } };
+})();
+
 // ---------- renderer ----------
 const canvas = $('#c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
@@ -380,6 +424,30 @@ const FinalShader = {
     }`,
 };
 
+// Runs right after the scene render, before bloom. Any NaN/Inf pixel that still slips through (a shader bug the
+// math guard cannot catch, like a divide by zero) is replaced by the average of its finite neighbours, so bloom
+// never sees it. Uses a bit test, not isnan(), because drivers are allowed to optimise isnan() away.
+// With ?strictmath the bad pixels are painted bright magenta instead, so they are easy to spot.
+const SanitizeShader = {
+  uniforms: { tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2(1, 1) }, uMark: { value: SHADER_GUARD.strict ? 1 : 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 uTexel; uniform float uMark; varying vec2 vUv;
+    bool badf(float x){ return (floatBitsToUint(x) & 0x7f800000u) == 0x7f800000u; }
+    bool bad(vec4 c){ return badf(c.r) || badf(c.g) || badf(c.b) || badf(c.a); }
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv);
+      if (bad(c)) {
+        if (uMark > 0.5) { gl_FragColor = vec4(50.0, 0.0, 50.0, 1.0); return; }
+        vec4 s = vec4(0.0); float n = 0.0;
+        for (int i = 0; i < 4; i++) { vec2 o = i == 0 ? vec2(1.0,0.0) : i == 1 ? vec2(-1.0,0.0) : i == 2 ? vec2(0.0,1.0) : vec2(0.0,-1.0);
+          vec4 q = texture2D(tDiffuse, vUv + o * uTexel); if (!bad(q)) { s += q; n += 1.0; } }
+        c = n > 0.0 ? s / n : vec4(0.0, 0.0, 0.0, 1.0);
+      }
+      gl_FragColor = vec4(clamp(c.rgb, 0.0, 30000.0), clamp(c.a, 0.0, 1.0));
+    }`,
+};
+
 const Post = {
   composer: null, bloom: null, final: null, flashA: 0, flashDecay: 3, pulse: 0,
   base: { bloom: 0.55, radius: 0.6, threshold: 0.9, exposure: 1.0, sat: 1.05, vig: 0.9, contrast: 1.04, tint: [1, 1, 1], lift: [0, 0, 0] },
@@ -389,6 +457,8 @@ const Post = {
     const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: G.q.msaa });
     this.composer = new EffectComposer(renderer, rt);
     this.composer.addPass(new RenderPass(scene, camera));
+    this.sanitize = new ShaderPass(SanitizeShader);
+    this.composer.addPass(this.sanitize);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.55, 0.6, 0.9);
     this.bloom.enabled = G.q.bloom;
     this.composer.addPass(this.bloom);
@@ -431,6 +501,7 @@ const Post = {
     const w = innerWidth, h = innerHeight, pr = Math.min(devicePixelRatio || 1, G.q.pr);
     renderer.setPixelRatio(pr); renderer.setSize(w, h, false);
     this.composer.setPixelRatio(pr); this.composer.setSize(w, h);
+    this.sanitize.uniforms.uTexel.value.set(1 / Math.max(1, Math.round(w * pr)), 1 / Math.max(1, Math.round(h * pr)));
     camera.aspect = w / h; camera.updateProjectionMatrix();
   },
   setQuality(name) {
@@ -1416,7 +1487,7 @@ const Bul = (() => {
     void main(){ vC = instanceColor; mat4 mw = modelMatrix * instanceMatrix; vec4 wp = mw * vec4(position, 1.0);
       vec3 n = mat3(mw) * normal; n /= max(length(n), 1e-5); vec3 v = cameraPosition - wp.xyz; v /= max(length(v), 1e-5);
       vF = clamp(dot(n, v), 0.0, 1.0); gl_Position = projectionMatrix * viewMatrix * wp; }`;
-  const BULF = `varying vec3 vC; varying float vF; void main(){ float k = pow(vF, 2.5); gl_FragColor = vec4(mix(vC * 1.25, vec3(1.25) + vC * 0.55, k), 1.0); }`;
+  const BULF = `varying vec3 vC; varying float vF; void main(){ float k = pow(clamp(vF, 0.0, 1.0), 2.5); /* re-clamp here: MSAA edge pixels extrapolate vF below 0, and pow(negative) is NaN on real GPUs */ gl_FragColor = vec4(mix(vC * 1.25, vec3(1.25) + vC * 0.55, k), 1.0); }`;
   const g = new THREE.SphereGeometry(1, 12, 9), mesh = new THREE.InstancedMesh(g, new THREE.ShaderMaterial({ vertexShader: BULV, fragmentShader: BULF }), MAX);
   const tail = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending }), MAX);
   const Q = new THREE.Quaternion(), YAX = new THREE.Vector3(0, 1, 0), TP = new THREE.Vector3(), TS = new THREE.Vector3();
@@ -7399,6 +7470,27 @@ window.__game = {
   setPhase(i) { const b = G.boss; b.hp = b.maxHp * b.def.phases[i].at - 1; },
   hurtBoss(frac) { const b = G.boss; b.hp = Math.max(1, b.hp - b.maxHp * frac); },
   kill() { G.boss.damage(1e9); },
+  // Render the scene once into a float target (same MSAA as play) and count NaN/Inf pixels. Pair with ?strictmath,
+  // which makes out-of-domain shader math return NaN in SwiftShader the way real GPUs do. Used by tools/nanscan.js.
+  // nanScanBy(): the same scan once per object in the scene with everything else hidden, to name the culprit.
+  nanScanBy(w = 480, h = 270) { const objs = []; scene.traverse((o) => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible) objs.push(o); });
+    const vis = objs.map((o) => o.visible), out = []; objs.forEach((o) => { o.visible = false; });
+    for (let i = 0; i < objs.length; i++) { objs[i].visible = true; const s = this.nanScan(w, h); objs[i].visible = false;
+      if (s.bad) { const o = objs[i]; let path = o.name || o.type; for (let q = o.parent; q && q !== scene; q = q.parent) path = (q.name || q.type) + '/' + path; out.push({ path, bad: s.bad, mat: o.material && (o.material.type + (o.material.uniforms ? ':' + Object.keys(o.material.uniforms).slice(0, 6).join(',') : '')) }); } }
+    objs.forEach((o, i) => { o.visible = vis[i]; }); return out;
+  },
+  nanScan(w = 480, h = 270) {
+    const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.FloatType, samples: G.q.msaa });
+    const asp = camera.aspect; camera.aspect = w / h; camera.updateProjectionMatrix();
+    renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(null);
+    camera.aspect = asp; camera.updateProjectionMatrix();
+    const px = new Float32Array(w * h * 4); renderer.readRenderTargetPixels(rt, 0, 0, w, h, px); rt.dispose();
+    let bad = 0, neg = 0; const where = [];
+    for (let i = 0; i < w * h; i++) { const r = px[i * 4], g2 = px[i * 4 + 1], b2 = px[i * 4 + 2];
+      if (!Number.isFinite(r) || !Number.isFinite(g2) || !Number.isFinite(b2) || !Number.isFinite(px[i * 4 + 3])) { bad++; if (where.length < 8) where.push([i % w, h - 1 - Math.floor(i / w)]); }
+      else if (r < -1e-3 || g2 < -1e-3 || b2 < -1e-3) neg++; }
+    return { bad, neg, where, strict: SHADER_GUARD.strict, patched: SHADER_GUARD.patched };
+  },
 };
 Hooks.frame.push((rdt, stage) => { if (stage === 0 && !G.paused) Bot.update(rdt * G.timeScale); });
 

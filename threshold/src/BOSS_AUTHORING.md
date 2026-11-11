@@ -84,3 +84,4 @@ Options: `name`, `color`, `blockable` (false means Riposte and Aegis cannot stop
 2. `node tools/sim.js <id> duskblade 3 3` and the same for `stormcaller`. The autopilot does not need to win, but look at what kills it with `tools/tank.js`: one mechanic dealing most of the damage usually means the telegraph is too short or there is no safe place.
 3. Take screenshots of each phase with `tools/shot.js "boss=<id>&skipintro=1&god=1&bot=3&phase=N"`.
 4. Check both classes can do the fight: the caster needs moments to stand still, the melee needs the boss reachable.
+5. `node tools/nanscan.js <id>` must print `ALL CLEAN`. A NaN pixel is invisible in the sandbox but shows as black squares on a real GPU (see README, Shader safety).

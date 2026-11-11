@@ -66,5 +66,26 @@ window.__game = {
   setPhase(i) { const b = G.boss; b.hp = b.maxHp * b.def.phases[i].at - 1; },
   hurtBoss(frac) { const b = G.boss; b.hp = Math.max(1, b.hp - b.maxHp * frac); },
   kill() { G.boss.damage(1e9); },
+  // Render the scene once into a float target (same MSAA as play) and count NaN/Inf pixels. Pair with ?strictmath,
+  // which makes out-of-domain shader math return NaN in SwiftShader the way real GPUs do. Used by tools/nanscan.js.
+  // nanScanBy(): the same scan once per object in the scene with everything else hidden, to name the culprit.
+  nanScanBy(w = 480, h = 270) { const objs = []; scene.traverse((o) => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible) objs.push(o); });
+    const vis = objs.map((o) => o.visible), out = []; objs.forEach((o) => { o.visible = false; });
+    for (let i = 0; i < objs.length; i++) { objs[i].visible = true; const s = this.nanScan(w, h); objs[i].visible = false;
+      if (s.bad) { const o = objs[i]; let path = o.name || o.type; for (let q = o.parent; q && q !== scene; q = q.parent) path = (q.name || q.type) + '/' + path; out.push({ path, bad: s.bad, mat: o.material && (o.material.type + (o.material.uniforms ? ':' + Object.keys(o.material.uniforms).slice(0, 6).join(',') : '')) }); } }
+    objs.forEach((o, i) => { o.visible = vis[i]; }); return out;
+  },
+  nanScan(w = 480, h = 270) {
+    const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.FloatType, samples: G.q.msaa });
+    const asp = camera.aspect; camera.aspect = w / h; camera.updateProjectionMatrix();
+    renderer.setRenderTarget(rt); renderer.render(scene, camera); renderer.setRenderTarget(null);
+    camera.aspect = asp; camera.updateProjectionMatrix();
+    const px = new Float32Array(w * h * 4); renderer.readRenderTargetPixels(rt, 0, 0, w, h, px); rt.dispose();
+    let bad = 0, neg = 0; const where = [];
+    for (let i = 0; i < w * h; i++) { const r = px[i * 4], g2 = px[i * 4 + 1], b2 = px[i * 4 + 2];
+      if (!Number.isFinite(r) || !Number.isFinite(g2) || !Number.isFinite(b2) || !Number.isFinite(px[i * 4 + 3])) { bad++; if (where.length < 8) where.push([i % w, h - 1 - Math.floor(i / w)]); }
+      else if (r < -1e-3 || g2 < -1e-3 || b2 < -1e-3) neg++; }
+    return { bad, neg, where, strict: SHADER_GUARD.strict, patched: SHADER_GUARD.patched };
+  },
 };
 Hooks.frame.push((rdt, stage) => { if (stage === 0 && !G.paused) Bot.update(rdt * G.timeScale); });

@@ -142,7 +142,7 @@ const Bul = (() => {
     void main(){ vC = instanceColor; mat4 mw = modelMatrix * instanceMatrix; vec4 wp = mw * vec4(position, 1.0);
       vec3 n = mat3(mw) * normal; n /= max(length(n), 1e-5); vec3 v = cameraPosition - wp.xyz; v /= max(length(v), 1e-5);
       vF = clamp(dot(n, v), 0.0, 1.0); gl_Position = projectionMatrix * viewMatrix * wp; }`;
-  const BULF = `varying vec3 vC; varying float vF; void main(){ float k = pow(vF, 2.5); gl_FragColor = vec4(mix(vC * 1.25, vec3(1.25) + vC * 0.55, k), 1.0); }`;
+  const BULF = `varying vec3 vC; varying float vF; void main(){ float k = pow(clamp(vF, 0.0, 1.0), 2.5); /* re-clamp here: MSAA edge pixels extrapolate vF below 0, and pow(negative) is NaN on real GPUs */ gl_FragColor = vec4(mix(vC * 1.25, vec3(1.25) + vC * 0.55, k), 1.0); }`;
   const g = new THREE.SphereGeometry(1, 12, 9), mesh = new THREE.InstancedMesh(g, new THREE.ShaderMaterial({ vertexShader: BULV, fragmentShader: BULF }), MAX);
   const tail = new THREE.InstancedMesh(g, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending }), MAX);
   const Q = new THREE.Quaternion(), YAX = new THREE.Vector3(0, 1, 0), TP = new THREE.Vector3(), TS = new THREE.Vector3();
