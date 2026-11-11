@@ -31,6 +31,44 @@ const Game = (() => {
   function toMenu() { clearWorld(); G.state = 'menu'; G.paused = false; UI.hud(false); UI.hideCard(); buildMenuScene(); UI.show('menu'); UI.fade(false); }
 
   function build(def, opts = {}) {
+    const rh = (!G.headless && !opts.noRehearsal) ? rehearse(def, opts) : null;
+    buildWorld(def, opts);
+    if (!G.headless) Warm.run(rh);
+  }
+  // Play the whole fight once, invisibly, before the real one: a throwaway copy of the arena runs every phase headless
+  // for a while with the autopilot in god mode, so that everything a phase creates on the fly (adds, props, swapped
+  // materials) exists once. Warm.run then draws those objects next to the real arena, which compiles their shaders up
+  // front, and keeps their materials alive so the shaders are not thrown away before the real fight needs them.
+  // The rehearsal uses its own random stream, so seeded runs play out exactly as they would without it.
+  const REHEARSE_SEC = 24, REHEARSE_DT = 1 / 20;
+  function rehearse(def, opts) {
+    const t0 = performance.now(), rng = G.rng, god = G.god, bot = Bot.level, kept = [];
+    G.rng = mulberry(0x5eed); G.god = true; Bot.level = 3; G.headless = true;
+    const known = new Set(); let found = new Map();
+    const mats = (o) => o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    const scan = (root) => root.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) for (const m of mats(o)) if (!known.has(m) && !found.has(m)) found.set(m, o); });
+    try {
+      buildWorld(def, opts);
+      scene.traverse((o) => { for (const m of mats(o)) known.add(m); });
+      G.keepDisposed = kept; // removed objects are kept whole until the warm-up frame has drawn them
+      const b = G.boss, n = def.phases.length;
+      G.state = 'fight';
+      for (let ph = 0; ph < n && G.state === 'fight'; ph++) {
+        G.ft = 0; const floor = () => b.maxHp * (ph + 1 < n ? def.phases[ph + 1].at + 0.005 : 0.02);
+        if (ph === 0) b.goPhase(0); else b.hp = b.maxHp * def.phases[ph].at - 1;
+        for (let k = Math.round(REHEARSE_SEC / REHEARSE_DT); k > 0 && G.state === 'fight' && b.alive; k--) {
+          Bot.update(REHEARSE_DT); G.step(REHEARSE_DT); if (ph > 0 && b.phase < ph) continue; b.hp = Math.max(b.hp, floor());
+        }
+        scan(scene);
+      }
+    } catch (e) { console.warn('rehearsal stopped early', e); }
+    try { G.keepDisposed = kept; clearWorld(); } catch (e) { console.warn(e); }
+    G.keepDisposed = null; G.headless = false; G.rng = rng; G.god = god; Bot.level = bot; G.ft = 0;
+    for (const r of kept) scan(r);
+    G.warmStats = { boss: def.id, rehearsalMs: Math.round(performance.now() - t0), newMaterials: found.size };
+    return { found, kept };
+  }
+  function buildWorld(def, opts = {}) {
     clearWorld(); curDef = def; G.state = 'loading'; G.ft = 0; G.paused = false;
     G.world = new THREE.Group(); scene.add(G.world);
     const cls = opts.cls ? G.classes.find((c) => c.id === opts.cls) : UI.selectedClass();
@@ -46,7 +84,6 @@ const Game = (() => {
     scene.add(p.group); scene.add(p.ring); p.group.position.copy(p.pos); p.group.rotation.y = p.facing;
     Post.set(def.post || {}); Cam.reset(p.facing); if (G.arena.camDist) Cam.tDist = Cam.dist = G.arena.camDist; if (G.arena.camPitch !== undefined) Cam.pitch = G.arena.camPitch; UI.buildHud();
     if (!Save.seen) Save.seen = {}; Save.seen[def.id] = true; saveSave();
-    if (!G.headless) { try { renderer.compile(scene, camera); } catch (e) { /* non-fatal */ } }
   }
   function* runIntro(def, opts) {
     const b = G.boss, p = G.player, A = G.arena;

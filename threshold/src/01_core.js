@@ -271,11 +271,12 @@ addEventListener('resize', () => Post.resize());
 
 // ---------- world lifecycle helpers ----------
 function disposeTree(root) {
+  if (G.keepDisposed) { G.keepDisposed.push(root); return; } // a fight rehearsal is collecting what it threw away (see Game.rehearse)
   root.traverse((o) => {
     if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
     const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
     for (const m of mats) {
-      if (m.userData && m.userData.shared) continue;
+      if (m.userData && (m.userData.shared || m.userData.warmKeep)) continue;
       for (const k in m) { const v = m[k]; if (v && v.isTexture && !v.userData.shared) v.dispose(); }
       if (m.uniforms) for (const k in m.uniforms) { const v = m.uniforms[k].value; if (v && v.isTexture && !v.userData.shared) v.dispose(); }
       m.dispose();

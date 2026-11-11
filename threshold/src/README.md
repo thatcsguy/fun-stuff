@@ -16,7 +16,8 @@ A PC-first 3D raid game: ten unrelated boss fights behind ten doors, two classes
 | `06_combat.js` | `Hz` telegraphed hazards, `Bul` bullets, `Ent` and `Boss` |
 | `07_player.js` | Procedural hero model, `Player` (movement, casting, GCD, buffs, dashes, damage) |
 | `08_classes.js` | The two classes and their autopilot rotations |
-| `09_ui.js`, `10_game.js` | HUD/menus, fight lifecycle, the hall-of-doors menu scene |
+| `09_ui.js`, `10_game.js` | HUD/menus, fight lifecycle (including the hidden rehearsal at load), the hall-of-doors menu scene |
+| `11_warm.js` | Warm-up frame and light keeper that stop shader compiles mid-fight |
 | `2x_boss_*.js` | One file per boss. Adding a file here adds a door. See `BOSS_AUTHORING.md` |
 | `90_bot.js` | Autopilot and the `window.__game` test hooks |
 | `99_tail.js` | Boot and URL parameters |
@@ -45,6 +46,8 @@ Slot order is the same for every class: filler, spender, ultimate, mobility, def
 - `sim.js <boss> <class> <botLevel> [runs] [maxSec] [phase]`: full autopilot attempts.
 - `tank.js <boss> <class> <botLevel> [hpMult]`: one attempt with extra health, totals damage taken per mechanic.
 - `hits.js <boss> <class> <botLevel>`: one attempt, prints every hit taken.
+- `hitch.js <boss>`: plays each phase in real frames and lists every shader compiled after the fight started (should be none).
+- `warmcheck.js [boss...]`: loads fights through the real loading path and prints rehearsal and warm-up times.
 - `shot.js <query> <out.png> [evalJS] [frames]`: screenshot.
 - `nanscan.js [boss ...]`: NaN audit (all doors if no args). Real GPUs turn out-of-domain shader math (`pow` of a negative, `normalize` of zero, ...) into NaN pixels that bloom spreads into black squares; SwiftShader hides most of these. This runs with `?strictmath`, which makes the sandbox return NaN the way a GPU does, plays every phase with both classes, and counts NaN pixels. Should print `ALL CLEAN`; door V (titan) may show an occasional 1-2 pixel hit on a `MeshStandardMaterial` at the screen edge, which comes from three.js's own flat-shading normal and is covered by the math guard below. Anything in the hundreds is a real bug (the Petal Storm bullet bug showed 600-900). `__game.nanScanBy()` names the mesh responsible. `NANSCAN_SAFE=1` runs it without `?strictmath`, to check the guards themselves.
 

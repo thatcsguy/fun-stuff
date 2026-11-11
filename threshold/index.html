@@ -514,11 +514,12 @@ addEventListener('resize', () => Post.resize());
 
 // ---------- world lifecycle helpers ----------
 function disposeTree(root) {
+  if (G.keepDisposed) { G.keepDisposed.push(root); return; } // a fight rehearsal is collecting what it threw away (see Game.rehearse)
   root.traverse((o) => {
     if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
     const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
     for (const m of mats) {
-      if (m.userData && m.userData.shared) continue;
+      if (m.userData && (m.userData.shared || m.userData.warmKeep)) continue;
       for (const k in m) { const v = m[k]; if (v && v.isTexture && !v.userData.shared) v.dispose(); }
       if (m.uniforms) for (const k in m.uniforms) { const v = m.uniforms[k].value; if (v && v.isTexture && !v.userData.shared) v.dispose(); }
       m.dispose();
@@ -1417,6 +1418,7 @@ const Hz = (() => {
     list.push(h); if (!h.silent && delay > 0.25) Sound.sfx('warn', 0.6);
     return h;
   }
+  function warm() { if (!free.length && !list.some((h) => h.mesh)) { const m = getMesh(); m.visible = false; free.push(m); } } // see Warm.run
   function release(h) { if (h.mesh) { h.mesh.visible = false; free.push(h.mesh); h.mesh = null; } h.state = 'done'; }
   function fire(h) {
     const p = G.player, s = h.shape;
@@ -1468,7 +1470,7 @@ const Hz = (() => {
     mark: (shape, dur, o = {}) => add(shape, 0.01, 0, Object.assign({ dur, style: 1, zoneStyle: 1, quiet: true, silent: true }, o)),
     cancel(h) { if (h && h.state !== 'done') release(h); },
     clear(tag) { for (const h of list) if (!tag || h.tag === tag) release(h); },
-    sync: syncMesh,
+    sync: syncMesh, warm,
     // Autopilot query: how soon will (x,z) be hit? Returns seconds until the earliest hit there, or Infinity.
     threat(x, z) { let best = Infinity; for (const h of list) { if (h.state === 'done' || h.state === 'fired' || !h.dmg) continue; if (inShape(h.shape, x, z) === !!h.invert) continue; const t = h.state === 'zone' ? 0 : h.delay - h.t; if (t < best) best = t; } return best; },
     // true when (x,z) sits in a lingering damage zone, armed or still arming
@@ -2200,6 +2202,44 @@ const Game = (() => {
   function toMenu() { clearWorld(); G.state = 'menu'; G.paused = false; UI.hud(false); UI.hideCard(); buildMenuScene(); UI.show('menu'); UI.fade(false); }
 
   function build(def, opts = {}) {
+    const rh = (!G.headless && !opts.noRehearsal) ? rehearse(def, opts) : null;
+    buildWorld(def, opts);
+    if (!G.headless) Warm.run(rh);
+  }
+  // Play the whole fight once, invisibly, before the real one: a throwaway copy of the arena runs every phase headless
+  // for a while with the autopilot in god mode, so that everything a phase creates on the fly (adds, props, swapped
+  // materials) exists once. Warm.run then draws those objects next to the real arena, which compiles their shaders up
+  // front, and keeps their materials alive so the shaders are not thrown away before the real fight needs them.
+  // The rehearsal uses its own random stream, so seeded runs play out exactly as they would without it.
+  const REHEARSE_SEC = 24, REHEARSE_DT = 1 / 20;
+  function rehearse(def, opts) {
+    const t0 = performance.now(), rng = G.rng, god = G.god, bot = Bot.level, kept = [];
+    G.rng = mulberry(0x5eed); G.god = true; Bot.level = 3; G.headless = true;
+    const known = new Set(); let found = new Map();
+    const mats = (o) => o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+    const scan = (root) => root.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) for (const m of mats(o)) if (!known.has(m) && !found.has(m)) found.set(m, o); });
+    try {
+      buildWorld(def, opts);
+      scene.traverse((o) => { for (const m of mats(o)) known.add(m); });
+      G.keepDisposed = kept; // removed objects are kept whole until the warm-up frame has drawn them
+      const b = G.boss, n = def.phases.length;
+      G.state = 'fight';
+      for (let ph = 0; ph < n && G.state === 'fight'; ph++) {
+        G.ft = 0; const floor = () => b.maxHp * (ph + 1 < n ? def.phases[ph + 1].at + 0.005 : 0.02);
+        if (ph === 0) b.goPhase(0); else b.hp = b.maxHp * def.phases[ph].at - 1;
+        for (let k = Math.round(REHEARSE_SEC / REHEARSE_DT); k > 0 && G.state === 'fight' && b.alive; k--) {
+          Bot.update(REHEARSE_DT); G.step(REHEARSE_DT); if (ph > 0 && b.phase < ph) continue; b.hp = Math.max(b.hp, floor());
+        }
+        scan(scene);
+      }
+    } catch (e) { console.warn('rehearsal stopped early', e); }
+    try { G.keepDisposed = kept; clearWorld(); } catch (e) { console.warn(e); }
+    G.keepDisposed = null; G.headless = false; G.rng = rng; G.god = god; Bot.level = bot; G.ft = 0;
+    for (const r of kept) scan(r);
+    G.warmStats = { boss: def.id, rehearsalMs: Math.round(performance.now() - t0), newMaterials: found.size };
+    return { found, kept };
+  }
+  function buildWorld(def, opts = {}) {
     clearWorld(); curDef = def; G.state = 'loading'; G.ft = 0; G.paused = false;
     G.world = new THREE.Group(); scene.add(G.world);
     const cls = opts.cls ? G.classes.find((c) => c.id === opts.cls) : UI.selectedClass();
@@ -2215,7 +2255,6 @@ const Game = (() => {
     scene.add(p.group); scene.add(p.ring); p.group.position.copy(p.pos); p.group.rotation.y = p.facing;
     Post.set(def.post || {}); Cam.reset(p.facing); if (G.arena.camDist) Cam.tDist = Cam.dist = G.arena.camDist; if (G.arena.camPitch !== undefined) Cam.pitch = G.arena.camPitch; UI.buildHud();
     if (!Save.seen) Save.seen = {}; Save.seen[def.id] = true; saveSave();
-    if (!G.headless) { try { renderer.compile(scene, camera); } catch (e) { /* non-fatal */ } }
   }
   function* runIntro(def, opts) {
     const b = G.boss, p = G.player, A = G.arena;
@@ -2299,6 +2338,113 @@ const Game = (() => {
   };
   let skipIntro = false;
   return { start(id, opts = {}) { lastOpts = opts; start(id, opts); }, restart, quit, pause, toMenu, onPlayerDead, onBossDead, get def() { return curDef; }, get tries() { return tries; } };
+})();
+
+// ==== 11_warm.js ====
+// Warm-up: make a fight's first phase transition as smooth as its first second.
+// Three things used to compile shaders mid-fight, which on a real GPU means a multi-second freeze:
+//  1. Objects that start hidden (pooled effects, later-phase props, adds) were never drawn before they first appeared,
+//     so their shaders, shadow-depth shaders and textures were built on that frame.
+//  2. Camera-occluder fading flips materials to transparent, a different shader variant.
+//  3. three.js bakes the NUMBER of each kind of light into every lit shader. A phase that showed or hid a light changed
+//     that number and recompiled every lit material in the arena at once.
+// Warm.run() (called at the end of Game.build, under the black loading fade) draws one frame with everything visible
+// and unculled, so every shader and texture is ready. The light keeper then pads the scene with zero-intensity dummy
+// lights each frame so the per-kind light counts never change during the fight, whatever the boss shows or hides.
+const Warm = (() => {
+  const FAR = -5000, SPARE_POINT = 6; let need = {}; const dummies = {};
+  const kindOf = (L) => L.type + (L.castShadow ? '+s' : '') + (L.map ? '+m' : '');
+  function count(all) {
+    const c = {};
+    const f = (o) => { if (o.isLight && !o.isAmbientLight && !o.userData.warmDummy) { const k = kindOf(o); c[k] = (c[k] || 0) + 1; } };
+    if (all) scene.traverse(f); else scene.traverseVisible(f);
+    return c;
+  }
+  function makeDummy(k) {
+    const [type, ...flags] = k.split('+'), shadow = flags.includes('s');
+    let L;
+    if (type === 'PointLight') L = new THREE.PointLight(0x000000, 0, 0.001);
+    else if (type === 'SpotLight') L = new THREE.SpotLight(0x000000, 0, 0.001, 0.01);
+    else if (type === 'DirectionalLight') L = new THREE.DirectionalLight(0x000000, 0);
+    else if (type === 'HemisphereLight') L = new THREE.HemisphereLight(0x000000, 0x000000, 0);
+    else if (type === 'RectAreaLight') L = new THREE.RectAreaLight(0x000000, 0, 0.001, 0.001);
+    else return null;
+    L.userData.warmDummy = true; L.position.set(0, FAR, 0);
+    if (L.target) { L.target.position.set(0, FAR - 1, 0); scene.add(L.target); }
+    if (shadow && L.shadow) {
+      // a shadow map is required to keep the shadow count stable, but its camera sees nothing, so it costs almost nothing
+      L.castShadow = true; L.shadow.mapSize.set(16, 16); const c = L.shadow.camera;
+      if (c.isOrthographicCamera) { c.left = c.bottom = -0.01; c.right = c.top = 0.01; }
+      c.near = 0.001; c.far = 0.002; c.updateProjectionMatrix();
+    }
+    if (flags.includes('m') && type === 'SpotLight') L.map = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+    scene.add(L); return L;
+  }
+  // Show exactly enough dummies of each kind that the visible count of every kind equals the fight's maximum.
+  function keep() {
+    const c = count(false);
+    for (const k in c) if (c[k] > (need[k] || 0)) need[k] = c[k]; // a light nobody saw at build time: one recompile, then stable
+    for (const k in dummies) if (!(k in need)) need[k] = 0;
+    for (const k in need) {
+      const want = need[k] - (c[k] || 0), arr = dummies[k] || (dummies[k] = []);
+      while (arr.length < want) { const d = makeDummy(k); if (!d) break; arr.push(d); }
+      for (let i = 0; i < arr.length; i++) arr[i].visible = i < want;
+    }
+  }
+  let retained = [];
+  const matsOf = (o) => o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+  function freeMaterial(m) {
+    delete m.userData.warmKeep; if (m.userData.shared) return;
+    for (const k in m) { const v = m[k]; if (v && v.isTexture && !v.userData.shared) v.dispose(); }
+    if (m.uniforms) for (const k in m.uniforms) { const v = m.uniforms[k].value; if (v && v.isTexture && !v.userData.shared) v.dispose(); }
+    m.dispose();
+  }
+  // rh: what Game.rehearse found ({found: Map(material -> object it was on), kept: removed roots}), or null.
+  function run(rh) {
+    const t0 = performance.now();
+    need = count(true); // every light in the arena, shown or not, is the target count for the whole fight
+    // adds (choristers, drones, geodes) bring their own small point lights mid-fight: keep headroom for them
+    need.PointLight = (need.PointLight || 0) + SPARE_POINT;
+    Hz.warm(); // one telegraph decal, so the first telegraph does not compile its shader
+    // stand-ins for everything the rehearsal created: same object type, geometry and material, drawn once beside the arena
+    const holder = new THREE.Group(); holder.name = 'warm';
+    if (rh) for (const [m, o] of rh.found) { let c; try { c = o.clone(false); } catch (e) { continue; } c.position.set(0, 0, 0); holder.add(c); }
+    scene.add(holder);
+    const shown = [], unculled = [];
+    scene.traverse((o) => {
+      if (!o.visible) { o.visible = true; shown.push(o); }
+      if (o.frustumCulled && (o.isMesh || o.isPoints || o.isLine || o.isSprite)) { o.frustumCulled = false; unculled.push(o); }
+    });
+    keep();
+    // three.js only compiles and uploads when it draws, so draw a real frame (scene, shadows, bloom, grade) under the loading fade
+    const was = renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate = true; renderer.shadowMap.needsUpdate = true;
+    try {
+      Post.composer.render();
+      // camera-occluder fading (Cam.fadeOccluders) switches those materials to transparent, which is another shader
+      // variant: draw a second frame with them see-through so that variant is ready too (three keeps both per material)
+      const fm = new Set(); scene.traverse((o) => { if (o.isMesh && o.userData.fadeOcclude) for (const m of matsOf(o)) if (!m.transparent) fm.add(m); });
+      if (fm.size) {
+        const dw = new Map(); for (const m of fm) { dw.set(m, m.depthWrite); m.transparent = true; m.depthWrite = false; m.needsUpdate = true; }
+        try { Post.composer.render(); } finally { for (const m of fm) { m.transparent = false; m.depthWrite = dw.get(m); m.needsUpdate = true; } }
+      }
+    } catch (e) { reportError(e); }
+    finally {
+      renderer.shadowMap.autoUpdate = was;
+      for (const o of shown) o.visible = false; for (const o of unculled) o.frustumCulled = true;
+      scene.remove(holder);
+      // the rehearsal's materials hold the compiled shaders until the next fight is warmed; everything else it made goes now
+      const old = retained; retained = [];
+      if (rh) {
+        for (const m of rh.found.keys()) if (!m.userData.shared) { m.userData.warmKeep = true; retained.push(m); }
+        for (const r of rh.kept) disposeTree(r);
+      }
+      for (const m of old) freeMaterial(m);
+      keep();
+    }
+    if (G.warmStats) G.warmStats.warmMs = Math.round(performance.now() - t0);
+  }
+  Hooks.frame.push((rdt, stage) => { if (stage === 1 && !G.headless) keep(); });
+  return { run, keep, get need() { return need; } };
 })();
 
 // ==== 20_boss_cathedral.js ====
@@ -7474,7 +7620,7 @@ const Bot = {
 };
 
 window.__game = {
-  G, Game, Bot, Hz, Bul, FX, Cam,
+  G, Game, Bot, Hz, Bul, FX, Cam, renderer, scene, camera,
   start(id, opts = {}) { Game.start(id, Object.assign({ instant: true }, opts)); },
   bot(n) { Bot.level = n; },
   god(on = true) { G.god = on; },
