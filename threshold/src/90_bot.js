@@ -50,7 +50,7 @@ const Bot = {
 };
 
 window.__game = {
-  G, Game, Bot, Hz, Bul, FX, Cam,
+  G, Game, Bot, Hz, Bul, FX, Cam, renderer, scene, camera,
   start(id, opts = {}) { Game.start(id, Object.assign({ instant: true }, opts)); },
   bot(n) { Bot.level = n; },
   god(on = true) { G.god = on; },

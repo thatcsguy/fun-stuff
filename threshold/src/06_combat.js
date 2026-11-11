@@ -72,6 +72,7 @@ const Hz = (() => {
     list.push(h); if (!h.silent && delay > 0.25) Sound.sfx('warn', 0.6);
     return h;
   }
+  function warm() { if (!free.length && !list.some((h) => h.mesh)) { const m = getMesh(); m.visible = false; free.push(m); } } // see Warm.run
   function release(h) { if (h.mesh) { h.mesh.visible = false; free.push(h.mesh); h.mesh = null; } h.state = 'done'; }
   function fire(h) {
     const p = G.player, s = h.shape;
@@ -123,7 +124,7 @@ const Hz = (() => {
     mark: (shape, dur, o = {}) => add(shape, 0.01, 0, Object.assign({ dur, style: 1, zoneStyle: 1, quiet: true, silent: true }, o)),
     cancel(h) { if (h && h.state !== 'done') release(h); },
     clear(tag) { for (const h of list) if (!tag || h.tag === tag) release(h); },
-    sync: syncMesh,
+    sync: syncMesh, warm,
     // Autopilot query: how soon will (x,z) be hit? Returns seconds until the earliest hit there, or Infinity.
     threat(x, z) { let best = Infinity; for (const h of list) { if (h.state === 'done' || h.state === 'fired' || !h.dmg) continue; if (inShape(h.shape, x, z) === !!h.invert) continue; const t = h.state === 'zone' ? 0 : h.delay - h.t; if (t < best) best = t; } return best; },
     // true when (x,z) sits in a lingering damage zone, armed or still arming

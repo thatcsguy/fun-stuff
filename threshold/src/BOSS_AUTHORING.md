@@ -78,6 +78,14 @@ Options: `name`, `color`, `blockable` (false means Riposte and Aegis cannot stop
 - `Cam.shot(posFrom, lookFrom, posTo, lookTo, seconds, fov)` for cinematics, then control returns to the player.
 - Music is a 16-step sequencer: each layer is `{ v: voice, pat: 'x...x...' or note digits, from: phaseIndex, to, oct, len, vol }`. Layers with `from: 1` join in phase two, and so on. Voices: kick snare hat tom taiko clap bass sub pad arp lead organ bell choir koto flute brass pulse.
 
+## Loading and hitches (`11_warm.js`, `Game.rehearse`)
+
+Starting a fight builds the arena, then plays every phase once, invisibly and headless, on a throwaway copy (god mode, autopilot, its own random stream), then draws one hidden frame with every object visible so all shaders and textures are ready before the fade lifts. A light keeper pads the scene with zero-intensity dummy lights so the number of each kind of light never changes mid-fight (three.js recompiles every lit material when it does). What this means for a boss file:
+
+- Show and hide lights freely, but build them all in `build()`. Lights made mid-fight (on adds) share a spare pool of 6 point lights; a shadow-casting light created mid-fight will recompile everything once.
+- Anything a phase creates (adds, props, swapped materials) is picked up by the rehearsal, as long as the phase reaches it within about 24 s of autopilot play. Make rare one-off objects in `build()` and hide them instead.
+- Check with `node tools/hitch.js <id>`: it plays each phase in real frames and lists every shader compiled after the fight started. Aim for none.
+
 ## Before shipping a boss
 
 1. `node tools/smoke.js <id>` must report `err=[]` for every phase and both classes.
@@ -85,3 +93,4 @@ Options: `name`, `color`, `blockable` (false means Riposte and Aegis cannot stop
 3. Take screenshots of each phase with `tools/shot.js "boss=<id>&skipintro=1&god=1&bot=3&phase=N"`.
 4. Check both classes can do the fight: the caster needs moments to stand still, the melee needs the boss reachable.
 5. `node tools/nanscan.js <id>` must print `ALL CLEAN`. A NaN pixel is invisible in the sandbox but shows as black squares on a real GPU (see README, Shader safety).
+6. `node tools/hitch.js <id>` lists no shader compiles after the fight starts.
