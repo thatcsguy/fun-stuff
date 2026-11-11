@@ -36,6 +36,8 @@ Slot order is the same for every class: filler, spender, ultimate, mobility, def
 
 `?boss=cathedral|leviathan|duelist|engine|titan|gorgon|theatre|wheel|express|winter|chess`, `&class=duskblade|stormcaller`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`, `&strictmath` (testing only: out-of-domain shader math returns NaN and NaN pixels show bright magenta).
 
+Doors XVI to XX use the ids `pit`.
+
 ## Test hooks
 
 `window.__game`: `start(id, {cls, phase})`, `bot(level)`, `god(on)`, `state()`, `fastForward(seconds)` (runs the sim without rendering), `setPhase(n)`, `hurtBoss(frac)`, `kill()`, plus `G`, `Game`, `Bot`, `Hz`, `Bul`, `FX`, `Cam`. Set `G.headless = true` before long `fastForward` runs to skip cosmetic effects.
@@ -49,6 +51,7 @@ Slot order is the same for every class: filler, spender, ultimate, mobility, def
 - `hitch.js <boss>`: plays each phase in real frames and lists every shader compiled after the fight started (should be none).
 - `warmcheck.js [boss...]`: loads fights through the real loading path and prints rehearsal and warm-up times.
 - `shot.js <query> <out.png> [evalJS] [frames]`: screenshot.
+- `diag.js <boss> <class> <expr> <seconds> [phase]`: autopilot run that prints `expr` (JS with `g, G, b, p, S` in scope) every half second, for tracing a mechanic.
 - `nanscan.js [boss ...]`: NaN audit (all doors if no args). Real GPUs turn out-of-domain shader math (`pow` of a negative, `normalize` of zero, ...) into NaN pixels that bloom spreads into black squares; SwiftShader hides most of these. This runs with `?strictmath`, which makes the sandbox return NaN the way a GPU does, plays every phase with both classes, and counts NaN pixels. Should print `ALL CLEAN`; door V (titan) may show an occasional 1-2 pixel hit on a `MeshStandardMaterial` at the screen edge, which comes from three.js's own flat-shading normal and is covered by the math guard below. Anything in the hundreds is a real bug (the Petal Storm bullet bug showed 600-900). `__game.nanScanBy()` names the mesh responsible. `NANSCAN_SAFE=1` runs it without `?strictmath`, to check the guards themselves.
 
 Run them with `NODE_PATH=<global node_modules with playwright> THREE_DIR=<unpacked three@0.170.0 package> node tools/smoke.js titan`.
