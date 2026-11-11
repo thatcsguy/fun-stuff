@@ -1,6 +1,6 @@
 # Adding a boss
 
-A boss is one file, `src/NN_boss_<id>.js` (use the next free number in the 20s), wrapped in an IIFE that ends with `G.bosses.push({...})`. Run `./build.sh` and a new door appears in the menu. Nothing else needs to change. `20_boss_cathedral.js` is the best file to copy from; `24_boss_titan.js` shows a non-standard arena (ring floor around a giant boss) and `23_boss_engine.js` a floor that falls away.
+A boss is one file, `src/NN_boss_<id>.js` (use the next free two-digit number below 90; files load in filename order, which is also door order), wrapped in an IIFE that ends with `G.bosses.push({...})`. Run `./build.sh` and a new door appears in the menu. Nothing else needs to change. `20_boss_cathedral.js` is the best file to copy from; `24_boss_titan.js` shows a non-standard arena (ring floor around a giant boss) and `23_boss_engine.js` a floor that falls away.
 
 House rules for these fights:
 

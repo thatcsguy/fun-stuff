@@ -1,7 +1,7 @@
 // UI: menu, HUD, screens, settings, gamepad/keyboard menu navigation.
 const UI = (() => {
   const el = { hud: $('#hud'), menu: $('#menu'), pause: $('#pause'), death: $('#death'), victory: $('#victory'), settings: $('#settings'), fade: $('#fade'), card: $('#title-card'), hurt: $('#hurtv'), hint: $('#hint'), dbg: $('#dbg') };
-  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
   const svg = (name, color) => `<svg viewBox="0 0 24 24"><path d="${ICON[name]}" fill="${color}" fill-rule="evenodd"/></svg>`;
   const fmtT = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
   let slots = [], cur = null, settingsFrom = 'menu', focusI = -1, hurtA = 0;
