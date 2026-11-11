@@ -203,7 +203,7 @@
       pl.prints[k].forEach((q) => {
         const wet = k + 1 < n && side(pl.creases[k + 1], q.x, q.z) < 0, m = putBlot(S, wet ? S.flaps[k + 1] : null, q);
         if (m) { if (wet) stay.push(m); else S.prints.push({ m, t: 2.6 }); }
-        if (!G.headless) FX.burst(q.x, 0.2, q.z, { n: 18, color: 0x1a2050, color2: 0x000000, speed: [2, 8], life: [0.3, 0.8], size: [0.2, 0.6], radius: q.bar ? 2 : q.r * 0.7, add: false });
+        if (!G.headless) FX.burst(q.x, 0.2, q.z, { n: 18, color: 0x1a2050, color2: 0x000000, speed: [2, 8], life: [0.3, 0.8], size: [0.2, 0.6], radius: q.bar ? 2 : q.r * 0.7, smoke: true });
       });
       if (k + 1 < n) S.flaps[k + 1].blots = S.flaps[k + 1].blots.concat(stay);
       if (p.alive && pl.prints[k].some((e) => inBlot(e, p.pos.x, p.pos.z))) p.hurt(380, { blockable: true, src: { name: 'Wet Ink' } });
@@ -226,7 +226,7 @@
     const S = b.state; if (S.form === to) return; const cur = S.rigs[S.form], nx = S.rigs[to];
     Sound.sfx('slash', 0.8, 1.6); for (let t = 0; t < 0.3; t += G.dt) { const k = 1 - t / 0.3; cur.scale.set(k, Math.max(0.03, k * k), k); cur.rotation.y += G.dt * 14; yield; }
     cur.visible = false; cur.scale.setScalar(1); cur.rotation.y = 0; nx.visible = true; S.form = to; S.seal.visible = false;
-    if (!G.headless) FX.burst(b.pos.x, 2.5, b.pos.z, { n: 40, color: 0xffffff, color2: 0xf0e8d8, speed: [2, 9], life: [0.5, 1.2], size: [0.2, 0.5], add: false });
+    if (!G.headless) FX.burst(b.pos.x, 2.5, b.pos.z, { n: 40, color: 0xffffff, color2: 0xf0e8d8, speed: [2, 9], life: [0.5, 1.2], size: [0.2, 0.5], smoke: true });
     for (const s of S.segs) s.visible = to === 'dragon'; if (to === 'dragon') S.hist.length = 0;
     for (let t = 0; t < 0.3; t += G.dt) { const k = t / 0.3; nx.scale.set(k, k * k, k); nx.rotation.y = (1 - k) * 4; yield; }
     nx.scale.setScalar(1); nx.rotation.y = 0; Sound.sfx('clap', 0.8);

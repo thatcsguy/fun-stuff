@@ -128,12 +128,12 @@
     if (S.lvl === 0) { const o = shuffle([[1, 14], [-1, 14], [1, -14], [-1, -14]]).find((q) => Math.hypot(q[0] - b.pos.x, q[1] - b.pos.z) > 4); x = o[0]; z = o[1]; }
     else { const c = pick(alive), a = Math.atan2(c.x, c.z) + pick([-0.45, 0.45]); x = Math.sin(a) * 12.5; z = Math.cos(a) * 12.5; }
     const r = yield* b.cast({ name: 'Shadowstep', time: 0.7 }); if (r !== 'done') return;
-    if (!G.headless) { FX.burst(b.pos.x, 2.5, b.pos.z, { n: 40, color: 0x0a0810, color2: 0x302840, speed: [1, 5], life: [0.5, 1.2], size: [0.4, 0.9], add: false }); FX.burst(x, 2.5, z, { n: 30, color: 0x0a0810, color2: 0x302840, speed: [1, 4], life: [0.4, 1.0], size: [0.4, 0.9], add: false }); }
+    if (!G.headless) { FX.burst(b.pos.x, 2.5, b.pos.z, { n: 40, color: 0x0a0810, color2: 0x302840, speed: [1, 5], life: [0.5, 1.2], size: [0.4, 0.9], smoke: true }); FX.burst(x, 2.5, z, { n: 30, color: 0x0a0810, color2: 0x302840, speed: [1, 4], life: [0.4, 1.0], size: [0.4, 0.9], smoke: true }); }
     Sound.sfx('blink', 0.8, 0.5); b.pos.x = x; b.pos.z = z; yield 0.5;
   }
   function topple(b, c, delay = 1.7) {
     const S = b.state, dir = Math.atan2(-c.x, -c.z) + rnd(-0.5, 0.5);
-    Hz.rect(c.x, c.z, dir, COLH + 1.5, 2.6, delay, 320, { name: 'Falling Column', tag: 'fight', onFire() { c.alive = false; c.rubble = true; c.fall = 0.001; c.dir = dir; Sound.sfx('bigboom', 1, 0.7); Sound.sfx('shatter', 0.8, 0.5); FX.shake(0.9); if (!G.headless) FX.burst(c.x + Math.sin(dir) * 4, 0.5, c.z + Math.cos(dir) * 4, { n: 40, color: 0xd8d0c4, speed: [2, 9], life: [0.4, 1.2], size: [0.2, 0.7], radius: 3, add: false }); } });
+    Hz.rect(c.x, c.z, dir, COLH + 1.5, 2.6, delay, 320, { name: 'Falling Column', tag: 'fight', onFire() { c.alive = false; c.rubble = true; c.fall = 0.001; c.dir = dir; Sound.sfx('bigboom', 1, 0.7); Sound.sfx('shatter', 0.8, 0.5); FX.shake(0.9); if (!G.headless) FX.burst(c.x + Math.sin(dir) * 4, 0.5, c.z + Math.cos(dir) * 4, { n: 40, color: 0xd8d0c4, speed: [2, 9], life: [0.4, 1.2], size: [0.2, 0.7], radius: 3, smoke: true }); } });
   }
   function spawnShade(b, c) {
     const S = b.state, grp = new THREE.Group(), body = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.2, 8), W.mat({ color: 0x08070a, roughness: 1 })); body.position.y = 1.1; body.castShadow = true; grp.add(body);
@@ -254,12 +254,12 @@
       if (S.walk && fight && p && p.alive && !b.castState) { const d = b.distToPlayer(); if (d > 4.5) { const a = b.angToPlayer(); b.pos.x += Math.sin(a) * 2.3 * dt; b.pos.z += Math.cos(a) * 2.3 * dt; G.arena.solid(b.pos); } }
       if (!p) return;
       const bl = S.carried || litBy(S, S.lamp, b.pos.x, b.pos.z, 0); b.dmgTaken = bl ? 1 : 0.5;
-      if (!bl && !G.headless && vrand() < dt * 10) FX.burst(b.pos.x, 2 + vrand() * 3, b.pos.z, { n: 1, color: 0x08070c, speed: [0.2, 1], up: 1.5, life: [0.5, 1.1], size: [0.5, 1.0], add: false });
+      if (!bl && !G.headless && vrand() < dt * 10) FX.burst(b.pos.x, 2 + vrand() * 3, b.pos.z, { n: 1, color: 0x08070c, speed: [0.2, 1], up: 1.5, life: [0.5, 1.1], size: [0.5, 1.0], smoke: true });
       // the dark bites
       const L = lit(S, p.pos.x, p.pos.z);
       if (fight && p.alive && !L && !b.transitioning) {
         S.darkT += dt;
-        if (S.darkT > 0.6) { p.speedMul = 0.75; S.biteT -= dt; if (S.biteT <= 0) { S.biteT = 0.5; p.hurt(Math.min(130, 45 + S.bites * 14), { blockable: false, dot: true, src: { name: 'The Dark' } }); S.bites++; if (!G.headless) FX.burst(p.pos.x, 0.3, p.pos.z, { n: 10, color: 0x06050a, color2: 0x282038, speed: [1, 4], up: 3, life: [0.3, 0.7], size: [0.3, 0.7], radius: 0.8, add: false }); } }
+        if (S.darkT > 0.6) { p.speedMul = 0.75; S.biteT -= dt; if (S.biteT <= 0) { S.biteT = 0.5; p.hurt(Math.min(130, 45 + S.bites * 14), { blockable: false, dot: true, src: { name: 'The Dark' } }); S.bites++; if (!G.headless) FX.burst(p.pos.x, 0.3, p.pos.z, { n: 10, color: 0x06050a, color2: 0x282038, speed: [1, 4], up: 3, life: [0.3, 0.7], size: [0.3, 0.7], radius: 0.8, smoke: true }); } }
       } else { p.speedMul = 1; S.darkT = Math.max(0, S.darkT - dt * 2); if (S.darkT === 0) { S.bites = 0; S.biteT = 0; } }
       // eyes open in the dark near you
       if (!G.headless) { let n = 0; const slot = Math.floor(t / 1.7);
