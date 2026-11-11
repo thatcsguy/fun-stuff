@@ -1,6 +1,6 @@
 # THRESHOLD: sources
 
-A PC-first 3D raid game: ten unrelated boss fights behind ten doors, two classes, no progression.
+A PC-first 3D raid game: unrelated boss fights, one behind each door, two classes, no progression.
 `threshold/index.html` is **generated**. Edit the files in this folder and run `./build.sh`; never hand-edit `index.html`.
 
 ## Layout
@@ -18,7 +18,7 @@ A PC-first 3D raid game: ten unrelated boss fights behind ten doors, two classes
 | `08_classes.js` | The two classes and their autopilot rotations |
 | `09_ui.js`, `10_game.js` | HUD/menus, fight lifecycle (including the hidden rehearsal at load), the hall-of-doors menu scene |
 | `11_warm.js` | Warm-up frame and light keeper that stop shader compiles mid-fight |
-| `2x_boss_*.js` | One file per boss. Adding a file here adds a door. See `BOSS_AUTHORING.md` |
+| `2x_boss_*.js`, `3x_boss_*.js` | One file per boss. Adding a file here adds a door. See `BOSS_AUTHORING.md` |
 | `90_bot.js` | Autopilot and the `window.__game` test hooks |
 | `99_tail.js` | Boot and URL parameters |
 
@@ -34,7 +34,7 @@ Slot order is the same for every class: filler, spender, ultimate, mobility, def
 
 ## URL parameters
 
-`?boss=cathedral|leviathan|duelist|engine|titan|gorgon|theatre|wheel|express|winter`, `&class=duskblade|stormcaller`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`, `&strictmath` (testing only: out-of-domain shader math returns NaN and NaN pixels show bright magenta).
+`?boss=cathedral|leviathan|duelist|engine|titan|gorgon|theatre|wheel|express|winter|chess`, `&class=duskblade|stormcaller`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`, `&strictmath` (testing only: out-of-domain shader math returns NaN and NaN pixels show bright magenta).
 
 ## Test hooks
 
