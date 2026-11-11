@@ -5675,18 +5675,31 @@ const Game = (() => {
 })();
 
 // ==== 25_boss_gorgon.js ====
-// DOOR VI: EURYALE, the Stone Garden. A moonlit terrace full of her victims. The fight is decided by what is on your screen.
+// DOOR VI: EURYALE, the Stone Garden. A moonlit terrace full of her victims. The fight is decided by which way your character is facing.
 (() => {
   const R = 18, VEN = 0x8dff7a, PALE = 0xd8ffd0, PED_R = 16.4, NPED = 10, MIR_R = 16.5;
   const _v = new V3(), _a = new V3(), _b2 = new V3(), _m = new THREE.Object3D();
 
-  // What the player can see. For a human it is the real camera frustum; the autopilot has a virtual gaze (S.botYaw).
+  // What the player can see: a 90 degree horizontal cone from the way the CHARACTER faces. The camera, the window shape
+  // and height play no part. Hold right mouse to face where the camera looks, or just move: you face the way you run.
+  // The autopilot cannot steer, so it keeps a virtual gaze (S.botYaw) with the same cone.
+  const VIS_HALF = PI / 4, VIS_NEAR = 1.5;
   function seen(S, x, y, z) {
-    const p = G.player;
-    if (G.headless || Bot.level) return Math.hypot(x - p.pos.x, z - p.pos.z) < 1.5 || Math.abs(angDiff(S.botYaw, angTo(p.pos.x, p.pos.z, x, z))) < 0.8;
-    if (Cam.cineW > 0.5) return true;
-    _v.set(x, y, z).project(camera);
-    return _v.z < 1 && Math.abs(_v.x) < 0.97 && Math.abs(_v.y) < 0.97;
+    const p = G.player, bot = G.headless || Bot.level;
+    if (!bot && Cam.cineW > 0.5) return true;
+    if (Math.hypot(x - p.pos.x, z - p.pos.z) < VIS_NEAR) return true;
+    return Math.abs(angDiff(bot ? S.botYaw : p.facing, angTo(p.pos.x, p.pos.z, x, z))) < VIS_HALF;
+  }
+  // A faint wedge on the floor at the player's feet showing exactly that cone.
+  function visionWedge() {
+    const N = 24, RAD = 9, pos = [0, 0, 0], col = [1, 1, 1], idx = [];
+    for (let i = 0; i <= N; i++) { const a = -VIS_HALF + i / N * VIS_HALF * 2; pos.push(Math.sin(a) * RAD, 0, Math.cos(a) * RAD); col.push(0, 0, 0); if (i) idx.push(0, i, i + 1); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setIndex(idx);
+    const fill = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: PALE, vertexColors: true, transparent: true, opacity: 0.1, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
+    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute([Math.sin(-VIS_HALF) * RAD, 0, Math.cos(-VIS_HALF) * RAD, 0, 0, 0, 0, 0, 0, Math.sin(VIS_HALF) * RAD, 0, Math.cos(VIS_HALF) * RAD], 3)); lg.setAttribute('color', new THREE.Float32BufferAttribute([0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0], 3));
+    const edge = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: PALE, vertexColors: true, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    const g = new THREE.Group(); g.add(fill, edge); fill.renderOrder = edge.renderOrder = 8; fill.frustumCulled = edge.frustumCulled = false; g.visible = false;
+    return { g, fill, edge, k: 0 };
   }
 
   function statueMesh(awake, seed) {
@@ -5841,6 +5854,7 @@ const Game = (() => {
       S.arms.push({ sh, el, sx });
     }
     S.headL = new THREE.PointLight(VEN, 0, 40, 1.5); S.headL.position.set(0, 5.6, 0.8); S.up.add(S.headL);
+    S.vis = visionWedge(); g.add(S.vis.g);
     S.gaze = 0; S.stoneT = 0; S.statSpeed = 2.7; S.botYaw = PI; S.nMir = 0; S.rear = 0; S.slashT = 0; S.grind = 0; S.seedN = 20; S.mode = 0;
     return {
       edge: 'wall', spawn: { x: 0, z: 13 }, bossStart: { x: 0, z: -3, face: 0 },
@@ -6034,6 +6048,12 @@ const Game = (() => {
       if (G.headless) return;
       Post.final.uniforms.uSat.value = Post.cur.sat * (1 - 0.92 * sat(S.stoneT / 0.5));
       for (const q of S.ped) if (q.rise > 0) { q.rise = Math.max(0, q.rise - dt * 0.6); q.mesh.position.y = 0.5 - q.rise * 2.6; }
+      // vision wedge: follows the character's facing, brightens during a stare and turns venom green while a face is inside it
+      { const V = S.vis, show = p.alive && G.state === 'fight' && Cam.cineW < 0.5; V.g.visible = show;
+        if (show) { V.g.position.set(p.pos.x, p.pos.y + 0.06, p.pos.z); V.g.rotation.y = p.facing;
+          const danger = S.gaze > 0 && sources(b).some((q) => seen(S, q.x, q.y, q.z)); V.k = damp(V.k, danger ? 1 : 0, 14, dt);
+          const c = V.fill.material.color.setHex(PALE).lerp(_c.setHex(VEN), V.k).multiplyScalar(1 + V.k * 1.5); V.edge.material.color.copy(c);
+          V.fill.material.opacity = 0.1 + S.gaze * 0.1 + V.k * 0.12; V.edge.material.opacity = 0.35 + S.gaze * 0.25 + V.k * 0.3; } }
       // body
       const gz = S.gaze, rear = damp(S.rearK || 0, Math.max(S.rear, gz > 0 ? 1 : 0), 5, dt); S.rearK = rear;
       S.up.position.y = Math.sin(t * 1.3) * 0.12 + rear * 0.7; S.up.rotation.x = -rear * 0.12 + Math.sin(t * 0.9) * 0.03; S.up.rotation.z = Math.sin(t * 0.7) * 0.05;
@@ -6075,7 +6095,7 @@ const Game = (() => {
       return h;
     },
   });
-  const _q = new THREE.Quaternion();
+  const _q = new THREE.Quaternion(); const _c = new THREE.Color();
 })();
 
 // ==== 26_boss_theatre.js ====
