@@ -81,9 +81,14 @@ function buildHero(cls) {
       else { rx = lerp(rx, -1.7, f); lx = lerp(lx, -1.7, f); re = -0.1; le = -0.1; body.rotation.x += f * 0.2; }
       re = lerp(re, -0.15, f);
     }
+    if (p.pose === 'fall') { // skydiving: belly down, limbs spread
+      body.rotation.x = 1.28 + Math.sin(G.now * 2.3) * 0.05 + A.lean * 0.12; body.position.set(0, 0.75, -0.95); body.rotation.z = Math.sin(G.now * 1.7) * 0.05;
+      legL.hip.rotation.x = 0.25 + Math.sin(G.now * 5) * 0.05; legR.hip.rotation.x = 0.25 - Math.sin(G.now * 5) * 0.05; legL.knee.rotation.x = legR.knee.rotation.x = 0.7;
+      if (A.swing <= 0 && A.cast < 0.05 && A.guard < 0.05) { lx = -2.3; rx = -2.3; lz = 0.75; rz = -0.75; le = re = -0.5; }
+    }
     armL.sh.rotation.set(lx, 0, lz); armR.sh.rotation.set(rx, 0, rz); armL.el.rotation.x = le; armR.el.rotation.x = re;
     const flap = moving ? 0.5 + Math.sin(G.now * 9) * 0.12 : 0.08 + Math.sin(G.now * 1.3) * 0.03;
-    for (let i = 0; i < cloak.length; i++) cloak[i].rotation.x = (i === 0 ? 0.12 + flap * 0.7 : flap * 0.3 + Math.sin(G.now * 7 - i) * 0.06 * amt) + (p.grounded ? 0 : 0.4);
+    for (let i = 0; i < cloak.length; i++) cloak[i].rotation.x = (i === 0 ? 0.12 + flap * 0.7 : flap * 0.3 + Math.sin(G.now * 7 - i) * 0.06 * amt) + (p.grounded && p.pose !== 'fall' ? 0 : 0.4);
     aura.intensity = 2.5 + A.cast * 6 + (p.flashT > 0 ? 8 : 0);
   }
   return { group: g, update, anim: A, wtip, body, swing(kind = 0, dur = 0.28) { A.swing = A.swingDur = dur; A.swingKind = kind; } };
