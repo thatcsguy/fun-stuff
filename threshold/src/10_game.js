@@ -17,7 +17,7 @@ const Game = (() => {
     W.env(sky, 0.6);
     const floor = new THREE.Mesh(new THREE.CircleGeometry(120, 64), W.mat({ color: 0x06070c, roughness: 0.12, metalness: 0.9 })); floor.rotation.x = -PI / 2; g.add(floor);
     G.bosses.forEach((d, i) => {
-      const n = G.bosses.length, a = (i - (n - 1) / 2) * Math.min(0.36, 2.2 / n), x = Math.sin(a) * 26, z = -Math.cos(a) * 26;
+      const n = G.bosses.length, a = (i - (n - 1) / 2) * Math.min(0.36, Math.max(0.2, 2.2 / n)), x = Math.sin(a) * 26, z = -Math.cos(a) * 26;
       const col = new THREE.Color(d.color || '#e8c77a');
       const frame = new THREE.Mesh(new THREE.BoxGeometry(4.6, 9.6, 0.5), W.mat({ color: 0x0c0d14, roughness: 0.35, metalness: 0.8 })); frame.position.set(x, 4.8, z); frame.lookAt(0, 4.8, 0); g.add(frame);
       const pane = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 8.6), new THREE.MeshBasicMaterial({ color: col.clone().multiplyScalar(1.5) })); pane.position.set(x * 0.985, 4.7, z * 0.985); pane.lookAt(0, 4.7, 0); g.add(pane);
