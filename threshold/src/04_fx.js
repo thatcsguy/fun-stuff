@@ -197,7 +197,7 @@ const FX = (() => {
   }
 
   function update(dt) {
-    if (G.headless) { for (let i = missiles.length - 1; i >= 0; i--) { const m = missiles[i]; m.t += dt; if (m.t >= m.total) { missiles.splice(i, 1); if (m.onHit) m.onHit(); } } return; }
+    if (G.headless) { for (let i = missiles.length - 1; i >= 0; i--) { const m = missiles[i]; m.t += dt; if (m.t >= m.total) { missiles.splice(i, 1); if (m.mesh) { fxRoot.remove(m.mesh); m.mesh.material.dispose(); } if (m.onHit) m.onHit(); } } return; }
     flush(PA); flush(PS);
     for (const name in pools) for (const m of pools[name].items) {
       if (!m.visible) continue; const u = m.userData; u.t += dt; const k = u.t / u.dur;
