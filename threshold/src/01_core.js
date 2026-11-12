@@ -201,7 +201,7 @@ const SanitizeShader = {
           vec4 q = texture2D(tDiffuse, vUv + o * uTexel); if (!bad(q)) { s += q; n += 1.0; } }
         c = n > 0.0 ? s / n : vec4(0.0, 0.0, 0.0, 1.0);
       }
-      gl_FragColor = vec4(clamp(c.rgb, 0.0, 30000.0), clamp(c.a, 0.0, 1.0));
+      gl_FragColor = vec4(clamp(c.rgb, 0.0, 64.0), clamp(c.a, 0.0, 1.0));
     }`,
 };
 
