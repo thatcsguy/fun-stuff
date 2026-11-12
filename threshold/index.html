@@ -6992,8 +6992,8 @@ const Warm = (() => {
     mote: [0xb8c8d0, 0xff8a40, 0xc8d4cc], moteM: [0.9, 1.5, 1.0], mirE: [0.5, 0.8, 1.7], skinRim: [0x4a6a80, 0x6a2016, 0x2e6a62], fill: [0x4a5a6c, 0x626470, 0x4c5654],
     envRim: [0x182838, 0x701c12, 0x1c6460], crowdRim: [0x3a5470, 0x701e16, 0x2a6a66], mirRim: [0x4a3010, 0x6a2a10, 0x5a9484], rim: [0x6a4a22, 0x8a2a14, 0x3a6458], cyp: [0x24384a, 0x4a1c18, 0x1a3034],
   };
-  const palC = (arr, pk, out) => { const i = Math.min(1, Math.floor(pk)), f = sat(pk - i); return out.setHex(arr[i]).lerp(_c2.setHex(arr[i + 1]), f); };
-  const palN = (arr, pk) => { const i = Math.min(1, Math.floor(pk)); return lerp(arr[i], arr[i + 1], sat(pk - i)); };
+  const palC = (arr, pk, out) => { const i = clamp(Math.floor(pk), 0, 1), f = sat(pk - i); return out.setHex(arr[i]).lerp(_c2.setHex(arr[i + 1]), f); };
+  const palN = (arr, pk) => { const i = clamp(Math.floor(pk), 0, 1); return lerp(arr[i], arr[i + 1], sat(pk - i)); };
 
   G.bosses.push({
     id: 'gorgon', name: 'EURYALE', title: 'The Stone Garden', hint: 'A glance', color: '#8dff7a', telegraph: 0x7dff8a,
@@ -7065,7 +7065,7 @@ const Warm = (() => {
         S.mir.forEach((m, k) => { if (!m.on) return; const ta = base + (S.nMir === 1 ? 0 : (k ? 2.1 : -2.1)); m.a += clamp(angDiff(m.a, ta), -0.55 * dt, 0.55 * dt); });
       }
       if (S.stoneT > 0) S.stoneT -= dt;
-      S.pk = damp(S.pk, b.phase || 0, 0.9, dt); if (b.phase >= 2) S.frostT = Math.min(1, S.frostT + dt / 40);
+      S.pk = damp(S.pk, Math.max(0, b.phase), 0.9, dt); if (b.phase >= 2) S.frostT = Math.min(1, S.frostT + dt / 40);
       if (G.headless) return;
       Post.final.uniforms.uSat.value = Post.cur.sat * (1 - 0.4 * sat(S.stoneT / 0.5));
       for (const q of S.ped) if (q.rise > 0) { q.rise = Math.max(0, q.rise - dt * 0.6); q.mesh.position.y = 0.5 - q.rise * 2.6; }
