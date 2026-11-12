@@ -16,13 +16,7 @@ OUT=../index.html
   echo '</html>'
 } > "$OUT"
 TMP=$(mktemp -d)
-python3 - "$OUT" "$TMP/check.mjs" <<'PY'
-import sys
-s = open(sys.argv[1]).read()
-a = s.index('<script type="module">') + len('<script type="module">')
-b = s.rindex('</script>')
-open(sys.argv[2], 'w').write(s[a:b])
-PY
+node -e 'const fs=require("fs"),s=fs.readFileSync(process.argv[1],"utf8"),t="<script type=\"module\">";fs.writeFileSync(process.argv[2],s.slice(s.indexOf(t)+t.length,s.lastIndexOf("</script>")))' "$OUT" "$TMP/check.mjs"
 node --check "$TMP/check.mjs" && echo SYNTAX_OK
 rm -rf "$TMP"
 echo "built $(wc -c < "$OUT") bytes -> threshold/index.html"
