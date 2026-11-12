@@ -9,7 +9,7 @@
     (ix, iz) => Math.max(Math.abs(ix - 3), Math.abs(iz - 3)) % 2, (ix, iz) => (Math.floor(ix / 2) + Math.floor(iz / 2)) % 2, (ix, iz) => (ix + iz * 2) % 3 === 0 ? 1 : 0,
   ];
   // per-phase accents: rim light on the machinery, distance haze, the core's resting colour
-  const RIM_COL = [0x2f6cff, 0x3a6ae8, 0x5a5cf0], HAZE_COL = [0x070c22, 0x140812, 0x0e0820], CORE_COL = [0x80c0ff, 0xff9040, 0xa478ff];
+  const RIM_COL = [0x2f6cff, 0x3a6ae8, 0x5a5cf0], HAZE_COL = [0x070c22, 0x140812, 0x0e0820], CORE_COL = [0x80c0ff, 0xff9040, 0x8a48ff];
 
   // ---------- shared shader dressing: fresnel rim + distance haze on standard materials ----------
   const RIM = { uRim: { value: new THREE.Color(RIM_COL[0]) }, uRimS: { value: 0.4 }, uHazeC: { value: new THREE.Color(HAZE_COL[0]) }, uHazeD: { value: new THREE.Vector2(26, 90) } };
@@ -118,11 +118,13 @@
       uniforms: { uTex: { value: planetTex() }, uSun: { value: sunDir.clone() }, uAtm: { value: new THREE.Color(atm) }, uTint: { value: new THREE.Color(tint) }, uT: { value: 0 } },
       vertexShader: 'varying vec3 vN; varying vec3 vW; varying vec2 vUv; void main(){ vUv=uv; vN=normalize(mat3(modelMatrix)*normal); vec4 w=modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }',
       fragmentShader: `uniform sampler2D uTex; uniform vec3 uSun, uAtm, uTint; uniform float uT; varying vec3 vN; varying vec3 vW; varying vec2 vUv;
+        float ph(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+        float pn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(ph(i), ph(i + vec2(1.0, 0.0)), f.x), mix(ph(i + vec2(0.0, 1.0)), ph(i + vec2(1.0, 1.0)), f.x), f.y); }
         void main(){ vec3 N = vN / max(length(vN), 1e-4); vec3 Vd = cameraPosition - vW; vec3 V = Vd / max(length(Vd), 1e-3);
           vec2 uv = vUv; uv.y += 0.006 * sin(uv.x * 6.2831853 * 3.0 + uv.y * 60.0 + uT) + 0.003 * sin(uv.x * 6.2831853 * 7.0 - uv.y * 140.0);
           vec3 base = texture2D(uTex, uv).rgb * uTint; float ndl = dot(N, uSun);
           float day = smoothstep(-0.12, 0.45, ndl); vec3 col = base * (0.012 + 1.05 * day * max(ndl + 0.12, 0.0));
-          col += vec3(1.0, 0.36, 0.12) * base * exp(-ndl * ndl * 60.0) * 0.35;
+          vec3 on = N; float cl = pn(on.xy * 9.0 + on.z * 4.0) * 0.6 + pn(on.yz * 21.0 - on.x * 7.0) * 0.4; col += vec3(1.0, 0.36, 0.12) * base * exp(-ndl * ndl * 110.0) * (0.06 + 0.34 * smoothstep(0.35, 0.85, cl));
           float fr = 1.0 - clamp(dot(N, V), 0.0, 1.0); col += uAtm * pow(max(fr, 0.0), 3.0) * smoothstep(-0.35, 0.5, ndl) * 0.9;
           gl_FragColor = vec4(max(col, vec3(0.0)), 1.0); }`,
     });
@@ -177,7 +179,7 @@
     const pts = [[0, -1.55], [0.4, -0.55], [0.34, 0.7], [0.1, 1.35], [0, 1.62], [-0.1, 1.35], [-0.34, 0.7], [-0.4, -0.55]];
     const shp = (k) => { const s = new THREE.Shape(); pts.forEach(([px, py], i) => (i ? s.lineTo(px * k, py * k) : s.moveTo(px * k, py * k))); s.closePath(); return s; };
     const body = new THREE.ExtrudeGeometry(shp(0.86), { depth: 0.22, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.06, bevelSegments: 2 }); body.center();
-    const rim = shp(1.0); const hole = new THREE.Path(); pts.slice().reverse().forEach(([px, py], i) => (i ? hole.lineTo(px * 0.88, py * 0.88) : hole.moveTo(px * 0.88, py * 0.88))); hole.closePath(); rim.holes.push(hole);
+    const rim = shp(1.0); const hole = new THREE.Path(); pts.slice().reverse().forEach(([px, py], i) => (i ? hole.lineTo(px * 0.94, py * 0.94) : hole.moveTo(px * 0.94, py * 0.94))); hole.closePath(); rim.holes.push(hole);
     const edge = new THREE.ExtrudeGeometry(rim, { depth: 0.08, bevelEnabled: false }); edge.center();
     return { body, edge };
   }
@@ -186,6 +188,8 @@
     toothG = new THREE.ExtrudeGeometry(sh, { depth: 0.14, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.02, bevelSegments: 1 }); toothG.center(); return toothG; };
   // emissive ticker strip: dashes that scroll around a ring in the trim colour
   const TICKU = { uC: { value: new THREE.Color(CY) }, uT: { value: 0 } }; let tickM = null;
+  const LAMPU = { uC: { value: new THREE.Color(CY) } }; let lampM = null;
+  const LAMPH = () => lampM || (lampM = new THREE.ShaderMaterial({ uniforms: LAMPU, vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv=modelViewMatrix*vec4(position,1.0); vN=normalMatrix*normal; vV=-mv.xyz; gl_Position=projectionMatrix*mv; }', fragmentShader: 'uniform vec3 uC; varying vec3 vN; varying vec3 vV; void main(){ vec3 n=vN/max(length(vN),1e-4); vec3 v=vV/max(length(vV),1e-4); float f=clamp(abs(dot(n,v)),0.0,1.0); float a=pow(f,3.0)*0.5; gl_FragColor=vec4(max(uC*a,vec3(0.0)),1.0); }', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   const TICK = () => tickM || (tickM = new THREE.ShaderMaterial({ uniforms: TICKU, vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
     fragmentShader: 'uniform vec3 uC; uniform float uT; varying vec2 vUv; void main(){ float d=fract(vUv.x*48.0-uT*0.6); float k=0.25+0.9*smoothstep(0.0,0.1,d)*(1.0-smoothstep(0.4,0.5,d)); float bl=pow(max(0.5+0.5*sin(vUv.x*6.2831853*3.0-uT*1.5),0.0),6.0); gl_FragColor=vec4(max(uC*(k*0.9+bl*0.8),vec3(0.0)),1.0); }' }));
   function gimbal(r, steel, trim, teethMat, tube = 0.17, teethOn = true, ns = 1) {
@@ -199,17 +203,17 @@
       const a = q * PI / 2 + PI / 4, nd = new THREE.Group(); nd.position.set(Math.cos(a) * r, Math.sin(a) * r, 0); nd.rotation.z = a; nd.scale.setScalar(ns);
       const blk = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.62, 0.56), steel); nd.add(blk);
       const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.66, 8), steel); cap.rotation.x = PI / 2; nd.add(cap);
-      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.36, 0.6), trim); lamp.position.x = 0.22; nd.add(lamp);
+      const lfr = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.66), steel); lfr.position.x = 0.215; nd.add(lfr); const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.44), trim); lamp.position.x = 0.25; nd.add(lamp); const lh = new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8), LAMPH()); lh.position.x = 0.3; nd.add(lh);
       gr.add(nd);
     }
     return gr;
   }
 
   function build(b) {
-    const g = G.world, S = b.state; tickM = null; toothG = null;
+    const g = G.world, S = b.state; tickM = null; toothG = null; lampM = null;
     const sunDir = new V3(-0.55, 0.3, -0.78).normalize();
-    const sky = W.sky({ top: 0x010207, horizon: 0x050720, bottom: 0x010106, stars: 1.6, nebula: 0.85, nebulaA: 0x340c48, nebulaB: 0x03344a, sunDir: sunDir.toArray(), sunColor: 0xfff0d8, sunSize: 0.06, sunGlow: 0.9 }); g.add(sky); S.sky = sky; W.env(sky, 0.6);
-    S.hemi = W.hemi(g, 0x34448a, 0x0c0614, 0.5);
+    const sky = W.sky({ top: 0x010207, horizon: 0x050720, bottom: 0x010106, stars: 1.6, nebula: 1.15, nebulaA: 0x340c48, nebulaB: 0x03344a, sunDir: sunDir.toArray(), sunColor: 0xfff0d8, sunSize: 0.06, sunGlow: 0.9 }); g.add(sky); S.sky = sky; W.env(sky, 0.6);
+    S.hemi = W.hemi(g, 0x34448a, 0x1c1834, 0.72);
     S.sun = W.sun(g, { dir: sunDir.toArray(), color: 0xfff0e0, intensity: 2.2, size: 24 });
     // two shadowless fills: warm bounce from the planet below, and a constant cool counter-light from the starfield side so silhouettes separate every phase
     S.planetFill = new THREE.DirectionalLight(0xff8a50, 0.95); S.planetFill.position.set(380, -560, -620).normalize().multiplyScalar(80); g.add(S.planetFill);
@@ -256,7 +260,7 @@
     mods.frustumCulled = false; S.orbit.add(mods);
     for (let i = 0; i < 7; i++) { const arc = new THREE.Mesh(new THREE.TorusGeometry(33 + (i % 3) * 1.6, 0.09, 4, 40, 0.5 + (i % 3) * 0.25), S.conduit); arc.rotation.set(PI / 2, 0, i / 7 * TAU); arc.position.y = (i % 2) * 0.6 - 0.4; S.orbit.add(arc); }
     // towers: open lattice masts (one instanced draw for every strut) with running lights
-    const twm = dress(new THREE.MeshStandardMaterial({ color: 0x3a4250, metalness: 0.85, roughness: 0.4, envMapIntensity: 0.9 }), { rim: 1.0, haze: 0.8 });
+    const twm = dress(new THREE.MeshStandardMaterial({ color: 0x46505f, metalness: 0.8, roughness: 0.42, envMapIntensity: 1.0 }), { rim: 1.6, haze: 0.7 });
     const struts = [], strut = (ax, ay, az, bx, by, bz, w) => struts.push([ax, ay, az, bx, by, bz, w]);
     const lightsN = 4 * 2 * 8, runL = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 0.5, 0.14), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }), lightsN), dd = new THREE.Object3D(), lc = new THREE.Color(); let li = 0;
     S.beacons = [];
@@ -270,8 +274,12 @@
       for (let s = 0; s < 2; s++) for (let k = 0; k < 8; k++) { const [cx, cz] = C4[s * 2]; dd.position.set(tx + cx * 1.15, -6 + k * 2.6, tz + cz * 1.15); dd.updateMatrix(); runL.setMatrixAt(li, dd.matrix); runL.setColorAt(li, lc.setHex(k % 3 === 2 ? 0xff4028 : 0x40c8ff).multiplyScalar(k % 3 === 2 ? 2.2 : 1.6)); li++; }
     }
     // hero structure behind the boss: a great ring gate with docking modules and a spire, far enough to sit in the haze
-    { const hg = new THREE.Group(); hg.position.set(0, 9, -62); g.add(hg); S.gate = hg;
+    { const hg = new THREE.Group(); hg.position.set(-34, 13, -92); hg.rotation.y = 0.5; g.add(hg); S.gate = hg;
+      const twm = dress(new THREE.MeshStandardMaterial({ color: 0x6a7690, metalness: 0.7, roughness: 0.45, emissive: 0x16223e, emissiveIntensity: 1, envMapIntensity: 1 }), { rim: 2.2, haze: 0.3 }); // its own hazed, rim-lit steel
       const gr = new THREE.Mesh(new THREE.TorusGeometry(17, 0.9, 8, 120), twm); hg.add(gr);
+      const wn = 64, win = new THREE.InstancedMesh(new THREE.BoxGeometry(0.55, 0.55, 0.55), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }), wn), wd = new THREE.Object3D(), wc = new THREE.Color();
+      for (let i = 0; i < wn; i++) { const a = i / wn * TAU + 0.03, rr = 17 + (i % 2 ? 1.0 : -1.0); wd.position.set(Math.cos(a) * rr, Math.sin(a) * rr, i % 3 ? 0.9 : -0.9); wd.updateMatrix(); win.setMatrixAt(i, wd.matrix); win.setColorAt(i, wc.setHex(i % 7 === 0 ? 0xff6040 : 0x8ac8ff).multiplyScalar(i % 7 === 0 ? 1.8 : 1.1 + (i % 3) * 0.25)); }
+      win.frustumCulled = false; hg.add(win);
       const gr2 = new THREE.Mesh(new THREE.TorusGeometry(15.4, 0.25, 4, 120), twm); hg.add(gr2);
       const gl = new THREE.Mesh(new THREE.TorusGeometry(16.2, 0.07, 4, 160), S.conduit); hg.add(gl);
       const gm = new THREE.InstancedMesh(new THREE.BoxGeometry(2.6, 1.8, 2.2), twm, 12), gd = new THREE.Object3D();
@@ -312,7 +320,7 @@
       S.tiles.push({ m, mat, sideMat, U, ix, iz, x: m.position.x, z: m.position.z, present: true, col: 0, warn: 0, back: 0, y: TY, flash: 0, cur: new THREE.Color(IDLE), rx: 0, rz: 0, sx: 0, sz: 0 });
     }
     // under the grid: a beam lattice the tiles sit on (one instanced draw), glowing seams in the gaps, and a soft haze far below for depth
-    { const lm = dress(new THREE.MeshStandardMaterial({ color: 0x2a3240, metalness: 0.85, roughness: 0.45, envMapIntensity: 0.8 }), { rim: 0.8, haze: 0.5 });
+    { const lm = dress(new THREE.MeshStandardMaterial({ color: 0x2c2650, metalness: 0.85, roughness: 0.66, envMapIntensity: 0.45 }), { rim: 0.45, haze: 0.5 });
       const list = [], L = N * TS + 1.2, yB = -TH - 0.3;
       for (let k = 0; k <= N; k++) { const c = -HALF + k * TS; list.push([c, yB, 0, 0.36, 0.5, L], [0, yB, c, L, 0.5, 0.36]); }
       for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) { const cx = -HALF + TS * (ix + 0.5), cz = -HALF + TS * (iz + 0.5); list.push([cx, yB - 0.55, cz, 0.18, 0.18, TS * 1.3, PI / 4], [cx, yB - 0.55, cz, 0.18, 0.18, TS * 1.3, -PI / 4], [cx, yB - 1.1, cz, 0.5, 0.8, 0.5, 0]); }
@@ -320,7 +328,7 @@
       const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), lm, list.length), d = new THREE.Object3D();
       list.forEach(([x, y, z, sx, sy, sz, ry], i) => { d.position.set(x, y, z); d.rotation.set(0, ry || 0, 0); d.scale.set(sx, sy, sz); d.updateMatrix(); im.setMatrixAt(i, d.matrix); });
       im.frustumCulled = false; g.add(im);
-      const sg = new THREE.PlaneGeometry(0.5, N * TS); sg.rotateX(-PI / 2); const smat = fadeMat(S.conduitU, 0.55);
+      const sg = new THREE.PlaneGeometry(0.5, N * TS); sg.rotateX(-PI / 2); const smat = fadeMat(S.conduitU, 0.42);
       for (let k = 1; k < N; k++) { const c = -HALF + k * TS; const a = new THREE.Mesh(sg, smat); a.position.set(c, -0.16, 0); g.add(a); const bb = new THREE.Mesh(sg, smat); bb.position.set(0, -0.16, c); bb.rotation.y = PI / 2; g.add(bb); }
       S.hazeU = { uC: { value: new THREE.Color(0x101a40) }, uA: { value: 1 } };
       const hz = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.ShaderMaterial({ uniforms: S.hazeU, vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
@@ -328,12 +336,14 @@
       hz.rotation.x = -PI / 2; hz.position.y = -22; g.add(hz);
       // pulsing node lights along the underframe, visible through gaps and dropped tiles (one instanced draw)
       const nl = []; for (let k = 0; k <= N; k++) for (let j = 0; j <= N; j++) if ((k + j) % 2 === 0) nl.push([-HALF + k * TS, yB - 0.75, -HALF + j * TS]);
-      S.nodeL = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }), nl.length);
-      nl.forEach(([x, y, z], i) => { d.position.set(x, y, z); d.rotation.set(0, PI / 4, 0); d.scale.setScalar(1); d.updateMatrix(); S.nodeL.setMatrixAt(i, d.matrix); }); S.nodeL.frustumCulled = false; g.add(S.nodeL);
+      S.nodeL = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }), nl.length);
+      S.nodeHU = { uC: { value: new THREE.Color(CY) } }; S.nodeH = new THREE.InstancedMesh(new THREE.SphereGeometry(0.55, 12, 8), new THREE.ShaderMaterial({ uniforms: S.nodeHU, vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv=modelViewMatrix*instanceMatrix*vec4(position,1.0); vN=normalMatrix*mat3(instanceMatrix)*normal; vV=-mv.xyz; gl_Position=projectionMatrix*mv; }',
+        fragmentShader: 'uniform vec3 uC; varying vec3 vN; varying vec3 vV; void main(){ vec3 n=vN/max(length(vN),1e-4); vec3 v=vV/max(length(vV),1e-4); float f=clamp(abs(dot(n,v)),0.0,1.0); float a=pow(f,2.5)*0.55; gl_FragColor=vec4(max(uC*a,vec3(0.0)),1.0); }', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }), nl.length);
+      nl.forEach(([x, y, z], i) => { d.position.set(x, y, z); d.rotation.set(0, PI / 4, 0); d.scale.setScalar(1); d.updateMatrix(); S.nodeL.setMatrixAt(i, d.matrix); S.nodeH.setMatrixAt(i, d.matrix); }); S.nodeL.frustumCulled = S.nodeH.frustumCulled = false; g.add(S.nodeL, S.nodeH);
       // energy lip: an additive curtain around the outer edge, brightest at the rim and fading down into the void
       S.lipU = { uC: { value: new THREE.Color(CY) }, uA: { value: 0.55 } };
       const lipM = new THREE.ShaderMaterial({ uniforms: S.lipU, vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
-        fragmentShader: 'uniform vec3 uC; uniform float uA; varying vec2 vUv; void main(){ float a=pow(clamp(vUv.y,0.0,1.0),3.0)*uA*(0.35+0.65*smoothstep(0.0,0.08,vUv.x)*smoothstep(1.0,0.92,vUv.x)); gl_FragColor=vec4(max(uC*a,vec3(0.0)),1.0); }',
+        fragmentShader: 'uniform vec3 uC; uniform float uA; varying vec2 vUv; void main(){ float y=clamp(vUv.y,0.0,1.0); float a=(pow(y,7.0)*0.5+exp(-(1.0-y)*(1.0-y)*1600.0)*1.1)*uA*(0.35+0.65*smoothstep(0.0,0.08,vUv.x)*smoothstep(1.0,0.92,vUv.x)); gl_FragColor=vec4(max(uC*a,vec3(0.0)),1.0); }',
         transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
       const lg = new THREE.PlaneGeometry(N * TS, 2.2); lg.translate(0, -1.1, 0);
       for (let k = 0; k < 4; k++) { const a = k * PI / 2, lp = new THREE.Mesh(lg, lipM); lp.position.set(Math.sin(a) * (HALF + 0.05), -0.02, Math.cos(a) * (HALF + 0.05)); lp.rotation.y = a; g.add(lp); } }
@@ -346,13 +356,13 @@
     const cU = { uC: { value: new THREE.Color(0x80c0ff) }, uHot: { value: 1.2 } }; S.crystalU = cU; S.coreMat = { color: cU.uC.value };
     const cg = new THREE.IcosahedronGeometry(0.85, 0); cg.computeVertexNormals();
     S.core = new THREE.Mesh(cg, new THREE.ShaderMaterial({ uniforms: cU, vertexShader: 'varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ vP=position; vec4 mv=modelViewMatrix*vec4(position,1.0); vN=normalMatrix*normal; vV=-mv.xyz; gl_Position=projectionMatrix*mv; }',
-      fragmentShader: 'uniform vec3 uC; uniform float uHot; varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ vec3 n=vN/max(length(vN),1e-4); vec3 v=vV/max(length(vV),1e-4); float fa=clamp(abs(dot(n,v)),0.0,1.0); float rim=pow(max(1.0-fa,0.0),1.8); vec3 c=uC*(0.18+1.25*rim)+vec3(0.9,0.95,1.0)*rim*0.25; float a=clamp(0.32+0.6*rim,0.0,1.0); gl_FragColor=vec4(clamp(c,vec3(0.0),vec3(1.8)),a); }', transparent: true, depthWrite: false }));
+      fragmentShader: 'uniform vec3 uC; uniform float uHot; varying vec3 vN; varying vec3 vV; varying vec3 vP; void main(){ vec3 n=vN/max(length(vN),1e-4); vec3 v=vV/max(length(vV),1e-4); float fa=clamp(abs(dot(n,v)),0.0,1.0); float rim=pow(max(1.0-fa,0.0),1.8); vec3 c=uC*(0.05+1.35*rim); float a=clamp(0.1+0.75*rim,0.0,1.0); gl_FragColor=vec4(clamp(c,vec3(0.0),vec3(1.8)),a); }', transparent: true, depthWrite: false }));
     S.core.renderOrder = 2;
     S.innerU = { uC: { value: new THREE.Color(0x80c0ff) }, uHot: { value: 1 } };
     const ig = new THREE.IcosahedronGeometry(0.42, 0); ig.computeVertexNormals();
     S.inner = new THREE.Mesh(ig, new THREE.ShaderMaterial({ uniforms: S.innerU, vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv=modelViewMatrix*vec4(position,1.0); vN=normalMatrix*normal; vV=-mv.xyz; gl_Position=projectionMatrix*mv; }',
-      fragmentShader: 'uniform vec3 uC; uniform float uHot; varying vec3 vN; varying vec3 vV; void main(){ vec3 n=vN/max(length(vN),1e-4); vec3 v=vV/max(length(vV),1e-4); float fa=clamp(abs(dot(n,v)),0.0,1.0); vec3 c=uC*(0.5+0.5*fa)+vec3(1.0,0.96,0.9)*pow(fa,4.0)*uHot*0.7; gl_FragColor=vec4(clamp(c,vec3(0.0),vec3(1.9)),1.0); }' }));
-    S.heart.add(S.inner);
+      fragmentShader: 'uniform vec3 uC; uniform float uHot; varying vec3 vN; varying vec3 vV; void main(){ vec3 n=vN/max(length(vN),1e-4); vec3 v=vV/max(length(vV),1e-4); float fa=clamp(abs(dot(n,v)),0.0,1.0); vec3 c=uC*(0.55+0.75*pow(max(1.0-fa,0.0),1.5))+uC*pow(fa,6.0)*uHot*0.35; gl_FragColor=vec4(clamp(c,vec3(0.0),vec3(1.7)),1.0); }' }));
+    S.heart.add(S.inner); S.hotM = new THREE.MeshBasicMaterial({ color: 0xffffff }); S.hot = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8), S.hotM); S.heart.add(S.hot);
     S.heart.add(S.core);
     // inner volume: three layered additive shells breathing out of phase
     S.shellU = []; for (let i = 0; i < 3; i++) { const U = { uC: { value: new THREE.Color(0x80c0ff) }, uA: { value: 0.3 } }; S.shellU.push(U);
@@ -368,20 +378,44 @@
     const rv = W.bake(256, (u, v) => { const fu = (u * 8) % 1, fv = (v * 2) % 1, e = Math.min(fu, 1 - fu, fv, 1 - fv), seam = smooth(sat(e * 30)), rx = Math.abs(fu - 0.12), ry = (v * 10) % 1, riv = Math.hypot(rx, Math.abs(ry - 0.5) / 4) < 0.03 ? 1 : 0, n = W.fbm(u * 32, v * 8, 4, 3, 8), id = W.hash2(Math.floor(u * 8), Math.floor(v * 2), 3);
       return [seam * 0.8 + riv * 0.25 + n * 0.08, (0.45 + id * 0.35) * (0.5 + 0.5 * seam) + riv * 0.3, 0.18 + id * 0.35 + n * 0.2 + (1 - seam) * 0.3]; }, { dark: 0x1c222c, light: 0x7a8496, strength: 4 });
     for (const k in rv) rv[k].repeat.set(6, 1);
-    const steelMat = () => dress(new THREE.MeshStandardMaterial({ color: 0xb0b8c8, map: rv.map, normalMap: rv.normalMap, roughnessMap: rv.roughnessMap, metalness: 1.0, roughness: 1.0, envMapIntensity: 1.5 }), { rim: 1.0 });
+    const steelMat = (tr) => dress(new THREE.MeshStandardMaterial({ color: 0xb0b8c8, map: rv.map, normalMap: rv.normalMap, roughnessMap: rv.roughnessMap, metalness: 1.0, roughness: 1.0, envMapIntensity: 1.5, transparent: !!tr }), { rim: 1.0 });
     const steel = steelMat();
     const bm = W.surface('metal', { size: 128, dark: 0x1a1f28, light: 0x4a5464, strength: 3 }); for (const k in bm) bm[k].repeat.set(1.2, 1.2);
     S.trim = new THREE.MeshStandardMaterial({ color: 0x05070a, emissive: CY, emissiveIntensity: 1.3 });
-    S.gapMat = new THREE.MeshStandardMaterial({ color: 0x080a10, metalness: 0.5, roughness: 0.5, emissive: 0x80c0ff, emissiveIntensity: 0.6 }); S.gapClones = [];
-    S.panels = []; for (const p of shellPanels(1.6)) { const gm = S.gapMat.clone(); S.gapClones.push(gm); const m = new THREE.Mesh(p.geo, [steelMat(), gm]); m.userData.fadeOcclude = true; m.userData.fadeMin = 0.12; m.geometry.computeBoundingSphere(); m.geometry.boundingSphere.radius = Math.max(m.geometry.boundingSphere.radius, 1.6); m.position.copy(p.cen); m.castShadow = true; S.rig.add(m); S.panels.push({ m, cen: p.cen, n: p.n, ph: vrand() * TAU }); }
+    S.gapMat = new THREE.MeshStandardMaterial({ color: 0x020306, metalness: 0.2, roughness: 0.9, emissive: 0x80c0ff, emissiveIntensity: 0.6, transparent: true });
+    // armour plates: dark brushed metal; the bevel heats toward the seams in the core's colour, the plate centre carries a faint warmth
+    S.plateU = { uHC: { value: new THREE.Color(0x80c0ff) }, uHK: { value: 1 } };
+    const plateMat = () => { const m = dress(new THREE.MeshStandardMaterial({ color: 0x3c4452, map: bm.map, normalMap: bm.normalMap, metalness: 0.9, roughness: 0.42, envMapIntensity: 0.9, transparent: true }), { rim: 0.7 }), ob = m.onBeforeCompile;
+      m.onBeforeCompile = (sh) => { ob(sh); sh.uniforms.uHC = S.plateU.uHC; sh.uniforms.uHK = S.plateU.uHK;
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vLP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvLP = position;');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vLP; uniform vec3 uHC; uniform float uHK;')
+          .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n{ float pr = length(vLP); float seam = smoothstep(0.47, 0.6, pr); float ctr = pow(max(1.0 - pr / 0.6, 0.0), 2.0); totalEmissiveRadiance = uHC * uHK * (seam * 0.9 + ctr * 0.12); }'); };
+      m.customProgramCacheKey = () => 'eng-plate'; return m; }; S.gapClones = [];
+    // seam walls under each plate: emission only along the plate edge, fading to dark toward the inner cap so the interior never reads as flat paper
+    const gapMatF = () => { const m = new THREE.MeshStandardMaterial({ color: 0x020306, metalness: 0.2, roughness: 0.9, emissive: 0x80c0ff, emissiveIntensity: 0.6, transparent: true });
+      m.onBeforeCompile = (sh) => { sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vLP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvLP = position;');
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vLP;').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= smoothstep(0.52, 0.63, length(vLP));'); };
+      m.customProgramCacheKey = () => 'eng-gap'; return m; };
+    S.panels = []; for (const p of shellPanels(1.6)) { const gm = gapMatF(); S.gapClones.push(gm); const m = new THREE.Mesh(p.geo, [plateMat(), gm]); m.userData.fadeOcclude = true; m.userData.fadeMin = 0.12; m.geometry.computeBoundingSphere(); m.geometry.boundingSphere.radius = Math.max(m.geometry.boundingSphere.radius, 1.6); m.position.copy(p.cen); m.castShadow = true; S.rig.add(m); S.panels.push({ m, cen: p.cen, n: p.n, ph: vrand() * TAU }); }
     // three clear nested gimbals: thin inner, medium middle, heavy toothed outer
     S.GR = [2.7, 3.45, 4.3]; S.gyro = []; S.trimClones = [];
-    for (let i = 0; i < 3; i++) { let sm = steel, tm = S.trim; if (i >= 1) { sm = steelMat(); tm = S.trim.clone(); S.trimClones.push(tm); }
+    for (let i = 0; i < 3; i++) { let sm = steel, tm = S.trim; if (i >= 1) { sm = steelMat(true); tm = S.trim.clone(); S.trimClones.push(tm); }
       const gr = gimbal(S.GR[i], sm, tm, sm, [0.08, 0.15, 0.27][i], i === 2, [0.6, 0.85, 1.15][i]); if (i >= 1) { gr.userData.band.userData.fadeOcclude = true; gr.userData.band.userData.fadeMin = 0.15; } S.rig.add(gr); S.gyro.push(gr); }
     S.arcV = [new V3(), new V3()];
     // fins: bevelled blades with an emissive edge inlay (two instanced draws for all twelve)
-    const bl = bladeGeos(); S.finBody = new THREE.InstancedMesh(bl.body, dress(new THREE.MeshStandardMaterial({ color: 0x8a94a8, map: bm.map, normalMap: bm.normalMap, roughnessMap: bm.roughnessMap, metalness: 0.9, roughness: 0.9, envMapIntensity: 1.3 }), { rim: 1.1 }), 6); S.finEdge = new THREE.InstancedMesh(bl.edge, S.trim.clone(), 6); S.finTrim = S.finEdge.material;
-    for (const fm of [S.finBody, S.finEdge]) { fm.geometry.boundingSphere = new THREE.Sphere(new V3(), 6.5); fm.userData.fadeOcclude = true; fm.userData.fadeMin = 0.1; } S.finBody.castShadow = true; S.finBody.frustumCulled = S.finEdge.frustumCulled = false; S.rig.add(S.finBody, S.finEdge);
+    // fins are solar vanes: glossy dark-blue cells on a silver grid, each its own mesh so only the one in front of the player fades
+    const fc = document.createElement('canvas'); fc.width = fc.height = 128; const fx2 = fc.getContext('2d'); fx2.fillStyle = '#28324c'; fx2.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const gr = fx2.createLinearGradient(i * 32, j * 32, i * 32 + 30, j * 32 + 30); gr.addColorStop(0, `rgb(${34 + (i * 7 + j * 3) % 10},${52 + (i * 5 + j) % 12},${118 + (i * 3 + j * 7) % 22})`); gr.addColorStop(1, '#0c1634'); fx2.fillStyle = gr; fx2.fillRect(i * 32 + 2, j * 32 + 2, 28, 28); fx2.fillStyle = 'rgba(120,150,230,0.07)'; fx2.fillRect(i * 32 + 15, j * 32 + 2, 1, 28); }
+    const ftex = new THREE.CanvasTexture(fc); ftex.colorSpace = THREE.SRGBColorSpace; ftex.wrapS = ftex.wrapT = THREE.RepeatWrapping; ftex.repeat.set(1.6, 1.6); ftex.anisotropy = 8;
+    const fec = document.createElement('canvas'); fec.width = fec.height = 128; const fe2 = fec.getContext('2d'); fe2.fillStyle = '#000'; fe2.fillRect(0, 0, 128, 128); fe2.fillStyle = '#1e1e1e'; for (let i = 0; i < 4; i++) { fe2.fillRect(i * 32, 0, 2, 128); fe2.fillRect(0, i * 32, 128, 2); }
+    const fetex = new THREE.CanvasTexture(fec); fetex.wrapS = fetex.wrapT = THREE.RepeatWrapping; fetex.repeat.copy(ftex.repeat);
+    const bl = bladeGeos(); S.fins = []; S.finTrims = [];
+    const camFade = (m, key) => { const ob = m.onBeforeCompile; m.onBeforeCompile = (sh) => { if (ob) ob(sh); sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.a *= mix(0.06, 1.0, smoothstep(4.0, 10.5, length(vViewPosition)));'); }; m.customProgramCacheKey = () => key; return m; };
+    for (let i = 0; i < 6; i++) {
+      const fb = new THREE.Mesh(bl.body, camFade(dress(new THREE.MeshStandardMaterial({ color: 0xffffff, map: ftex, metalness: 0.6, roughness: 0.46, emissive: CY, emissiveMap: fetex, emissiveIntensity: 0.3, envMapIntensity: 0.9, transparent: true }), { rim: 0.6 }), 'eng-finb'));
+      const fe = new THREE.Mesh(bl.edge, camFade(new THREE.MeshStandardMaterial({ color: 0x05070a, roughness: 0.9, metalness: 0, emissive: CY, emissiveIntensity: 0.6, transparent: true }), 'eng-fine')); S.finTrims.push(fe.material, fb.material);
+      for (const m of [fb, fe]) { m.userData.fadeOcclude = true; m.userData.fadeMin = 0.12; m.matrixAutoUpdate = false; S.rig.add(m); } fb.castShadow = true; S.fins.push([fb, fe]);
+    }
     S.shards = []; for (let i = 0; i < 6; i++) S.shards.push({ a: i / 6 * TAU, e: (i % 2 ? 0.3 : -0.3), sp: 0.35 }); S.dummy = new THREE.Object3D();
     // light pool: a soft additive disc on the floor in the core's colour, so the arena picks up the boss
     S.poolU = { uC: { value: new THREE.Color(0x80c0ff) }, uA: { value: 0.22 } };
@@ -417,6 +451,9 @@
       const fl = new THREE.Mesh(floorG, fm); fl.position.set(0, -1.13, 15); grp.add(fl);
       grp.visible = false; S.laserG.add(grp); S.lasers.push({ grp, beam, mat, gU, fU, cd: 0 });
     }
+    S.bshU = new THREE.ShaderMaterial({ vertexShader: 'varying vec3 vC; varying float vF; void main(){ vC = instanceColor; mat4 mw = modelMatrix * instanceMatrix; vec4 wp = mw * vec4(position, 1.0); vec3 n = mat3(mw) * normal; n /= max(length(n), 1e-5); vec3 v = cameraPosition - wp.xyz; v /= max(length(v), 1e-5); vF = clamp(dot(n, v), 0.0, 1.0); gl_Position = projectionMatrix * viewMatrix * wp; }',
+      fragmentShader: 'varying vec3 vC; varying float vF; void main(){ float f = clamp(vF, 0.0, 1.0); float a = smoothstep(0.0, 0.4, f) * (1.0 - 0.75 * smoothstep(0.8, 0.98, f)) * 0.78; gl_FragColor = vec4(max(vC * 1.25, vec3(0.0)), a); }', transparent: true, depthWrite: false });
+    S.bsh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 16, 12), S.bshU, 400); S.bsh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(400 * 3), 3); S.bsh.count = 0; S.bsh.frustumCulled = false; S.bsh.renderOrder = 11; g.add(S.bsh);
     S.sweep = null; S.pol = null; S.coreCol = 0; S.open = 0; S.spin = 1; S.tethers = []; S.dangerCol = 0; S.heat = 0;
     const present = (x, z) => { const i = tIdx(x, z); return i >= 0 && S.tiles[i].present; };
     return {
@@ -502,7 +539,7 @@
       FX.pillar(t.x, t.z, { r: 1.2, h: 14, color: 0xffb030, dur: 0.7 });
       const a = b.spawnAdd({ name: 'Aegis Drone', hp: 600, x: t.x, z: t.z, radius: 0.9, aimY: 1.5, mesh: droneMesh(), color: 0xffb030,
         update(e) { e.pos.y = 0.3 + Math.sin(G.now * 3 + e.pos.x) * 0.15; const dg = e.group.children[0].userData; dg.ring.rotation.y += G.dt * 1.4; dg.flame.value = G.now; },
-        *run(e) { yield 2; while (e.alive) { const p = G.player; Bul.fire({ x: e.pos.x, z: e.pos.z, y: 1.5, dir: angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z), speed: 5.5, turn: 0.55, dmg: 110, color: 0xffb030, r: 0.45, life: 6, tag: 'fight' }); Sound.sfx('bolt', 0.4, 0.5); yield 4.6; } },
+        *run(e) { yield 2; while (e.alive) { const p = G.player; Bul.fire({ x: e.pos.x, z: e.pos.z, y: 1.5, dir: angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z), speed: 5.5, turn: 0.55, dmg: 110, color: 0xe07a10, shell: 0xff6408, r: 0.45, life: 6, tag: 'fight' }); Sound.sfx('bolt', 0.4, 0.5); yield 4.6; } },
         onDeath() { if (!G.ents.some((q) => q.isAdd && q.alive && q.name === 'Aegis Drone')) { b.immune = false; Sound.sfx('shatter'); FX.dome(0, 4.2, 0, { r: 7, color: 0xffb030, dur: 0.6 }); } } });
       S.tethers.push(a);
     }
@@ -512,16 +549,16 @@
     const S = b.state; const r = yield* b.cast({ name: 'Overclock', time: 3.0, interruptible: true, onTick: (k) => { S.heat = k; } });
     if (r !== 'done') { S.heat = 0; yield 1.5; return; }
     Sound.sfx('roar', 0.7, 2.4); let t = 0, a0 = rnd(TAU); const sg = rnd() < 0.5 ? 1 : -1;
-    while (t < dur) { for (let k = 0; k < arms; k++) { const a = a0 + k / arms * TAU; Bul.fire({ x: Math.sin(a) * 2.4, z: Math.cos(a) * 2.4, dir: a, speed: 7, dmg: 95, color: 0xffb030, r: 0.4, life: 4.5 }); } a0 += sg * 0.21; t += 0.13; S.heat = 1; yield 0.13; }
+    while (t < dur) { for (let k = 0; k < arms; k++) { const a = a0 + k / arms * TAU; Bul.fire({ x: Math.sin(a) * 2.4, z: Math.cos(a) * 2.4, dir: a, speed: 7, dmg: 95, color: b.phase >= 2 ? 0x8a3ae0 : 0xe07a10, shell: b.phase >= 2 ? 0x7428ff : 0xff6000, r: 0.4, life: 4.5 }); } a0 += sg * 0.21; t += 0.13; S.heat = 1; yield 0.13; }
     S.heat = 0; yield 0.6;
   }
   function* supernova(b, waves = 4) {
     const S = b.state; yield* b.cast({ name: 'Supernova', time: 1.4, onTick: (k) => { S.heat = k; } });
-    for (let w = 0; w < waves; w++) { const gap = b.angToPlayer() + rnd(-1.6, 1.6), gap2 = gap + PI + rnd(-0.6, 0.6); for (let i = 0; i < 44; i++) { const a = i / 44 * TAU; if (Math.abs(angDiff(a, gap)) < 0.3 || Math.abs(angDiff(a, gap2)) < 0.3) continue; Bul.fire({ x: Math.sin(a) * 2.4, z: Math.cos(a) * 2.4, dir: a, speed: 6.4, dmg: 100, color: w % 2 ? MG : CY, r: 0.4, life: 5 }); } FX.ring(0, 0, { r1: 9, color: w % 2 ? MG : CY, dur: 0.4, mult: 0.6, width: 0.06 }); Sound.sfx('zap', 0.7, 0.6 + w * 0.1); FX.shake(0.3); yield 1.25; }
+    for (let w = 0; w < waves; w++) { const gap = b.angToPlayer() + rnd(-1.6, 1.6), gap2 = gap + PI + rnd(-0.6, 0.6); for (let i = 0; i < 44; i++) { const a = i / 44 * TAU; if (Math.abs(angDiff(a, gap)) < 0.3 || Math.abs(angDiff(a, gap2)) < 0.3) continue; Bul.fire({ x: Math.sin(a) * 2.4, z: Math.cos(a) * 2.4, dir: a, speed: 6.4, dmg: 100, color: w % 2 ? 0xd02090 : 0x10a0d8, shell: w % 2 ? MG : CY, r: 0.4, life: 5 }); } FX.ring(0, 0, { r1: 9, color: w % 2 ? MG : CY, dur: 0.4, mult: 0.6, width: 0.06 }); Sound.sfx('zap', 0.7, 0.6 + w * 0.1); FX.shake(0.3); yield 1.25; }
     S.heat = 0; yield 0.6;
   }
   function* eclipse(b, lvl, dur = 3) {
-    const S = b.state, U = S.sky.material.uniforms; const i0 = S.sun.intensity, i1 = [2.2, 1.0, 1.3][lvl], n0 = U.uNeb.value, n1 = [0.85, 0.9, 1.0][lvl], h0 = S.hemi.intensity, h1 = [0.5, 0.32, 0.42][lvl], g0 = U.uSunGlow.value, g1 = [0.9, 0.3, 0.6][lvl], c0 = U.uSunCol.value.clone(), c1 = new THREE.Color([0xfff0d8, 0xffa070, 0xc8b0ff][lvl]);
+    const S = b.state, U = S.sky.material.uniforms; const i0 = S.sun.intensity, i1 = [2.2, 1.0, 1.3][lvl], n0 = U.uNeb.value, n1 = [1.15, 1.15, 1.25][lvl], h0 = S.hemi.intensity, h1 = [0.72, 0.52, 0.62][lvl], g0 = U.uSunGlow.value, g1 = [0.9, 0.3, 0.6][lvl], c0 = U.uSunCol.value.clone(), c1 = new THREE.Color([0xfff0d8, 0xffa070, 0xc8b0ff][lvl]);
     const hs0 = S.hemi.color.clone(), hs1 = new THREE.Color([0x34448a, 0x5a3438, 0x34306a][lvl]), f0 = S.fog.color.clone(), f1 = new THREE.Color([0x070b1e, 0x120810, 0x08061a][lvl]), fd0 = S.fog.density, fd1 = [0.0065, 0.006, 0.0042][lvl], pz0 = S.planetG.position.clone(), pz1 = S.ppos.clone().multiplyScalar([1, 0.96, 0.86][lvl]), sc0 = S.planetG.scale.x, sc1 = [1, 1.03, 1.1][lvl];
     const r0 = RIM.uRim.value.clone(), r1 = new THREE.Color(RIM_COL[lvl]), z0 = RIM.uHazeC.value.clone(), z1 = new THREE.Color(HAZE_COL[lvl]);
     const apply = (k) => { S.sun.intensity = lerp(i0, i1, k); U.uNeb.value = lerp(n0, n1, k); S.hemi.intensity = lerp(h0, h1, k); U.uSunGlow.value = lerp(g0, g1, k); W.colorLerp(U.uSunCol.value, c0, c1, k); S.sun.color.copy(U.uSunCol.value); W.colorLerp(RIM.uRim.value, r0, r1, k); W.colorLerp(RIM.uHazeC.value, z0, z1, k); W.colorLerp(S.hemi.color, hs0, hs1, k); W.colorLerp(S.fog.color, f0, f1, k); S.fog.density = lerp(fd0, fd1, k); S.planetG.position.lerpVectors(pz0, pz1, k); S.planetG.scale.setScalar(lerp(sc0, sc1, k)); S.open = lerp(S.open, lvl * 0.5, k * 0.2); };
@@ -531,7 +568,7 @@
   // a phase started directly (skipping earlier enters) still shows the full escalation of the phases before it
   function skipLook(b, lvl) {
     const S = b.state, it = eclipse(b, lvl, 0); while (!it.next().done);
-    S.conduitU.uC.value.setHex([CY, 0xff6030, 0xb080ff][lvl]); S.trim.emissive.setHex([CY, 0xff7a30, 0xd0a0ff][lvl]);
+    S.conduitU.uC.value.setHex([CY, 0xff6030, 0x8a40ff][lvl]); S.trim.emissive.setHex([CY, 0xff7a30, 0x9a50ff][lvl]);
     Post.set(Object.assign({}, b.def.post, [{}, { bloom: 0.58, tint: [1.04, 0.98, 1.0] }, { bloom: 0.62, threshold: 0.9, tint: [1.0, 0.97, 1.07], exposure: 1.0 }][lvl]));
   }
   const dropNow = (S, list) => { for (const i of list) { const q = S.tiles[i]; if (!q.present) continue; q.present = false; q.warn = 0; q.col = 0; q.y = -60; q.backT = 0; } };
@@ -569,7 +606,7 @@
         yield* b.cast({ name: 'Critical Mass', time: 2.6, onTick: (k) => { S.heat = k; FX.shake(k * 0.5); } });
         Sound.sfx('bigboom'); Sound.sfx('shatter'); FX.flash(0xd8c8ff, 0.4, 1.6); FX.shake(1.3); FX.explode(0, 4.2, 0, 0xb080ff, 9, 0xe0d0ff); Co.start(eclipse(b, 2), 'fight'); Co.start(Post.lerpTo({ bloom: 0.62, threshold: 0.9, tint: [1.0, 0.97, 1.07], exposure: 1.0 }, 2), 'fight');
         const outer = []; for (const t of S.tiles) if (t.present && Math.max(Math.abs(t.ix - 3), Math.abs(t.iz - 3)) === 3) outer.push(t.iz * N + t.ix); dropTiles(b, outer, { warn: 3.4 });
-        S.conduitU.uC.value.setHex(0xb080ff); S.trim.emissive.setHex(0xd0a0ff); yield 3.8;
+        S.conduitU.uC.value.setHex(0x8a40ff); S.trim.emissive.setHex(0x9a50ff); yield 3.8;
       }, *run(b) {
         while (true) {
           yield* supernova(b, 4);
@@ -604,30 +641,33 @@
         q.m.position.set(q.x + (jit ? (vrand() - 0.5) * jit : 0), Math.max(-60, q.y) + (jit ? (vrand() - 0.5) * jit * 0.6 : 0), q.z + (jit ? (vrand() - 0.5) * jit : 0)); q.m.rotation.set(q.rx, 0, q.rz); q.m.visible = q.y > -55;
         q.flash = Math.max(0, q.flash - dt * 2.2);
         const fall = !q.present, hex = fall ? WARN : q.warn > 0 ? WARN : COLS[q.col]; _c.setHex(hex);
-        const wave = 0.5 + 0.5 * Math.sin(t * 0.9 - Math.hypot(q.x, q.z) * 0.28); if (!fall && !q.warn && !q.col) _c.lerp(_c2.setHex(IDLE2), wave * 0.7); q.cur.lerp(_c, Math.min(1, dt * 10));
+        const wave = 0.5 + 0.5 * Math.sin(t * 0.9 - Math.hypot(q.x, q.z) * 0.28); const idle = !fall && !q.warn && !q.col, ov = idle && b.phase >= 2 && !S.pol ? 0.9 * Math.pow(Math.max(0, Math.sin(t * 3.0 - Math.hypot(q.x, q.z) * 0.55)), 2) : 0; if (idle) _c.lerp(_c2.setHex(IDLE2), wave * 0.7 * (1 - ov)).lerp(_c2.setHex(0x8a46ff), ov * 0.85); q.cur.lerp(_c, Math.min(1, dt * 10));
         let k; const K = q.U.uK.value;
         if (fall) { k = 2.2 * Math.max(0, 1 + (q.y - TY) / 14); K.set(1, 0.6, 0.2); }
         else if (q.warn > 0) { k = 2.0 + 1.8 * (0.5 + 0.5 * Math.sin(t * 16)); K.set(1, 0.55, 1); }
         else if (q.col) { k = 1.05 + (S.dangerCol === q.col ? 0.55 * (0.5 + 0.5 * Math.sin(t * 10)) : 0); K.set(1, 0.12, 0.8); }
-        else { k = 1.2 + 0.6 * wave; K.set(1.1, 0.22 + 0.15 * wave, 0.6); }
+        else { k = (1.2 + 0.6 * wave) * (1 + ov * 0.3); K.set(1.1 + ov * 0.8, 0.22 + 0.15 * wave + ov * 0.1, 0.6); }
         k += q.flash * 5; const pol = !fall && !q.warn && q.col ? q.col : 0; q.U.uPol.value = pol; q.U.uPat.value = pol ? 1.1 : 0;
         q.mat.emissive.copy(q.cur); q.mat.emissiveIntensity = k; q.sideMat.emissive.copy(q.cur); q.sideMat.emissiveIntensity = k * 0.75;
       }
+      if (b.phase >= 2 && !S.pol && vrand() < dt * 6) { const c = -HALF + TS * (1 + Math.floor(vrand() * (N - 1))), s0 = -HALF + TS * (1 + Math.floor(vrand() * (N - 2))), A = S.arcV[0], B = S.arcV[1]; if (vrand() < 0.5) { A.set(c, 0.06, s0); B.set(c, 0.06, s0 + TS); } else { A.set(s0, 0.06, c); B.set(s0 + TS, 0.06, c); } FX.lightning(A, B, { color: 0xa070ff, width: 0.065, jag: 0.25, dur: 0.3, mult: 1.6, sparks: false }); }
       if (sw) { const armed = sw.arm <= 0 && sw.t > 0, fl = sw.warn > 0 ? (Math.sin(t * 40) > 0 ? 1 : 0.25) : 1; for (let i = 0; i < sw.n; i++) { const L = S.lasers[i]; L.grp.rotation.y = sw.a + i / sw.n * TAU; L.mat.color.setHex(sw.warn > 0 ? 0xfff0e0 : 0xffb080).multiplyScalar(armed ? 1.5 * fl : 0.5); L.gU.uA.value = armed ? 0.5 * fl : 0.2; L.gU.uK.value = armed ? 9 : 30; L.fU.uA.value = armed ? 0.28 : 0.12; L.beam.scale.set(armed ? 1 : 0.4, armed ? 1 : 0.4, 1); if (armed && vrand() < dt * 30) { const r = 3 + vrand() * 16, a = L.grp.rotation.y; FX.burst(Math.sin(a) * r, 0.05, Math.cos(a) * r, { n: 1, color: 0xff6030, speed: [0.5, 2.5], up: 2, life: [0.2, 0.5], size: [0.08, 0.2] }); } } }
+      { const sh = S.bsh; let n = 0; for (const bb of Bul.list) { if (!bb.shell || n >= 400) continue; const s2 = bb.r * 1.3 * (bb.t < 0.15 ? bb.t / 0.15 : 1); _m4.makeScale(s2, s2, s2); _m4.setPosition(bb.x, bb.y, bb.z); sh.setMatrixAt(n, _m4); sh.setColorAt(n, _c3.setHex(bb.shell)); n++; }
+        sh.count = n; if (n) { sh.instanceMatrix.needsUpdate = true; sh.instanceColor.needsUpdate = true; } }
       // core
       S.heat = Math.max(0, S.heat - dt * 0.6); const dc = S.dangerCol, ch = dc === 1 ? CY : dc === 2 ? MG : CORE_COL[Math.min(2, Math.max(0, b.phase))];
       _c.setHex(ch); const hc = S.haloMat.uniforms.uC.value; hc.lerp(_c, Math.min(1, dt * 12)); S.coreL.color.copy(hc);
       const hk = Math.min(2.2, 1.3 + S.heat * 0.6 + (dc ? 0.4 : 0));
-      S.coreMat.color.copy(hc).multiplyScalar(0.9 + S.heat * 0.25); S.innerU.uC.value.copy(hc).multiplyScalar(1.0 + S.heat * 0.2); S.innerU.uHot.value = (dc ? 1.3 : 0.9) * (0.8 + 0.2 * Math.sin(t * 2.4)) + S.heat * 0.3; S.inner.rotation.y -= dt * 2.6; S.inner.rotation.z += dt * 1.1; for (let i = 0; i < 3; i++) { const U = S.shellU[i]; U.uC.value.copy(hc).multiplyScalar(hk * 0.6); U.uA.value = (0.14 + 0.1 * Math.sin(t * 2.6 + i * 2.1)) * (1 + S.heat * 0.4) * (1 - i * 0.25); } S.spikeMat.color.copy(hc).multiplyScalar(hk * 0.5); S.gapMat.emissive.copy(hc); S.gapMat.emissiveIntensity = Math.min(0.7, 0.35 + S.heat * 0.3 + (dc ? 0.2 : 0)); for (const gc of S.gapClones) { gc.emissive.copy(hc); gc.emissiveIntensity = S.gapMat.emissiveIntensity; }
+      S.coreMat.color.copy(hc).multiplyScalar(0.9 + S.heat * 0.25); S.innerU.uC.value.copy(hc).multiplyScalar(1.0 + S.heat * 0.2); S.innerU.uHot.value = (dc ? 1.3 : 0.9) * (0.8 + 0.2 * Math.sin(t * 2.4)) + S.heat * 0.3 + b.phase * 0.1; S.hotM.color.copy(hc).lerp(_c2.setRGB(1, 1, 1), 0.55).multiplyScalar(1.5 + S.heat * 0.4); S.inner.rotation.y -= dt * 2.6; S.inner.rotation.z += dt * 1.1; for (let i = 0; i < 3; i++) { const U = S.shellU[i]; U.uC.value.copy(hc).multiplyScalar(hk * 0.45); U.uA.value = (0.14 + 0.1 * Math.sin(t * 2.6 + i * 2.1)) * (1 + S.heat * 0.4) * (1 - i * 0.25); } S.spikeMat.color.copy(hc).multiplyScalar(hk * 0.5); S.gapMat.emissive.copy(hc); S.gapMat.emissiveIntensity = Math.min(1.5, 0.7 + b.phase * 0.25 + S.heat * 0.5 + (dc ? 0.3 : 0)); S.plateU.uHC.value.copy(hc); S.plateU.uHK.value = 0.5 + b.phase * 0.3 + S.heat * 0.6 + (dc ? 0.3 : 0); for (const gc of S.gapClones) { gc.emissive.copy(hc); gc.emissiveIntensity = S.gapMat.emissiveIntensity; }
       S.poolU.uC.value.copy(hc); S.tetherU.uC.value.copy(hc).multiplyScalar(1.4); S.tetherU.uT.value = t % 100; S.poolU.uA.value = 0.2 + S.heat * 0.1 + (dc ? 0.08 : 0);
-      S.haloMat.uniforms.uA.value = 0.5 + S.heat * 0.25;
+      S.haloMat.uniforms.uA.value = 0.32 + S.heat * 0.2;
       S.coreL.intensity = 40 + S.heat * 50 + (dc ? 40 : 0) + b.phase * 10; S.halo.scale.setScalar(1 + S.heat * 0.3 + Math.sin(t * 3) * 0.04 + S.open * 0.35);
       S.heart.rotation.y += dt * 1.2; S.heart.rotation.x += dt * 0.5; S.core.rotation.z += dt * 2; S.heart.scale.setScalar(1 + S.open * 0.25 + S.heat * 0.15 + Math.sin(t * 5) * 0.03);
       for (const o of S.orbitL) o.rotation.z += dt * 2.5;
       for (let pi = 0; pi < S.panels.length; pi++) { const pn = S.panels[pi]; const off = 0.25 + S.open * 0.3 + S.heat * 0.1 + (b.phase >= 2 && pi % 3 === 0 ? 0.9 + 0.3 * Math.sin(t * 0.7 + pi) : 0) + Math.max(0, Math.sin(t * 1.3 + pn.ph)) * 0.05; pn.m.position.copy(pn.cen).addScaledVector(pn.n, off); }
       S.rig.position.y = 4.2 + Math.sin(t * 0.9) * 0.25;
       const sp = 0.5 + b.phase * 0.5 + S.heat * 3; S.gyro[0].rotation.x += dt * sp; S.gyro[0].rotation.y += dt * sp * 0.3; S.gyro[1].rotation.y += dt * sp * 0.8; S.gyro[1].rotation.z += dt * sp * 0.4; S.gyro[2].rotation.x -= dt * sp * 0.6; S.gyro[2].rotation.z += dt * sp * 0.7;
-      S.finTrim.emissive.copy(S.trim.emissive); TICKU.uC.value.copy(S.trim.emissive); TICKU.uT.value = t % 1000; for (const tm of S.trimClones) tm.emissive.copy(S.trim.emissive);
+      for (let i = 0; i < S.finTrims.length; i++) { const fm = S.finTrims[i]; fm.emissive.copy(S.trim.emissive); fm.emissiveIntensity = i % 2 ? 0.22 + 0.06 * b.phase + S.heat * 0.15 : 0.6 + S.heat * 0.15; } TICKU.uC.value.copy(S.trim.emissive); LAMPU.uC.value.copy(S.trim.emissive).multiplyScalar(0.9); TICKU.uT.value = t % 1000; for (const tm of S.trimClones) tm.emissive.copy(S.trim.emissive);
       // phase 2+: arcs jump between the gimbal rings
       if (b.phase >= 1 && vrand() < dt * (b.phase * 1.6)) { const i = Math.floor(vrand() * 2), j = i + 1, A = S.arcV[0], B = S.arcV[1], a1 = vrand() * TAU, a2 = a1 + (vrand() - 0.5) * 0.8;
         A.set(Math.cos(a1) * S.GR[i], Math.sin(a1) * S.GR[i], 0); S.gyro[i].localToWorld(A); B.set(Math.cos(a2) * S.GR[j], Math.sin(a2) * S.GR[j], 0); S.gyro[j].localToWorld(B); FX.lightning(A, B, { color: b.phase >= 2 ? 0xb890ff : 0xff9a50, width: 0.05, jag: 0.35, dur: 0.14, mult: 1.6, sparks: false }); }
@@ -636,10 +676,9 @@
         for (let i = 0; i < want; i++) { const q = S.deb[i]; if (q.y < -45) { const tt = S.tiles[Math.floor(vrand() * S.tiles.length)]; q.x = tt.x + (vrand() - 0.5) * 4; q.z = tt.z + (vrand() - 0.5) * 4; q.y = -1.5 - vrand() * 30; q.vy = 0.6 + vrand() * 1.6; q.rx = vrand() * TAU; q.ry = vrand() * TAU; q.sr = (vrand() - 0.5) * 2; q.s = 0.5 + vrand() * 0.9; }
           q.y -= q.vy * dt; q.rx += q.sr * dt; q.ry += q.sr * 0.7 * dt; dm.position.set(q.x, q.y, q.z); dm.rotation.set(q.rx, q.ry, 0); dm.scale.setScalar(q.s); dm.updateMatrix(); S.debris.setMatrixAt(i, dm.matrix); }
         S.debris.instanceMatrix.needsUpdate = true; S.debris.material.emissive.copy(S.trim.emissive).multiplyScalar(0.25); }
-      S.orbit.rotation.y += dt * 0.02; S.gate.rotation.z += dt * 0.015; S.lipU.uC.value.copy(S.conduitU.uC.value); S.nodeL.material.color.copy(S.trim.emissive).multiplyScalar(1.2 + 0.8 * Math.max(0, Math.sin(t * 3))); S.hazeU.uC.value.copy(S.fog.color).multiplyScalar(3.2);
+      S.orbit.rotation.y += dt * 0.02; S.gate.rotation.z += dt * 0.015; S.lipU.uC.value.copy(S.conduitU.uC.value); S.nodeL.material.color.copy(S.trim.emissive).multiplyScalar(0.75 + 0.45 * Math.max(0, Math.sin(t * 3))); S.nodeHU.uC.value.copy(S.nodeL.material.color); S.hazeU.uC.value.copy(S.fog.color).multiplyScalar(3.2);
       const d = S.dummy;
-      for (let i = 0; i < S.shards.length; i++) { const u = S.shards[i]; u.a += dt * u.sp * (1 + b.phase * 0.6); const r = 5.6 + b.phase * 0.3 + S.heat * 0.4, ce = Math.cos(u.e * (1 - S.open * 0.5)); d.position.set(Math.sin(u.a) * r * ce, Math.sin(u.e) * r * (0.55 - S.open * 0.2), Math.cos(u.a) * r * ce); d.lookAt(0, 0, 0); d.rotateX(PI / 2); d.rotateY(0.95); d.scale.set(1.15, 1.15 * (1 + b.phase * 0.18), 1.15); d.updateMatrix(); S.finBody.setMatrixAt(i, d.matrix); S.finEdge.setMatrixAt(i, d.matrix); }
-      S.finBody.instanceMatrix.needsUpdate = true; S.finEdge.instanceMatrix.needsUpdate = true;
+      for (let i = 0; i < S.shards.length; i++) { const u = S.shards[i]; u.a += dt * u.sp * (1 + b.phase * 0.6); const r = 5.6 + b.phase * 0.3 + S.heat * 0.4, ce = Math.cos(u.e * (1 - S.open * 0.5)); d.position.set(Math.sin(u.a) * r * ce, Math.sin(u.e) * r * (0.55 - S.open * 0.2), Math.cos(u.a) * r * ce); d.lookAt(0, 0, 0); d.rotateX(PI / 2); d.rotateY(0.95); d.scale.set(1.15, 1.15 * (1 + b.phase * 0.18), 1.15); d.updateMatrix(); for (const m of S.fins[i]) m.matrix.copy(d.matrix); }
       // drone tethers
       for (let i = S.tethers.length - 1; i >= 0; i--) { const a = S.tethers[i]; if (!a.alive) { S.tethers.splice(i, 1); continue; } if (vrand() < dt * 30) { const k = vrand(); FX.burst(lerp(a.pos.x, 0, k), lerp(1.6, 4.2, k), lerp(a.pos.z, 0, k), { n: 1, color: 0xffb030, speed: [0, 0.6], life: [0.2, 0.45], size: [0.15, 0.3] }); } }
       S.planet.rotation.y += dt * 0.004; S.planet.material.uniforms.uT.value = t * 0.02 % 100;
@@ -662,5 +701,5 @@
       return h;
     },
   });
-  const _c = new THREE.Color(), _c2 = new THREE.Color(), _v = new V3();
+  const _c = new THREE.Color(), _c2 = new THREE.Color(), _c3 = new THREE.Color(), _m4 = new THREE.Matrix4(), _v = new V3();
 })();
