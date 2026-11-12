@@ -164,7 +164,8 @@ const FinalShader = {
   vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
   fragmentShader: `
     uniform sampler2D tDiffuse; uniform float uTime,uVig,uChroma,uGrain,uSat,uPulse,uContrast; uniform vec3 uTint,uLift; uniform vec4 uFlash; varying vec2 vUv;
-    float h(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233))+uTime*7.13)*43758.5453); }
+    // sin-free hash: sin() of pixel-sized arguments loses precision on real GPUs (D3D11) and lined the grain up into vertical stripes in dark frames
+    float h(vec2 p){ p += fract(uTime*vec2(7.13,3.71))*vec2(113.0,71.0); vec3 q=fract(vec3(p.xyx)*0.1031); q+=dot(q,q.yzx+33.33); return fract((q.x+q.y)*q.z); }
     void main(){
       vec2 c = vUv-0.5; float r2 = dot(c,c);
       float ch = uChroma*(1.0+uPulse*6.0)*(0.4+r2*3.0);
