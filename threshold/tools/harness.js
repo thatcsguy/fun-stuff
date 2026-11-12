@@ -4,7 +4,12 @@ const fs = require('fs'), path = require('path');
 const ROOT = process.env.TH_ROOT || path.resolve(__dirname, '../..'), THREE = process.env.THREE_DIR || path.resolve(__dirname, 'package');
 const types = {'.js':'text/javascript','.html':'text/html','.css':'text/css','.json':'application/json','.png':'image/png'};
 async function launch(o = {}) {
-  const browser = await chromium.launch({ args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist'] });
+  // TH_GPU=1: real-GPU mode for a machine with a graphics card (e.g. Patrick's Windows PC). Uses installed Chrome
+  // (TH_CHANNEL overrides, e.g. msedge) with hardware ANGLE; TH_HEADED=1 shows the window. Default stays SwiftShader for GPU-less sandboxes.
+  const gpu = !!process.env.TH_GPU;
+  const browser = await chromium.launch(gpu
+    ? { channel: process.env.TH_CHANNEL || 'chrome', headless: !process.env.TH_HEADED, args: ['--use-angle=' + (process.env.TH_ANGLE || (process.platform === 'win32' ? 'd3d11' : 'default')), '--ignore-gpu-blocklist', '--enable-gpu-rasterization'] }
+    : { args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--ignore-gpu-blocklist'] });
   const ctx = await browser.newContext({ viewport: { width: o.w || 1280, height: o.h || 720 }, deviceScaleFactor: 1 });
   await ctx.route(/^https:\/\/cdn\.jsdelivr\.net\/npm\/three@[^/]+\/(.*)$/, (route) => {
     const m = route.request().url().match(/three@[^/]+\/([^?#]*)/); const f = path.join(THREE, m[1]);
@@ -17,7 +22,7 @@ async function launch(o = {}) {
     route.fulfill({ status: 200, contentType: types[path.extname(f)] || 'text/plain', body: fs.readFileSync(f) });
   });
   const page = await ctx.newPage();
-  page.on('console', (m) => { if (m.type() === 'error' || (m.type() === 'warning' && !/GPU stall|swiftshader|Automatic fallback/i.test(m.text()))) console.log('[console.' + m.type() + ']', m.text().slice(0, 400)); });
+  page.on('console', (m) => { if (m.type() === 'error' || (m.type() === 'warning' && !/GPU stall|swiftshader|Automatic fallback|X3595/i.test(m.text()))) console.log('[console.' + m.type() + ']', m.text().slice(0, 400)); });
   page.on('pageerror', (e) => console.log('[pageerror]', (e.stack||e.message).split('\n').slice(0,4).join(' | ')));
   return { browser, page };
 }
