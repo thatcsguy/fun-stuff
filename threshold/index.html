@@ -10442,6 +10442,9 @@ const Warm = (() => {
     return true;
   }
   const LNOW = { x: 0, z: 0, h: 13 }, LFUT = { x: 0, z: 0, h: 13 };
+  const lampFut = (S, at) => lampAt(S, S.lt + Math.max(0, at - G.now) * S.lrate, LFUT);
+  // tuning: seconds in the dark before it bites, seconds for Snuff to shrink the light, and the small pool's radius
+  const GRACE = 1.5, SHRINK = 3.0, POOL = 6;
   const lit = (S, x, z) => litBy(S, S.lamp, x, z, S.pool);
 
   function buildHall(g, S) {
@@ -10643,7 +10646,7 @@ const Warm = (() => {
     // a hidden template so every shade material is compiled during the loading warm-up
     { const tpl = new THREE.Group(); tpl.position.set(0, -50, 0); g.add(tpl); for (const [geo, m] of [[S.shadeKit.robe, shM], [S.shadeKit.hood, shHood], [S.shadeKit.head, shBlack], [S.shadeKit.eye, shEye]]) tpl.add(new THREE.Mesh(geo.clone(), m)); }
     S.tint = [1, 1, 1]; S.lift = [0, 0, 0];
-    Object.assign(S, { lvl: 0, lvV: 0, lamp: { x: 0, z: 0, h: 13 }, pool: 0, poolT: 0, out: 0, carried: false, bx: 0, bz: 0, darkT: 0, bites: 0, biteT: 0, flareAt: 0, sunAt: 0, flareK: 0, sunK: 0, raise: 0, shades: [], dayK: 0, spotI: 15, litK: 0 });
+    Object.assign(S, { lvl: 0, lvV: 0, lamp: { x: 0, z: 0, h: 13 }, pool: 0, poolT: 0, out: 0, carried: false, bx: 0, bz: 0, darkT: 0, bites: 0, lt: 0, lrate: 1, biteT: 0, flareAt: 0, sunAt: 0, flareK: 0, sunK: 0, raise: 0, shades: [], dayK: 0, spotI: 15, litK: 0 });
     return {
       edge: 'wall', spawn: { x: 0, z: 6 }, bossStart: { x: 1, z: -14, face: 0 }, camDist: 16,
       contains: (x, z) => Math.hypot(x, z) <= R - 0.5, bulletBounds: (x, z) => Math.hypot(x, z) < R + 1,
@@ -10687,7 +10690,7 @@ const Warm = (() => {
   }
   function* snuff(b) {
     const S = b.state; S.raise = 1; const r = yield* b.cast({ name: 'Snuff', time: 1.6 }); S.raise = 0; if (r !== 'done') return;
-    Sound.sfx('steam', 0.9, 0.6); S.poolT = 5.5; yield 1.0;
+    Sound.sfx('steam', 0.9, 0.6); S.poolT = 7.0; yield 1.0;
   }
   function* step(b) {
     const S = b.state, alive = S.cols.filter((c) => c.alive); let x, z;
@@ -10796,11 +10799,17 @@ const Warm = (() => {
     update(b, dt) {
       const S = b.state, p = G.player, t = G.now, fight = G.state === 'fight';
       // the lamp
-      S.bx = b.pos.x; S.bz = b.pos.z; lampAt(S, t, LNOW);
+      // the lamp keeps its own clock so it can drift slower while Snuff holds it to a small pool
+      S.slowK = damp(S.slowK || 0, S.poolT > 0 ? 1 : 0, 4, dt); S.lrate = 1 - 0.55 * S.slowK; S.lt += dt * S.lrate;
+      S.bx = b.pos.x; S.bz = b.pos.z; lampAt(S, S.lt, LNOW);
       const k = 1 - Math.exp(-(S.carried ? 5 : 2.5) * dt); S.lamp.x = lerp(S.lamp.x, LNOW.x, k); S.lamp.z = lerp(S.lamp.z, LNOW.z, k); S.lamp.h = lerp(S.lamp.h, LNOW.h, k);
       if (S.poolT > 0) S.poolT -= dt; if (S.out > 0) S.out -= dt;
-      S.poolK = damp(S.poolK || 0, S.poolT > 0 ? 1 : 0, 3, dt); S.pool = S.poolK > 0.5 ? 6 : 0;
-      const ang = lerp(ANG, Math.atan(6 / S.lamp.h), S.poolK); S.spot.angle = ang;
+      // Snuff shrinks the light to its small pool over SHRINK seconds (the lit area shrinks with it), then lets it out quickly
+      S.poolK = S.poolT > 0 ? Math.min(1, (S.poolK || 0) + dt / SHRINK) : Math.max(0, (S.poolK || 0) - dt / 0.8);
+      // (the shrink starts from the arena's far wall, not the lamp's full reach, so all of SHRINK is felt)
+      const pe = smooth(S.poolK), full = S.lamp.h * Math.tan(ANG), r0 = Math.min(full * 0.96, R + Math.hypot(S.lamp.x, S.lamp.z));
+      S.pool = S.poolK > 0 ? lerp(r0, POOL, pe) : 0;
+      const ang = Math.atan((S.poolK > 0 ? lerp(r0 / 0.96, POOL, pe) : full) / S.lamp.h); S.spot.angle = ang;
       S.spot.position.set(S.lamp.x, S.lamp.h, S.lamp.z); S.spot.target.position.set(S.lamp.x, 0, S.lamp.z);
       S.burst = Math.max(0, (S.burst || 0) - dt * 2.5); S.dip = Math.max(0, (S.dip || 0) - dt * 1.6); S.outK = damp(S.outK || 0, S.out > 0 ? 1 : 0, 6, dt);
       S.lvV = damp(S.lvV, S.lvl, 1.2, dt); const L = S.lvV; S.uT.value = t;
@@ -10864,7 +10873,7 @@ const Warm = (() => {
       const Lp = lit(S, p.pos.x, p.pos.z);
       if (fight && p.alive && !Lp && !b.transitioning) {
         S.darkT += dt;
-        if (S.darkT > 0.6) { p.speedMul = 0.75; S.biteT -= dt; if (S.biteT <= 0) { S.biteT = 0.5; p.hurt(Math.min(130, 45 + S.bites * 14), { blockable: false, dot: true, src: { name: 'The Dark' } }); S.bites++; if (!G.headless) FX.burst(p.pos.x, 0.3, p.pos.z, { n: 10, color: 0x06050a, color2: 0x282038, speed: [1, 4], up: 3, life: [0.3, 0.7], size: [0.3, 0.7], radius: 0.8, smoke: true }); } }
+        if (S.darkT > GRACE) { p.speedMul = 0.75; S.biteT -= dt; if (S.biteT <= 0) { S.biteT = 0.5; p.hurt(Math.min(130, 45 + S.bites * 14), { blockable: false, dot: true, src: { name: 'The Dark' } }); S.bites++; if (!G.headless) FX.burst(p.pos.x, 0.3, p.pos.z, { n: 10, color: 0x06050a, color2: 0x282038, speed: [1, 4], up: 3, life: [0.3, 0.7], size: [0.3, 0.7], radius: 0.8, smoke: true }); } }
       } else { p.speedMul = 1; S.darkT = Math.max(0, S.darkT - dt * 2); if (S.darkT === 0) { S.bites = 0; S.biteT = 0; } }
       if (G.headless) return;
       // pillars that hide the player or the boss (or crowd the camera) dissolve to an outline
@@ -10894,8 +10903,8 @@ const Warm = (() => {
     },
     danger(b, x, z) {
       const S = b.state; let best = Infinity;
-      if (S.flareAt) { lampAt(S, S.flareAt, LFUT); if (litBy(S, LFUT, x, z, S.pool)) best = Math.max(0, S.flareAt - G.now); }
-      if (S.sunAt) { lampAt(S, S.sunAt, LFUT); if (!litBy(S, LFUT, x, z, S.pool)) best = Math.min(best, Math.max(0, S.sunAt - G.now)); }
+      if (S.flareAt) { lampFut(S, S.flareAt); if (litBy(S, LFUT, x, z, S.pool)) best = Math.max(0, S.flareAt - G.now); }
+      if (S.sunAt) { lampFut(S, S.sunAt); if (!litBy(S, LFUT, x, z, S.pool)) best = Math.min(best, Math.max(0, S.sunAt - G.now)); }
       if (best === Infinity && !(S.flareAt && S.flareAt - G.now < 1.6) && !lit(S, x, z)) best = 0.4; // the dark itself
       return best;
     },
@@ -10903,7 +10912,7 @@ const Warm = (() => {
       const S = b.state, wantDark = S.flareAt && (!S.sunAt || S.flareAt < S.sunAt) && S.flareAt - G.now < 1.6, avoid = (x, z) => !wantDark && !lit(S, x, z);
       let target = b; for (const e of S.shades) if (e.alive && !e.immune) target = e;
       if (S.flareAt && (!S.sunAt || S.flareAt < S.sunAt)) { // head for where a shadow will be when the lamp flares
-        lampAt(S, S.flareAt, LFUT); let best = null, bd = 1e9;
+        lampFut(S, S.flareAt); let best = null, bd = 1e9;
         for (const c of S.cols) { if (!c.alive) continue; const a = Math.atan2(c.x - LFUT.x, c.z - LFUT.z); for (const d of [2.2, 3.4, 4.6]) { const x = c.x + Math.sin(a) * d, z = c.z + Math.cos(a) * d; if (Math.hypot(x, z) > R - 1 || litBy(S, LFUT, x, z, S.pool)) continue; const q = Math.hypot(x - p.pos.x, z - p.pos.z); if (q < bd) { bd = q; best = [x, z]; } } }
         if (best) { const tt = bd / 7, left = S.flareAt - G.now; if (left < tt + 0.9) return { x: best[0], z: best[1], w: 4, avoid, target }; const a = Math.atan2(p.pos.x - best[0], p.pos.z - best[1]); let wx = best[0] + Math.sin(a) * 2.4, wz = best[1] + Math.cos(a) * 2.4; if (!lit(S, wx, wz)) { wx = best[0] - Math.cos(a) * 2.6; wz = best[1] + Math.sin(a) * 2.6; } return { x: wx, z: wz, w: 2, avoid, target }; }
       }
