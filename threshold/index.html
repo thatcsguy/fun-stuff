@@ -9713,9 +9713,10 @@ const Warm = (() => {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); return g;
   }
   // the paper's cut edge: a thin wall showing its thickness (and its reverse colour)
-  function edgeGeo(P, map, d = 0.14) {
+  function edgeGeo(P, map, d = 0.14, keep) {
     const pos = [], uv = [], col = [];
     for (let i = 0; i < P.length; i++) {
+      if (keep && !keep(P[i], P[(i + 1) % P.length])) continue;
       const A = P[i], B = P[(i + 1) % P.length], a = map ? map(A[0], A[1]) : A, c = map ? map(B[0], B[1]) : B, ua = suv(A), ub = suv(B);
       pos.push(a[0], 0, a[1], c[0], 0, c[1], c[0], -d, c[1], a[0], 0, a[1], c[0], -d, c[1], a[0], -d, a[1]); uv.push(...ua, ...ub, ...ub, ...ua, ...ub, ...ua);
       col.push(1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 0.22, 0.22, 0.22, 1.6, 1.6, 1.6, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22); // lit cut edge on top, falling into shadow underneath
@@ -9878,6 +9879,7 @@ const Warm = (() => {
       hm.position.y = -0.25; hm.renderOrder = 2; g.add(hm);
     }
     S.baseEdge = new THREE.Mesh(edgeGeo(S.poly, null, 0.4), S.edgeM); S.baseEdge.receiveShadow = true; g.add(S.baseEdge);
+    S.land = [null, null];
     S.flaps = [0, 1].map(() => { const grp = new THREE.Group(), piv = new THREE.Group(); grp.add(piv); const top = new THREE.Mesh(polyGeo(SQUARE()), S.paperM), un = new THREE.Mesh(top.geometry, S.underM), ed = new THREE.Mesh(edgeGeo(SQUARE()), S.edgeM); top.receiveShadow = true; top.castShadow = true; un.receiveShadow = true; un.castShadow = true; un.position.y = -0.03; piv.add(top); piv.add(un); piv.add(ed); grp.visible = false; g.add(grp); return { grp, piv, top, un, ed, phi: 0, f: null, blots: [] }; });
     // ink: blots that ride the flap, and the prints they leave (feathered, pooled at the rim)
     S.inkU = { uIA: { value: new THREE.Color(0.03, 0.035, 0.08) }, uIB: { value: new THREE.Color(0.006, 0.008, 0.02) }, uIE: { value: new THREE.Color(0, 0, 0) }, uSh: { value: 0 } };
@@ -10118,7 +10120,7 @@ const Warm = (() => {
   }
   function setupFlap(S, k, f, poly) {
     const F = S.flaps[k], th = Math.atan2(-f.nx, -f.nz), X = [Math.cos(th), -Math.sin(th)], fp = clipPoly(poly, f, false);
-    F.f = f; F.th = th; F.phi = 0; F.grp.position.set(f.cx, 0.012 * (k + 1), f.cz); F.grp.rotation.y = th; F.piv.rotation.x = 0; F.grp.visible = fp.length >= 3;
+    F.f = f; F.fp = fp; F.th = th; F.phi = 0; F.grp.position.set(f.cx, 0.012 * (k + 1), f.cz); F.grp.rotation.y = th; F.piv.rotation.x = 0; F.grp.visible = fp.length >= 3;
     F.toLocal = (x, z) => [(x - f.cx) * X[0] + (z - f.cz) * X[1], -side(f, x, z)];
     F.top.geometry.dispose(); F.top.geometry = F.un.geometry = polyGeo(fp, F.toLocal, 3); F.ed.geometry.dispose(); F.ed.geometry = edgeGeo(fp, F.toLocal); F.curl = 0;
     F.p0 = [F.top.geometry, F.ed.geometry].map((q) => q.attributes.position.array.slice()); F.zMax = 1; for (let i = 2; i < F.p0[0].length; i += 3) F.zMax = Math.max(F.zMax, F.p0[0][i]);
@@ -10136,7 +10138,42 @@ const Warm = (() => {
   function clearInk(S) { for (const m of S.blotPool.concat(S.barPool)) { m.visible = false; if (m.parent !== G.world) G.world.add(m); } S.prints.length = 0; for (const F of S.flaps) F.blots = []; }
   function baseGeo(S, P) { S.base.geometry.dispose(); S.base.geometry = S.baseUnder.geometry = polyGeo(P); S.baseEdge.geometry.dispose(); S.baseEdge.geometry = edgeGeo(P, null, 0.4); }
   function setFloor(S, folds) { S.folds = folds; let P = SQUARE(); for (const f of folds) P = clipPoly(P, f, true); S.poly = P; baseGeo(S, P); }
-  function resetSheet(S) { setFloor(S, []); for (const F of S.flaps) { F.grp.visible = false; F.phi = 0; F.anim = null; } for (const d of S.dashes.concat(S.chevs)) d.count = 0; clearInk(S); S.pend = null; S.safe = null; }
+  // ---------- landed paper: once a flap is down it is redrawn where it really lies (world UVs, so the real holes show through),
+  // and whatever hangs past the floor's edge drapes down over it like a tablecloth, so what looks like floor is floor ----------
+  const DROOP = 1.4;
+  function clearLand(S, k) { const L = S.land[k]; if (!L) return; L.grp.traverse((o) => { if (o.isMesh) o.geometry.dispose(); }); L.grp.removeFromParent(); S.land[k] = null; }
+  function edgeLines(P) { // a convex polygon's edges as half-planes, side > 0 inside
+    let cx = 0, cz = 0; for (const q of P) { cx += q[0]; cz += q[1]; } cx /= P.length; cz /= P.length; const out = [];
+    for (let i = 0; i < P.length; i++) { const A = P[i], B = P[(i + 1) % P.length], dx = B[0] - A[0], dz = B[1] - A[1], len = Math.hypot(dx, dz); if (len < 1e-3) continue;
+      let nx = -dz / len, nz = dx / len; if ((cx - A[0]) * nx + (cz - A[1]) * nz < 0) { nx = -nx; nz = -nz; } out.push({ cx: A[0], cz: A[1], nx, nz }); }
+    return out;
+  }
+  // floor: the walkable polygon to drape over; cut: a later crease whose flap has carried part of this paper away
+  function buildLand(S, k, floor, cut, settled) {
+    clearLand(S, k); const F = S.flaps[k]; if (G.headless || !F.fp || F.fp.length < 3) return false;
+    let R = F.fp.map((q) => refl(F.f, q[0], q[1])); if (cut) R = clipPoly(R, cut, true); if (R.length < 3) return false;
+    const grp = new THREE.Group(), y = 0.012 * (k + 1) + 0.03, L = { grp, drapes: [], rise: -1 }, hinges = []; grp.position.y = y; G.world.add(grp); S.land[k] = L;
+    for (const e of edgeLines(floor)) {
+      const out = clipPoly(R, e, false); R = clipPoly(R, e, true); if (out.length < 3) continue;
+      let deep = 0; for (const q of out) deep = Math.max(deep, -side(e, q[0], q[1])); if (deep < 0.3) continue; hinges.push(e);
+      const th = Math.atan2(-e.nx, -e.nz), X = [Math.cos(th), -Math.sin(th)], toL = (x, z) => [(x - e.cx) * X[0] + (z - e.cz) * X[1], -side(e, x, z)];
+      const dg = new THREE.Group(), piv = new THREE.Group(); dg.position.set(e.cx - e.nx * 0.02 * k, 0, e.cz - e.nz * 0.02 * k); dg.rotation.y = th; dg.add(piv); grp.add(dg);
+      const top = new THREE.Mesh(polyGeo(out, toL, 1), S.underM), ed = new THREE.Mesh(edgeGeo(out, toL), S.edgeM); top.castShadow = true; top.receiveShadow = true; piv.add(top); piv.add(ed);
+      L.drapes.push({ piv, t: settled ? 1 : 0 }); piv.rotation.x = settled ? DROOP : 0;
+    }
+    if (R.length >= 3) {
+      const on = (e, q) => Math.abs(side(e, q[0], q[1])) < 1e-3, keep = (A, B) => !hinges.some((e) => on(e, A) && on(e, B));
+      const m = new THREE.Mesh(polyGeo(R), S.underM), ed = new THREE.Mesh(edgeGeo(R, null, 0.14, keep), S.edgeM); m.receiveShadow = true; grp.add(m); grp.add(ed); L.flat = [m, ed];
+    }
+    return true;
+  }
+  function landStep(S, dt) {
+    for (let k = 0; k < 2; k++) { const L = S.land[k]; if (!L) continue;
+      if (L.rise >= 0) { L.rise += dt; const q = 1 - smooth(clamp(L.rise / 0.12, 0, 1)); for (const d of L.drapes) d.piv.rotation.x = Math.min(d.piv.rotation.x, DROOP * q); if (L.rise >= 0.12) clearLand(S, k); continue; }
+      for (const d of L.drapes) if (d.t < 1) { d.t = Math.min(1, d.t + dt / 0.25); const u = d.t - 1, c = 1.2; d.piv.rotation.x = DROOP * (1 + (c + 1) * u * u * u + c * u * u); } // ease out with a little overshoot
+    }
+  }
+  function resetSheet(S) { clearLand(S, 0); clearLand(S, 1); setFloor(S, []); for (const F of S.flaps) { F.grp.visible = false; F.phi = 0; F.anim = null; } for (const d of S.dashes.concat(S.chevs)) d.count = 0; clearInk(S); S.pend = null; S.safe = null; }
   function creaseFx(S, k, lift) {
     const F = S.flaps[k]; if (G.headless || !F.seg) return; const [A, B] = F.seg, len = Math.hypot(B[0] - A[0], B[1] - A[1]), m = S.cflash[k];
     if (lift) { m.visible = true; m.k = 1; m.position.set((A[0] + B[0]) / 2, 0.08, (A[1] + B[1]) / 2); m.rotation.y = Math.atan2(B[0] - A[0], B[1] - A[1]); m.scale.set(1.4, 1, len); }
@@ -10162,10 +10199,11 @@ const Warm = (() => {
       Sound.sfx('wave', 0.9, 1.6); Sound.sfx('slash', 0.7, 0.5);
       if (p.alive && side(f, p.pos.x, p.pos.z) < 0 && G.arena.contains(p.pos.x, p.pos.z)) { const dist = -side(f, p.pos.x, p.pos.z) + 3; p.hurt(300, { blockable: false, src: { name: 'The Fold' } }); if (p.alive) { p.kb = { vx: f.nx * dist / 0.38, vz: f.nz * dist / 0.38, t: 0.38 }; p.casting = null; p.dash = null; } }
       F.anim = { t: 0, from: 0, to: -PI, dur: 0.5 }; S.dashes[k].count = 0; S.chevs[k].count = 0;
-      if (!G.headless) { let P = SQUARE(); for (const c of pl.creases.slice(0, k + 1)) P = clipPoly(P, c, true); baseGeo(S, P); creaseFx(S, k, true); } // the lifted flap leaves the void behind it (visual only)
+      if (!G.headless) { let P = SQUARE(); for (const c of pl.creases.slice(0, k + 1)) P = clipPoly(P, c, true); baseGeo(S, P); creaseFx(S, k, true); for (let j = 0; j < k; j++) if (S.land[j]) buildLand(S, j, P, f, true); } // the lifted flap leaves the void behind it (visual only)
       yield 0.5;
       // slam: wet ink prints at its mirror image
       setFloor(S, pl.creases.slice(0, k + 1)); Sound.sfx('bigboom', 0.9, 1.3); FX.shake(0.7); creaseFx(S, k, false);
+      if (!G.headless) { buildLand(S, k, S.poly, null, false); F.grp.visible = false; F.piv.rotation.x = -PI; F.anim = null; }
       for (const m of F.blots) if (m) { m.visible = false; G.world.add(m); }
       const stay = [];
       pl.prints[k].forEach((q) => {
@@ -10184,9 +10222,10 @@ const Warm = (() => {
   }
   function* unfold(b) {
     const S = b.state; if (!S.folds.length) return;
+    for (const L of S.land) if (L) { L.rise = 0; if (L.flat) for (const m of L.flat) m.visible = false; }
     for (const F of S.flaps) if (F.f && S.folds.includes(F.f)) { F.grp.visible = true; F.piv.rotation.x = -PI; F.anim = { t: 0, from: -PI, to: 0, dur: 0.6 }; for (const m of F.blots) if (m) { m.visible = false; G.world.add(m); } F.blots = []; }
     Sound.sfx('wave', 0.6, 1.2); yield 0.6;
-    setFloor(S, []); for (const F of S.flaps) F.grp.visible = false;
+    clearLand(S, 0); clearLand(S, 1); setFloor(S, []); for (const F of S.flaps) F.grp.visible = false;
   }
 
   // ---------- forms ----------
@@ -10400,7 +10439,7 @@ const Warm = (() => {
     ],
     update(b, dt) {
       const S = b.state, p = G.player, t = G.now;
-      moodStep(S, dt); burnStep(S, dt);
+      moodStep(S, dt); burnStep(S, dt); if (!G.headless) landStep(S, dt);
       if (S.burning && G.state === 'fight') { S.creepT -= dt; if (S.creepT <= 0) { S.creepT = 5.5; creep(S, 4); } }
       // flaps: think-time flutter, then the swing
       for (let k = 0; k < 2; k++) {
