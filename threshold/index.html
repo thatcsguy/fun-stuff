@@ -5593,6 +5593,8 @@ const Warm = (() => {
     S.conduitU.uC.value.setHex([CY, 0xff6030, 0x8a40ff][lvl]); S.trim.emissive.setHex([CY, 0xff7a30, 0x9a50ff][lvl]);
     Post.set(Object.assign({}, b.def.post, [{}, { bloom: 0.58, tint: [1.04, 0.98, 1.0] }, { bloom: 0.62, threshold: 0.9, tint: [1.0, 0.97, 1.07], exposure: 1.0 }][lvl]));
   }
+  // a phase change kills Polarize mid-cast; without this its colours stay painted on the grid until the next Polarize
+  const clearPol = (b) => { const S = b.state; S.pol = null; for (const t of S.tiles) t.col = 0; if (S.dangerCol) setCore(b, 0); };
   const dropNow = (S, list) => { for (const i of list) { const q = S.tiles[i]; if (!q.present) continue; q.present = false; q.warn = 0; q.col = 0; q.y = -60; q.backT = 0; } };
 
   G.bosses.push({
@@ -5614,7 +5616,7 @@ const Warm = (() => {
         while (true) { yield* polarize(b); yield* lance(b); yield* sweep(b, 2, 10, 0.5); yield* overclock(b); yield* polarize(b); yield* lance(b, 2); yield* sweep(b, 2, 9, 0.55, { reverse: true }); }
       } },
       { at: 0.68, skipTo(b) { skipLook(b, 1); }, *enter(b) {
-        const S = b.state; S.sweep = null; Sound.sfx('roar', 0.8, 2); FX.flash(0xff6030, 0.3, 1.5); FX.shake(0.7); Co.start(eclipse(b, 1), 'fight'); Co.start(Post.lerpTo({ bloom: 0.58, tint: [1.04, 0.98, 1.0] }, 3), 'fight');
+        const S = b.state; S.sweep = null; clearPol(b); Sound.sfx('roar', 0.8, 2); FX.flash(0xff6030, 0.3, 1.5); FX.shake(0.7); Co.start(eclipse(b, 1), 'fight'); Co.start(Post.lerpTo({ bloom: 0.58, tint: [1.04, 0.98, 1.0] }, 3), 'fight');
         dropTiles(b, [0, 6, 42, 48, 3, 21, 27, 45], { warn: 3.2 }); S.conduitU.uC.value.setHex(0xff6030); S.trim.emissive.setHex(0xff7a30); yield 3.6;
       }, *run(b) {
         while (true) {
@@ -5624,7 +5626,7 @@ const Warm = (() => {
         }
       } },
       { at: 0.35, skipTo(b) { skipLook(b, 2); dropNow(b.state, [0, 6, 42, 48, 3, 21, 27, 45]); }, *enter(b) {
-        const S = b.state; S.sweep = null; for (const e of G.ents) if (e.isAdd) e.die(); b.immune = true;
+        const S = b.state; S.sweep = null; clearPol(b); for (const e of G.ents) if (e.isAdd) e.die(); b.immune = true;
         yield* b.cast({ name: 'Critical Mass', time: 2.6, onTick: (k) => { S.heat = k; FX.shake(k * 0.5); } });
         Sound.sfx('bigboom'); Sound.sfx('shatter'); FX.flash(0xd8c8ff, 0.4, 1.6); FX.shake(1.3); FX.explode(0, 4.2, 0, 0xb080ff, 9, 0xe0d0ff); Co.start(eclipse(b, 2), 'fight'); Co.start(Post.lerpTo({ bloom: 0.62, threshold: 0.9, tint: [1.0, 0.97, 1.07], exposure: 1.0 }, 2), 'fight');
         const outer = []; for (const t of S.tiles) if (t.present && Math.max(Math.abs(t.ix - 3), Math.abs(t.iz - 3)) === 3) outer.push(t.iz * N + t.ix); dropTiles(b, outer, { warn: 3.4 });
