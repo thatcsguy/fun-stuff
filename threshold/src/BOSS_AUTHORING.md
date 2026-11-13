@@ -47,6 +47,8 @@ House rules for these fights:
 
 Angles: angle `a` points along `(sin a, cos a)` on the XZ plane, the same as `rotation.y`.
 
+A floor that turns under the player (carrying them with `player.push`) should also turn `Cam.yaw` and `player.facing` by the same angular velocity each frame, or the floor appears to spin around the player and camera-relative WASD drifts. See the "carry the player" block in `27_boss_wheel.js` `update()`, which also blends the rate when the player steps between rings and skips while `Cam.cine` is set.
+
 ## Scripting
 
 Phases are generator coroutines. `yield 1.5` waits seconds, `yield` waits a frame, `yield () => cond` waits for a condition, `yield*` calls another generator. When health crosses the next phase's `at`, the running `run` is cancelled, hazards tagged `'phase'` are cleared, and `enter` then `run` of the next phase start. Use `Co.start(gen, 'fight')` for things that must survive a phase change.
