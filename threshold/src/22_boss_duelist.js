@@ -411,8 +411,8 @@
       fragmentShader: 'uniform float uTime; varying float vF; varying vec3 vL; void main(){ float k=clamp(vF,0.0,1.0); float lob=0.5+0.5*cos(atan(vL.z,vL.x+1e-4)*5.0+uTime*2.0); vec3 rim=vec3(1.0,0.34,0.58), body=vec3(0.82,0.1,0.3)*(0.85+0.15*lob), core=vec3(1.15,0.78,0.88);\n vec3 c=mix(rim,body,smoothstep(0.0,0.5,k)); c=mix(c,core,smoothstep(0.955,0.995,k)); gl_FragColor=vec4(clamp(c,vec3(0.0),vec3(1.3)),1.0); }' }), 320);
     S.orb.count = 0; S.orb.frustumCulled = false; g.add(S.orb); S.M4 = new THREE.Matrix4();
     S.orbHalo = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), haloMat(new THREE.Color(0xff3a78).multiplyScalar(0.22)), 320); S.orbHalo.count = 0; S.orbHalo.frustumCulled = false; S.orbHalo.renderOrder = 14; g.add(S.orbHalo);
-    S.cuts = []; S.haste = 0; S.still = false; S.walk = false; S.kneel = 0; S.night = 0; S.open = 0; S.torn = false; S.tv = new V3();
-    b.onDamaged = (amt, info) => { if (S.still && !S.countered && info.src === 'player') { S.countered = true; Co.start(counter(b), 'phase'); } };
+    S.cuts = []; S.haste = 0; S.still = false; S.warn = 0; S.graceT = 0; S.walk = false; S.kneel = 0; S.night = 0; S.open = 0; S.torn = false; S.tv = new V3();
+    b.onDamaged = (amt, info) => { if (S.still && !S.countered && G.now >= S.graceT && info.src === 'player') { S.countered = true; Co.start(counter(b), 'phase'); } };
     return { edge: 'wall', radius: R, spawn: { x: 0, z: 10 }, bossStart: { x: 0, z: -5, face: 0 }, contains: (x, z) => x * x + z * z <= R * R,
       camLimit(x, y, z) { const r = Math.hypot(x, z); if (r > 25) { x *= 25 / r; z *= 25 / r; } return { x, y: Math.min(y, 15), z }; } };
   }
@@ -486,8 +486,15 @@
     }
     yield 0.5; S.fake.parryT = 0; yield 0.4;
   }
+  // tell before Stillness: 1.2 s of blade glint, a closing pale ring and a rising chime, then a short grace when he kneels,
+  // so a 1.5 s Bolt started on the tell still lands safely and in-flight hits are not punished
+  const STILL_TELL = 1.2, STILL_GRACE = 0.35;
   function* stillness(b, dur = 2.3) {
-    const S = b.state; S.walk = false; S.still = true; S.countered = false; S.kneel = 1; Sound.sfx('bell', 0.45, 3); b.facing = b.angToPlayer();
+    const S = b.state; S.walk = false; b.facing = b.angToPlayer(); S.warn = 0.001;
+    Sound.sfx('glint', 0.9); FX.flash(0xfff4e0, 0.16, 2.2);
+    if (!G.headless) { FX.ring(b.pos.x, b.pos.z, { r0: 7.5, r1: 1.3, color: 0xfff4e0, dur: STILL_TELL, width: 0.24, mult: 1.7 }); FX.light(b.pos.x, 3, b.pos.z, 0xfff0d0, 45, STILL_TELL, 18); }
+    yield STILL_TELL;
+    S.warn = 0; S.still = true; S.graceT = G.now + STILL_GRACE; S.countered = false; S.kneel = 1; Sound.sfx('bell', 0.45, 3); b.facing = b.angToPlayer();
     yield* b.cast({ name: 'Stillness', time: dur });
     S.still = false; S.kneel = 0;
     if (!S.countered) { S.open = 3.2; b.dmgTaken = 1.6; petals(b.pos.x, b.pos.z, 24); yield 3.2; b.dmgTaken = 1; } else yield 1.0;
@@ -618,7 +625,8 @@
       if (ph >= 1 && b.group.visible && vrand() < dt * (ph >= 2 ? 26 : 16)) { const sh = S.shs[vrand() < 0.5 ? 0 : 1]; sh.getWorldPosition(S.tv); FX.burst(S.tv.x, S.tv.y + 0.1, S.tv.z, { n: 1, color: ph >= 2 ? 0xff3048 : 0xffb0c4, color2: ph >= 2 ? 0x400010 : ROSE, speed: [0.4, 1.4], up: 1.6, life: [0.6, 1.2], size: [0.1, 0.2], radius: 0.25 }); }
       const mk = ph >= 2 ? S.night : 0; const eg = ph >= 1 ? 1.35 + 0.15 * Math.sin(G.now * 4) : 1; S.edgeMat.color.setRGB(lerp(2.4 * eg, 4.2, mk), lerp(0.7 * eg, 0.35, mk), lerp(1.0 * eg, 0.45, mk)); S.trimM.emissiveIntensity = ph >= 1 ? lerp(0.9, 2.2, mk) : 0.4;
       if (mk > 0.5 && b.group.visible && vrand() < dt * 40) { const a = G.now * 2.4 + vrand() * 0.6 + (vrand() < 0.5 ? PI : 0), r = 1.4 + vrand() * 0.5; FX.burst(b.pos.x + Math.sin(a) * r, 0.3 + vrand() * 2.2, b.pos.z + Math.cos(a) * r, { n: 1, color: 0xff2a40, color2: 0x600010, dir: [Math.cos(a), 0.25, -Math.sin(a)], spread: 0.15, speed: [2.5, 4], life: [0.5, 0.9], size: [0.1, 0.2], drag: 0.5 }); } S.maskMat.emissiveIntensity = mk * (2.2 + 0.8 * Math.sin(G.now * 3)); S.eyeMat.color.setRGB(lerp(2, 5, mk), lerp(1.7, 0.4, mk), lerp(1.75, 0.5, mk));
-      S.aura.material.opacity = S.still ? 0.5 + 0.4 * Math.sin(G.now * 12) : S.open > 0 ? 0.25 : 0; S.aura.material.color.setHex(S.still ? 0xffffff : 0x70ff90); S.aura.scale.setScalar(S.still ? 1 + 0.15 * Math.sin(G.now * 6) : 1.2);
+      if (S.warn > 0) S.warn = Math.min(1, S.warn + dt / STILL_TELL);
+      S.aura.material.opacity = S.still ? 0.5 + 0.4 * Math.sin(G.now * 12) : S.warn > 0 ? 0.25 + 0.55 * S.warn : S.open > 0 ? 0.25 : 0; S.aura.material.color.setHex(S.still ? 0xffffff : S.warn > 0 ? 0xffe6b0 : 0x70ff90); S.aura.scale.setScalar(S.still ? 1 + 0.15 * Math.sin(G.now * 6) : S.warn > 0 ? 2.6 - 1.6 * S.warn : 1.2);
       { const c = camera.position, v = S.pv || (S.pv = new V3()); let near = false;
         if (!Cam.cine && b.distToPlayer() > 1.2 && Math.hypot(b.pos.x - c.x, b.pos.z - c.z) < Math.hypot(p.pos.x - c.x, p.pos.z - c.z) - 0.6) { v.set(p.pos.x, p.pos.y + 0.9, p.pos.z).project(camera); const px = v.x, py = v.y; v.set(b.pos.x, b.pos.y, b.pos.z).project(camera); const bx = v.x, y0 = v.y; v.set(b.pos.x, b.pos.y + 3.3, b.pos.z).project(camera); const y1 = v.y, hw = Math.abs(y1 - y0) * 0.26 / Math.max(camera.aspect, 0.3); near = Math.abs(px - bx) < hw && py > y0 && py < y1; }
         S.fadeU.value = damp(S.fadeU.value, near ? 0.5 : 0, 8, dt); }
@@ -629,6 +637,6 @@
         S.orb.count = S.orbHalo.count = n; if (n) S.orb.instanceMatrix.needsUpdate = S.orbHalo.instanceMatrix.needsUpdate = true; }
       if (S.haste && vrand() < dt * 12 * S.haste) FX.burst(b.pos.x, 0.2 + vrand() * 2, b.pos.z, { n: 1, color: 0xff2040, speed: [0.3, 1.2], up: 1.5, life: [0.4, 0.8], radius: 0.5 });
     },
-    bot(b) { return { holdFire: b.state.still }; },
+    bot(b) { return { holdFire: b.state.still || b.state.warn > 0 }; },
   });
 })();

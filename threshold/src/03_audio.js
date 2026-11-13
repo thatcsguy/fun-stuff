@@ -76,6 +76,7 @@ const Sound = {
       case 'roar': T({ f: 95 * p, slide: 55 * p, dur: 1.5, vol: 0.4 * v, type: 'sawtooth', lp: 600, lpEnd: 200, a: 0.15, rev: 1 }); T({ f: 143 * p, slide: 70 * p, dur: 1.4, vol: 0.25 * v, type: 'square', lp: 500, a: 0.2, det: 30 }); N({ dur: 1.4, vol: 0.2 * v, f: 700, fEnd: 200, a: 0.2, rev: 1 }); break;
       case 'laser': T({ f: 1400 * p, slide: 300, dur: 0.45, vol: 0.13 * v, type: 'sawtooth', lp: 5000, rev: 1 }); T({ f: 70, dur: 0.5, vol: 0.2 * v, type: 'square', lp: 300 }); break;
       case 'bell': [1, 2.01, 2.76, 5.4].forEach((m, i) => T({ f: 110 * p * m, dur: 3.2 / (1 + i * 0.6), vol: 0.22 * v / (1 + i), rev: 1 })); break;
+      case 'glint': [1568, 2093, 2637].forEach((f, i) => T({ f: f * p, dur: 0.9 - i * 0.15, vol: 0.11 * v, when: S.ctx.currentTime + i * 0.16, rev: 1, type: 'triangle' })); N({ dur: 0.5, vol: 0.12 * v, f: 6000, fEnd: 9000, type: 'highpass', a: 0.3 }); break;
       case 'charge': T({ f: 120 * p, slide: 900 * p, dur: 0.9, vol: 0.12 * v, type: 'sawtooth', lp: 500, lpEnd: 5000, a: 0.5 }); break;
       case 'kill': S.sfx('bigboom', v); [262, 392, 523, 784].forEach((f, i) => T({ f, dur: 2.4, vol: 0.12, when: S.ctx.currentTime + 0.3 + i * 0.14, rev: 1, type: 'triangle' })); break;
       case 'thunder': N({ dur: 2.4, vol: 0.5 * v, f: 220, fEnd: 50, type: 'lowpass', a: 0.02, rev: 1 }); N({ dur: 0.25, vol: 0.35 * v, f: 3000, fEnd: 400 }); break;
