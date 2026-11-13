@@ -5757,7 +5757,7 @@ const Warm = (() => {
 // ==== 24_boss_titan.js ====
 // DOOR V: MOLTHAR, the Kiln-Titan. A ring of basalt around a lake of fire, and something very large standing in it.
 (() => {
-  const R0 = 12, R1 = 21, MID = 16.5, SEG = PI / 4, FIRE = 0xff6a1a, TELE = 0xfff4d6, ZONE = 0xff2a4a, ICE = 0x5ab8ff, ARM = 17.5;
+  const R0 = 12, R1 = 21, MID = 16.5, SEG = PI / 4, FIRE = 0xff6a1a, TELE = 0xfff4d6, ZONE = 0xff2a4a, ICE = 0x5ab8ff, ARM = 17.5, BS = 0.75; // BS: body scale (smaller titan so the far ring stays visible)
   const segOf = (x, z) => { let a = Math.atan2(x, z); if (a < 0) a += TAU; return Math.floor(a / SEG) % 8; };
   const pt = (a, r, y, out) => (out || new V3()).set(Math.sin(a) * r, y, Math.cos(a) * r);
   const playerAng = () => Math.atan2(G.player.pos.x, G.player.pos.z);
@@ -5817,6 +5817,9 @@ const Warm = (() => {
       return m;
     };
   }
+  // Flat-shaded normals from screen derivatives: a sub-pixel sliver (the hex columns' cap tips, far away) gives a zero cross
+  // product, and normalize(0) is NaN on real GPUs, which bloom spreads into a black square. Same chunk with a guarded length.
+  const SAFE_FLAT = THREE.ShaderChunk.normal_fragment_begin.replace('normalize( cross( fdx, fdy ) )', 'cross( fdx, fdy ) * inversesqrt( max( dot( cross( fdx, fdy ), cross( fdx, fdy ) ), 1e-24 ) )');
   // Basalt that glows from below where it meets the lava (walls, boulders, columns).
   function hotRock(rk, o = {}) {
     const m = new THREE.MeshStandardMaterial({ map: o.noMap ? null : rk.map, normalMap: o.noMap ? null : rk.normalMap, roughnessMap: o.noMap ? null : rk.roughnessMap, color: o.color || 0xffffff, roughness: o.noMap ? 0.8 : 0.9, metalness: 0.05, flatShading: true, side: o.side || THREE.FrontSide, envMapIntensity: 0.4 });
@@ -5825,7 +5828,7 @@ const Warm = (() => {
     m.onBeforeCompile = (s) => {
       Object.assign(s.uniforms, U);
       s.vertexShader = 'varying vec3 vTW;\n' + s.vertexShader.replace('#include <project_vertex>', VTW);
-      s.fragmentShader = 'uniform float uLY, uFall, uGlow, uRimR, uStreak; varying vec3 vTW;\n' + s.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      s.fragmentShader = 'uniform float uLY, uFall, uGlow, uRimR, uStreak; varying vec3 vTW;\n' + s.fragmentShader.replace('#include <normal_fragment_begin>', SAFE_FLAT).replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         float hb_ = exp(-max(vTW.y - uLY, 0.0) * uFall);
         if (uStreak > 0.0) { float an_ = atan(vTW.x, vTW.z + 1e-4) * 40.0; float st_ = pow(max(sin(an_ + sin(an_ * 0.37) * 2.0), 0.0), 18.0) * smoothstep(-1.4, 0.0, vTW.y); hb_ += st_ * uStreak * 1.5; }
         ${RIM}
@@ -6057,7 +6060,7 @@ const Warm = (() => {
     // One giant shape: a hunched trapezoid torso under a broad shoulder yoke, a heavy brow and jaw set low and forward,
     // tapering limbs ending in fists bigger than the head. Every part is a bevelled, noise-pushed solid (no straight edges),
     // box-projected UVs at a per-part scale (big plates on the torso, small cells at the joints), molten only at joints and core.
-    const bg = b.group; S.body = new THREE.Group(); bg.add(S.body);
+    const bg = b.group; S.body = new THREE.Group(); S.body.scale.setScalar(BS); bg.add(S.body);
     const H = S.makeHide, crust = H({ ei: 0.16, color: 0xc4b6ac, rim: 1.1 }), skin = H({ ei: 1.5 }), cap = H({ ei: 0.03, color: 0xa89a92, rim: 0.9 }), hotSkin = H({ ei: 2.6, rim: 0.4 }), fistM = H({ ei: 0.8, color: 0xc4b6ac, rim: 1.0 }),
       molten = H({ molten: true, ei: 1.7, color: 0x3a2018, rim: 0.3, flat: false }), horn = H({ ei: 0.3, color: 0xa89c94, rough: 0.7, metal: 0.1, rim: 2.4, root: 0.9 });
     const n3 = (x, y, z, sd) => (W.fbm(x + z * 0.37 + 11, y - z * 0.21 + 7, sd, 3) + W.fbm(y + 5.3, z + x * 0.29 + 3, sd + 7, 3)) * 0.5;
@@ -6171,14 +6174,14 @@ const Warm = (() => {
       totalEmissiveRadiance += vec3(0.5, 0.9, 1.2) * pow(max(fr_, 0.0), 2.5) * 0.9;`); };
     S.geoMat.customProgramCacheKey = () => 'titanGeode';
     S.cupGeo = new THREE.DodecahedronGeometry(1, 0); S.cupMat = new THREE.MeshStandardMaterial({ color: 0x2a2624, roughness: 0.95, metalness: 0, flatShading: true });
-    S.open = 0; S.stag = 0; S.armor = 0.6; S.lvl = 0; S.rise = 0; S.pend = null; S.swp = null; S.breath = 0; S.stoke = 0;
+    S.open = 0; S.stag = 0; S.armor = 0.6; S.lvl = 0; S.rise = 0; S.pend = null; S.swp = null; S.breath = 0; S.stoke = 0; S.scorch = []; S.sunderLog = [];
     b.dmgTaken = S.armor;
     return {
-      edge: 'wall', camDist: 19, camPitch: 0.2, spawn: { x: 0, z: 17.5 }, bossStart: { x: 0, z: 0, face: 0 }, ringY: 0,
+      edge: 'wall', camDist: 21, camPitch: 0.3, spawn: { x: 0, z: 17.5 }, bossStart: { x: 0, z: 0, face: 0 }, ringY: 0,
       contains: (x, z) => { const r = Math.hypot(x, z); return r >= R0 + 0.3 && r <= R1 - 0.3; },
       clamp(p) { const r = Math.hypot(p.x, p.z) || 1, c = clamp(r, R0 + 0.45, R1 - 0.45); if (c !== r) { p.x *= c / r; p.z *= c / r; } },
       // Far out over the lava the camera stays low so the whole titan fits above the player instead of being cut at the chest.
-      camLimit(x, y, z) { let r = Math.hypot(x, z); if (r > 38) { x *= 38 / r; z *= 38 / r; r = 38; } else if (r < R0 + 0.8 && y < 26) { const k = (R0 + 0.8) / (r || 1); x *= k; z *= k; } const cap = r > 27 ? lerp(17, 6, smooth(sat((r - 27) / 8))) : 99; return { x, y: clamp(y, r > R1 ? 2.8 : 0.5, cap), z }; },
+      camLimit(x, y, z) { let r = Math.hypot(x, z); if (r > 38) { x *= 38 / r; z *= 38 / r; r = 38; } else if (r < R0 + 0.8 && y < 26) { const k = (R0 + 0.8) / (r || 1); x *= k; z *= k; } const cap = r > 27 ? lerp(17, 9, smooth(sat((r - 27) / 8))) : 99; /* the smaller titan fits above the player from a bit higher */ return { x, y: clamp(y, r > R1 ? 2.8 : 0.5, cap), z }; },
       bulletBounds: (x, z) => x * x + z * z < 30 * 30,
     };
   }
@@ -6203,31 +6206,76 @@ const Warm = (() => {
     FX.explode(x, 1.5, z, ICE, 8, 0xffffff); FX.lightning(new V3(x, 2, z), new V3(0, 10, 0), { color: ICE, width: 0.6, jag: 2.5, dur: 0.5 }); FX.flash(ICE, 0.1, 7); Sound.sfx('shatter'); Sound.sfx('roar', 1, 0.7); FX.shake(1);
     S.stag = 9; b.dmgTaken = 2.0; b.castState = null; FX.num(b.aim(new V3()), 'STAGGERED', 'note');
   }
+  // A phase change kills the running mechanic mid-way (Co.stopTag skips its tail), so phase enters put hands, facing and bot hints back.
+  function resetMech(b) { const S = b.state; for (const A of S.arms) { A.mode = 'rest'; A.locked = false; A.hold = 0; } S.swp = null; S.pend = null; S.breath = 0; b.autoFace = true; }
   function* reel(b) { const S = b.state; while (S.stag > 0) yield; yield 0.8; }
+  // Slam: the wedge follows the player, then commits `lock` s before impact (snap flash + click), leaving room to walk out on foot.
+  const SLAM_ARC = 0.62, SLAM_LOCK = 1.3, GEO_TOL = 0.48;
   function* slam(b, o = {}) {
-    const S = b.state, arc = 0.72, t = o.time || 1.9, extra = o.extra || [];
+    const S = b.state, arc = SLAM_ARC, t = o.time || 2.3, extra = o.extra || [], lock = SLAM_LOCK, burn = o.burn || 6;
     const arm = S.arms[angDiff(b.facing, playerAng()) > 0 ? 1 : 0], other = S.arms[arm === S.arms[0] ? 1 : 0];
-    let a = playerAng(); S.pend = { t, lock: 0.85 };
-    const h = wedge(a, arc, t, 430, { name: 'Slam', lock: 0.85, track: (s) => { s.dir = dampAng(s.dir, playerAng(), 10, G.dt); a = s.dir; }, kb: { dist: 4 }, quiet: true, onFire: () => {
+    let a = playerAng(); S.pend = { t, lock };
+    const h = wedge(a, arc, t, 430, { name: 'Slam', lock, track: (sh) => { sh.dir = dampAng(sh.dir, playerAng(), 10, G.dt); a = sh.dir; }, kb: { dist: 4 }, quiet: true, onFire: () => {
       FX.shake(1); Sound.sfx('bigboom', 0.9); pt(a, MID, 0.5, _v); FX.explode(_v.x, 0.5, _v.z, FIRE, 7, 0xffd080); for (let k = 0; k < 3; k++) { pt(a + (k - 1) * 0.25, R0 + 2 + k * 3, 0.3, _v); FX.burst(_v.x, 0.3, _v.z, { n: 16, smoke: true, color: 0x6a3a26, color2: 0x2a1610, speed: [2, 8], up: 5, grav: 12, life: [0.8, 1.6], size: [0.5, 1.4] }); }
-      Hz.zone({ type: 'cone', x: 0, z: 0, dir: a, arc, r: R1 + 0.4, r0: R0 - 0.3 }, o.burn || 6, 80, { name: 'Scorch', color: ZONE, delay: 0.5 });
-      for (const q of S.geodes) if (q.alive && Math.abs(angDiff(a, q.a)) < arc / 2 + 0.12) stagger(b, q);
+      Hz.zone({ type: 'cone', x: 0, z: 0, dir: a, arc, r: R1 + 0.4, r0: R0 - 0.3 }, burn, 80, { name: 'Scorch', color: ZONE, delay: 0.5 });
+      S.scorch.push({ a, arc, t: burn + 0.5 });
+      for (const q of S.geodes) if (q.alive && Math.abs(angDiff(a, q.a)) < GEO_TOL) stagger(b, q);
     } });
+    const hs = [h];
     arm.mode = 'raise'; arm.ang = a;
-    for (const e of extra) { const a2 = a + e; wedge(a2, arc, t, 430, { name: 'Slam', kb: { dist: 4 }, quiet: true, silent: true, track: (s) => { s.dir = a + e; }, lock: 0.85, onFire: (hh) => { const d = hh.shape.dir; pt(d, MID, 0.5, _v); FX.explode(_v.x, 0.5, _v.z, FIRE, 7, 0xffd080); for (const q of S.geodes) if (q.alive && Math.abs(angDiff(d, q.a)) < arc / 2 + 0.12) stagger(b, q); } }); other.mode = 'raise'; other.ang = a2; other.follow = e; }
-    let el = 0; while (el < t) { el += G.dt; S.pend.t = t - el; arm.ang = a; if (extra.length) other.ang = a + extra[0]; yield; }
+    for (const e of extra) { const a2 = a + e; hs.push(wedge(a2, arc, t, 430, { name: 'Slam', kb: { dist: 4 }, quiet: true, silent: true, track: (sh) => { sh.dir = a + e; }, lock, onFire: (hh) => { const d = hh.shape.dir; pt(d, MID, 0.5, _v); FX.explode(_v.x, 0.5, _v.z, FIRE, 7, 0xffd080); for (const q of S.geodes) if (q.alive && Math.abs(angDiff(d, q.a)) < GEO_TOL) stagger(b, q); } })); other.mode = 'raise'; other.ang = a2; other.follow = e; }
+    let el = 0, locked = false, lt = 0;
+    while (el < t) {
+      el += G.dt; S.pend.t = t - el; arm.ang = a; if (extra.length) other.ang = a + extra[0];
+      if (!locked && t - el <= lock) { locked = true; lt = 0; Sound.sfx('tick', 3, 0.55); Sound.sfx('warn', 0.5, 0.7); arm.locked = true; if (extra.length) other.locked = true; }
+      if (locked) { lt += G.dt; for (const hh of hs) if (hh.mesh && hh.state === 'tele') hh.mesh.material.uniforms.uFire.value = Math.max(0, 0.55 - lt * 2.2); }
+      yield;
+    }
+    arm.locked = other.locked = false;
     S.pend = null; arm.mode = 'slam'; arm.hold = 1.3; if (extra.length) { other.mode = 'slam'; other.hold = 1.3; }
-    void h; yield 0.3; if (S.stag > 0) { yield* reel(b); return; } yield o.rest === undefined ? 1.2 : o.rest;
+    yield 0.3; if (S.stag > 0) { yield* reel(b); return; } yield o.rest === undefined ? 1.2 : o.rest;
   }
+  // Sunder the Ring: one fist plants at the far edge of a pocket of ring, the other sweeps the long way round and stops against it.
+  // The pocket is the stretch between his hands; it is always reachable on foot and never crosses lava or a fresh scorch.
+  const GARC = 1.05;
+  const segA = (a) => Math.floor((((a % TAU) + TAU) % TAU) / SEG) % 8;
+  const segsAlong = (a0, a1) => { const out = new Set(), n = Math.ceil(Math.abs(a1 - a0) / 0.04) + 1; for (let i = 0; i <= n; i++) out.add(segA(a0 + (a1 - a0) * i / n)); return out; };
+  const scorched = (S, a0, a1) => { const n = Math.ceil(Math.abs(a1 - a0) / 0.04) + 1; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; for (const sc of S.scorch) if (sc.t > 0.3 && Math.abs(angDiff(sc.a, a)) < sc.arc / 2) return true; } return false; };
+  function pickPocket(S) {
+    const pa = playerAng(), sides = rnd() < 0.5 ? [1, -1] : [-1, 1], d0 = rnd(1.1, 1.45);
+    for (const strict of [true, false]) for (const d of [d0, 1.1]) for (const s of sides) {
+      const gap = pa + s * d, far = gap + s * GARC / 2, segs = segsAlong(pa, far);
+      let ok = true; for (const i of segs) if (S.seg[i].gone || S.seg[i].on) ok = false;
+      if (ok && strict && scorched(S, pa + s * 0.2, far)) ok = false;
+      if (ok) return { gap, s, d };
+    }
+    return null;
+  }
+  const cinders = () => Hz.list.some((h) => h.name === 'Cinders' && h.state !== 'done');
   function* sweepArm(b) {
-    const S = b.state, s = rnd() < 0.5 ? 1 : -1, pa = playerAng(), gap = pa + s * rnd(1.75, 2.15), gArc = 1.05, t = 3.4;
-    yield* b.cast({ name: 'Sunder the Ring', time: 0.6 });
-    S.swp = { gap, t }; const arm = S.arms[s > 0 ? 1 : 0]; arm.mode = 'sweep'; arm.ang = gap + s * gArc / 2; arm.hold = 99;
-    Hz.mark({ type: 'cone', x: 0, z: 0, dir: gap, arc: gArc - 0.1, r: R1, r0: R0 }, t, { color: 0x80ffd0, alpha: 0.8 });
-    wedge(gap + PI, TAU - gArc, t, 480, { name: 'Sunder the Ring', kb: { dist: 5 }, quiet: true, onFire: () => { Sound.sfx('bigboom'); FX.shake(1.1); FX.flash(FIRE, 0.25, 3); for (let k = 0; k < 10; k++) { pt(gap + gArc / 2 + (k + 0.5) / 10 * (TAU - gArc), MID, 0.5, _v); FX.explode(_v.x, 0.5, _v.z, FIRE, 5); } } });
-    let el = 0; while (el < t - 0.45) { el += G.dt; S.swp.t = t - el; yield; }
-    const a0 = arm.ang; el = 0; while (el < 0.5) { el += G.dt; arm.ang = a0 + s * (TAU - gArc) * smooth(el / 0.5); yield; }
-    S.swp = null; arm.hold = 0.6; arm.mode = 'slam'; yield 1.6;
+    const S = b.state;
+    // safety net: never start while surge lava or cinder pools are still on the ring
+    let w = 0; while (w < 4 && (S.seg.some((sg) => !sg.gone && sg.on) || cinders())) { w += G.dt; yield; }
+    const pk = pickPocket(S);
+    S.sunderLog.push(pk ? { d: pk.d, t: 3.4 + (pk.d - 1.1) / 0.35 * 0.4, r: Math.hypot(G.player.pos.x, G.player.pos.z), phase: b.phase } : { skip: true, phase: b.phase });
+    if (!pk) { yield* slam(b, { time: S.lvl >= 2 ? 2.0 : 2.3 }); return; }
+    // the window grows with the distance, so even from the outer edge there is about 0.8 s to spare on foot
+    const t = 3.4 + (pk.d - 1.1) / 0.35 * 0.4;
+    const { gap, s } = pk, far = gap + s * GARC / 2, near = gap - s * GARC / 2;
+    const planter = S.arms[s > 0 ? 1 : 0], sweeper = S.arms[s > 0 ? 0 : 1];
+    // he turns to face the pocket while he winds up
+    const af = b.autoFace; b.autoFace = false;
+    yield* b.cast({ name: 'Sunder the Ring', time: 0.6, onTick: () => { b.facing = dampAng(b.facing, gap, 7, G.dt); } });
+    S.swp = { gap, t };
+    planter.mode = 'plant'; planter.ang = far; planter.hold = 99; planter.landed = false;
+    sweeper.mode = 'raise'; sweeper.ang = near; sweeper.hold = 99;
+    wedge(gap + PI, TAU - GARC, t, 480, { name: 'Sunder the Ring', kb: { dist: 5 }, quiet: true, onFire: () => { Sound.sfx('bigboom'); FX.shake(1.1); FX.flash(FIRE, 0.25, 3); for (let k = 0; k < 10; k++) { pt(far + s * (k + 0.5) / 10 * (TAU - GARC), MID, 0.5, _v); FX.explode(_v.x, 0.5, _v.z, FIRE, 5); } } });
+    let el = 0; while (el < t - 0.45) { el += G.dt; S.swp.t = t - el; b.facing = dampAng(b.facing, gap, 4, G.dt);
+      if (!planter.landed && el > 0.35) { planter.landed = true; pt(far, MID, 0.5, _v); FX.shake(0.7); Sound.sfx('boom', 0.9, 0.7); if (!G.headless) { FX.explode(_v.x, 0.5, _v.z, FIRE, 4.5, 0xffd080); FX.burst(_v.x, 0.3, _v.z, { n: 18, smoke: true, color: 0x6a3a26, color2: 0x2a1610, speed: [2, 7], up: 4, grav: 12, life: [0.7, 1.4], size: [0.5, 1.2] }); } }
+      yield; }
+    sweeper.mode = 'sweep'; el = 0; while (el < 0.5) { el += G.dt; S.swp.t = Math.max(0, 0.45 - el); sweeper.ang = near - s * (TAU - GARC) * smooth(el / 0.5); b.facing = dampAng(b.facing, gap, 4, G.dt); yield; }
+    S.swp = null; sweeper.hold = 0.6; sweeper.mode = 'slam'; sweeper.ang = far; yield 0.6;
+    planter.mode = 'rest'; planter.hold = 0; b.autoFace = af; yield 1.0;
   }
   function* surge(b, list, o = {}) {
     const S = b.state; yield* b.cast({ name: 'Lava Surge', time: 0.8 }); const warn = o.warn || 2.6, dur = o.dur || 6;
@@ -6237,7 +6285,8 @@ const Warm = (() => {
   const pickSegs = (S, n) => {
     // always the player's segment, never both of its neighbours: one side stays walkable
     const p = segOf(G.player.pos.x, G.player.pos.z), bad = (i) => S.seg[i].gone || S.seg[i].on, L = (p + 7) % 8, Rt = (p + 1) % 8;
-    const keep = bad(L) ? Rt : bad(Rt) ? L : rnd() < 0.5 ? L : Rt;
+    const sc = (i) => S.scorch.some((q) => q.t > 0.5 && Math.abs(angDiff(q.a, (i + 0.5) * SEG)) < q.arc / 2 + SEG / 2 - 0.15);
+    const keep = bad(L) ? Rt : bad(Rt) ? L : sc(L) && !sc(Rt) ? Rt : sc(Rt) && !sc(L) ? L : rnd() < 0.5 ? L : Rt;
     const all = shuffle([0, 1, 2, 3, 4, 5, 6, 7].filter((i) => !S.seg[i].gone && i !== p && i !== keep)), out = [p];
     for (const i of all) { if (out.length >= n) break; out.push(i); } return out;
   };
@@ -6263,7 +6312,7 @@ const Warm = (() => {
     if (lvl === 2 && !G.headless) { S.core.getWorldPosition(_v); FX.explode(_v.x, _v.y, _v.z, FIRE, 6, 0xffe0a0); FX.burst(_v.x, _v.y, _v.z, { n: 30, color: 0x6a3a26, color2: 0x2a1610, smoke: true, speed: [4, 12], up: 4, grav: 16, life: [1, 2], size: [0.6, 1.4] }); }
     const h0 = U.uHor.value.clone(), h1 = new THREE.Color([0x2e0c06, 0x3a0c06, 0x560a04][lvl]), c0 = U.uCloudCol.value.clone(), c1 = new THREE.Color([0x3a2826, 0x40221e, 0x4a1a14][lvl]), f0 = S.fogC.clone(), f1 = new THREE.Color([0x120706, 0x140606, 0x1a0604][lvl]);
     const t0 = U.uTop.value.clone(), t1 = new THREE.Color([0x070103, 0x0c0204, 0x1a0306][lvl]), d0 = scene.fog.density, d1 = [0.0085, 0.0095, 0.0108][lvl];
-    const e0 = S.floorMat.emissiveIntensity, e1 = [1.2, 1.4, 1.65][lvl], hb0 = S.HU.uHeatB.value, cr0 = S.HU.uCrack.value, r0 = S.rise, r1 = [0, 1.0, 2.0][lvl], ec0 = EU.uCol.value.clone(), ec1 = new THREE.Color(0xff8030).multiplyScalar([1.4, 2.0, 2.8][lvl]), v0 = EU.uVel.value.clone(), v1 = new V3(...[[0.4, 1.7, 0.2], [0.9, 2.6, 0.5], [1.8, 3.8, 1.0]][lvl]), a0 = S.ash.material.uniforms.uAlpha.value, lh0 = S.lake.material.uniforms.uHeat.value;
+    const e0 = S.floorMat.emissiveIntensity, e1 = [1.2, 1.4, 1.65][lvl], hb0 = S.HU.uHeatB.value, cr0 = S.HU.uCrack.value, r0 = S.rise, r1 = [0, 0, 0][lvl], ec0 = EU.uCol.value.clone(), ec1 = new THREE.Color(0xff8030).multiplyScalar([1.4, 2.0, 2.8][lvl]), v0 = EU.uVel.value.clone(), v1 = new V3(...[[0.4, 1.7, 0.2], [0.9, 2.6, 0.5], [1.8, 3.8, 1.0]][lvl]), a0 = S.ash.material.uniforms.uAlpha.value, lh0 = S.lake.material.uniforms.uHeat.value;
     for (let i = 0; i < S.falls.length; i++) S.falls[i].m.visible = S.falls[i].sp.visible = i < [3, 5, 7][lvl];
     const ly0 = S.lake.position.y, sw0 = S.lake.material.uniforms.uSwell.value, sg0 = S.smokeU.uGlow.value, ew0 = S.FU.uEW.value, fl0 = S.FU.uFl.value, cb0 = S.coreBase || 0;
     const rh0 = S.HU.uRootH.value, br0 = S.lake.material.uniforms.uBreak.value, lg0 = S.lipCol.userData.U.uGlow.value, sgl0 = S.stubMat.userData.U.uGlow.value, hs0 = S.heatGlow.scale.x, hc0 = S.heatGlow.material.color.clone(), hc1 = new THREE.Color([0xff4a10, 0xff5a14, 0xff8a28][lvl]), bc0 = S.banks[0].material.color.clone(), bc1 = new THREE.Color([0x8a4a30, 0xa04a28, 0xc05a26][lvl]);
@@ -6274,7 +6323,7 @@ const Warm = (() => {
 
   G.bosses.push({
     id: 'titan', name: 'MOLTHAR', title: 'The Kiln-Titan', hint: 'A mountain', color: '#ff6a1a', telegraph: TELE,
-    hp: 30000, radius: 11, aimY: 10, enrage: 430,
+    hp: 28500, radius: 11, aimY: 7, enrage: 430,
     post: { bloom: 0.5, threshold: 1.0, radius: 0.65, exposure: 1.05, vig: 1.0, sat: 1.08, contrast: 1.14, tint: [1.02, 0.98, 0.97], lift: [0, 0.006, 0.011] },
     music: { bpm: 96, root: 36, scale: [0, 1, 3, 5, 7, 8, 10], prog: [0, 0, 1, 0, 0, 0, 5, 4],
       layers: [
@@ -6283,37 +6332,37 @@ const Warm = (() => {
         { v: 'brass', from: 2, pat: ['0.....0.2...1...', '4.....4.5...4...'], oct: 2, len: 4, vol: 0.1 }, { v: 'snare', from: 2, pat: '....x..x....x.xx', vol: 0.18 }, { v: 'tom', from: 2, pat: '..x...x...x...x.', vol: 0.2 }, { v: 'choir', from: 2, pat: '7.......8.......', oct: 2, len: 9, vol: 0.07 },
       ] },
     build,
-    *intro(b) { Sound.sfx('roar', 1, 0.6); yield* Cam.shot([0, 2, 30], [0, 4, 0], [9, 5, 23], [0, 15, 0], 4.6, 58); },
+    *intro(b) { Sound.sfx('roar', 1, 0.6); yield* Cam.shot([0, 2, 30], [0, 4, 0], [9, 5, 23], [0, 12, 0], 4.6, 58); },
     phases: [
+      // phase 1: every mechanic on its own
       { at: 1, *run(b) {
         const S = b.state; b.autoFace = true; b.turnRate = 1.6; yield 1.2;
         while (true) {
-          spawnGeode(b); yield 1.0; yield* slam(b); yield* slam(b);
-          yield* surge(b, pickSegs(S, 3)); yield* breath(b); yield* sweepArm(b);
-          spawnGeode(b); yield* stoke(b); yield* slam(b); yield* breath(b); yield* slam(b); yield* surge(b, pickSegs(S, 3)); yield* sweepArm(b);
+          spawnGeode(b); yield 1.0; yield* slam(b); yield* slam(b); yield* breath(b); yield* sweepArm(b); yield* surge(b, pickSegs(S, 3)); yield* slam(b); yield* breath(b);
+          spawnGeode(b); yield* stoke(b); yield* slam(b); yield* slam(b); yield* sweepArm(b); yield* surge(b, pickSegs(S, 3)); yield* breath(b); yield* slam(b);
         }
       } },
-      { at: 0.67, *enter(b) { Sound.sfx('roar', 1, 0.7); FX.shake(1.2); FX.flash(FIRE, 0.4, 1.5); Co.start(erupt(b, 1), 'fight'); Co.start(Post.lerpTo({ bloom: 0.52, contrast: 1.16, tint: [1.04, 0.97, 0.95] }, 3), 'fight'); yield 3.2; },
+      // phase 2: adds Cinderfall, multi-wedge slams and the alternating floor (with a one second all-clear between the two halves)
+      { at: 0.67, *enter(b) { resetMech(b); Sound.sfx('roar', 1, 0.7); FX.shake(1.2); FX.flash(FIRE, 0.4, 1.5); Co.start(erupt(b, 1), 'fight'); Co.start(Post.lerpTo({ bloom: 0.52, contrast: 1.16, tint: [1.04, 0.97, 0.95] }, 3), 'fight'); yield 3.2; },
         *run(b) {
-          const S = b.state;
           while (true) {
-            spawnGeode(b); yield* meteors(b, 5, false); yield* slam(b, { extra: [PI] }); yield* slam(b);
-            yield* surge(b, [0, 2, 4, 6], { wait: 4.2, dur: 5 }); yield* surge(b, [1, 3, 5, 7], { dur: 5, wait: 1.5 }); yield* breath(b); yield 2.5;
-            spawnGeode(b); yield* sweepArm(b); yield* stoke(b); yield* slam(b, { extra: [PI / 2, -PI / 2] }); yield* meteors(b, 4, true); yield* slam(b); yield* breath(b);
+            spawnGeode(b); yield* meteors(b, 5, false); yield* slam(b, { extra: [PI] }); yield* slam(b); yield* sweepArm(b);
+            yield* surge(b, [0, 2, 4, 6], { dur: 5, wait: 5.2 } /* evens cool 7.6 s after their cast; odds cast 0.8 + warn 2.6 lands them 1.0 s later */); yield* surge(b, [1, 3, 5, 7], { dur: 5 }); yield* breath(b); yield 2.5;
+            spawnGeode(b); yield* stoke(b); yield* slam(b, { extra: [PI / 2, -PI / 2] }); yield* meteors(b, 4, true); yield* slam(b); yield* breath(b); yield* sweepArm(b);
           }
         } },
+      // phase 3: the ring is a C and slams are faster
       { at: 0.34, *enter(b) {
-        const S = b.state; yield* b.cast({ name: 'Cataclysm', time: 2.6, onTick: (k) => { S.stoke = k; FX.shake(k * 0.6); } }); S.stoke = 0;
+        const S = b.state; resetMech(b); yield* b.cast({ name: 'Cataclysm', time: 2.6, onTick: (k) => { S.stoke = k; FX.shake(k * 0.6); } }); S.stoke = 0;
         Sound.sfx('bigboom'); Sound.sfx('roar', 1, 0.5); FX.flash(0xffa040, 0.7, 1); FX.shake(1.4); Co.start(erupt(b, 2), 'fight'); Co.start(Post.lerpTo({ bloom: 0.54, threshold: 1.05, exposure: 0.98, contrast: 1.18, tint: [1.06, 0.96, 0.93] }, 3), 'fight');
         const p = segOf(G.player.pos.x, G.player.pos.z), a = (p + 4) % 8, c = (p + 5) % 8;
         for (const i of [a, c]) { const sg = S.seg[i]; sg.gone = true; sg.on = true; sg.until = 1e9; sg.warn = 3; Hz.zone({ type: 'cone', x: 0, z: 0, dir: (i + 0.5) * SEG, arc: SEG + 0.004, r: R1 + 0.3, r0: R0 - 0.3 }, 99999, 200, { name: 'Lava', tag: 'fight', color: ZONE, delay: 3, every: 0.5 }); for (const q of S.geodes) if (q.alive && Math.floor((((q.a % TAU) + TAU) % TAU) / SEG) === i) { q.alive = false; q.grp.visible = false; } }
         yield 3.4;
       }, *run(b) {
-        const S = b.state;
+        const S = b.state, T3 = 2.0;
         while (true) {
-          spawnGeode(b); yield* slam(b, { extra: [PI], time: 1.7 }); yield* meteors(b, 6, true); yield* slam(b, { time: 1.7 });
-          yield* surge(b, pickSegs(S, 3), { wait: 1.2 }); yield* breath(b); yield* sweepArm(b);
-          spawnGeode(b); yield* stoke(b); yield* slam(b, { extra: [PI / 2, -PI / 2], time: 1.7 }); yield* surge(b, pickSegs(S, 3), { wait: 0.5 }); yield* meteors(b, 5, true); yield* slam(b, { time: 1.7 }); yield* breath(b);
+          spawnGeode(b); yield* meteors(b, 5, true); yield* slam(b, { extra: [PI], time: T3 }); yield* slam(b, { time: T3 }); yield* sweepArm(b); yield* surge(b, pickSegs(S, 3)); yield* breath(b); yield* slam(b, { time: T3 });
+          spawnGeode(b); yield* stoke(b); yield* slam(b, { extra: [PI / 2, -PI / 2], time: T3 }); yield* sweepArm(b); yield* surge(b, pickSegs(S, 3)); yield* breath(b); yield* meteors(b, 4, true); yield* slam(b, { time: T3 });
         }
       } },
     ],
@@ -6322,10 +6371,11 @@ const Warm = (() => {
       if (S.stag > 0) { S.stag -= dt; if (S.stag <= 0) { b.dmgTaken = S.armor; Sound.sfx('boom', 0.6, 0.6); } }
       for (const sg of S.seg) { if (!sg.on) continue; sg.until -= dt; sg.warn -= dt; if (sg.until <= 0) sg.on = false; }
       for (const q of S.geodes) if (q.alive) q.t += dt;
+      for (let i = S.scorch.length - 1; i >= 0; i--) { S.scorch[i].t -= dt; if (S.scorch[i].t <= 0) S.scorch.splice(i, 1); }
       if (G.headless) return;
       for (const sg of S.seg) { const tgt = sg.on ? (sg.warn > 0 ? 0.35 : 1) : 0; sg.lvl = damp(sg.lvl, tgt, sg.on ? 2.5 : 1.5, dt); sg.m.visible = sg.lvl > 0.02; sg.m.position.y = -0.5 + sg.lvl * 0.56; }
       for (const q of S.geodes) if (q.alive) { q.grp.scale.setScalar(Math.min(1, q.t / 0.6)); q.grp.rotation.y += dt * 0.3; if (vrand() < dt * 6) FX.burst(q.grp.position.x, 1.5, q.grp.position.z, { n: 1, color: ICE, speed: [0.5, 2], up: 2, life: [0.4, 0.9], size: [0.1, 0.25], radius: 0.8 }); }
-      S.geoMat.emissiveIntensity = 0.8 + Math.sin(t * 4) * 0.25; S.HU.uT.value = t; S.FU.uT.value = t; { const cx = camera.position.x, cz = camera.position.z, cl = Math.hypot(cx, cz) || 1; S.rimL.position.set(-cx / cl * 70, 45, -cz / cl * 70); S.heatGlow.position.set(-cx / cl * 14, 11 + S.rise, -cz / cl * 14); S.heatGlow.material.opacity = 0.24 + S.lvl * 0.1; }
+      S.geoMat.emissiveIntensity = 0.8 + Math.sin(t * 4) * 0.25; S.HU.uT.value = t; S.FU.uT.value = t; { const cx = camera.position.x, cz = camera.position.z, cl = Math.hypot(cx, cz) || 1; S.rimL.position.set(-cx / cl * 70, 45, -cz / cl * 70); S.heatGlow.position.set(-cx / cl * 14, 8 + S.rise, -cz / cl * 14); S.heatGlow.material.opacity = 0.24 + S.lvl * 0.1; }
       for (let i = 0; i < S.cards.length; i++) S.cards[i].material.rotation += dt * (i % 2 ? 0.02 : -0.02);
       if (S.lvl >= 2 && vrand() < dt * 0.3) { const a = vrand() * TAU, r = 40 + vrand() * 40; FX.lightning(new V3(Math.sin(a) * r, 41, Math.cos(a) * r), new V3(Math.sin(a + 0.4) * (r + 10), 39, Math.cos(a + 0.4) * (r + 10)), { color: 0xffc080, width: 0.9, jag: 6, dur: 0.3 }); } S.core.getWorldPosition(S.HU.uCore.value);
       for (const fl of S.falls) if (fl.m.visible && vrand() < dt * 2.5) FX.burst(fl.x, -0.6, fl.z, { n: 4, smoke: true, color: 0x8a7e7a, color2: 0x2a2422, speed: [0.5, 2], up: 3, grav: -0.5, life: [1.5, 3], size: [1.5, 3], radius: fl.w * 0.5 });
@@ -6333,7 +6383,7 @@ const Warm = (() => {
       if (S.lvl >= 2 && vrand() < dt * 1.6) { const a = vrand() * TAU, r = 25 + vrand() * 16; FX.burst(Math.sin(a) * r, 34, Math.cos(a) * r, { n: 2, color: 0xff7a30, color2: 0x2a1a14, dir: [0, -1, 0], spread: 0.05, speed: [16, 22], grav: 12, life: [1.4, 1.7], size: [0.4, 0.8] }); }
       // body
       S.open = damp(S.open, S.stag > 0 ? 1 : 0, 4, dt);
-      S.body.position.y = -4.2 + S.rise + Math.sin(t * 0.7) * 0.25 - S.open * 1.2; S.torso.rotation.x = S.open * 0.2 + Math.sin(t * 0.5) * 0.02 + (S.breath === 1 ? -0.08 : S.breath === 2 ? 0.14 : 0);
+      S.body.position.y = -3.4 + S.rise + Math.sin(t * 0.7) * 0.25 - S.open * 1.2; S.torso.rotation.x = S.open * 0.2 + Math.sin(t * 0.5) * 0.02 + (S.breath === 1 ? -0.08 : S.breath === 2 ? 0.14 : 0);
       S.head.rotation.x = damp(S.head.rotation.x, S.open * 0.5 + (S.stoke > 0 ? -0.5 : 0) + (S.breath ? 0.25 : 0.12), 5, dt);
       for (const m of S.pecs) m.visible = S.lvl < 2;
       for (const p of S.plates) { p.pv.visible = S.lvl < 2; p.pv.rotation.y = p.sx * S.open * 1.3; p.pv.rotation.x = -p.sy * S.open * 0.9; }
@@ -6349,11 +6399,13 @@ const Warm = (() => {
       for (const A of S.arms) {
         const restA = b.facing + A.sx * -1.05;
         if (A.mode === 'rest') pt(restA, R0 + 0.6, 1.6 + Math.sin(t * 0.8 + A.sx) * 0.3, A.tgt);
-        else if (A.mode === 'raise') pt(A.ang, MID - 3, 19, A.tgt);
-        else if (A.mode === 'sweep') pt(A.ang, MID, 3.2, A.tgt);
+        else if (A.mode === 'raise') pt(A.ang, MID - 3, A.locked ? 16 : 15 + Math.sin(t * 3) * 0.3, A.tgt);
+        else if (A.mode === 'sweep') pt(A.ang, MID, 2.4, A.tgt);
+        else if (A.mode === 'plant') pt(A.ang, MID, 1.6, A.tgt);
         else { pt(A.ang, MID, 1.8, A.tgt); A.hold -= dt; if (A.hold <= 0) A.mode = 'rest'; }
-        A.cur.lerp(A.tgt, 1 - Math.exp(-(A.mode === 'slam' ? 26 : A.mode === 'sweep' ? 30 : 3.2) * dt));
-        A.g.lookAt(A.cur); A.g.getWorldPosition(_v); A.g.scale.z = clamp(_v.distanceTo(A.cur) / ARM, 0.5, 1.8);
+        A.cur.lerp(A.tgt, 1 - Math.exp(-(A.mode === 'slam' ? 26 : A.mode === 'sweep' ? 30 : A.mode === 'plant' ? 12 : 3.2) * dt));
+        // the arm is modelled ARM long in body space; the body is scaled by BS, so stretch against the scaled length to land on the ring
+        A.g.lookAt(A.cur); A.g.getWorldPosition(_v); A.g.scale.z = clamp(_v.distanceTo(A.cur) / (ARM * BS), 0.45, 2.2);
       }
       S.plume.material.opacity = 0.35 + S.lvl * 0.2 + Math.sin(t * 3) * 0.05; S.plume.scale.x = S.plume.scale.z = 1 + S.lvl * 0.4 + Math.sin(t * 1.3) * 0.05;
       if (S.lvl >= 1 && vrand() < dt * S.lvl * 2) { const a = vrand() * TAU, r = vrand() < 0.5 ? R0 - 1.2 : R1 + 1.5 + vrand() * 2; FX.burst(Math.sin(a) * r, -1, Math.cos(a) * r, { n: 12, color: 0xffc060, color2: 0xa02008, speed: [1, 3], up: 8 + S.lvl * 3, grav: 10, life: [0.8, 1.5], size: [0.25, 0.7] }); }
