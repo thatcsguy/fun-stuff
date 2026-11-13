@@ -100,7 +100,8 @@ const Hz = (() => {
         if (h.mesh) { const u = h.mesh.material.uniforms; u.uProg.value = sat(h.t / h.delay); u.uTime.value = G.now; }
         if (h.t >= h.delay) { if (h.dur > 0) { h.state = 'zone'; h.zt = 0; h.tickT = 0; if (h.mesh) h.mesh.material.uniforms.uStyle.value = h.zoneStyle || 2; if (h.onFire) h.onFire(h); } else fire(h); }
       } else if (h.state === 'fired') {
-        h.fireT -= dt; if (h.mesh) { h.mesh.material.uniforms.uFire.value = sat(h.fireT / 0.28); h.mesh.material.uniforms.uAlpha.value = sat(h.fireT / 0.2) * h.alpha; }
+        h.fireT -= dt; if (h.track && h.trackFired) { h.track(h.shape, h); if (h.mesh) syncMesh(h); } // trackFired: the flash keeps following a moving floor
+        if (h.mesh) { h.mesh.material.uniforms.uFire.value = sat(h.fireT / 0.28); h.mesh.material.uniforms.uAlpha.value = sat(h.fireT / 0.2) * h.alpha; }
         if (h.fireT <= 0) { release(h); list.splice(i, 1); }
       } else if (h.state === 'zone') {
         h.zt += dt; h.tickT -= dt;

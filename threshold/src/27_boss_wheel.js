@@ -310,7 +310,7 @@
     const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.22, 0.55, 14, 1, true), W.mat({ color: 0x3a1408, roughness: 0.35, side: THREE.DoubleSide })); cup.position.y = -0.36; S.arms[1].hand.add(cup);
     const cupR = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.03, 6, 20), goldM); cupR.rotation.x = PI / 2; cupR.position.y = -0.64; S.arms[1].hand.add(cupR);
     S.rake = new THREE.Group(); const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, R - 2), goldM); shaft.position.z = (R - 2) / 2 + 2; S.rake.add(shaft); const head2 = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.5, 0.25), goldM); head2.position.z = R - 0.3; S.rake.add(head2); S.rake.position.y = 0.6; S.rake.visible = false; g.add(S.rake);
-    Object.assign(S, { ao: 0, ai: 0, wo: 0.2, wi: 0.2, wT: 0.2, counter: false, frenzy: 0, gest: 0, rakeOn: 0, lvl: 0, vort: 0, burstA: 0, camW: 0 });
+    Object.assign(S, { ao: 0, ai: 0, wo: 0.2, wi: 0.2, wT: 0.2, counter: false, frenzy: 0, gest: 0, rakeOn: 0, lvl: 0, vort: 0, burstA: 0, camW: 0, riders: [] });
     return {
       edge: 'wall', spawn: { x: 0, z: 13 }, bossStart: { x: 0, z: 0, face: 0 }, camDist: 16,
       contains: (x, z) => { const d = Math.hypot(x, z); return d <= R - 0.5 && d >= HUB; },
@@ -320,14 +320,16 @@
     };
   }
 
+  // a short-lived FX mesh that turns with the ring at radius r, so it holds still under the locked camera
+  function ride(S, m, r) { if (m) S.riders.push({ m, r, t: m.userData.dur || 0.5 }); }
   // ---- the house games ----
   function erupt(b, col, ring, delay) {
     const S = b.state, c = col ? INK : RED;
     const rs = ring === 0 ? [[HUB - 0.3, SPLIT]] : ring === 1 ? [[SPLIT, R]] : [[HUB - 0.3, R]];
     Sound.sfx('warn', 1.6, col ? 0.7 : 1.3);
     for (let k = col; k < NP; k += 2) for (const [r0, r1] of rs) {
-      Hz.cone(0, 0, 0, PA - 0.03, r1, delay, 400, { r0, name: col ? 'Noir' : 'Rouge', color: c, quiet: true, lock: 0, track: (s) => { s.dir = (k + 0.5) * PA + ringA(S, (r0 + r1) / 2); },
-        onFire(h) { const a = h.shape.dir; for (const rr of [r0 + 2, (r0 + r1) / 2, r1 - 1.5]) FX.pillar(Math.sin(a) * rr, Math.cos(a) * rr, { r: 1.8, h: 12, color: c, dur: 0.5 }); FX.burst(Math.sin(a) * (r0 + r1) / 2, 0.3, Math.cos(a) * (r0 + r1) / 2, { n: 14, color: c, color2: GOLD, speed: [2, 8], up: 6, life: [0.4, 0.9], radius: 2 }); } });
+      Hz.cone(0, 0, 0, PA - 0.03, r1, delay, 400, { r0, name: col ? 'Noir' : 'Rouge', color: c, quiet: true, lock: 0, trackFired: true, track: (s) => { s.dir = (k + 0.5) * PA + ringA(S, (r0 + r1) / 2); },
+        onFire(h) { const a = h.shape.dir; for (const rr of [r0 + 2, (r0 + r1) / 2, r1 - 1.5]) ride(S, FX.pillar(Math.sin(a) * rr, Math.cos(a) * rr, { r: 1.8, h: 12, color: c, dur: 0.5 }), rr); FX.burst(Math.sin(a) * (r0 + r1) / 2, 0.3, Math.cos(a) * (r0 + r1) / 2, { n: 14, color: c, color2: GOLD, speed: [2, 8], up: 6, life: [0.4, 0.9], radius: 2 }); } });
     }
     Co.start(function* () { yield delay; Sound.sfx('bigboom', 0.5); FX.shake(0.5); }, 'phase');
   }
@@ -337,7 +339,7 @@
     Sound.sfx('dash', 1, 0.5); yield 1.2;
   }
   function suitHz(b, c, delay) {
-    const S = b.state, o = (track) => ({ name: SUITN[c.suit], color: SUITC[c.suit], lock: 0, track });
+    const S = b.state, o = (track) => ({ name: SUITN[c.suit], color: SUITC[c.suit], lock: 0, trackFired: true, track });
     const at = (s) => { const w = wpos(S, c.la, c.r, _w); s.x = w.x; s.z = w.z; };
     const line = (off, w) => Hz.rect(0, 0, 0, 38, w, delay, 320, o((s) => { const q = wpos(S, c.la, c.r, _w), d = q.a + off; s.dir = d; s.x = q.x - Math.sin(d) * 19; s.z = q.z - Math.cos(d) * 19; }));
     if (c.suit === 0) line(PI / 2, 4.4); else if (c.suit === 1) Hz.circle(0, 0, 7.4, delay, 320, o(at)); else if (c.suit === 2) { line(PI / 4, 3.2); line(-PI / 4, 3.2); } else Hz.donut(0, 0, 3.7, 15, delay, 320, o(at));
@@ -355,7 +357,7 @@
       const c = mine[i]; c.flipT = 0.001; Sound.sfx('tick', 2, 0.8); suitHz(b, c, delay);
       Co.start(function* () {
         yield delay; const w = wpos(S, c.la, c.r, {}), sc = SUITC[c.suit];
-        if (!G.headless) { FX.burst(w.x, 0.5, w.z, { n: 40, color: sc, color2: GOLD, speed: [4, 12], life: [0.35, 0.9], size: [0.25, 0.6], drag: 2.2 }); FX.ring(w.x, w.z, { r0: 0.3, r1: 5.2, color: sc, dur: 0.5, width: 0.16 }); FX.light(w.x, 1.5, w.z, sc, 60, 0.45, 18); }
+        if (!G.headless) { FX.burst(w.x, 0.5, w.z, { n: 40, color: sc, color2: GOLD, speed: [4, 12], life: [0.35, 0.9], size: [0.25, 0.6], drag: 2.2 }); ride(S, FX.ring(w.x, w.z, { r0: 0.3, r1: 5.2, color: sc, dur: 0.5, width: 0.16 }), c.r); FX.light(w.x, 1.5, w.z, sc, 60, 0.45, 18); }
         FX.shake(0.44); Sound.sfx('boom', 0.9, 0.9 + c.suit * 0.15); c.on = false; c.g.visible = false; c.gl.visible = false;
       }, 'phase');
       if (!(pair && i % 2 === 0 && i < mine.length - 1)) yield gap;
@@ -454,6 +456,7 @@
       // carry the player (also while airborne, not while dashing), and turn the camera and facing with the ring underfoot so the floor holds still on screen
       const wHere = Math.hypot(p.pos.x, p.pos.z) < SPLIT ? S.wi : S.wo;
       if (p.alive && !p.dash && G.state === 'fight' && dt > 0) { const c = Math.cos(wHere * dt) - 1, sn = Math.sin(wHere * dt); p.push.x += (p.pos.x * c + p.pos.z * sn) / dt; p.push.z += (p.pos.z * c - p.pos.x * sn) / dt; } // exact rotation, so standing still does not creep outward
+      for (let i = S.riders.length - 1; i >= 0; i--) { const q = S.riders[i], a = (q.r < SPLIT ? S.wi : S.wo) * dt, c = Math.cos(a), sn = Math.sin(a), x = q.m.position.x, z = q.m.position.z; q.m.position.x = x * c + z * sn; q.m.position.z = z * c - x * sn; if ((q.t -= dt) <= 0) S.riders.splice(i, 1); }
       if (p.alive && G.state === 'fight' && !Cam.cine) { S.camW = damp(S.camW, wHere, 9, dt); const dy = S.camW * dt; Cam.yaw = wrapPi(Cam.yaw + dy); p.facing = wrapPi(p.facing + dy); }
       else S.camW = 0;
       // balls
