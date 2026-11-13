@@ -236,7 +236,7 @@ class Player {
     else if (this.dash) { const d = this.dash, k = Math.min(1, d.t / dt); vx = d.vx * k; vz = d.vz * k; d.t -= dt; if (d.t <= 0) { this.dash = null; if (d.done) d.done(this); } ml = 0; }
     else { const sp = this.speed * this.speedMul; vx = mx * sp; vz = mz * sp; }
     this.intentX = mx; this.intentZ = mz; this.moving = ml > 0.15;
-    vx += this.push.x; vz += this.push.z; this.push.x = this.push.z = 0;
+    const pux = this.push.x, puz = this.push.z; vx += pux; vz += puz; this.push.x = this.push.z = 0;
     const ox = this.pos.x, oz = this.pos.z;
     this.pos.x += vx * dt; this.pos.z += vz * dt;
     // facing
@@ -259,7 +259,7 @@ class Player {
       if (!this.falling && this.pos.y <= floor) { if (!A || A.edge !== 'fall' || A.contains(this.pos.x, this.pos.z)) { this.pos.y = floor; this.vy = 0; this.grounded = true; } else this.falling = true; }
       if (this.falling) { this.casting = null; if (this.pos.y < -7) { this.hp = 0; this.die('fall'); } }
     }
-    this.moveSpeed = Math.hypot(this.pos.x - ox, this.pos.z - oz) / Math.max(dt, 1e-4);
+    this.moveSpeed = Math.min(Math.hypot(vx - pux, vz - puz), Math.hypot(this.pos.x - ox, this.pos.z - oz) / Math.max(dt, 1e-4)); // own motion only (being carried by a turning floor or wind is not walking), and none when blocked
     // casting
     if (this.casting) {
       const c = this.casting, s = this.sk[c.i].def;

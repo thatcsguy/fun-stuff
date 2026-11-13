@@ -87,7 +87,7 @@ const FX = (() => {
   function ring(x, z, o = {}) {
     if (G.headless) return; const m = take('ring'), u = m.material.uniforms;
     m.position.set(x, o.y === undefined ? 0.08 : o.y, z); m.userData.dur = o.dur || 0.5; m.userData.r0 = o.r0 || 0.2; m.userData.r1 = o.r1 || 6;
-    u.uC.value.set(o.color || 0xffffff).multiplyScalar(o.mult || 2); u.uW.value = o.width || 0.12; m.scale.setScalar(Math.max(m.userData.r0, m.userData.r1) * 1.1); m.renderOrder = 12;
+    u.uC.value.set(o.color || 0xffffff).multiplyScalar(o.mult || 2); u.uW.value = o.width || 0.12; m.scale.setScalar(Math.max(m.userData.r0, m.userData.r1) * 1.1); m.renderOrder = 12; return m;
   }
 
   const cylGeo = new THREE.CylinderGeometry(1, 1, 1, 20, 1, true); cylGeo.translate(0, 0.5, 0); cylGeo.userData.shared = true;
@@ -100,7 +100,7 @@ const FX = (() => {
   function pillar(x, z, o = {}) {
     if (G.headless) return; const m = take('pillar');
     m.position.set(x, o.y || 0, z); m.scale.set(o.r || 1, o.h || 14, o.r || 1); m.userData.dur = o.dur || 0.6; m.userData.r = o.r || 1;
-    m.material.uniforms.uC.value.set(o.color || 0xffffff).multiplyScalar(o.mult || 2.2);
+    m.material.uniforms.uC.value.set(o.color || 0xffffff).multiplyScalar(o.mult || 2.2); return m;
   }
 
   const beamGeo = new THREE.CylinderGeometry(1, 1, 1, 10, 1, true); beamGeo.rotateX(PI / 2); beamGeo.userData.shared = true;
