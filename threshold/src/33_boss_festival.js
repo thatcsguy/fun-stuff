@@ -128,17 +128,119 @@
     const mesh = new THREE.Mesh(geo, m); mesh.receiveShadow = true; g.add(mesh); P.u = u; P.burn = -1; return mesh;
   }
 
-  // The ground pattern of a shell from mortar k. Shapes use the Hz conventions so Hz.inShape can test them.
+  // The ground pattern of a shell from mortar k, always relative to that mortar. Four colours in two pairs of opposites:
+  // red (peony) near me is bad, yellow (ring) only near me is safe, blue (cross) my line is bad, green (willow) only my line is safe.
   function shapesOf(type, k) {
-    const th = mAng(k) + PI, dx = Math.sin(th), dz = Math.cos(th), [ax, az] = mPos(k, MR * 0.45), px = dz, pz = -dx;
-    if (type === 'peony') return [{ type: 'circle', x: ax, z: az, r: 8.5 }];
-    if (type === 'ring') return [{ type: 'donut', x: ax, z: az, r0: 5, r1: 14 }];
-    if (type === 'willow') return [-9, 0, 9].map((o) => ({ type: 'rect', x: ax + px * o - dx * 24, z: az + pz * o - dz * 24, dir: th, len: 48, w: 4.2 }));
-    if (type === 'cross') return [{ type: 'rect', x: ax - dx * 26, z: az - dz * 26, dir: th, len: 52, w: 4.6 }, { type: 'rect', x: ax - px * 26, z: az - pz * 26, dir: th + PI / 2, len: 52, w: 4.6 }];
+    const th = mAng(k) + PI, dx = Math.sin(th), dz = Math.cos(th), px = dz, pz = -dx;
+    if (type === 'peony') { const [x, z] = mPos(k, 9); return [{ type: 'circle', x, z, r: 11 }]; }
+    if (type === 'ring') { const [x, z] = mPos(k, 10); return [{ type: 'donut', x, z, r0: 5, r1: 30 }]; }
+    if (type === 'cross') { const [x, z] = mPos(k, R + 1); return [{ type: 'rect', x, z, dir: th, len: 2 * R + 2, w: 9 }]; }
+    if (type === 'willow') return [-1, 1].map((s) => ({ type: 'rect', x: -dx * (R + 2) + px * s * 23.5, z: -dz * (R + 2) + pz * s * 23.5, dir: th, len: 2 * R + 4, w: 40 }));
     return [];
   }
-  const GRID = []; for (let x = -R + 1; x < R; x += 1.25) for (let z = -R + 1; z < R; z += 1.25) if (Math.hypot(x, z) < R - 1) GRID.push([x, z]);
-  function safeOf(S, set) { const sh = []; for (const k of set) for (const s of shapesOf(S.types[k], k)) sh.push(s); return GRID.filter((q) => !sh.some((s) => Hz.inShape(s, q[0], q[1]))); }
+  // ---------- volley planner ----------
+  // The floor as a grid of cells. A set of shells is survivable when one connected safe patch of SURV cells is left,
+  // impossible when DEAD or fewer cells are left anywhere; nothing in between (a sliver) is ever allowed to decide a volley.
+  const GS = 1.25, GRID = [], GI = new Map(), SURV = 20, DEAD = 3, TIGHT = 45, SPD = 7, SPARE = 1.5, RISE = 1.2;
+  for (let x = -R + 1, i = 0; x < R; x += GS, i++) for (let z = -R + 1, j = 0; z < R; z += GS, j++) {
+    if (Math.hypot(x, z) >= R - 1) continue; let solid = false; for (let k = 0; k < NM; k++) { const [mx, mz] = mPos(k); if (Math.hypot(x - mx, z - mz) < 1.4) solid = true; }
+    if (!solid) { GI.set(i * 64 + j, GRID.length); GRID.push([x, z, i, j]); } }
+  const NBR = GRID.map(([, , i, j]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, c]) => GI.get((i + a) * 64 + j + c)).filter((n) => n !== undefined));
+  const MASK = {}, maskOf = (type, k) => MASK[type + k] || (MASK[type + k] = Uint8Array.from(GRID, (q) => shapesOf(type, k).some((s) => Hz.inShape(s, q[0], q[1])) ? 1 : 0));
+  // safe cells left when these mortars fire (purple never counts): { total, big: cell ids of the largest connected safe patch }
+  function evalSet(S, set) {
+    const ms = set.filter((k) => k >= 0 && S.types[k] !== 'comet').map((k) => maskOf(S.types[k], k)), n = GRID.length, ok = new Uint8Array(n); let total = 0;
+    for (let i = 0; i < n; i++) { let f = 1; for (const m of ms) if (m[i]) { f = 0; break; } ok[i] = f; total += f; }
+    let big = []; const seen = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { if (!ok[i] || seen[i]) continue; const c = [i]; seen[i] = 1; for (let h = 0; h < c.length; h++) for (const j of NBR[c[h]]) if (ok[j] && !seen[j]) { seen[j] = 1; c.push(j); } if (c.length > big.length) big = c; }
+    return { total, big };
+  }
+  const kind = (e) => e.big.length >= SURV ? 'ok' : e.total <= DEAD ? 'dead' : 'sliver';
+  const minD = (cells, x, z) => { let d = Infinity; for (const c of cells) { const q = GRID[c], e = Math.hypot(q[0] - x, q[1] - z); if (e < d) d = e; } return d; };
+  // From the worst of a few starting points, on foot at speed 7: catch the spark while it is still on its fuse, then reach the
+  // patch with SPARE seconds left before the shells land (total seconds after the volley starts).
+  const SAMPLES = [[0, 0], [11, 0], [-11, 0], [0, 11], [0, -11]];
+  function reachOK(P, Tspark, cells, total) {
+    const q = [0, 0];
+    for (const s0 of SAMPLES) {
+      let best = Infinity;
+      if (P) { for (let t = 0.3; t < Tspark - 0.15; t += 0.1) { at(P, P.len * t / Tspark, q); if (Math.hypot(q[0] - s0[0], q[1] - s0[1]) / SPD > t) continue; best = Math.min(best, t + minD(cells, q[0], q[1]) / SPD); } }
+      else best = minD(cells, s0[0], s0[1]) / SPD;
+      if (best + SPARE > total) return false;
+    }
+    return true;
+  }
+  // Where Nian plants himself for Feast: covered by the keeper shell alone, a few metres from the player's patch.
+  function feastSpot(S, lit, keep, patch) {
+    const km = maskOf(S.types[keep], keep), others = lit.filter((k) => k !== keep).map((k) => maskOf(S.types[k], k)); let best = null, bs = Infinity;
+    for (let i = 0; i < GRID.length; i++) { if (!km[i] || others.some((m) => m[i])) continue; const [x, z] = GRID[i]; if (Math.hypot(x, z) > 14) continue; const d = minD(patch, x, z); if (d < 3.5) continue; const s = Math.abs(d - 5.5); if (s < bs) { bs = s; best = [x, z]; } }
+    return best;
+  }
+  // Every lit set this layout allows, sorted into archetypes:
+  //  A one answer: all lit is impossible, exactly one stamp makes it survivable.
+  //  B Feast: two stamps survive, only one of them leaves the keeper shell that lands on Nian.
+  //  C leave it alone: all lit is survivable but tight, stamping wastes the stamp.
+  //  D dragon: like C, but the centre spiral burns too and is the spark to stamp.
+  const ACT = [
+    { T: 8, warn: 1.0, ns: [2, 3], multi: true }, // act 1 also accepts sets where more than one stamp works (like the two yellows)
+    { T: 7, warn: 0.5, ns: [3, 4], B: true },
+    { T: 6.5, warn: 0.5, ns: [4, 5], B: true, D: true },
+  ];
+  function buildPools(S, cfg) {
+    const pools = { A: [], B: [], C: [], D: [] }, total = cfg.T + RISE + cfg.warn;
+    for (let m = 1; m < 1 << NM; m++) {
+      const lit = []; let bad = false; for (let k = 0; k < NM; k++) if (m >> k & 1) { if (S.types[k] === 'comet') bad = true; lit.push(k); }
+      if (bad || !cfg.ns.includes(lit.length)) continue;
+      const all = evalSet(S, lit), ka = kind(all); if (ka === 'sliver') continue;
+      const drops = lit.map((k) => { const e = evalSet(S, lit.filter((j) => j !== k)); return { k, e, c: kind(e) }; });
+      if (drops.some((d) => d.c === 'sliver')) continue;
+      const okd = drops.filter((d) => d.c === 'ok');
+      if (ka === 'dead') {
+        if (okd.length === 1 || (cfg.multi && okd.length)) { const d = okd[Math.floor(rnd(okd.length))]; if (reachOK(S.fuses[d.k], cfg.T, d.e.big, total)) pools.A.push({ arch: 'A', lit, answer: d.k, safe: d.e.big }); }
+        else if (okd.length === 2 && cfg.B) for (const [x, kp] of [[okd[0], okd[1]], [okd[1], okd[0]]]) {
+          const spot = feastSpot(S, lit, kp.k, x.e.big); if (spot && reachOK(S.fuses[x.k], cfg.T, x.e.big, total)) pools.B.push({ arch: 'B', lit, answer: x.k, keep: kp.k, spot, safe: x.e.big });
+        }
+      } else if (all.big.length <= TIGHT) {
+        if (reachOK(null, 0, all.big, total)) pools.C.push({ arch: 'C', lit, answer: null, safe: all.big });
+        if (cfg.D && reachOK(S.spiral, total + 0.3, all.big, total)) pools.D.push({ arch: 'D', lit, answer: -1, safe: all.big });
+      }
+    }
+    return pools;
+  }
+  // New colours for every act of every run: two of each, never two of a colour side by side; act 3 trades one for purple.
+  function makeLayout(S, n) {
+    if (S.layouts && S.layouts[n]) { Object.assign(S, S.layouts[n], { hist: [], lastLit: '', used: {} }); return; }
+    const cfg = ACT[n], need = { A: 8, B: cfg.B ? 4 : 0, C: n ? n : 0, D: cfg.D ? 3 : 0 }; let best = null, bs = -1;
+    for (let t = 0; t < 500 && (!best || t < 120); t++) {
+      const cols = ['peony', 'peony', 'ring', 'ring', 'cross', 'cross', 'willow', 'willow']; if (n === 2) cols[rndi(0, 3) * 2] = 'comet';
+      const ty = shuffle(cols); if (ty.some((c, k) => c === ty[(k + 1) % NM])) continue;
+      S.types = ty; const pools = buildPools(S, cfg); let sc = Infinity; for (const a in need) if (need[a]) sc = Math.min(sc, pools[a].length / need[a]);
+      sc = Math.min(sc, new Set(pools.A.map((e) => e.answer)).size / 4); // the answer can't always be the same mortar
+      if (sc > bs) { bs = sc; best = { ty, pools }; } if (sc >= 1) break;
+    }
+    S.types = best.ty; S.pools = best.pools; S.hist = []; S.lastLit = ''; S.used = {};
+    if (S.layouts) S.layouts[n] = { types: S.types, pools: S.pools };
+  }
+  const litKey = (lit) => lit.slice().sort().join(',');
+  // weighted archetype pick: never the same archetype three volleys running, only archetypes this layout has
+  function nextArch(S, w) {
+    const h = S.hist, ok = (a) => S.pools[a] && S.pools[a].some((e) => litKey(e.lit) !== S.lastLit) && !(h.length >= 2 && h[h.length - 1] === a && h[h.length - 2] === a);
+    const keys = Object.keys(w).filter(ok); if (!keys.length) return Object.keys(w).find((a) => S.pools[a] && S.pools[a].length) || 'A';
+    let r = rnd(keys.reduce((s, a) => s + w[a], 0)); for (const a of keys) { r -= w[a]; if (r <= 0) return a; } return keys[keys.length - 1];
+  }
+  // a random lit set of that archetype, never the same set twice running, favouring the sets used least this act
+  function pickPlan(S, arch) {
+    const all = S.pools[arch] || [], used = S.used || (S.used = {}), pool = all.filter((e) => litKey(e.lit) !== S.lastLit), cand = pool.length ? pool : all; if (!cand.length) return null;
+    const sc = (e) => (used[litKey(e.lit)] || 0) * 2 + (used['k' + e.answer] || 0), lo = Math.min(...cand.map(sc)), use = cand.filter((e) => sc(e) === lo), pl = use[Math.floor(rnd(use.length))];
+    used[litKey(pl.lit)] = (used[litKey(pl.lit)] || 0) + 1; used['k' + pl.answer] = (used['k' + pl.answer] || 0) + 1; return pl;
+  }
+  // phase 1's fixed opener: each colour alone, a red with a blue that leave room, then two yellows (stamp one)
+  function teach(S) {
+    const of = (t) => shuffle(S.types.map((x, k) => x === t ? k : -1).filter((k) => k >= 0)), one = (lit) => ({ arch: 'T', lit, answer: null, safe: evalSet(S, lit).big });
+    const r = of('peony'), y = of('ring'), bl = of('cross'), gr = of('willow'); let pair = null;
+    for (const a of r) for (const c of bl) if (!pair && kind(evalSet(S, [a, c])) === 'ok') pair = [a, c];
+    return [one([r[0]]), one([y[0]]), one([bl[0]]), one([gr[0]]), one(pair || [r[1]]), { arch: 'A', lit: y, answer: y[0], safe: evalSet(S, [y[1]]).big }];
+  }
 
   // ---------- polylines ----------
   function polyline(pts) { const L = [0]; for (let i = 1; i < pts.length; i++) L.push(L[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return { pts, L, len: L[L.length - 1] }; }
@@ -294,10 +396,12 @@
       const F = polyline(bez(fp, fm, q2, 26, 0.6)); F.mesh = fuse(g, F, S); F.mesh.visible = false; F.to = k2; F.atS = P.len * 0.5; S.forks.push(F); }
     { const pts = []; for (let i = 0; i <= 120; i++) { const t = i / 120, a = 0.6 + t * TAU * 1.5, r = lerp(15.2, 1.6, t); pts.push([Math.sin(a) * r, Math.cos(a) * r]); } S.spiral = polyline(pts); S.spiral.mesh = fuse(g, S.spiral, S); S.spiral.mesh.visible = false; }
     S.allF = [...S.fuses, ...S.forks, S.spiral];
+    // this run's three colour layouts and their volley pools, worked out during loading so act changes don't hitch
+    S.layouts = []; for (let n = 2; n >= 0; n--) makeLayout(S, n);
     S.big = new THREE.Group(); const bt = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.1, 1.5, 20), rimify(W.mat({ color: 0x7a1610, roughness: 0.42 }), S, 'lq')); for (const y of [0.12, 0.75, 1.42]) { const hp = new THREE.Mesh(new THREE.TorusGeometry(y < 0.5 ? 1.09 : y > 1 ? 0.97 : 1.03, 0.06, 6, 24), S.hoopM); hp.rotation.x = PI / 2; hp.position.y = y; S.big.add(hp); } const btop = new THREE.Mesh(new THREE.CircleGeometry(0.9, 24), W.glow(0xff7a20, 0.9)); btop.rotation.x = -PI / 2; btop.position.y = 1.51; S.big.add(btop); bt.position.y = 0.75; bt.castShadow = true; S.big.add(bt); const bb = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.1, 6, 20), goldM); bb.rotation.x = PI / 2; bb.position.y = 1.1; S.big.add(bb); S.big.visible = false; g.add(S.big);
     // sparks and rising shells: warm core, soft halo, a turning star
     S.sparkM = W.glow(0xffd890, 1.8); const bbG = new THREE.PlaneGeometry(2, 2), coreG = new THREE.SphereGeometry(0.12, 8, 6);
-    S.sparkPool = Array.from({ length: 16 }, () => { const m = new THREE.Group(), c = new THREE.Mesh(coreG, S.sparkM), h = new THREE.Mesh(bbG, sparkleMat(S, 1.45)); h.frustumCulled = false; m.add(c); m.add(h); m.visible = false; g.add(m); return m; });
+    const ringG = new THREE.TorusGeometry(0.5, 0.06, 6, 24); S.sparkPool = Array.from({ length: 16 }, () => { const m = new THREE.Group(), cm = W.glow(0xffd890, 1.8), c = new THREE.Mesh(coreG, cm), h = new THREE.Mesh(bbG, sparkleMat(S, 1.45)), rg = new THREE.Mesh(ringG, W.glow(0xffe8c0, 2.4, { transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); rg.rotation.x = -PI / 2; rg.visible = false; h.frustumCulled = false; m.add(c); m.add(h); m.add(rg); m.userData = { cm, rg }; m.visible = false; g.add(m); return m; });
     S.shellPool = Array.from({ length: 10 }, () => { const m = new THREE.Group(), c = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), W.glow(0xffffff, 1)), h = new THREE.Mesh(bbG, sparkleMat(S, 1.1)); h.frustumCulled = false; m.add(c); m.add(h); m.userData.c = c; m.userData.h = h; m.visible = false; g.add(m); return m; });
     S.sparks = []; S.shells = [];
     // sky bursts: one point cloud, motion done in the vertex shader
@@ -413,31 +517,30 @@
   function shellLook(sm, col, k) { sm.userData.c.material.color.setHex(col).multiplyScalar(k); const u = sm.userData.h.material.uniforms; u.uCol.value.setHex(col).multiplyScalar(0.8); u.uCore.value.setHex(col).lerp(_w, 0.55).multiplyScalar(1.4); }
 
   // ---------- fuses and shells ----------
-  function addSpark(S, o) { const m = S.sparkPool.find((q) => !q.visible); const sp = Object.assign({ s: 0, alive: true, m, forked: false }, o);
-    if (m) { m.visible = true; m.scale.setScalar(o.big ? 1.6 : 1); const u = m.children[1].material.uniforms; if (o.big) { u.uCol.value.setRGB(1, 0.6, 0.1); u.uCore.value.setRGB(1.5, 1.2, 0.6); } else if (o.quick) { u.uCol.value.setRGB(0.9, 0.75, 0.55); u.uCore.value.setRGB(1.6, 1.6, 1.5); } else { u.uCol.value.setRGB(1, 0.42, 0.1); u.uCore.value.setRGB(1.3, 0.95, 0.55); } }
-    S.sparks.push(sp); return sp; }
-  // Plan a volley: which mortars are lit, which the player has to stamp, where it will be safe.
-  function planVolley(b, o) {
-    const S = b.state, p = G.player;
-    for (let attempt = 0; attempt < 200; attempt++) {
-      const lit = shuffle([0, 1, 2, 3, 4, 5, 6, 7]).slice(0, o.n).filter((k) => S.types[k] !== 'comet' || o.comet); if (lit.length < o.n) continue;
-      const all = safeOf(S, lit).length;
-      if (!o.must) { if (all >= 40) return { lit, stamp: [], keep: null }; continue; }
-      if (all >= 14) continue;
-      // one shell is worth keeping: it must be able to cover the beast while leaving the player room beside it
-      const order = shuffle(lit);
-      for (const keep of order) { if (S.types[keep] === 'comet') continue;
-        for (const drop of order) { if (drop === keep) continue; const rest = lit.filter((k) => k !== drop), sf = safeOf(S, rest); if (sf.length >= 34) return { lit, stamp: [drop], keep, safe: sf }; }
-        if (o.n >= 5) for (let i = 0; i < order.length; i++) { const d1 = order[i], d2 = (d1 + 1) % NM; if (d1 === keep || d2 === keep || !lit.includes(d2)) continue; const rest = lit.filter((k) => k !== d1 && k !== d2), sf = safeOf(S, rest); if (sf.length >= 34) return { lit, stamp: [d1, d2], keep, safe: sf }; }
-      }
-    }
-    return null;
+  // Each spark burns in its mortar's colour. Once one spark of a volley is stamped the rest go white-hot (white core,
+  // a little ring of flame, coloured trail) and can't be stamped until the volley lands or Rekindle relights the first.
+  function sparkLook(sp) {
+    const m = sp.m; if (!m) return; const u = m.children[1].material.uniforms, cm = m.userData.cm, c = _c.setHex(sp.col || 0xffa040);
+    m.scale.setScalar(sp.big ? 1.6 : 1); m.userData.rg.visible = !!sp.locked;
+    if (sp.locked) { cm.color.setRGB(2.6, 2.5, 2.3); u.uCol.value.copy(c).multiplyScalar(1.0); u.uCore.value.setRGB(1.9, 1.85, 1.75); }
+    else if (sp.big) { cm.color.setRGB(1.8, 1.3, 0.6); u.uCol.value.setRGB(1, 0.6, 0.1); u.uCore.value.setRGB(1.5, 1.2, 0.6); }
+    else { cm.color.copy(c).lerp(_w, 0.3).multiplyScalar(1.8); u.uCol.value.copy(c).multiplyScalar(1.0); u.uCore.value.copy(c).lerp(_w, 0.4).multiplyScalar(1.35); }
   }
-  function startVolley(b, o) {
-    const S = b.state, pl = planVolley(b, o) || planVolley(b, Object.assign({}, o, { must: false, n: Math.min(3, o.n) })); if (!pl) return null;
-    const T = o.T, V = { lit: pl.lit, stamp: pl.stamp, keep: pl.keep, arrive: G.now + T, land: G.now + T + 1.2 + 1.6, done: false, fired: [], safe: pl.safe || null, T };
-    pl.lit.forEach((k, i) => { const P = S.fuses[k], quick = o.quick && i === 0, delay = quick ? T * 0.45 : 0; S.mortars[k].armed = true; addSpark(S, { P, to: k, speed: P.len / (T - delay), wait: delay, quick, vol: V, fork: o.forks && i === 1 && !pl.lit.includes(S.forks[k].to) && S.types[S.forks[k].to] !== 'comet' ? S.forks[k] : null }); });
-    S.vol = V; Sound.sfx('steam', 0.7, 1.8);
+  function addSpark(S, o) { const m = S.sparkPool.find((q) => !q.visible); const sp = Object.assign({ s: 0, alive: true, m, locked: false }, o); if (m) { m.visible = true; sparkLook(sp); } S.sparks.push(sp); return sp; }
+  function stampOut(S, sp, x, z) {
+    sp.alive = false; if (sp.m) { sp.m.visible = false; sp.m = null; } if (sp.to >= 0) S.mortars[sp.to].armed = S.sparks.some((o) => o.alive && o.to === sp.to);
+    Sound.sfx('steam', 0.9, 2.2); if (!G.headless) FX.burst(x, 0.3, z, { n: 14, color: 0x9a9088, speed: [1, 4], up: 3, life: [0.4, 0.9], size: [0.3, 0.6], smoke: true });
+    const V = sp.vol; if (!V || V.lock) return; V.lock = sp; let any = false;
+    for (const o of V.sparks) if (o.alive && o !== sp) { o.locked = true; sparkLook(o); any = true; if (!G.headless && o.m) FX.burst(o.m.position.x, 0.4, o.m.position.z, { n: 10, color: 0xffffff, color2: o.col || GOLD, speed: [1, 4], up: 3, life: [0.2, 0.5], size: [0.1, 0.22] }); }
+    if (any) Sound.sfx('tick', 0.8, 0.6);
+  }
+  function startVolley(b, pl, o) {
+    const S = b.state, T = o.T; if (!pl) return null;
+    const V = Object.assign({}, pl, { arrive: G.now + T, land: G.now + T + RISE + o.warn, warn: o.warn, T, lock: null, fired: [], sparks: [], fuses: pl.lit.slice() });
+    if (o.comet) { const c = S.types.indexOf('comet'); if (c >= 0) V.fuses.push(c); }
+    for (const k of V.fuses) { const P = S.fuses[k]; S.mortars[k].armed = true; V.sparks.push(addSpark(S, { P, to: k, speed: P.len / T, vol: V, col: TYPES[S.types[k]] })); }
+    if (pl.arch === 'D') { V.sparks.push(addSpark(S, { P: S.spiral, to: -1, speed: S.spiral.len / (T + RISE + o.warn + 0.3), big: true, vol: V, col: GOLD })); Sound.sfx('steam', 0.9, 1.2); }
+    S.vol = V; S.lastLit = litKey(pl.lit); S.hist.push(pl.arch); Sound.sfx('steam', 0.7, 1.8);
     return V;
   }
   function launch(b, k, V) {
@@ -448,12 +551,13 @@
     if (V) V.fired.push(k);
   }
   function burst(b, sh) {
-    const S = b.state, shapes = shapesOf(sh.type, sh.k); skyBurst(S, sh.x1, 30, sh.z1, sh.type, sh.col); Sound.sfx('bigboom', 0.55, 1.3 + (sh.k % 3) * 0.15); FX.flash(sh.col, 0.07, 3); FX.light(sh.x1, 16, sh.z1, sh.col, 45, 0.7, 60);
+    const S = b.state, shapes = shapesOf(sh.type, sh.k), warn = sh.V ? sh.V.warn : 1.0; skyBurst(S, sh.x1, 30, sh.z1, sh.type, sh.col); Sound.sfx('bigboom', 0.55, 1.3 + (sh.k % 3) * 0.15); FX.flash(sh.col, 0.07, 3); FX.light(sh.x1, 16, sh.z1, sh.col, 45, 0.7, 60);
     if (!G.headless) S.atmos.material.uniforms.uFw.value.setHex(sh.col).multiplyScalar(0.07);
     let first = true;
-    const hit = () => { if (!first) return; first = false; if (shapes.some((s) => Hz.inShape(s, b.pos.x, b.pos.z))) startle(b); Sound.sfx('boom', 0.8, 0.8); FX.shake(0.5); };
+    // a shell only startles Nian while he is mid-Feast: that is the one way to stop it, and the damage window
+    const hit = () => { if (!first) return; first = false; if (b.castState && b.castState.name === 'Feast' && shapes.some((s) => Hz.inShape(s, b.pos.x, b.pos.z))) startle(b); Sound.sfx('boom', 0.8, 0.8); FX.shake(0.5); };
     const o = { name: sh.type[0].toUpperCase() + sh.type.slice(1), color: sh.col, tag: 'fight', quiet: true, silent: true, onFire: hit };
-    for (const s of shapes) { if (s.type === 'circle') Hz.circle(s.x, s.z, s.r, 1.6, 340, o); else if (s.type === 'donut') Hz.donut(s.x, s.z, s.r0, s.r1, 1.6, 340, o); else Hz.rect(s.x, s.z, s.dir, s.len, s.w, 1.6, 320, o); }
+    for (const s of shapes) { if (s.type === 'circle') Hz.circle(s.x, s.z, s.r, warn, 600, o); else if (s.type === 'donut') Hz.donut(s.x, s.z, s.r0, s.r1, warn, 600, o); else Hz.rect(s.x, s.z, s.dir, s.len, s.w, warn, 600, o); }
     if (sh.type === 'comet') { const sgn = sh.k % 2 ? 1 : -1, a0 = mAng(sh.k) + PI, t0 = G.now; Hz.zone({ type: 'rect', x: sh.x1, z: sh.z1, dir: a0, len: 24, w: 3.4 }, 6.5, 95, { name: 'Comet', color: sh.col, delay: 1.6, tag: 'fight', track(s) { s.dir = a0 + sgn * Math.max(0, G.now - t0 - 1.6) * 0.75; } }); }
     Sound.sfx('warn', 0.5);
   }
@@ -463,7 +567,10 @@
     if (!G.headless) { b.aim(_a); FX.burst(_a.x, _a.y + 1, _a.z, { n: 40, color: GOLD, color2: 0xffffff, speed: [3, 10], life: [0.4, 1.0], size: [0.2, 0.5] }); FX.ring(b.pos.x, b.pos.z, { r0: 1, r1: 7, color: GOLD, dur: 0.5 }); }
   }
   function* stunned(b) { const S = b.state; while (S.stun > 0) yield; }
-  function* waitVolley(b, V, extra = 0.4) { if (!V) return; while (G.now < V.land + extra) yield; if (b.state.vol === V) b.state.vol = null; }
+  // while the shells are in the air Nian pads after the player (never closer than a few metres), so melee can keep hitting
+  function* waitVolley(b, V, extra = 0.4) { if (!V) return; const S = b.state, p = G.player;
+    while (G.now < V.land + extra) { if (p && S.stun <= 0 && !b.castState) { const dx = p.pos.x - b.pos.x, dz = p.pos.z - b.pos.z, d = Math.hypot(dx, dz); if (d > 3.6) { const k = Math.min(1, 4.2 * G.dt / d); b.pos.x += dx * k; b.pos.z += dz * k; S.walk += G.dt * 8; } } yield; }
+    if (S.vol === V) S.vol = null; }
 
   // ---------- Nian's own kit ----------
   function* pounce(b) {
@@ -483,7 +590,7 @@
     const S = b.state, p = G.player; yield* stunned(b); const r = yield* b.cast({ name: 'Lantern Toss', time: 0.8 }); if (r !== 'done') return;
     for (let k = 0; k < n; k++) { const a = rnd(TAU), d = k ? rnd(2, 8) : 0, x = p.pos.x + Math.sin(a) * d, z = p.pos.z + Math.cos(a) * d; if (Math.hypot(x, z) > R - 2) continue;
       if (!G.headless) FX.missile(new V3(b.pos.x, 3.5, b.pos.z), new V3(x, 0.3, z), { speed: 22, arc: 6, color: 0xff8030, size: 0.4 });
-      Hz.zone({ type: 'circle', x, z, r: 3 }, 6, 80, { name: 'Lantern Fire', color: 0xff7028, delay: 1.2 }); yield 0.3; }
+      Hz.zone({ type: 'circle', x, z, r: 3 }, 4, 80, { name: 'Lantern Fire', color: 0xff7028, delay: 1.2 }); yield 0.3; }
     yield 0.6;
   }
   function* stampede(b, legs = 3) {
@@ -501,29 +608,51 @@
     for (let w = 0; w < waves; w++) { const a = rnd(TAU), sx = Math.sin(a), sz = Math.cos(a), gap = rndi(-3, 3); for (let i = -6; i <= 6; i++) { if (Math.abs(i - gap) <= 1) continue; Bul.fire({ x: -sx * 24 + sz * i * 2.6, z: -sz * 24 - sx * i * 2.6, dir: a, speed: 13, r: 0.36, dmg: 130, color: pick([0xff5050, 0xffc840, 0x60c0ff]), life: 4 }); } Sound.sfx('laser', 0.6, 1.4); yield 1.2; }
     yield 0.4;
   }
-  // Feast: only a shell landing on him stops it. He plants himself where the shell worth keeping will land.
+  // Feast: only the keeper shell landing on him stops it. The planner chose where he plants himself.
   function* feast(b, V) {
-    const S = b.state; if (!V || V.keep === null || V.keep === undefined) return; yield* stunned(b);
-    const sh = shapesOf(S.types[V.keep], V.keep)[0]; let x, z; if (sh.type === 'circle') { x = sh.x * 0.8; z = sh.z * 0.8; } else if (sh.type === 'donut') { const a = Math.atan2(-sh.x, -sh.z); x = sh.x + Math.sin(a) * 8; z = sh.z + Math.cos(a) * 8; } else { x = sh.x + Math.sin(sh.dir) * sh.len * 0.42; z = sh.z + Math.cos(sh.dir) * sh.len * 0.42; }
-    const x0 = b.pos.x, z0 = b.pos.z; for (let t = 0; t < 0.6; t += G.dt) { const q = smooth(t / 0.6); b.pos.x = lerp(x0, x, q); b.pos.z = lerp(z0, z, q); S.hopY = Math.sin(q * PI) * 4; yield; } S.hopY = 0;
+    const S = b.state; if (!V || !V.spot) return; yield* stunned(b);
+    const [x, z] = V.spot, x0 = b.pos.x, z0 = b.pos.z; for (let t = 0; t < 0.6; t += G.dt) { const q = smooth(t / 0.6); b.pos.x = lerp(x0, x, q); b.pos.z = lerp(z0, z, q); S.hopY = Math.sin(q * PI) * 4; yield; } S.hopY = 0;
     const time = Math.max(1.5, V.land - G.now + 0.5); S.jawOpen = 1;
     const r = yield* b.cast({ name: 'Feast', time }); S.jawOpen = 0;
     if (r === 'done') { const p = G.player; Sound.sfx('roar', 1, 0.5); FX.flash(RED, 0.5, 1.2); FX.shake(0.9); if (p.alive) p.hurt(450, { blockable: false, src: { name: 'Feast' } }); b.hp = Math.min(b.maxHp, b.hp + b.maxHp * 0.025); if (!G.headless) FX.ring(b.pos.x, b.pos.z, { r0: 1, r1: 30, color: RED, dur: 0.7 }); yield 0.6; }
     else yield* stunned(b);
   }
+  // Rekindle: relights the spark the player stamped and lifts the white-hot lock, so they must stamp again.
   function* roar(b) {
     const S = b.state; yield* stunned(b); S.jawOpen = 1; const r = yield* b.cast({ name: 'Rekindle', time: 2.4, interruptible: true }); S.jawOpen = 0;
-    if (r === 'done') { Sound.sfx('roar', 1, 0.8); const V = S.vol; if (V && G.now < V.arrive) { for (const sp of S.sparks) if (!sp.alive && sp.vol === V && !sp.relit && sp.P) { sp.relit = true; sp.alive = true; const left = Math.max(1.8, V.arrive - G.now); sp.speed = (sp.P.len - sp.s) / left; if (sp.m) sp.m.visible = true; else { sp.m = S.sparkPool.find((q) => !q.visible); if (sp.m) sp.m.visible = true; } S.mortars[sp.to].armed = true; } } }
+    if (r === 'done') { Sound.sfx('roar', 1, 0.8); const V = S.vol, sp = V && V.lock;
+      if (sp && G.now < V.arrive - 0.5) { sp.alive = true; sp.speed = (sp.P.len - sp.s) / Math.max(0.6, (sp.big ? V.land + 0.3 : V.arrive) - G.now); sp.m = S.sparkPool.find((q) => !q.visible); if (sp.m) sp.m.visible = true; if (sp.to >= 0) S.mortars[sp.to].armed = true;
+        V.lock = null; for (const o of V.sparks) if (o.alive) { o.locked = false; sparkLook(o); }
+        if (!G.headless) { const q = at(sp.P, sp.s, [0, 0]); FX.burst(q[0], 0.4, q[1], { n: 24, color: sp.col || GOLD, color2: 0xffffff, speed: [2, 6], up: 4, life: [0.3, 0.7], size: [0.12, 0.3] }); } } }
     yield 0.5;
   }
-  function lightSpiral(b) { const S = b.state; if (S.bigS && S.bigS.alive) return; S.bigS = addSpark(S, { P: S.spiral, to: -1, speed: 5.6, big: true, wait: 0 }); Sound.sfx('steam', 0.9, 1.2); }
+  // Nian waits for the player to commit, then tries to undo it. Never late in the fuse.
+  function* rekindleWatch(b, V) { while (V && !V.lock && G.now < V.arrive - 4.6) yield; if (V && V.lock && G.now < V.arrive - 4.2 && b.state.vol === V) yield* roar(b); }
+
+  // one volley with Nian's moves around it: an opener at the start of the fuse, nothing that moves the player late, then
+  // straight back to the player once it lands so melee isn't chasing him out of a pocket
+  const OPEN = [pounce, sweep];
+  function* volley(b, pl, o) {
+    const S = b.state; if (!pl) { yield 1; return; }
+    const V = startVolley(b, pl, o);
+    if (pl.arch === 'B') yield* feast(b, V);
+    else { if (!o.calm) { if (!S.obag || !S.obag.length) S.obag = shuffle([0, 1]); yield* OPEN[S.obag.pop()](b); } if (o.rekindle) yield* rekindleWatch(b, V); }
+    yield* waitVolley(b, V, 0.2); yield* pounce(b);
+  }
+  // Nian's own moves between volleys, drawn from a shuffled bag so the order changes every run
+  const FILL = [
+    [(b) => toss(b, 3), (b) => stampede(b, 2), (b) => rockets(b, 1), sweep],
+    [(b) => toss(b, 3), (b) => stampede(b, 3), (b) => rockets(b, 2), sweep],
+    [(b) => stampede(b, 3), (b) => rockets(b, 1), (b) => toss(b, 2), sweep],
+  ];
+  function* filler(b, n, count) { const S = b.state; for (let i = 0; i < count; i++) { if (!S.bag || !S.bag.length) S.bag = shuffle(FILL[n].map((_, j) => j)); yield* FILL[n][S.bag.pop()](b); } }
 
   function setAct(b, n) {
     const S = b.state; S.lvl = n; S.hopY = 0; S.jawOpen = 0; b.autoFace = true;
-    for (const sp of S.sparks) { sp.alive = false; if (sp.m) sp.m.visible = false; } S.sparks.length = 0; S.vol = null; S.bigS = null; for (const m of S.mortars) m.armed = false;
+    for (const sp of S.sparks) { sp.alive = false; if (sp.m) sp.m.visible = false; } S.sparks.length = 0; S.vol = null; for (const m of S.mortars) m.armed = false;
     for (const P of S.allF) P.burn = -1;
-    S.types = n === 0 ? ['peony', 'ring', 'willow', 'cross', 'peony', 'ring', 'willow', 'cross'] : n === 1 ? ['peony', 'ring', 'cross', 'comet', 'ring', 'willow', 'peony', 'cross'] : ['ring', 'peony', 'comet', 'cross', 'willow', 'ring', 'cross', 'peony'];
-    S.mortars.forEach((m, k) => m.bm.color.setHex(TYPES[S.types[k]]).multiplyScalar(1.3)); for (const F of S.forks) F.mesh.visible = n >= 1; S.spiral.mesh.visible = S.big.visible = n >= 2;
+    if (S.act !== n) { S.act = n; makeLayout(S, n); S.bag = null; S.obag = null; }
+    S.mortars.forEach((m, k) => m.bm.color.setHex(TYPES[S.types[k]]).multiplyScalar(1.3)); for (const F of S.forks) F.mesh.visible = false; S.spiral.mesh.visible = S.big.visible = n >= 2;
   }
   function look(b, n, instant) { const S = b.state; S.lookN = n; if (instant) { S.mood = n; if (!G.headless) Post.set(Object.assign({}, b.def.post, POST[n])); } }
   // the phase mood: sky, fog, light, lanterns, cloth heat, embers, all eased toward the current act
@@ -564,12 +693,11 @@
     },
     phases: [
       { at: 1, *run(b) {
-        const S = b.state; setAct(b, 0); yield 1.0; let n = 0;
-        while (true) {
-          const V = startVolley(b, { n: n ? 3 : 2, T: n ? 6 : 7 }); yield* pounce(b); yield* sweep(b); yield* waitVolley(b, V);
-          yield* toss(b, 3); yield* stampede(b, 2);
-          const V2 = startVolley(b, { n: n ? 4 : 3, T: 6, must: n > 0 }); yield* sweep(b); yield* pounce(b); yield* waitVolley(b, V2); yield* rockets(b, 1); n++;
-        }
+        const S = b.state, c = ACT[0]; setAct(b, 0); yield 1.0;
+        // the fixed teaching opener: long ground warning, no stamp needed until the two yellows
+        for (const pl of teach(S)) { yield* volley(b, pl, { T: pl.lit.length === 1 ? 6 : c.T, warn: 1.6, calm: pl.lit.length === 1 }); if (pl.lit.length > 1) yield* filler(b, 0, 1); }
+        let warn = 1.45;
+        while (true) { yield* volley(b, pickPlan(S, 'A'), { T: c.T, warn }); warn = Math.max(c.warn, warn - 0.15); yield* filler(b, 0, 1); }
       } },
       { at: 0.66, skipTo(b) { look(b, 1, true); },
         *enter(b) {
@@ -579,27 +707,19 @@
           Co.start(Post.lerpTo(POST[1], 3), 'fight'); yield 1.2;
         },
         *run(b) {
-          const S = b.state; setAct(b, 1); yield 0.5; let n = 0;
-          while (true) {
-            const V = startVolley(b, { n: 4, T: 5.6, must: true, forks: true, quick: n % 2 === 1, comet: true }); yield* pounce(b); yield* feast(b, V); yield* waitVolley(b, V);
-            yield* toss(b, 3); yield* stampede(b, 3); yield* rockets(b, 2);
-            const V2 = startVolley(b, { n: 4, T: 5.6, must: true, forks: true, comet: true }); yield* sweep(b); if (n % 2) yield* roar(b); else yield* pounce(b); yield* waitVolley(b, V2); n++;
-          }
+          const S = b.state, c = ACT[1]; setAct(b, 1); yield 0.5;
+          while (true) { const a = nextArch(S, { A: 0.45, B: 0.45, C: 0.1 }); yield* volley(b, pickPlan(S, a), { T: c.T, warn: c.warn, rekindle: a === 'A' && rnd() < 0.4 }); yield* filler(b, 1, rndi(1, 2)); }
         } },
       { at: 0.33, skipTo(b) { look(b, 2, true); },
         *enter(b) {
           const S = b.state; setAct(b, 2); S.stun = 0; S.jawOpen = 1; yield* b.moveTo(4, 4, 14);
           yield* b.cast({ name: 'Grand Finale', time: 2.2, onTick: (k) => FX.shake(k * 0.3) }); S.jawOpen = 0; Sound.sfx('roar', 1, 0.5); FX.flash(GOLD, 0.35, 1);
+          for (let k = 0; k < 8; k++) if (!G.headless) FX.pillar(S.mortars[k].x, S.mortars[k].z, { r: 0.9, h: 10, color: TYPES[S.types[k]], dur: 0.8 });
           skyBurst(S, 0, 36, 0, 'big', GOLD); Co.start(Post.lerpTo(POST[2], 3), 'fight'); yield 1.0;
         },
         *run(b) {
-          const S = b.state; setAct(b, 2); yield 0.4; let n = 0;
-          Co.start(function* () { while (true) { lightSpiral(b); yield 24; } }, 'phase');
-          while (true) {
-            const V = startVolley(b, { n: 5, T: 5.0, must: true, forks: true, quick: true, comet: true }); yield* pounce(b); if (n % 2 === 0) yield* feast(b, V); else yield* sweep(b); yield* waitVolley(b, V, 0.2);
-            yield* stampede(b, 3);
-            const V2 = startVolley(b, { n: 5, T: 5.0, must: true, forks: true, comet: true }); yield* rockets(b, 1); if (n % 2) yield* roar(b); yield* pounce(b); yield* waitVolley(b, V2, 0.2); yield* toss(b, 2); n++;
-          }
+          const S = b.state, c = ACT[2]; setAct(b, 2); yield 0.4;
+          while (true) { const a = nextArch(S, { A: 0.35, B: 0.25, C: 0.1, D: 0.3 }); yield* volley(b, pickPlan(S, a), { T: c.T, warn: c.warn, comet: a !== 'D' && rnd() < 0.5, rekindle: (a === 'A' || a === 'D') && rnd() < 0.35 }); yield* filler(b, 2, rndi(1, 2)); }
         } },
     ],
     update(b, dt) {
@@ -609,14 +729,13 @@
       // sparks
       const q = [0, 0];
       for (let i = S.sparks.length - 1; i >= 0; i--) {
-        const sp = S.sparks[i]; if (!sp.alive) { if (sp.vol && G.now > sp.vol.land) S.sparks.splice(i, 1); continue; }
-        if (sp.wait > 0) { sp.wait -= dt; } else sp.s += sp.speed * dt;
-        at(sp.P, sp.s, q); if (sp.m) { sp.m.position.set(q[0], 0.3, q[1]); const fl = 0.8 + Math.sin(t * 40 + i) * 0.25; sp.m.children[1].scale.setScalar(fl * (sp.quick ? 1.3 : 1)); }
-        if (!G.headless && vrand() < dt * 55) FX.burst(q[0], 0.35, q[1], { n: 2, color: sp.quick ? 0xffffff : 0xffd070, color2: 0xff7a20, speed: [1.5, 5], up: 3, life: [0.2, 0.55], size: [0.08, 0.2] });
-        if (sp.fork && !sp.forked && sp.s >= sp.fork.atS) { sp.forked = true; const left = Math.max(0.5, sp.vol.arrive - G.now); S.mortars[sp.fork.to].armed = true; addSpark(S, { P: sp.fork, to: sp.fork.to, speed: sp.fork.len / left, wait: 0, vol: sp.vol }); sp.vol.lit.push(sp.fork.to); Sound.sfx('tick', 0.8, 1.5); }
-        // stamped out?
-        if (fight && p && p.alive && sp.wait <= 0 && Math.hypot(p.pos.x - q[0], p.pos.z - q[1]) < 1.15 && p.pos.y < 1.2) { sp.alive = false; if (sp.m) sp.m.visible = false; if (sp.to >= 0) S.mortars[sp.to].armed = S.sparks.some((o) => o.alive && o.to === sp.to); Sound.sfx('steam', 0.9, 2.2); if (!G.headless) FX.burst(q[0], 0.3, q[1], { n: 14, color: 0x9a9088, speed: [1, 4], up: 3, life: [0.4, 0.9], size: [0.3, 0.6], smoke: true }); continue; }
-        if (sp.s >= sp.P.len) { sp.alive = false; if (sp.m) sp.m.visible = false;
+        const sp = S.sparks[i]; if (!sp.alive) { if (!sp.vol || G.now > sp.vol.land) S.sparks.splice(i, 1); continue; }
+        sp.s += sp.speed * dt;
+        at(sp.P, sp.s, q); if (sp.m) { sp.m.position.set(q[0], 0.3, q[1]); const fl = 0.8 + Math.sin(t * 40 + i) * 0.25; sp.m.children[1].scale.setScalar(fl * (sp.locked ? 1.25 : 1)); if (sp.locked) { const rg = sp.m.userData.rg; rg.scale.setScalar(0.9 + Math.sin(t * 17 + i) * 0.15); rg.rotation.z = t * 4; } }
+        if (!G.headless && vrand() < dt * 55) FX.burst(q[0], 0.35, q[1], { n: 2, color: sp.locked ? 0xffffff : (sp.col || 0xffd070), color2: sp.locked ? (sp.col || 0xffd070) : 0xff7a20, speed: [1.5, 5], up: 3, life: [0.2, 0.55], size: [0.08, 0.2] });
+        // stamped out? White-hot (locked) sparks can't be.
+        if (fight && p && p.alive && !sp.locked && Math.hypot(p.pos.x - q[0], p.pos.z - q[1]) < 1.15 && p.pos.y < 1.2) { stampOut(S, sp, q[0], q[1]); continue; }
+        if (sp.s >= sp.P.len) { sp.alive = false; if (sp.m) { sp.m.visible = false; sp.m = null; }
           if (sp.big) { Sound.sfx('bigboom', 1, 0.5); const sm = { x0: 0, z0: 0, x1: 0, z1: 0, t: 0, type: 'big', col: GOLD, k: -1, m: S.shellPool.find((o) => !o.visible) }; if (sm.m) { sm.m.visible = true; shellLook(sm.m, GOLD, 2.5); } S.shells.push(sm); }
           else launch(b, sp.to, sp.vol); }
       }
@@ -665,12 +784,27 @@
       S.light.intensity = 14 + S.jawK * 26;
     },
     bot(b, p) {
-      const S = b.state, V = S.vol, q = [0, 0]; let best = null, bd = 1e9;
-      const want = (sp) => sp.alive && sp.wait <= 0 && (sp.big || (V && V.stamp.includes(sp.to)) || (sp.fork && !sp.forked && V && V.stamp.includes(sp.fork.to)));
-      for (const sp of S.sparks) { if (!want(sp)) continue; at(sp.P, sp.s + sp.speed * 0.5, q); const d = Math.hypot(q[0] - p.pos.x, q[1] - p.pos.z) - (sp.big ? 6 : 0); if (d < bd) { bd = d; best = [q[0], q[1]]; } }
-      if (best && !(V && V.land - G.now < 2.2)) return { x: best[0], z: best[1], w: 5 };
-      if (V && V.safe && G.now > V.arrive - 1.5 && G.now < V.land) { let s = null, sd = 1e9; for (const c of V.safe) { const d = Math.hypot(c[0] - p.pos.x, c[1] - p.pos.z) + Math.hypot(c[0] - b.pos.x, c[1] - b.pos.z) * 0.2; if (d < sd) { sd = d; s = c; } } if (s) return { x: s[0], z: s[1], w: 3 }; }
-      return {};
+      const S = b.state, V = S.vol, q = [0, 0]; if (!V || G.now > V.land + 0.1) return {};
+      const live = V.sparks.filter((sp) => sp.alive), goal = !V.lock && V.answer !== null && V.answer !== undefined ? live.find((sp) => V.answer === -1 ? sp.big : sp.to === V.answer) : null;
+      const avoid = (x, z) => live.some((sp) => sp !== goal && !sp.locked && [0, 0.4].some((dt) => { at(sp.P, sp.s + sp.speed * dt, q); return Math.hypot(q[0] - x, q[1] - z) < 1.8; }));
+      // walk round sparks it must not stamp: if one sits on the straight line to the target, aim beside it instead
+      const detour = (tx, tz, w) => { const px = p.pos.x, pz = p.pos.z, lx = tx - px, lz = tz - pz, L = Math.hypot(lx, lz) || 1, ux = lx / L, uz = lz / L;
+        // a spark about to run into us: step off its fuse sideways
+        for (const sp of live) { if (sp === goal || sp.locked) continue; for (const dt of [0, 0.25, 0.5]) { at(sp.P, sp.s + sp.speed * dt, q); if (Math.hypot(q[0] - px, q[1] - pz) > 1.7) continue;
+          const a = at(sp.P, sp.s + sp.speed * dt + 0.5, [0, 0]), fx = a[0] - q[0], fz = a[1] - q[1], fl = Math.hypot(fx, fz) || 1, sg = ((px - q[0]) * fz - (pz - q[1]) * fx) > 0 ? 1 : -1;
+          return { x: px + fz / fl * sg * 2.5, z: pz - fx / fl * sg * 2.5, w: w + 2, avoid }; } }
+        for (const sp of live) { if (sp === goal || sp.locked) continue; for (const dt of [0, 0.35]) { at(sp.P, sp.s + sp.speed * dt, q); const rx = q[0] - px, rz = q[1] - pz, al = rx * ux + rz * uz, sd = rx * uz - rz * ux;
+          if (al > -0.5 && al < L + 0.5 && Math.abs(sd) < 1.8) { const sg = sd > 0 ? -1 : 1; return { x: q[0] + uz * sg * 2.6, z: q[1] - ux * sg * 2.6, w: w + 2, avoid }; } } }
+        return { x: tx, z: tz, w, avoid }; };
+      // meet the spark further along its fuse, at the first point it can be reached before it gets there
+      if (goal && (goal.big || G.now < V.arrive - 0.2)) { let ok = false; for (let dt = 0.3; dt < 8 && !ok; dt += 0.1) { if (goal.s + goal.speed * dt > goal.P.len) break; at(goal.P, goal.s + goal.speed * dt, q); ok = Math.hypot(q[0] - p.pos.x, q[1] - p.pos.z) - 0.9 <= SPD * dt; } if (!ok) at(goal.P, goal.s + goal.speed * 0.4, q); return Object.assign(detour(q[0], q[1], 6), { holdFire: Math.hypot(q[0] - p.pos.x, q[1] - p.pos.z) > 2.5 }); }
+      // what will still fire, and the biggest safe patch it leaves
+      const firing = V.fuses.filter((k) => V.fired.includes(k) || live.some((sp) => sp.to === k)), e = evalSet(S, firing);
+      if (!e.big.length) return { avoid };
+      const inP = new Set(e.big), deep = e.big.filter((c) => NBR[c].length === 4 && NBR[c].every((j) => inP.has(j))), use = deep.length ? deep : e.big;
+      let s = null, sd = Infinity; for (const c of use) { const [x, z] = GRID[c], d = Math.hypot(x - p.pos.x, z - p.pos.z) + Math.hypot(x - b.pos.x, z - b.pos.z) * 0.2; if (d < sd) { sd = d; s = GRID[c]; } }
+      return detour(s[0], s[1], 4);
     },
   });
+  G.festTest = { inShape: Hz.inShape, shapesOf, evalSet, kind, buildPools, makeLayout, nextArch, pickPlan, teach, reachOK, ACT, RISE, SURV, DEAD, TIGHT }; // planner hooks for tools/festsoak.js
 })();
