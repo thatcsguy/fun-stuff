@@ -5,7 +5,7 @@
   const along = (x, z, d) => x * Math.sin(d) + z * Math.cos(d), lat = (x, z, d) => x * Math.cos(d) - z * Math.sin(d);
   function sheltered(S, x, z, d) { for (const q of S.pil) { if (!q.alive) continue; const da = along(x, z, d) - along(q.x, q.z, d), dl = Math.abs(lat(x, z, d) - lat(q.x, q.z, d)); if (da > 0.2 && da < 6.2 && dl < 1.5) return true; } return false; }
   // danger palette: warm against the cold sea, so telegraphs never share the boss's teal
-  const DANGER = 0xff7a3a, BOLT = 0xffd35a, CHARGED = 0xffaa3c, VORTEX = 0xff5c7c, COIL = 0xff4a30, SAFE = 0x8fe8ff;
+  const DANGER = 0xff7a3a, BOLT = 0xffd35a, CHARGED = 0xffaa3c, VORTEX = 0xff5c7c, COIL = 0xff4a30;
   const MOON = new V3(-0.42, 0.36, -0.83).normalize(), BAND = new THREE.Color(), UNDER = new THREE.Color(), CDARK = new THREE.Color();
 
   // ---------- local geometry helpers ----------
@@ -640,13 +640,12 @@
     const S = b.state, m = S.wavePool.find((q) => !q.visible); if (!m) return;
     const w = { dir, s: -40, speed, mesh: m, dmg, hit: false }; m.visible = true; m.rotation.y = dir; S.waves.push(w); Sound.sfx('wave');
   }
-  function marks(S, dir, dur) { for (const q of S.pil) if (q.alive) Hz.mark({ type: 'rect', x: q.x + Math.sin(dir) * 1.5, z: q.z + Math.cos(dir) * 1.5, dir, len: 4.7, w: 2.9 }, dur, { color: SAFE, alpha: 0.55 }); }
   function* tidal(b, o = {}) {
     const S = b.state, dir = wrapPi(S.ang + PI), time = o.time || 3.0, speed = o.speed || 15;
-    S.pend = { dir, t: time, speed }; marks(S, dir, time + 2.4);
+    S.pend = { dir, t: time, speed };
     yield* b.cast({ name: 'Tidal Wave', time, onTick: (k, cs) => { S.jawOpen = k; S.headTgt.set(0, 8 + k * 2, 2.5); if (S.pend) S.pend.t = time - cs.t; } });
     S.pend = null; S.headTgt.set(0, 6.2, 4.2); spawnWave(b, dir, speed, 360); Sound.sfx('roar', 0.9); roarSpray(S);
-    if (o.second) { yield 1.5; const d2 = wrapPi(dir + (rnd() < 0.5 ? 1 : -1) * PI / 2); marks(S, d2, 3.6); S.pend = { dir: d2, t: 1.0, speed }; yield 1.0; S.pend = null; spawnWave(b, d2, speed, 360); }
+    if (o.second) { yield 1.5; const d2 = wrapPi(dir + (rnd() < 0.5 ? 1 : -1) * PI / 2); S.pend = { dir: d2, t: 1.0, speed }; yield 1.0; S.pend = null; spawnWave(b, d2, speed, 360); }
     yield 2.6;
   }
   function* bite(b) {
