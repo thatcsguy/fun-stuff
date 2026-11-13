@@ -183,8 +183,8 @@
   //  D dragon: like C, but the centre spiral burns too and is the spark to stamp.
   const ACT = [
     { T: 8, warn: 1.0, ns: [2, 3], multi: true }, // act 1 also accepts sets where more than one stamp works (like the two yellows)
-    { T: 7, warn: 0.5, ns: [3, 4], B: true },
-    { T: 6.5, warn: 0.5, ns: [4, 5], B: true, D: true },
+    { T: 8, warn: 0.5, ns: [3, 4] },
+    { T: 8, warn: 0.5, ns: [4, 5], D: true }, // same 8 s to solve in every act; only the puzzles get bigger
   ];
   function buildPools(S, cfg) {
     const pools = { A: [], B: [], C: [], D: [] }, total = cfg.T + RISE + cfg.warn;
@@ -210,7 +210,7 @@
   // New colours for every act of every run: two of each, never two of a colour side by side; act 3 trades one for purple.
   function makeLayout(S, n) {
     if (S.layouts && S.layouts[n]) { Object.assign(S, S.layouts[n], { hist: [], lastLit: '', used: {} }); return; }
-    const cfg = ACT[n], need = { A: 8, B: cfg.B ? 4 : 0, C: n ? n : 0, D: cfg.D ? 3 : 0 }; let best = null, bs = -1;
+    const cfg = ACT[n], need = { A: 8, C: n ? n : 0, D: cfg.D ? 3 : 0 }; let best = null, bs = -1;
     for (let t = 0; t < 500 && (!best || t < 120); t++) {
       const cols = ['peony', 'peony', 'ring', 'ring', 'cross', 'cross', 'willow', 'willow']; if (n === 2) cols[rndi(0, 3) * 2] = 'comet';
       const ty = shuffle(cols); if (ty.some((c, k) => c === ty[(k + 1) % NM])) continue;
@@ -388,10 +388,10 @@
       const bm = new THREE.MeshBasicMaterial({ color: 0xffffff }), band = new THREE.Mesh(new THREE.CylinderGeometry(0.69, 0.73, 0.7, 16, 1, true), bm); tg.add(band);
       const cr = new THREE.Mesh(cradleG, woodM2); cr.castShadow = true; grp.add(cr);
       S.mortars.push({ k, x, z, bm, armed: false, kick: 0, tg }); }
-    // fuses: rim to mortar, never through one shared point. Forks (later) branch to the next mortar round.
+    // fuses: straight out from the middle to each mortar. Forks (unused for now) branch to the next mortar round.
     S.fuses = []; S.forks = [];
     for (let k = 0; k < NM; k++) { const sgn = k % 2 ? 1 : -1, a0 = mAng(k) + sgn * 1.9, p0 = [Math.sin(a0) * 16.3, Math.cos(a0) * 16.3], p2 = mPos(k, MR - 0.9), mid = [(p0[0] + p2[0]) * 0.5 * 0.5, (p0[1] + p2[1]) * 0.5 * 0.5];
-      const P = polyline(bez(p0, mid, p2, 44, 1.1)); P.mesh = fuse(g, P, S); S.fuses.push(P);
+      const P = polyline(Array.from({ length: 31 }, (_, i) => mPos(k, lerp(3, MR - 0.9, i / 30)))); P.mesh = fuse(g, P, S); S.fuses.push(P); // straight out from the middle to the mortar
       const k2 = (k + (sgn > 0 ? NM - 1 : 1)) % NM, fp = at(P, P.len * 0.5, [0, 0]).slice(), q2 = mPos(k2, MR - 0.9), fm = [(fp[0] + q2[0]) * 0.5 * 0.8, (fp[1] + q2[1]) * 0.5 * 0.8];
       const F = polyline(bez(fp, fm, q2, 26, 0.6)); F.mesh = fuse(g, F, S); F.mesh.visible = false; F.to = k2; F.atS = P.len * 0.5; S.forks.push(F); }
     { const pts = []; for (let i = 0; i <= 120; i++) { const t = i / 120, a = 0.6 + t * TAU * 1.5, r = lerp(15.2, 1.6, t); pts.push([Math.sin(a) * r, Math.cos(a) * r]); } S.spiral = polyline(pts); S.spiral.mesh = fuse(g, S.spiral, S); S.spiral.mesh.visible = false; }
@@ -554,8 +554,7 @@
     const S = b.state, shapes = shapesOf(sh.type, sh.k), warn = sh.V ? sh.V.warn : 1.0; skyBurst(S, sh.x1, 30, sh.z1, sh.type, sh.col); Sound.sfx('bigboom', 0.55, 1.3 + (sh.k % 3) * 0.15); FX.flash(sh.col, 0.07, 3); FX.light(sh.x1, 16, sh.z1, sh.col, 45, 0.7, 60);
     if (!G.headless) S.atmos.material.uniforms.uFw.value.setHex(sh.col).multiplyScalar(0.07);
     let first = true;
-    // a shell only startles Nian while he is mid-Feast: that is the one way to stop it, and the damage window
-    const hit = () => { if (!first) return; first = false; if (b.castState && b.castState.name === 'Feast' && shapes.some((s) => Hz.inShape(s, b.pos.x, b.pos.z))) startle(b); Sound.sfx('boom', 0.8, 0.8); FX.shake(0.5); };
+    const hit = () => { if (!first) return; first = false; Sound.sfx('boom', 0.8, 0.8); FX.shake(0.5); };
     const o = { name: sh.type[0].toUpperCase() + sh.type.slice(1), color: sh.col, tag: 'fight', quiet: true, silent: true, onFire: hit };
     for (const s of shapes) { if (s.type === 'circle') Hz.circle(s.x, s.z, s.r, warn, 600, o); else if (s.type === 'donut') Hz.donut(s.x, s.z, s.r0, s.r1, warn, 600, o); else Hz.rect(s.x, s.z, s.dir, s.len, s.w, warn, 600, o); }
     if (sh.type === 'comet') { const sgn = sh.k % 2 ? 1 : -1, a0 = mAng(sh.k) + PI, t0 = G.now; Hz.zone({ type: 'rect', x: sh.x1, z: sh.z1, dir: a0, len: 24, w: 3.4 }, 6.5, 95, { name: 'Comet', color: sh.col, delay: 1.6, tag: 'fight', track(s) { s.dir = a0 + sgn * Math.max(0, G.now - t0 - 1.6) * 0.75; } }); }
@@ -708,7 +707,7 @@
         },
         *run(b) {
           const S = b.state, c = ACT[1]; setAct(b, 1); yield 0.5;
-          while (true) { const a = nextArch(S, { A: 0.45, B: 0.45, C: 0.1 }); yield* volley(b, pickPlan(S, a), { T: c.T, warn: c.warn, rekindle: a === 'A' && rnd() < 0.4 }); yield* filler(b, 1, rndi(1, 2)); }
+          while (true) { const a = nextArch(S, { A: 0.85, C: 0.15 }); yield* volley(b, pickPlan(S, a), { T: c.T, warn: c.warn, rekindle: a === 'A' && rnd() < 0.4 }); yield* filler(b, 1, rndi(1, 2)); }
         } },
       { at: 0.33, skipTo(b) { look(b, 2, true); },
         *enter(b) {
@@ -719,7 +718,7 @@
         },
         *run(b) {
           const S = b.state, c = ACT[2]; setAct(b, 2); yield 0.4;
-          while (true) { const a = nextArch(S, { A: 0.35, B: 0.25, C: 0.1, D: 0.3 }); yield* volley(b, pickPlan(S, a), { T: c.T, warn: c.warn, comet: a !== 'D' && rnd() < 0.5, rekindle: (a === 'A' || a === 'D') && rnd() < 0.35 }); yield* filler(b, 2, rndi(1, 2)); }
+          while (true) { const a = nextArch(S, { A: 0.55, C: 0.15, D: 0.3 }); yield* volley(b, pickPlan(S, a), { T: c.T, warn: c.warn, comet: a !== 'D' && rnd() < 0.5, rekindle: (a === 'A' || a === 'D') && rnd() < 0.35 }); yield* filler(b, 2, rndi(1, 2)); }
         } },
     ],
     update(b, dt) {

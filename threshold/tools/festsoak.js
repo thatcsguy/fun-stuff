@@ -9,7 +9,7 @@ const { launch } = require('./harness.js');
   const r = await page.evaluate((runs) => {
     const g = window.__game, G = g.G; G.headless = true; g.start('festival', { cls: 'duskblade' }); g.fastForward(1);
     const F = G.festTest, S0 = G.boss.state, rng0 = G.rng, fails = [], stats = { A: 0, B: 0, C: 0, D: 0, T: 0 }, maxShare = [0, 0, 0], minAns = [99, 99, 99], pools = [[], [], []], layouts = [new Set(), new Set(), new Set()];
-    const W = [{ A: 1 }, { A: 0.45, B: 0.45, C: 0.1 }, { A: 0.35, B: 0.25, C: 0.1, D: 0.3 }], VOL = [10, 9, 9];
+    const W = [{ A: 1 }, { A: 0.85, C: 0.15 }, { A: 0.55, C: 0.15, D: 0.3 }], VOL = [10, 9, 9];
     const mul = (seed) => { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
     const t0 = performance.now(); let tLayout = 0, nLayout = 0;
     for (let run = 0; run < runs; run++) {
