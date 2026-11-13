@@ -9,7 +9,7 @@ A PC-first 3D raid game: unrelated boss fights, one behind each door, four class
 | --- | --- |
 | `00_head.html`, `00_ui.html` | CSS, import map (three.js 0.170 from jsDelivr), HUD and menu markup |
 | `01_core.js` | `G` namespace, math helpers, seeded RNG, `Settings`, `Save`, coroutines (`Co`), renderer, post-processing (`Post`) |
-| `02_input.js` | Keyboard, mouse (MMO camera), gamepad; `Input.bot` override for the autopilot |
+| `02_input.js` | Keyboard, mouse (MMO camera), gamepad; remappable bindings (`Binds`), controller toggle; `Input.bot` override for the autopilot |
 | `03_audio.js` | Synth sound effects (`Sound`) and the layered step-sequencer (`Music`) |
 | `04_fx.js` | `FX`: particles, rings, beams, lightning, domes, missiles, damage numbers, shake |
 | `05_world.js` | `Cam` (orbit camera + cinematic shots) and `W` (procedural textures, sky, water, lava, lights, motes) |
@@ -29,6 +29,15 @@ A PC-first 3D raid game: unrelated boss fights, one behind each door, four class
 Keyboard and mouse: WASD move (camera-relative), hold LMB to orbit the camera, hold RMB to steer the character with the camera, both buttons to run forward, wheel to zoom, Space to jump, Tab or click to target, Esc to pause. Abilities on `1 2 3 Q E R F` (also `4-7`).
 
 Controller: left stick move, right stick camera, `RT RB Y A B X LB` for the seven slots, LT jump, d-pad to cycle targets, R3 to reset the camera, Start to pause.
+
+These are the defaults. Settings (title menu or pause) has a Controller On/Off toggle and a binding table that shows keyboard + mouse
+bindings when the controller is off and pad buttons when it is on; click a binding (or A / ✕ on it) and press the new key or button.
+Taking a key another action uses swaps the two. Keyboard bindings can be any key, Shift + a key, or the middle and side mouse buttons;
+Esc cancels, Backspace clears. Fixed and not remappable: left/right mouse camera, wheel zoom, click to target, Esc pause, both sticks,
+Start / Options pause, and A / B (✕ / ○) plus the d-pad in menus. Everything is stored in `localStorage.th_settings`
+(`pad`: true / false / unset, where unset means the first controller button press turns it on; `glyphs`: auto / xbox / ps; `binds`).
+Button prompts follow the connected pad (PlayStation pads are detected by Sony's vendor id 054c) unless overridden.
+Pad buttons use the W3C standard mapping that Chrome gives Xbox, DualShock 4 and DualSense pads.
 
 Every class has up to seven skills in hotbar slots 0-6 (a slot can be empty). Duskblade and Stormcaller fill all seven the same way: filler, spender, ultimate, mobility, defensive, interrupt, heal. Ashwarden and Hexslinger do not follow that template.
 

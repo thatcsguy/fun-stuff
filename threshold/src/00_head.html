@@ -75,11 +75,44 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 #menu .foot kbd{font:11px ui-monospace,Consolas,monospace;border:1px solid var(--line);padding:0 5px;border-radius:3px;color:#cfcabd}
 
 /* ---------- settings ---------- */
-.panel{border:1px solid var(--line);background:var(--glass);padding:18px 26px;display:grid;grid-template-columns:auto 240px;gap:12px 22px;align-items:center;font-size:13px;letter-spacing:.08em}
-.panel input[type=range]{width:100%;accent-color:var(--accent)}
-.panel select{background:#0c0d15;color:#eee;border:1px solid var(--line);padding:5px 8px;font:inherit}
-.keys{font-size:12.5px;line-height:1.9;color:#cfcabd;max-width:760px;text-align:center}
-.keys kbd{font:11px ui-monospace,Consolas,monospace;border:1px solid var(--line);padding:1px 6px;border-radius:3px;color:#fff;margin:0 2px}
+#settings{justify-content:flex-start;overflow:auto;padding:3vh 2vw;gap:14px}
+#settings>:first-child{margin-top:auto}#settings>:last-child{margin-bottom:auto}
+.set-wrap{display:flex;gap:22px;align-items:flex-start;justify-content:center;flex-wrap:wrap;width:100%}
+.set-col{border:1px solid var(--line);background:var(--glass);padding:14px 18px 16px;display:flex;flex-direction:column;gap:4px;font-size:13px;letter-spacing:.06em}
+.set-gen{width:min(440px,100%)}.set-ctl{width:min(560px,100%)}
+.set-col h2{margin:0 0 6px}
+.srow{display:grid;grid-template-columns:1fr 200px;align-items:center;gap:12px;padding:5px 8px;border:1px solid transparent;min-height:34px}
+.srow:has(.sv){grid-template-columns:1fr 160px 34px}
+.srow .sv{font:12px ui-monospace,Consolas,monospace;color:#9d988b;text-align:right}
+.srow input[type=range]{width:100%;accent-color:var(--accent)}
+.nav.srow.focus,.nav.bk.focus{border-color:var(--accent);background:rgba(232,199,122,.08)}
+.seg{display:flex;border:1px solid var(--line)}
+.seg span{flex:1;text-align:center;padding:5px 6px;cursor:pointer;font-size:12px;letter-spacing:.08em;color:#a9a497;transition:background .12s}
+.seg span+span{border-left:1px solid var(--line)}
+.seg span:hover{color:#fff}
+.seg span.on{background:rgba(232,199,122,.18);color:var(--accent2)}
+body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
+.padstat{font-size:11.5px;color:#8f8b80;padding:0 8px 4px;text-align:right;min-height:16px}
+#binds{display:grid;grid-template-columns:1fr 112px 112px;gap:3px 6px;margin-top:6px;align-items:center}
+#binds.pad{grid-template-columns:1fr 140px}
+#binds .bh{font-size:10.5px;letter-spacing:.2em;color:#7d796f;text-transform:uppercase;padding:6px 8px 2px}
+#binds .bh.grp{grid-column:1/-1;color:var(--accent);opacity:.8;padding-top:10px}
+#binds .bn{padding:0 8px;color:#e9e6dd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#binds .bn small{color:#8a867b;margin-left:6px;font-size:11.5px;letter-spacing:.04em}
+.bk{height:28px;border:1px solid var(--line);background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center;font:12px ui-monospace,Consolas,monospace;color:#fff;transition:all .12s}
+.bk:hover{border-color:rgba(255,255,255,.4)}
+.bk.empty{color:#5d5a52}
+.bk.wait{border-color:var(--accent);color:var(--accent);animation:bkpulse .9s ease-in-out infinite}
+.bk.swap{border-color:#7fc8ff;box-shadow:0 0 14px rgba(127,200,255,.35)}
+@keyframes bkpulse{50%{background:rgba(232,199,122,.16)}}
+.set-col h2.h2b{margin-top:14px}
+.fixed{display:grid;grid-template-columns:1fr auto;gap:5px 12px;font-size:12.5px;color:#b9b4a6;padding:0 8px;align-items:center}
+.fixed kbd{font:11.5px ui-monospace,Consolas,monospace;border:1px solid var(--line);padding:2px 8px;border-radius:3px;color:#ddd;justify-self:end}
+.ctl-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}.ctl-head h2{margin:0;flex:1}
+#bind-hint{font-size:11.5px;color:var(--accent);letter-spacing:.04em}#bind-hint kbd{font:11px ui-monospace,Consolas,monospace;border:1px solid var(--line);padding:1px 5px;border-radius:3px;color:#fff;margin:0 2px}
+.btn.small{padding:6px 14px;font-size:10.5px;min-width:0;letter-spacing:.16em}
+.bk.face{font-size:16px}
+@media (max-height:800px){#settings{padding:1.5vh 2vw;gap:10px}#settings h1{font-size:34px}.srow{min-height:28px;padding:3px 8px}.bk{height:23px}#binds{gap:2px 6px}#binds .bh.grp{padding:6px 8px 1px}.set-col{padding:10px 16px 12px}}
 
 /* ---------- HUD ---------- */
 #hud{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:0;transition:opacity .5s}

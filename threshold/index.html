@@ -75,11 +75,44 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 #menu .foot kbd{font:11px ui-monospace,Consolas,monospace;border:1px solid var(--line);padding:0 5px;border-radius:3px;color:#cfcabd}
 
 /* ---------- settings ---------- */
-.panel{border:1px solid var(--line);background:var(--glass);padding:18px 26px;display:grid;grid-template-columns:auto 240px;gap:12px 22px;align-items:center;font-size:13px;letter-spacing:.08em}
-.panel input[type=range]{width:100%;accent-color:var(--accent)}
-.panel select{background:#0c0d15;color:#eee;border:1px solid var(--line);padding:5px 8px;font:inherit}
-.keys{font-size:12.5px;line-height:1.9;color:#cfcabd;max-width:760px;text-align:center}
-.keys kbd{font:11px ui-monospace,Consolas,monospace;border:1px solid var(--line);padding:1px 6px;border-radius:3px;color:#fff;margin:0 2px}
+#settings{justify-content:flex-start;overflow:auto;padding:3vh 2vw;gap:14px}
+#settings>:first-child{margin-top:auto}#settings>:last-child{margin-bottom:auto}
+.set-wrap{display:flex;gap:22px;align-items:flex-start;justify-content:center;flex-wrap:wrap;width:100%}
+.set-col{border:1px solid var(--line);background:var(--glass);padding:14px 18px 16px;display:flex;flex-direction:column;gap:4px;font-size:13px;letter-spacing:.06em}
+.set-gen{width:min(440px,100%)}.set-ctl{width:min(560px,100%)}
+.set-col h2{margin:0 0 6px}
+.srow{display:grid;grid-template-columns:1fr 200px;align-items:center;gap:12px;padding:5px 8px;border:1px solid transparent;min-height:34px}
+.srow:has(.sv){grid-template-columns:1fr 160px 34px}
+.srow .sv{font:12px ui-monospace,Consolas,monospace;color:#9d988b;text-align:right}
+.srow input[type=range]{width:100%;accent-color:var(--accent)}
+.nav.srow.focus,.nav.bk.focus{border-color:var(--accent);background:rgba(232,199,122,.08)}
+.seg{display:flex;border:1px solid var(--line)}
+.seg span{flex:1;text-align:center;padding:5px 6px;cursor:pointer;font-size:12px;letter-spacing:.08em;color:#a9a497;transition:background .12s}
+.seg span+span{border-left:1px solid var(--line)}
+.seg span:hover{color:#fff}
+.seg span.on{background:rgba(232,199,122,.18);color:var(--accent2)}
+body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
+.padstat{font-size:11.5px;color:#8f8b80;padding:0 8px 4px;text-align:right;min-height:16px}
+#binds{display:grid;grid-template-columns:1fr 112px 112px;gap:3px 6px;margin-top:6px;align-items:center}
+#binds.pad{grid-template-columns:1fr 140px}
+#binds .bh{font-size:10.5px;letter-spacing:.2em;color:#7d796f;text-transform:uppercase;padding:6px 8px 2px}
+#binds .bh.grp{grid-column:1/-1;color:var(--accent);opacity:.8;padding-top:10px}
+#binds .bn{padding:0 8px;color:#e9e6dd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#binds .bn small{color:#8a867b;margin-left:6px;font-size:11.5px;letter-spacing:.04em}
+.bk{height:28px;border:1px solid var(--line);background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center;font:12px ui-monospace,Consolas,monospace;color:#fff;transition:all .12s}
+.bk:hover{border-color:rgba(255,255,255,.4)}
+.bk.empty{color:#5d5a52}
+.bk.wait{border-color:var(--accent);color:var(--accent);animation:bkpulse .9s ease-in-out infinite}
+.bk.swap{border-color:#7fc8ff;box-shadow:0 0 14px rgba(127,200,255,.35)}
+@keyframes bkpulse{50%{background:rgba(232,199,122,.16)}}
+.set-col h2.h2b{margin-top:14px}
+.fixed{display:grid;grid-template-columns:1fr auto;gap:5px 12px;font-size:12.5px;color:#b9b4a6;padding:0 8px;align-items:center}
+.fixed kbd{font:11.5px ui-monospace,Consolas,monospace;border:1px solid var(--line);padding:2px 8px;border-radius:3px;color:#ddd;justify-self:end}
+.ctl-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}.ctl-head h2{margin:0;flex:1}
+#bind-hint{font-size:11.5px;color:var(--accent);letter-spacing:.04em}#bind-hint kbd{font:11px ui-monospace,Consolas,monospace;border:1px solid var(--line);padding:1px 5px;border-radius:3px;color:#fff;margin:0 2px}
+.btn.small{padding:6px 14px;font-size:10.5px;min-width:0;letter-spacing:.16em}
+.bk.face{font-size:16px}
+@media (max-height:800px){#settings{padding:1.5vh 2vw;gap:10px}#settings h1{font-size:34px}.srow{min-height:28px;padding:3px 8px}.bk{height:23px}#binds{gap:2px 6px}#binds .bh.grp{padding:6px 8px 1px}.set-col{padding:10px 16px 12px}}
 
 /* ---------- HUD ---------- */
 #hud{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:0;transition:opacity .5s}
@@ -227,21 +260,25 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 
 <div id="settings" class="screen hidden">
   <h1>SETTINGS</h1>
-  <div class="panel">
-    <label>Master volume</label><input type="range" id="set-vol" min="0" max="100">
-    <label>Music</label><input type="range" id="set-mus" min="0" max="100">
-    <label>Mouse sensitivity</label><input type="range" id="set-sens" min="10" max="300">
-    <label>Controller camera speed</label><input type="range" id="set-psens" min="10" max="300">
-    <label>Invert camera Y</label><input type="checkbox" id="set-inv">
-    <label>Graphics</label><select id="set-q"><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select>
-  </div>
-  <div class="keys">
-    <b>Keyboard + mouse</b><br>
-    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>Space</kbd> jump &nbsp; hold <kbd>Left mouse</kbd> turn camera &nbsp; hold <kbd>Right mouse</kbd> turn camera and character &nbsp; both buttons run forward<br>
-    <kbd>Wheel</kbd> zoom &nbsp; <kbd>Tab</kbd> or click to change target &nbsp; <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>Q</kbd><kbd>E</kbd><kbd>R</kbd><kbd>F</kbd> skills (also <kbd>4</kbd>-<kbd>7</kbd>, or click the bar) &nbsp; <kbd>Esc</kbd> pause<br>
-    <b>Controller</b><br>
-    <kbd>L stick</kbd> move &nbsp; <kbd>R stick</kbd> camera &nbsp; <kbd>RT</kbd><kbd>RB</kbd><kbd>Y</kbd><kbd>A</kbd><kbd>B</kbd><kbd>X</kbd><kbd>LB</kbd> skills, in hotbar order (each skill shows its button)<br>
-    <kbd>LT</kbd> jump &nbsp; <kbd>D-pad ◀ ▶</kbd> change target &nbsp; <kbd>R3</kbd> reset camera &nbsp; <kbd>Start</kbd> pause
+  <div class="set-wrap">
+    <div class="set-col set-gen">
+      <h2>General</h2>
+      <div class="srow nav" data-adj="vol"><label>Master volume</label><input type="range" id="set-vol" min="0" max="100" tabindex="-1"><span class="sv"></span></div>
+      <div class="srow nav" data-adj="mus"><label>Music</label><input type="range" id="set-mus" min="0" max="100" tabindex="-1"><span class="sv"></span></div>
+      <div class="srow nav kbm-only" data-adj="sens"><label>Mouse sensitivity</label><input type="range" id="set-sens" min="10" max="300" tabindex="-1"><span class="sv"></span></div>
+      <div class="srow nav pad-only" data-adj="psens"><label>Camera speed</label><input type="range" id="set-psens" min="10" max="300" tabindex="-1"><span class="sv"></span></div>
+      <div class="srow nav" data-adj="inv"><label>Invert camera Y</label><div class="seg" id="set-inv"><span data-v="0">Off</span><span data-v="1">On</span></div></div>
+      <div class="srow nav" data-adj="q"><label>Graphics</label><div class="seg" id="set-q"><span data-v="low">Low</span><span data-v="med">Medium</span><span data-v="high">High</span></div></div>
+      <h2 class="h2b">Fixed controls</h2>
+      <div class="fixed" id="bind-fixed"></div>
+    </div>
+    <div class="set-col set-ctl">
+      <div class="ctl-head"><h2>Controls</h2><span id="bind-hint"></span><button class="btn nav small" id="bind-reset"></button></div>
+      <div class="srow nav" data-adj="pad"><label>Controller</label><div class="seg" id="set-pad"><span data-v="0">Off</span><span data-v="1">On</span></div></div>
+      <div class="srow nav pad-only" data-adj="glyphs"><label>Button prompts</label><div class="seg" id="set-glyphs"><span data-v="auto">Auto</span><span data-v="xbox">Xbox</span><span data-v="ps">PlayStation</span></div></div>
+      <div class="padstat pad-only" id="padstat"></div>
+      <div id="binds"></div>
+    </div>
   </div>
   <button class="btn nav primary" data-act="back">Back</button>
 </div>
@@ -566,27 +603,152 @@ function frame(now) {
 }
 
 // ==== 02_input.js ====
-// Input: keyboard + mouse (MMO style) and gamepad. Produces a camera-space move vector, look deltas, slot presses and actions.
-const SLOT_KEYS = { Digit1: 0, Digit2: 1, Digit3: 2, KeyQ: 3, KeyE: 4, KeyR: 5, KeyF: 6, Digit4: 3, Digit5: 4, Digit6: 5, Digit7: 6 };
-const SLOT_LABEL_KBM = ['1', '2', '3', 'Q', 'E', 'R', 'F'];
-const SLOT_LABEL_PAD = ['RT', 'RB', 'Y', 'A', 'B', 'X', 'LB'];
-const PAD_SLOT = { 7: 0, 5: 1, 3: 2, 0: 3, 1: 4, 2: 5, 4: 6 };
+// Input: keyboard + mouse (MMO style) and gamepad, both remappable. Produces a camera-space move vector, look deltas, slot presses and actions.
+// Settings.pad is the controller toggle: true = on (the gamepad is read and prompts show its buttons), false = off (gamepads are ignored),
+// undefined = never chosen (the first controller button press turns it on). Bindings live in Settings.binds = { kbm: { action: [key, key] },
+// pad: { action: button } }; anything missing falls back to BIND_DEFAULTS. Keys are KeyboardEvent.code strings, optionally 'Shift+' prefixed,
+// or Mouse1/Mouse3/Mouse4 (middle and side buttons). Pad buttons are W3C standard-mapping indices (Xbox and PlayStation pads in Chrome).
+// Fixed, not remappable: mouse camera (hold left/right), wheel zoom, click to target, Esc pause; sticks; Start/Options pause; menu A/B + d-pad.
+const BIND_ACTIONS = [
+  { id: 'up', name: 'Move forward', kbmOnly: true }, { id: 'down', name: 'Move back', kbmOnly: true },
+  { id: 'left', name: 'Move left', kbmOnly: true }, { id: 'right', name: 'Move right', kbmOnly: true },
+  { id: 's0', slot: 0 }, { id: 's1', slot: 1 }, { id: 's2', slot: 2 }, { id: 's3', slot: 3 }, { id: 's4', slot: 4 }, { id: 's5', slot: 5 }, { id: 's6', slot: 6 },
+  { id: 'jump', name: 'Jump' }, { id: 'tnext', name: 'Next target' }, { id: 'tprev', name: 'Previous target' }, { id: 'camreset', name: 'Reset camera' },
+];
+const BIND_DEFAULTS = {
+  kbm: {
+    up: ['KeyW', 'ArrowUp'], down: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
+    s0: ['Digit1', null], s1: ['Digit2', null], s2: ['Digit3', null], s3: ['KeyQ', 'Digit4'], s4: ['KeyE', 'Digit5'], s5: ['KeyR', 'Digit6'], s6: ['KeyF', 'Digit7'],
+    jump: ['Space', null], tnext: ['Tab', null], tprev: ['Shift+Tab', null], camreset: [null, null],
+  },
+  pad: { s0: 7, s1: 5, s2: 3, s3: 0, s4: 1, s5: 2, s6: 4, jump: 6, tnext: 15, tprev: 14, camreset: 11 },
+};
+const PAD_START = 9; // pause, always; also cancels a rebind
+const KEY_RESERVED = /^(Escape|F5|F11|F12|Control(Left|Right)|Alt(Left|Right)|Meta(Left|Right)|OS(Left|Right)|ContextMenu|Backspace|Delete)$/;
+
+const Binds = (() => {
+  const ACT = {}; for (const a of BIND_ACTIONS) ACT[a.id] = a;
+  const acts = (dev) => BIND_ACTIONS.filter((a) => dev === 'kbm' || !a.kbmOnly);
+  let keyMap = {}, padMap = {}, layout = null;
+  function get(dev, id) {
+    const s = Settings.binds && Settings.binds[dev], v = s && s[id] !== undefined ? s[id] : BIND_DEFAULTS[dev][id];
+    return dev === 'kbm' ? (Array.isArray(v) ? [v[0] || null, v[1] || null] : [null, null]) : (typeof v === 'number' ? v : null);
+  }
+  function all(dev) { const o = {}; for (const a of acts(dev)) o[a.id] = get(dev, a.id); return o; }
+  function rebuild() {
+    keyMap = {}; padMap = {};
+    for (const a of acts('kbm')) for (const k of get('kbm', a.id)) if (k) keyMap[k] = a.id;
+    for (const a of acts('pad')) { const b = get('pad', a.id); if (b !== null) padMap[b] = a.id; }
+  }
+  function store(dev, o) { if (!Settings.binds) Settings.binds = {}; Settings.binds[dev] = o; saveSettings(); rebuild(); }
+  // Put value v on (id, idx). Whatever action already had v gets this one's old value, so nothing silently ends up unbound.
+  // Returns the id of the action that was swapped, if any.
+  function assign(dev, id, idx, v) {
+    const o = all(dev); let swapped = null;
+    if (dev === 'kbm') {
+      const old = o[id][idx];
+      for (const a in o) for (let j = 0; j < 2; j++) if (o[a][j] === v && v !== null && !(a === id && j === idx)) { o[a][j] = old; swapped = a; }
+      o[id][idx] = v;
+      for (const a in o) if (!o[a][0] && o[a][1]) { o[a][0] = o[a][1]; o[a][1] = null; } // keep the primary column filled first
+    } else {
+      const old = o[id];
+      for (const a in o) if (o[a] === v && a !== id) { o[a] = old; swapped = a; }
+      o[id] = v;
+    }
+    store(dev, o); return swapped === id ? null : swapped;
+  }
+  function reset(dev) { if (Settings.binds) delete Settings.binds[dev]; saveSettings(); rebuild(); }
+  // Lookups for input events.
+  const keyAction = (e) => (e.shiftKey && !/^Shift/.test(e.code) && keyMap['Shift+' + e.code]) || keyMap[e.code] || null;
+  const padAction = (b) => padMap[b] || null;
+  function held(id, keys) {
+    for (const k of get('kbm', id)) {
+      if (!k) continue;
+      if (k.startsWith('Shift+')) { if (keys[k.slice(6)] && (keys.ShiftLeft || keys.ShiftRight)) return true; }
+      else if (keys[k]) return true;
+    }
+    return false;
+  }
+  // ---- names ----
+  if (navigator.keyboard && navigator.keyboard.getLayoutMap) navigator.keyboard.getLayoutMap().then((m) => { layout = m; if (typeof UI !== 'undefined') UI.deviceChanged(); }).catch(() => { });
+  const KEYN = {
+    Space: 'Space', Tab: 'Tab', Enter: 'Enter', CapsLock: 'Caps', ShiftLeft: 'LShift', ShiftRight: 'RShift', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
+    Insert: 'Ins', Home: 'Home', End: 'End', PageUp: 'PgUp', PageDown: 'PgDn', NumpadEnter: 'NumEnt', NumpadAdd: 'Num+', NumpadSubtract: 'Num-', NumpadMultiply: 'Num*',
+    NumpadDivide: 'Num/', NumpadDecimal: 'Num.', Mouse1: 'MMB', Mouse3: 'M4', Mouse4: 'M5',
+  };
+  const PUNCT = { Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\', IntlBackslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/' };
+  function keyName(k) {
+    if (!k) return '';
+    let pre = ''; if (k.startsWith('Shift+')) { pre = '⇧'; k = k.slice(6); }
+    if (KEYN[k]) return pre + KEYN[k];
+    if (/^(Key[A-Z]|Digit\d)$/.test(k) || PUNCT[k]) { const l = layout && layout.get(k); return pre + (l ? l.toUpperCase() : PUNCT[k] || k.slice(-1)); }
+    if (/^Numpad\d$/.test(k)) return pre + 'Num' + k.slice(6);
+    return pre + k;
+  }
+  const PADN = {
+    xbox: ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'View', 'Menu', 'LS', 'RS', 'D▲', 'D▼', 'D◀', 'D▶'],
+    ps: ['✕', '○', '□', '△', 'L1', 'R1', 'L2', 'R2', 'Share', 'Options', 'L3', 'R3', 'D▲', 'D▼', 'D◀', 'D▶'],
+  };
+  const PADC = { xbox: ['#62c84a', '#e5483b', '#3f8ff0', '#f0c22c'], ps: ['#86a9ff', '#ff6a6a', '#ff8fd2', '#4fe0b4'] };
+  function padStyle() { return Settings.glyphs === 'ps' || Settings.glyphs === 'xbox' ? Settings.glyphs : Input.padKind; }
+  function padName(b) {
+    if (b === null || b === undefined) return '';
+    const s = padStyle(); if (s === 'ps' && b === 8 && Input.padDualSense) return 'Create';
+    return PADN[s][b] || ('B' + b);
+  }
+  const padColor = (b) => (b !== null && b < 4) ? PADC[padStyle()][b] : '';
+  // The short label shown on the hotbar and class cards for a slot, on the current device.
+  function slotLabel(i) {
+    const id = 's' + i;
+    if (Input.device === 'pad') { const b = get('pad', id); return { t: padName(b), c: padColor(b) }; }
+    const k = get('kbm', id); return { t: keyName(k[0] || k[1]), c: '' };
+  }
+  rebuild();
+  return { ACT, acts, get, all, assign, reset, keyAction, padAction, held, keyName, padName, padColor, padStyle, slotLabel, capture: null };
+})();
 
 const Input = {
-  device: 'kbm',
+  device: 'kbm', padKind: 'xbox', padDualSense: false, padId: '',
   keys: {}, slotHeld: [0, 0, 0, 0, 0, 0, 0],
   mouse: { l: false, r: false, dx: 0, dy: 0, wheel: 0, downX: 0, downY: 0, moved: 0, downAt: 0 },
   moveX: 0, moveZ: 0, lookX: 0, lookY: 0, zoom: 0, steer: false,
   padPrev: [], padNavT: 0,
-  onSlot: null, onAction: null, onNav: null,   // set by the game/UI
+  onSlot: null, onAction: null, onNav: null, onCapture: null,   // set by the game/UI
   bot: null,                                    // when set, {moveX, moveZ} world-space override from the autopilot
-  active() { return G.state === 'fight' || G.state === 'intro'; },
-  setDevice(d) { if (this.device !== d) { this.device = d; if (typeof UI !== 'undefined') UI.deviceChanged(); } },
+  active() { return (G.state === 'fight' || G.state === 'intro') && !G.paused; },
+  syncDevice() { const d = Settings.pad === true ? 'pad' : 'kbm'; if (this.device !== d) { this.device = d; if (typeof UI !== 'undefined') UI.deviceChanged(); } },
+  setPad(on) { Settings.pad = !!on; saveSettings(); this.padPrev = []; this.syncDevice(); },
   fire(name, arg) { if (this.onAction) this.onAction(name, arg); },
+  press(id) {
+    const a = Binds.ACT[id]; if (!a) return;
+    if (a.slot !== undefined) { this.slotHeld[a.slot] = 1; if (this.active() && this.onSlot) this.onSlot(a.slot); }
+    else if (id === 'jump') { if (this.active()) this.fire('jump'); }
+    else if (id === 'tnext') this.fire('target-next'); else if (id === 'tprev') this.fire('target-prev'); else if (id === 'camreset') this.fire('camreset');
+  },
+  // ---- rebinding: the settings screen calls beginCapture; the next key / mouse button / pad button becomes the binding ----
+  beginCapture(dev, id, idx) { this.capture = { dev, id, idx, t: performance.now(), shift: null }; Binds.capture = this.capture; },
+  endCapture(value) {
+    const c = this.capture; this.capture = null; Binds.capture = null; if (!c) return;
+    let swapped = null; if (value !== undefined) swapped = Binds.assign(c.dev, c.id, c.idx, value);
+    if (this.onCapture) this.onCapture(c, value, swapped);
+  },
+  capture: null,
+  pickPad() {
+    if (Settings.pad === false || !navigator.getGamepads) return null;
+    let gp = null, any = null;
+    for (const p of navigator.getGamepads()) if (p && p.connected && p.buttons.length >= 10) { if (!any) any = p; if (!gp && p.mapping === 'standard') gp = p; }
+    gp = gp || any;
+    if (gp && gp.id !== this.padId) {
+      this.padId = gp.id; this.padKind = /054c|playstation|dualshock|dualsense|wireless controller/i.test(gp.id) ? 'ps' : 'xbox';
+      this.padDualSense = /0ce6|0df2|dualsense/i.test(gp.id); if (typeof UI !== 'undefined') UI.deviceChanged();
+    }
+    return gp;
+  },
   poll(rdt) {
     const k = this.keys, m = this.mouse;
-    let mx = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0);
-    let mz = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0);
+    if (this.capture && performance.now() - this.capture.t > 8000) this.endCapture();
+    let mx = (Binds.held('right', k) ? 1 : 0) - (Binds.held('left', k) ? 1 : 0);
+    let mz = (Binds.held('up', k) ? 1 : 0) - (Binds.held('down', k) ? 1 : 0);
     if (m.l && m.r) mz = 1;
     const sens = 0.0026 * Settings.sens / 100;
     let lx = 0, ly = 0;
@@ -594,72 +756,117 @@ const Input = {
     m.dx = 0; m.dy = 0;
     this.zoom = m.wheel; m.wheel = 0;
     this.steer = m.r;
+    // held state of each skill slot, from every source (a second key bound to the same slot cannot cancel the first)
+    for (let i = 0; i < 7; i++) this.slotHeld[i] = Binds.held('s' + i, k) ? 1 : 0;
     // gamepad
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    let gp = null; for (const p of pads) if (p && p.connected && p.buttons.length >= 10) { gp = p; break; }
+    const gp = this.pickPad();
     if (gp) {
-      const dz = (v) => Math.abs(v) < 0.18 ? 0 : (v - Math.sign(v) * 0.18) / 0.82;
-      const ax = dz(gp.axes[0] || 0), ay = dz(gp.axes[1] || 0), rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
-      if (ax || ay || rx || ry) this.setDevice('pad');
-      if (this.device === 'pad') {
+      const b = gp.buttons.map((x, i) => (i === 6 || i === 7) ? x.value > 0.4 : x.pressed);
+      const prev = this.padPrev, edge = (i) => b[i] && !prev[i];
+      if (Settings.pad === undefined) { // never chosen: the first button press switches the controller on
+        if (b.some((x, i) => edge(i))) { this.padPrev = b; this.setPad(true); if (typeof UI !== 'undefined') UI.padWoke(); }
+        else this.padPrev = b;
+      } else if (this.capture) {
+        for (let i = 0; i < b.length; i++) if (edge(i)) {
+          if (i === PAD_START) { this.endCapture(); break; }
+          if (this.capture.dev === 'pad' && i < 16) { this.endCapture(i); break; }
+        }
+        this.padPrev = b;
+      } else {
+        const dz = (v) => Math.abs(v) < 0.18 ? 0 : (v - Math.sign(v) * 0.18) / 0.82;
+        const ax = dz(gp.axes[0] || 0), ay = dz(gp.axes[1] || 0), rx = dz(gp.axes[2] || 0), ry = dz(gp.axes[3] || 0);
         if (ax || ay) { mx = ax; mz = -ay; }
         const ps = 2.6 * Settings.psens / 100;
         lx += -rx * Math.abs(rx) * ps * rdt; ly += ry * Math.abs(ry) * ps * 0.7 * rdt * (Settings.inv ? -1 : 1);
-      }
-      const b = gp.buttons.map((x, i) => (i === 6 || i === 7) ? x.value > 0.4 : x.pressed);
-      const prev = this.padPrev;
-      for (let i = 0; i < b.length; i++) {
-        const down = b[i] && !prev[i], up = !b[i] && prev[i];
-        if (down) this.setDevice('pad');
-        if (i in PAD_SLOT) { if (down) { this.slotHeld[PAD_SLOT[i]] = 1; if (this.active()) { if (this.onSlot) this.onSlot(PAD_SLOT[i]); } else if (i === 0) this.navFire('ok'); else if (i === 1) this.navFire('back'); } if (up) this.slotHeld[PAD_SLOT[i]] = 0; }
-        else if (down) {
-          if (i === 6) this.fire('jump'); else if (i === 9) this.fire('pause'); else if (i === 11) this.fire('camreset');
-          else if (i === 15) this.fire('target-next'); else if (i === 14) this.fire('target-prev');
-          if (!this.active()) { if (i === 12) this.navFire('up'); if (i === 13) this.navFire('down'); if (i === 14) this.navFire('left'); if (i === 15) this.navFire('right'); }
+        const fight = this.active();
+        for (let i = 0; i < b.length; i++) {
+          const act = this.padAction(i);
+          if (act && b[i] && Binds.ACT[act].slot !== undefined) this.slotHeld[Binds.ACT[act].slot] = 1;
+          if (!edge(i)) continue;
+          if (i === PAD_START) { this.fire('pause'); continue; }
+          if (fight) { if (act) this.press(act); }
+          else if (i === 0) this.navFire('ok'); else if (i === 1) this.navFire('back');
+          else if (i === 12) this.navFire('up'); else if (i === 13) this.navFire('down'); else if (i === 14) this.navFire('left'); else if (i === 15) this.navFire('right');
         }
-      }
-      this.padPrev = b;
-      if (!this.active()) { // stick navigation in menus
-        this.padNavT -= rdt;
-        const sx = gp.axes[0] || 0, sy = gp.axes[1] || 0;
-        if (this.padNavT <= 0 && (Math.abs(sx) > 0.6 || Math.abs(sy) > 0.6)) { this.navFire(Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 'right' : 'left') : (sy > 0 ? 'down' : 'up')); this.padNavT = 0.22; }
+        this.padPrev = b;
+        if (!fight) { // stick navigation in menus
+          this.padNavT -= rdt;
+          const sx = gp.axes[0] || 0, sy = gp.axes[1] || 0;
+          if (this.padNavT <= 0 && (Math.abs(sx) > 0.6 || Math.abs(sy) > 0.6)) { this.navFire(Math.abs(sx) > Math.abs(sy) ? (sx > 0 ? 'right' : 'left') : (sy > 0 ? 'down' : 'up')); this.padNavT = 0.22; }
+          else if (Math.abs(sx) < 0.3 && Math.abs(sy) < 0.3) this.padNavT = 0;
+        }
       }
     }
     const l = Math.hypot(mx, mz); if (l > 1) { mx /= l; mz /= l; }
     this.moveX = mx; this.moveZ = mz; this.lookX = lx; this.lookY = ly;
   },
+  padAction(i) { return Binds.padAction(i); },
   navFire(dir) { if (this.onNav) this.onNav(dir); },
   clear() { this.keys = {}; this.slotHeld.fill(0); this.mouse.l = this.mouse.r = false; },
 };
+Input.syncDevice();
 
+// ---- keyboard ----
+function captureKey(e) {
+  const c = Input.capture;
+  if (e.code === 'Escape') return Input.endCapture();
+  if (e.code === 'Backspace' || e.code === 'Delete') return c.dev === 'kbm' ? Input.endCapture(null) : undefined;
+  if (c.dev !== 'kbm' || e.repeat || KEY_RESERVED.test(e.code) || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (/^Shift(Left|Right)$/.test(e.code)) { c.shift = e.code; return; } // a lone Shift binds on release; Shift + key binds the combo
+  Input.endCapture((e.shiftKey ? 'Shift+' : '') + e.code);
+}
 addEventListener('keydown', (e) => {
-  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) { e.target.blur(); if (e.code.startsWith('Arrow')) e.preventDefault(); } // menus are driven by the nav focus, never by browser focus
+  if (Input.capture) { e.preventDefault(); e.stopPropagation(); captureKey(e); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  Input.setDevice('kbm');
-  const fight = Input.active();
-  if (fight && (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'KeyF' || e.code === 'Quote' || e.code === 'Slash')) e.preventDefault();
+  const fight = Input.active(), act = Binds.keyAction(e);
+  if (fight && (act || e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'Quote' || e.code === 'Slash')) e.preventDefault();
   if (e.code === 'Tab') e.preventDefault();
   if (e.repeat) return;
   Input.keys[e.code] = true;
-  if (e.code === 'Escape') Input.fire('pause');
-  else if (e.code === 'Tab') Input.fire(e.shiftKey ? 'target-prev' : 'target-next');
-  else if (e.code === 'Space') { if (fight) Input.fire('jump'); }
-  else if (e.code in SLOT_KEYS) { const s = SLOT_KEYS[e.code]; Input.slotHeld[s] = 1; if (fight && Input.onSlot) Input.onSlot(s); }
+  if (e.code === 'Escape') { Input.fire('pause'); return; }
+  if (act) Input.press(act);
   if (!fight) {
     if (e.code === 'Enter') Input.navFire('ok');
     else if (e.code === 'ArrowUp') Input.navFire('up'); else if (e.code === 'ArrowDown') Input.navFire('down');
     else if (e.code === 'ArrowLeft') Input.navFire('left'); else if (e.code === 'ArrowRight') Input.navFire('right');
   }
-});
-addEventListener('keyup', (e) => { Input.keys[e.code] = false; if (e.code in SLOT_KEYS) Input.slotHeld[SLOT_KEYS[e.code]] = 0; });
+}, true);
+addEventListener('keyup', (e) => {
+  Input.keys[e.code] = false;
+  const c = Input.capture; if (c && c.shift === e.code) { e.preventDefault(); Input.endCapture(e.code); }
+}, true);
 addEventListener('blur', () => Input.clear());
+
+// ---- mouse ----
+// Left and right buttons drive the camera and are fixed; middle and the two side buttons (Mouse1, Mouse3, Mouse4) can be bound.
+const BINDABLE_MOUSE = (b) => b === 1 || b === 3 || b === 4;
+let swallowClick = false;
+addEventListener('mousedown', (e) => {
+  if (Input.capture) {
+    e.preventDefault(); e.stopPropagation();
+    if (Input.capture.dev === 'kbm' && BINDABLE_MOUSE(e.button)) Input.endCapture('Mouse' + e.button);
+    else { swallowClick = e.button === 0; Input.endCapture(); }
+    return;
+  }
+  if (!BINDABLE_MOUSE(e.button)) return;
+  const code = 'Mouse' + e.button, act = Binds.keyAction({ code, shiftKey: e.shiftKey });
+  if (act || Input.active()) e.preventDefault();
+  Input.keys[code] = true; if (act) Input.press(act);
+}, true);
+addEventListener('click', (e) => { if (swallowClick) { swallowClick = false; e.preventDefault(); e.stopPropagation(); } }, true);
+addEventListener('mouseup', (e) => {
+  if (!BINDABLE_MOUSE(e.button)) return;
+  Input.keys['Mouse' + e.button] = false;
+  if (Input.active() || Binds.keyAction({ code: 'Mouse' + e.button, shiftKey: false })) e.preventDefault(); // stop side buttons from going back/forward in history
+}, true);
+addEventListener('auxclick', (e) => { if (Input.active()) e.preventDefault(); });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 canvas.addEventListener('mousedown', (e) => {
-  Input.setDevice('kbm');
   const m = Input.mouse;
   if (e.button === 0) m.l = true; else if (e.button === 2) m.r = true; else return;
   m.downX = e.clientX; m.downY = e.clientY; m.moved = 0; m.downAt = performance.now();
-  if (Input.active() && !G.paused && canvas.requestPointerLock && document.pointerLockElement !== canvas) {
+  if (Input.active() && canvas.requestPointerLock && document.pointerLockElement !== canvas) {
     try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { }); } catch (err) { /* lock is optional */ }
   }
   e.preventDefault();
@@ -675,6 +882,8 @@ addEventListener('mousemove', (e) => {
   if (m.l || m.r) { m.dx += e.movementX || 0; m.dy += e.movementY || 0; m.moved += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0); }
 });
 canvas.addEventListener('wheel', (e) => { Input.mouse.wheel += Math.sign(e.deltaY); e.preventDefault(); }, { passive: false });
+addEventListener('gamepadconnected', () => { Input.padId = ''; });
+addEventListener('gamepaddisconnected', () => { Input.padId = ''; if (typeof UI !== 'undefined') UI.deviceChanged(); });
 Hooks.frame.push((rdt, stage) => { if (stage === 0) Input.poll(rdt); });
 
 // ==== 03_audio.js ====
@@ -2268,8 +2477,8 @@ const UI = (() => {
     const cw = $('#classes'); cw.innerHTML = '';
     for (const c of G.classes) {
       const b = document.createElement('button'); b.className = 'cls nav' + (c === selectedClass() ? ' sel' : ''); b.style.setProperty('--c', c.color);
-      const labels = Input.device === 'pad' ? SLOT_LABEL_PAD : SLOT_LABEL_KBM;
-      b.innerHTML = `<div class="cn">${c.name}</div><div class="cr">${c.role}</div><div class="sk">` + c.skills.map((s, i) => !s ? '' : `<div class="ic">${svg(s.icon, c.color)}</div><div><kbd>${labels[i]}</kbd><b>${s.name}</b> ${s.desc}</div>`).join('') + '</div>';
+      const kb = (i) => { const l = Binds.slotLabel(i); return `<kbd${l.c ? ` style="color:${l.c}"` : ''}>${l.t || '·'}</kbd>`; };
+      b.innerHTML = `<div class="cn">${c.name}</div><div class="cr">${c.role}</div><div class="sk">` + c.skills.map((s, i) => !s ? '' : `<div class="ic">${svg(s.icon, c.color)}</div><div>${kb(i)}<b>${s.name}</b> ${s.desc}</div>`).join('') + '</div>';
       b.onclick = () => { Settings.cls = c.id; saveSettings(); Sound.sfx('uiok'); buildMenu(); };
       cw.appendChild(b);
     }
@@ -2287,7 +2496,9 @@ const UI = (() => {
   function show(name) {
     for (const k of ['menu', 'pause', 'death', 'victory', 'settings']) el[k].classList.toggle('hidden', k !== name);
     cur = name || null; focusI = -1;
+    if (Input.capture) Input.endCapture();
     if (name === 'menu') buildMenu();
+    if (name === 'settings') refreshSettings();
     if (name && Input.device === 'pad') moveFocus(0, true);
   }
   function fade(on) { el.fade.classList.toggle('clear', !on); }
@@ -2319,11 +2530,15 @@ const UI = (() => {
     for (const ph of b.def.phases) if (ph.at < 1) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (ph.at * 100) + '%'; bar.appendChild(t); }
     $('#bname').textContent = b.def.name;
   }
+  // Called whenever the controller toggle, prompt style, connected pad or a binding changes: every on-screen button label follows.
   function deviceChanged() {
-    const labels = Input.device === 'pad' ? SLOT_LABEL_PAD : SLOT_LABEL_KBM;
-    slots.forEach((s, i) => { if (s) s.key.textContent = labels[i]; });
-    if (cur === 'menu') buildMenu();
+    document.body.classList.toggle('dev-pad', Input.device === 'pad');
+    slots.forEach((s, i) => { if (s) { const l = Binds.slotLabel(i); s.key.textContent = l.t; s.key.style.color = l.c; } });
+    const f = focusI;
+    if (cur === 'menu') { buildMenu(); if (f >= 0) setFocus(f); }
+    if (cur === 'settings') refreshSettings();
   }
+  function padWoke() { if (cur && focusI < 0) moveFocus(0, true); }
   function castBar(key, node, cs) {
     const on = !!cs; setCls(key + 'on', node, 'on', on);
     if (!on) return; setCls(key + 'int', node, 'int', !!cs.int); setSx(key + 'f', node.firstElementChild, sat(cs.t / cs.time)); setTxt(key + 'n', node.lastElementChild, cs.name);
@@ -2376,29 +2591,115 @@ const UI = (() => {
     if (a === 'resume') Game.pause(false); else if (a === 'restart') Game.restart(); else if (a === 'quit') Game.quit();
     else if (a === 'settings') openSettings('pause'); else if (a === 'back') show(settingsFrom);
   });
-  function openSettings(from) { settingsFrom = from; $('#set-vol').value = Settings.vol; $('#set-mus').value = Settings.mus; $('#set-sens').value = Settings.sens; $('#set-psens').value = Settings.psens; $('#set-inv').checked = Settings.inv; $('#set-q').value = Settings.q; show('settings'); }
+  // ---- settings: general options, the controller toggle, and the binding table for the current device ----
+  const RANGE = { vol: [0, 100, 5], mus: [0, 100, 5], sens: [10, 300, 10], psens: [10, 300, 10] };
+  const segOf = (k) => $('#set-' + k);
+  function segSet(k, v) { for (const n of segOf(k).children) n.classList.toggle('on', n.dataset.v === String(v)); }
+  function openSettings(from) { settingsFrom = from; show('settings'); }
+  function refreshSettings() {
+    for (const k in RANGE) { const n = $('#set-' + k); n.value = Settings[k]; n.nextElementSibling.textContent = Settings[k]; }
+    segSet('inv', Settings.inv ? 1 : 0); segSet('q', Settings.q); segSet('pad', Settings.pad ? 1 : 0); segSet('glyphs', Settings.glyphs || 'auto');
+    buildBinds();
+    const items = navItems(); if (focusI >= items.length) focusI = items.length - 1; if (focusI >= 0 && items[focusI]) items[focusI].classList.add('focus');
+  }
+  function setOpt(k, v) {
+    if (k in RANGE) { const [lo, hi] = RANGE[k]; Settings[k] = clamp(Math.round(+v), lo, hi); Sound.applyVolume(); }
+    else if (k === 'inv') Settings.inv = String(v) === '1';
+    else if (k === 'q') { Settings.q = v; Post.setQuality(v); }
+    else if (k === 'pad') { Input.setPad(String(v) === '1'); refreshSettings(); return; }
+    else if (k === 'glyphs') Settings.glyphs = v;
+    saveSettings(); if (k === 'glyphs') deviceChanged(); else refreshSettings();
+  }
+  function adjust(k, d) { // left / right on a focused row
+    if (k in RANGE) { setOpt(k, Settings[k] + d * RANGE[k][2]); Sound.sfx('ui'); return; }
+    const vals = [...segOf(k).children].map((n) => n.dataset.v), on = segOf(k).querySelector('.on');
+    const i = on ? vals.indexOf(on.dataset.v) : 0, j = d === 0 ? (i + 1) % vals.length : clamp(i + d, 0, vals.length - 1);
+    if (j !== i) { setOpt(k, vals[j]); Sound.sfx('ui'); }
+  }
+  for (const k in RANGE) $('#set-' + k).oninput = (e) => setOpt(k, e.target.value);
+  $('#settings .set-wrap').addEventListener('click', (e) => {
+    const sv = e.target.closest('.seg span'), row = e.target.closest('.srow');
+    if (sv) { setOpt(row.dataset.adj, sv.dataset.v); Sound.sfx('uiok'); }
+    else if (row && !e.target.closest('input') && !(row.dataset.adj in RANGE)) adjust(row.dataset.adj, 0);
+  });
+  function padLabel() {
+    const gp = Input.padId ? Input.pickPad() : null; if (!gp) return 'No controller found. Press a button on it.';
+    return gp.id.replace(/\s*\(.*$/, '').slice(0, 48) + (gp.mapping === 'standard' ? '' : ' (unusual layout: rebind anything that feels wrong)');
+  }
+  function bindCell(dev, id, i) {
+    const c = Input.capture, waiting = c && c.dev === dev && c.id === id && c.idx === i;
+    const v = dev === 'pad' ? Binds.get('pad', id) : Binds.get('kbm', id)[i];
+    const t = waiting ? (dev === 'pad' ? 'press a button' : 'press a key') : (dev === 'pad' ? Binds.padName(v) : Binds.keyName(v)) || '—';
+    const col = !waiting && dev === 'pad' ? Binds.padColor(v) : '';
+    return `<button class="bk nav${waiting ? ' wait' : ''}${col ? ' face' : ''}${!waiting && (v === null || v === undefined) ? ' empty' : ''}" data-id="${id}" data-i="${i}" data-col="${i}"${col ? ` style="color:${col}"` : ''}>${t}</button>`;
+  }
+  function buildBinds() {
+    const dev = Input.device, pad = dev === 'pad', w = $('#binds'), cls = selectedClass(), c = Input.capture;
+    w.className = pad ? 'pad' : '';
+    let h = '', grp = '';
+    for (const a of Binds.acts(dev)) {
+      const g = a.kbmOnly ? 'Movement' : a.slot !== undefined ? 'Skills' : 'Other';
+      if (g !== grp) { grp = g; h += `<div class="bh grp">${g}</div>`; }
+      const sk = a.slot !== undefined && cls.skills[a.slot];
+      h += `<div class="bn">${a.slot !== undefined ? 'Skill ' + (a.slot + 1) + (sk ? `<small>${sk.name}</small>` : '') : a.name}</div>`;
+      h += pad ? bindCell('pad', a.id, 0) : bindCell('kbm', a.id, 0) + bindCell('kbm', a.id, 1);
+    }
+    w.innerHTML = h;
+    const k = (t) => `<kbd>${t}</kbd>`, P = (b) => Binds.padName(b);
+    const fixed = pad ? [['Move', 'Left stick'], ['Camera', 'Right stick'], ['Pause', P(9)], ['Menus: confirm / back', P(0) + ' / ' + P(1)]]
+      : [['Turn camera', 'Hold left mouse'], ['Turn camera and character', 'Hold right mouse'], ['Run forward', 'Both mouse buttons'], ['Zoom', 'Wheel'], ['Pick a target', 'Click it'], ['Pause', 'Esc']];
+    $('#bind-fixed').innerHTML = fixed.map(([a, b]) => `<span>${a}</span>${k(b)}`).join('');
+    $('#bind-hint').innerHTML = !c ? '' : c.dev === 'pad' ? `${k(P(9))} cancels` : `${k('Esc')} cancels &nbsp;${k('Backspace')} clears`;
+    $('#bind-reset').classList.toggle('hidden', !!c);
+    $('#padstat').textContent = pad ? padLabel() : '';
+    $('#bind-reset').textContent = pad ? 'Reset buttons' : 'Reset keys';
+  }
+  $('#binds').addEventListener('click', (e) => {
+    const b = e.target.closest('.bk'); if (!b) return;
+    const c = Input.capture, dev = Input.device, id = b.dataset.id, i = +b.dataset.i;
+    if (c && c.id === id && c.idx === i) { Input.endCapture(); return; }
+    Input.beginCapture(dev, id, i); Sound.sfx('uiok'); buildBinds(); focusCell(id, i);
+  });
+  $('#bind-reset').onclick = () => { Binds.reset(Input.device); Sound.sfx('uiok'); deviceChanged(); };
+  function focusCell(id, i) { const items = navItems(), j = items.findIndex((n) => n.dataset.id === id && +n.dataset.i === i); if (j >= 0 && (focusI >= 0 || Input.device === 'pad')) setFocus(j, true); }
+  Input.onCapture = (c, value, swapped) => {
+    deviceChanged(); focusCell(c.id, c.idx); Sound.sfx(value === undefined ? 'ui' : 'uiok');
+    if (swapped) for (const n of $('#binds').querySelectorAll(`.bk[data-id="${swapped}"]`)) { n.classList.add('swap'); setTimeout(() => n.classList.remove('swap'), 1400); }
+  };
   $('#btn-settings').onclick = () => openSettings('menu');
   $('#btn-fs').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => { }); };
-  for (const [id, key] of [['set-vol', 'vol'], ['set-mus', 'mus'], ['set-sens', 'sens'], ['set-psens', 'psens']]) $('#' + id).oninput = (e) => { Settings[key] = +e.target.value; saveSettings(); Sound.applyVolume(); };
-  $('#set-inv').onchange = (e) => { Settings.inv = e.target.checked; saveSettings(); };
-  $('#set-q').onchange = (e) => { Settings.q = e.target.value; saveSettings(); Post.setQuality(Settings.q); };
+  // buttons and sliders never keep browser focus, so Space / Enter in a fight cannot press a menu button again
+  document.addEventListener('click', () => { const a = document.activeElement; if (a && a !== document.body && a.blur) a.blur(); });
 
   // ---- gamepad / keyboard focus navigation ----
   function navItems() { return cur ? [...el[cur].querySelectorAll('.nav')].filter((n) => n.offsetParent !== null) : []; }
-  function moveFocus(d, absolute) {
+  function setFocus(i, quiet) {
     const items = navItems(); if (!items.length) return; items.forEach((n) => n.classList.remove('focus'));
-    focusI = absolute ? 0 : ((focusI < 0 ? 0 : focusI + d) + items.length) % items.length;
-    if (cur === 'menu' && absolute) focusI = Math.min(items.length - 1, G.classes.length);
-    items[focusI].classList.add('focus'); items[focusI].scrollIntoView({ block: 'nearest' }); Sound.sfx('ui');
+    focusI = clamp(i, 0, items.length - 1); items[focusI].classList.add('focus'); items[focusI].scrollIntoView({ block: 'nearest' }); if (!quiet) Sound.sfx('ui');
+  }
+  function moveFocus(d, absolute) {
+    const items = navItems(); if (!items.length) return;
+    let i = absolute ? 0 : ((focusI < 0 ? 0 : focusI + d) + items.length) % items.length;
+    if (cur === 'menu' && absolute) i = Math.min(items.length - 1, G.classes.length);
+    // in the binding table, up / down stay in the same column
+    const f = items[focusI];
+    if (!absolute && f && f.dataset.col !== undefined && Input.device === 'kbm') {
+      for (let j = focusI + d; j >= 0 && j < items.length; j += d) { const n = items[j]; if (n.dataset.col === undefined || n.dataset.col === f.dataset.col) { i = j; break; } }
+    }
+    setFocus(i, absolute);
   }
   Input.onNav = (dir) => {
-    if (!cur) return;
-    if (dir === 'ok') { const items = navItems(); if (items[focusI]) items[focusI].click(); else moveFocus(0, true); }
+    if (!cur || Input.capture) return;
+    const items = navItems(), f = items[focusI];
+    if (dir === 'ok') { if (f) f.click(); else moveFocus(0, true); }
     else if (dir === 'back') { if (cur === 'settings') show(settingsFrom); else if (cur === 'pause') Game.pause(false); }
+    else if ((dir === 'left' || dir === 'right') && f && f.dataset.adj) adjust(f.dataset.adj, dir === 'left' ? -1 : 1);
+    else if ((dir === 'left' || dir === 'right') && f && f.dataset.col !== undefined) { if (Input.device === 'kbm' && f.dataset.col === (dir === 'left' ? '1' : '0')) setFocus(focusI + (dir === 'left' ? -1 : 1)); }
     else moveFocus(dir === 'up' || dir === 'left' ? -1 : 1);
   };
+  document.body.classList.toggle('dev-pad', Input.device === 'pad');
   Hooks.frame.push((rdt, stage) => { if (stage === 1) update(rdt); });
-  return { el, show, fade, titleCard, hideCard, buildHud, deviceChanged, slotFlash, hurtFlash, selectedClass, fmtT, ROMAN, hud(on) { el.hud.classList.toggle('on', on); }, get screen() { return cur; } };
+  return { el, show, fade, titleCard, hideCard, buildHud, deviceChanged, padWoke, slotFlash, hurtFlash, selectedClass, fmtT, ROMAN, hud(on) { el.hud.classList.toggle('on', on); }, get screen() { return cur; } };
 })();
 
 // ==== 10_game.js ====
@@ -15997,7 +16298,7 @@ const Bot = {
 };
 
 window.__game = {
-  G, Game, Bot, Hz, Bul, FX, Cam, Input, renderer, scene, camera,
+  G, Game, Bot, Hz, Bul, FX, Cam, Input, Binds, Settings, renderer, scene, camera,
   start(id, opts = {}) { Game.start(id, Object.assign({ instant: true }, opts)); },
   bot(n) { Bot.level = n; },
   god(on = true) { G.god = on; },
