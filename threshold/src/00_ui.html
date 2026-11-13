@@ -64,21 +64,25 @@
 
 <div id="settings" class="screen hidden">
   <h1>SETTINGS</h1>
-  <div class="panel">
-    <label>Master volume</label><input type="range" id="set-vol" min="0" max="100">
-    <label>Music</label><input type="range" id="set-mus" min="0" max="100">
-    <label>Mouse sensitivity</label><input type="range" id="set-sens" min="10" max="300">
-    <label>Controller camera speed</label><input type="range" id="set-psens" min="10" max="300">
-    <label>Invert camera Y</label><input type="checkbox" id="set-inv">
-    <label>Graphics</label><select id="set-q"><option value="high">High</option><option value="med">Medium</option><option value="low">Low</option></select>
-  </div>
-  <div class="keys">
-    <b>Keyboard + mouse</b><br>
-    <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move &nbsp; <kbd>Space</kbd> jump &nbsp; hold <kbd>Left mouse</kbd> turn camera &nbsp; hold <kbd>Right mouse</kbd> turn camera and character &nbsp; both buttons run forward<br>
-    <kbd>Wheel</kbd> zoom &nbsp; <kbd>Tab</kbd> or click to change target &nbsp; <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>Q</kbd><kbd>E</kbd><kbd>R</kbd><kbd>F</kbd> skills (also <kbd>4</kbd>-<kbd>7</kbd>, or click the bar) &nbsp; <kbd>Esc</kbd> pause<br>
-    <b>Controller</b><br>
-    <kbd>L stick</kbd> move &nbsp; <kbd>R stick</kbd> camera &nbsp; <kbd>RT</kbd><kbd>RB</kbd><kbd>Y</kbd><kbd>A</kbd><kbd>B</kbd><kbd>X</kbd><kbd>LB</kbd> skills, in hotbar order (each skill shows its button)<br>
-    <kbd>LT</kbd> jump &nbsp; <kbd>D-pad ◀ ▶</kbd> change target &nbsp; <kbd>R3</kbd> reset camera &nbsp; <kbd>Start</kbd> pause
+  <div class="set-wrap">
+    <div class="set-col set-gen">
+      <h2>General</h2>
+      <div class="srow nav" data-adj="vol"><label>Master volume</label><input type="range" id="set-vol" min="0" max="100" tabindex="-1"><span class="sv"></span></div>
+      <div class="srow nav" data-adj="mus"><label>Music</label><input type="range" id="set-mus" min="0" max="100" tabindex="-1"><span class="sv"></span></div>
+      <div class="srow nav kbm-only" data-adj="sens"><label>Mouse sensitivity</label><input type="range" id="set-sens" min="10" max="300" tabindex="-1"><span class="sv"></span></div>
+      <div class="srow nav pad-only" data-adj="psens"><label>Camera speed</label><input type="range" id="set-psens" min="10" max="300" tabindex="-1"><span class="sv"></span></div>
+      <div class="srow nav" data-adj="inv"><label>Invert camera Y</label><div class="seg" id="set-inv"><span data-v="0">Off</span><span data-v="1">On</span></div></div>
+      <div class="srow nav" data-adj="q"><label>Graphics</label><div class="seg" id="set-q"><span data-v="low">Low</span><span data-v="med">Medium</span><span data-v="high">High</span></div></div>
+      <h2 class="h2b">Fixed controls</h2>
+      <div class="fixed" id="bind-fixed"></div>
+    </div>
+    <div class="set-col set-ctl">
+      <div class="ctl-head"><h2>Controls</h2><span id="bind-hint"></span><button class="btn nav small" id="bind-reset"></button></div>
+      <div class="srow nav" data-adj="pad"><label>Controller</label><div class="seg" id="set-pad"><span data-v="0">Off</span><span data-v="1">On</span></div></div>
+      <div class="srow nav pad-only" data-adj="glyphs"><label>Button prompts</label><div class="seg" id="set-glyphs"><span data-v="auto">Auto</span><span data-v="xbox">Xbox</span><span data-v="ps">PlayStation</span></div></div>
+      <div class="padstat pad-only" id="padstat"></div>
+      <div id="binds"></div>
+    </div>
   </div>
   <button class="btn nav primary" data-act="back">Back</button>
 </div>
