@@ -288,14 +288,18 @@
     const jag = (q, h, rr) => { const P = q.attributes.position; for (let i = 0; i < P.count; i++) if (P.getY(i) > h / 2 - 1e-3) { const an = Math.atan2(P.getX(i), P.getZ(i)); P.setY(i, P.getY(i) - (0.15 + 0.5 * Math.abs(Math.sin(an * 2.3 + rr * 9)) * (0.6 + 0.4 * Math.sin(an * 7 + rr * 3)))); } q.computeVertexNormals(); return q; };
     const moulding = new THREE.TorusGeometry(0.93, 0.13, 6, 28); moulding.rotateX(PI / 2);
     const marble = S.marble;
+    S.colMats = []; const colMat = () => { const m = withRim(marble.clone(), S.envRim, 2.4); S.colMats.push(m); return m; };
     const cr = mulberry(77); let prevTall = false; const tallList = [];
     for (let i = 0; i < 16; i++) {
       const a = i / 16 * TAU + 0.1, x = Math.sin(a) * 20.6, z = Math.cos(a) * 20.6, tall = cr() < 0.45, h = tall ? 10 : 2 + cr() * 5;
-      const col = new THREE.Mesh(tall ? flute(0.78, 0.9, h, 12) : jag(scaleUV(flute(0.8, 0.9, h, 12), h / 10), h, i * 0.37), marble); col.position.set(x, h / 2 - 0.2, z); col.castShadow = true; g.add(col);
-      const mo = new THREE.Mesh(moulding, marble); mo.position.set(x, 0.42, z); g.add(mo);
-      const base = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.6, 2.3), marble); base.position.set(x, 0.1, z); base.rotation.y = a; g.add(base);
-      if (tall) { tallList.push([x, z, h]); const cap = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.6, 2.3), marble); cap.position.set(x, h + 0.05, z); cap.rotation.y = a; g.add(cap);
-        if (prevTall) { const a0 = (i - 0.5) / 16 * TAU + 0.1; const lin = new THREE.Mesh(new THREE.BoxGeometry(8.6, 1.1, 1.9), marble); lin.position.set(Math.sin(a0) * 20.4, h + 0.9, Math.cos(a0) * 20.4); lin.rotation.y = a0; g.add(lin); } }
+      // each column (with its base, moulding and capital) gets its own marble so it can fade when it hides the player
+      const pm = colMat();
+      const col = new THREE.Mesh(tall ? flute(0.78, 0.9, h, 12) : jag(scaleUV(flute(0.8, 0.9, h, 12), h / 10), h, i * 0.37), pm); col.position.set(x, h / 2 - 0.2, z); col.castShadow = true; g.add(col);
+      col.userData.fadeOcclude = true; col.userData.fadeMin = 0.2; col.userData.fadeCol = { r: 1.9, y0: -h / 2, y1: h / 2 + (tall ? 1 : 0.2) };
+      const mo = new THREE.Mesh(moulding, pm); mo.position.set(x, 0.42, z); g.add(mo);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.6, 2.3), pm); base.position.set(x, 0.1, z); base.rotation.y = a; g.add(base);
+      if (tall) { tallList.push([x, z, h]); const cap = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.6, 2.3), pm); cap.position.set(x, h + 0.05, z); cap.rotation.y = a; g.add(cap);
+        if (prevTall) { const a0 = (i - 0.5) / 16 * TAU + 0.1; const lin = new THREE.Mesh(new THREE.BoxGeometry(8.6, 1.1, 1.9), colMat()); lin.userData.fadeOcclude = true; lin.userData.fadeMin = 0.2; lin.position.set(Math.sin(a0) * 20.4, h + 0.9, Math.cos(a0) * 20.4); lin.rotation.y = a0; g.add(lin); } }
       else { cr(); cr();
         for (let q = 0; q < 2; q++) { const aa = a + 0.06 + q * 0.12 * (cr() < 0.5 ? -1 : 1), rr2 = 22.4 + cr() * 1.6, dh = 1.2 + cr() * 0.9; if ([0.94, 2.83, 4.08, 5.97].some((fa) => Math.abs(angDiff(fa, aa)) < 0.3)) { cr(); continue; } const drum = new THREE.Mesh(flute(0.8, 0.8, dh, 12, 0.03), drumMs); drum.position.set(Math.sin(aa) * rr2, 0.78, Math.cos(aa) * rr2); drum.rotation.set(PI / 2, cr() * 3, 0); drum.rotation.order = 'YXZ'; drum.castShadow = true; g.add(drum); } }
       prevTall = tall;
@@ -745,7 +749,7 @@
       const fl = 0.72 + 0.28 * Math.sin(t * 1.1) * (0.8 + 0.2 * Math.sin(t * 5.3 + 1));
       S.mosU.crk.value.setRGB(1.0, 0.3, 0.06).lerp(_c.setRGB(0.1, 0.5, 0.34), p2).multiplyScalar(p1 * (0.55 - p2 * 0.15) * fl);
       S.mosU.eye.value.setRGB(0.5, 1.0, 0.45).multiplyScalar(p2 * (0.6 + S.gaze * 1.2));
-      S.marble.emissiveIntensity = S.stoneMat.emissiveIntensity = p2 * 1.6 * (0.75 + 0.25 * Math.sin(t * 7.1) * Math.sin(t * 2.9));
+      S.marble.emissiveIntensity = S.stoneMat.emissiveIntensity = p2 * 1.6 * (0.75 + 0.25 * Math.sin(t * 7.1) * Math.sin(t * 2.9)); for (const m of S.colMats) m.emissiveIntensity = S.marble.emissiveIntensity;
       S.frost.material.uniforms.uA.value = p2; S.frost.material.uniforms.uIn.value = R + 0.5 - S.frostT * 3.2; S.frost.material.uniforms.uT.value = t;
       // body
       const gz = S.gaze, rear = damp(S.rearK || 0, Math.max(S.rear, gz > 0 ? 1 : 0), 5, dt); S.rearK = rear;
