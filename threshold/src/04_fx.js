@@ -87,7 +87,7 @@ const FX = (() => {
   function ring(x, z, o = {}) {
     if (G.headless) return; const m = take('ring'), u = m.material.uniforms;
     m.position.set(x, o.y === undefined ? 0.08 : o.y, z); m.userData.dur = o.dur || 0.5; m.userData.r0 = o.r0 || 0.2; m.userData.r1 = o.r1 || 6;
-    u.uC.value.set(o.color || 0xffffff).multiplyScalar(o.mult || 2); u.uW.value = o.width || 0.12; m.scale.setScalar(m.userData.r1 * 1.1); m.renderOrder = 12;
+    u.uC.value.set(o.color || 0xffffff).multiplyScalar(o.mult || 2); u.uW.value = o.width || 0.12; m.scale.setScalar(Math.max(m.userData.r0, m.userData.r1) * 1.1); m.renderOrder = 12;
   }
 
   const cylGeo = new THREE.CylinderGeometry(1, 1, 1, 20, 1, true); cylGeo.translate(0, 0.5, 0); cylGeo.userData.shared = true;
@@ -203,7 +203,7 @@ const FX = (() => {
       if (!m.visible) continue; const u = m.userData; u.t += dt; const k = u.t / u.dur;
       if (k >= 1 + (u.hold || 0) / u.dur) { m.visible = false; continue; }
       const kk = sat(k);
-      if (name === 'ring') { m.material.uniforms.uR.value = lerp(u.r0, u.r1, 1 - Math.pow(1 - kk, 2.2)) / (u.r1 * 1.1); m.material.uniforms.uA.value = 1 - kk * kk; }
+      if (name === 'ring') { m.material.uniforms.uR.value = lerp(u.r0, u.r1, 1 - Math.pow(1 - kk, 2.2)) / (Math.max(u.r0, u.r1) * 1.1); m.material.uniforms.uA.value = 1 - kk * kk; }
       else if (name === 'pillar') { m.material.uniforms.uA.value = (1 - kk) * (1 - kk); m.scale.x = m.scale.z = u.r * (1 - kk * 0.4); }
       else if (name === 'beam') { const a = u.t < u.hold ? 1 : 1 - sat((u.t - u.hold) / u.dur); m.material.uniforms.uA.value = a; m.scale.x = m.scale.y = u.w * (0.3 + 0.7 * a); if (a <= 0) m.visible = false; }
       else if (name === 'bolt') { const fl = (1 - kk) * (vrand() > 0.25 ? 1 : 0.3); m.material.color.copy(u.col).multiplyScalar(fl); }
