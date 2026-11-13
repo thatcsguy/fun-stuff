@@ -310,7 +310,7 @@
     const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.22, 0.55, 14, 1, true), W.mat({ color: 0x3a1408, roughness: 0.35, side: THREE.DoubleSide })); cup.position.y = -0.36; S.arms[1].hand.add(cup);
     const cupR = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.03, 6, 20), goldM); cupR.rotation.x = PI / 2; cupR.position.y = -0.64; S.arms[1].hand.add(cupR);
     S.rake = new THREE.Group(); const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, R - 2), goldM); shaft.position.z = (R - 2) / 2 + 2; S.rake.add(shaft); const head2 = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.5, 0.25), goldM); head2.position.z = R - 0.3; S.rake.add(head2); S.rake.position.y = 0.6; S.rake.visible = false; g.add(S.rake);
-    Object.assign(S, { ao: 0, ai: 0, wo: 0.2, wi: 0.2, wT: 0.2, counter: false, frenzy: 0, gest: 0, rakeOn: 0, lvl: 0, vort: 0, burstA: 0 });
+    Object.assign(S, { ao: 0, ai: 0, wo: 0.2, wi: 0.2, wT: 0.2, counter: false, frenzy: 0, gest: 0, rakeOn: 0, lvl: 0, vort: 0, burstA: 0, camW: 0 });
     return {
       edge: 'wall', spawn: { x: 0, z: 13 }, bossStart: { x: 0, z: 0, face: 0 }, camDist: 16,
       contains: (x, z) => { const d = Math.hypot(x, z); return d <= R - 0.5 && d >= HUB; },
@@ -451,7 +451,11 @@
       if (S.frenzy > 0) S.frenzy -= dt;
       const wt = S.wT * (S.frenzy > 0 ? 2.4 : 1); S.wo = damp(S.wo, wt, 1.6, dt); S.wi = damp(S.wi, S.counter ? -wt : wt, 1.6, dt);
       S.ao = wrapPi(S.ao + S.wo * dt); S.ai = wrapPi(S.ai + S.wi * dt);
-      if (p.alive && p.grounded && !p.dash && G.state === 'fight') { const w = Math.hypot(p.pos.x, p.pos.z) < SPLIT ? S.wi : S.wo; p.push.x += w * p.pos.z; p.push.z -= w * p.pos.x; }
+      // carry the player (also while airborne, not while dashing), and turn the camera and facing with the ring underfoot so the floor holds still on screen
+      const wHere = Math.hypot(p.pos.x, p.pos.z) < SPLIT ? S.wi : S.wo;
+      if (p.alive && !p.dash && G.state === 'fight' && dt > 0) { const c = Math.cos(wHere * dt) - 1, sn = Math.sin(wHere * dt); p.push.x += (p.pos.x * c + p.pos.z * sn) / dt; p.push.z += (p.pos.z * c - p.pos.x * sn) / dt; } // exact rotation, so standing still does not creep outward
+      if (p.alive && G.state === 'fight' && !Cam.cine) { S.camW = damp(S.camW, wHere, 9, dt); const dy = S.camW * dt; Cam.yaw = wrapPi(Cam.yaw + dy); p.facing = wrapPi(p.facing + dy); }
+      else S.camW = 0;
       // balls
       for (const bl of S.balls) {
         if (bl.state === 'off') continue; bl.t += dt; if (bl.cd > 0) bl.cd -= dt;
