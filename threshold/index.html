@@ -12266,7 +12266,7 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
 // ==== 34_boss_fall.js ====
 // DOOR XV: ANZU, the Storm Roc. The whole fight is a fall through the sky; what rises from below is the danger, the ground is the clock.
 (() => {
-  const R = 17, GOLD = 0xffb648, STORM = 0x9fc8ff, LIFT = 5, RISE = 42;
+  const R = 17, GOLD = 0xffb648, STORM = 0x9fc8ff, SAFE = 0x5cff8c, LIFT = 5, RISE = 42;
   const _a = new V3(), _b = new V3(), _m = new THREE.Object3D(), _c = new THREE.Color(), _x = new V3(), _y = new V3(), _z = new V3(), _w = new V3(), _M = new THREE.Matrix4();
   const HOLE_D = [5.5, 9.5, 12.5];
   const holeAt = (d, a) => [-d * Math.sin(a), -d * Math.cos(a)];
@@ -12539,7 +12539,7 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
   function sendSlab(b, i, a0, T, w = 0) {
     const S = b.state, sl = S.slabs[i]; sl.on = true; sl.fire = G.now + T; sl.a0 = a0; sl.w = w; sl.m.visible = true; sl.hit = false;
     const [x, z] = holeAt(sl.d, a0);
-    Hz.circle(x, z, 3.2, T, 450, { name: 'Skyfall', color: GOLD, invert: true, blockable: false, lock: 0.02, tag: 'fight', quiet: i > 0 && false,
+    Hz.circle(x, z, 3.2, T, 450, { name: 'Skyfall', color: SAFE, invert: true, blockable: false, lock: 0.02, tag: 'fight', quiet: i > 0 && false,
       track(s) { const q = holeAt(sl.d, sl.a0 + sl.w * Math.min(0, G.now - sl.fire)); s.x = q[0]; s.z = q[1]; }, onFire() { Sound.sfx('boom', 1, 0.5); FX.shake(0.9); } });
     Sound.sfx('charge', 0.6, 0.5);
   }
