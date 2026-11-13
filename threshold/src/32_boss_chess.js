@@ -1,10 +1,10 @@
 // DOOR XIII: ZUGZWANG, the Last Grandmaster. A chessboard on a giant's study table. The pieces play by the rules.
 (() => {
+  // <board> pure board logic, no THREE or game globals (tools/chessfuzz.js loads this block on its own)
   const C = 4.5, HALF = 18, EMBER = 0xff5a28, IVORY = 0xfff0d0, GOLD = 0xffc850;
   const cx = (i) => (i - 3.5) * C, ci = (x) => Math.floor((x + HALF) / C);
   const inB = (i, j) => i >= 0 && i < 8 && j >= 0 && j < 8;
   const cellOf = (x, z) => { const i = ci(x), j = ci(z); return inB(i, j) ? { i, j } : null; };
-  const _a = new V3(), _b = new V3(), _m = new THREE.Object3D(), _c = new THREE.Color();
   const ROOK = [[1, 0], [-1, 0], [0, 1], [0, -1]], DIAG = [[1, 1], [1, -1], [-1, 1], [-1, -1]], ALL = ROOK.concat(DIAG);
   const JUMP = [[1, 2], [2, 1], [-1, 2], [-2, 1], [1, -2], [2, -1], [-1, -2], [-2, -1]];
   const HEIGHT = { P: 3.2, R: 3.6, N: 4.2, B: 4.8, Q: 5.5 };
@@ -20,6 +20,64 @@
     else if (type === 'K') { for (const [dx, dz] of ALL) if (inB(i + dx, j + dz)) out.push((j + dz) * 8 + i + dx); }
     return out;
   }
+  // good-cell count wanted per act, and the walking budget to the nearest good cell
+  const GOOD = [[3, 8], [2, 5], [1, 3]], LOCK = 0.6;
+  const reachOf = (T) => Math.max(C * 1.2, (T - LOCK - 1.5) * 7 * 0.8);
+  // A final position: which cells the pieces strike, and from which free cells the player's piece `you` attacks the King.
+  function evalBoard(all, k, you) {
+    const grid = new Uint8Array(64); grid[k.j * 8 + k.i] = 1; for (const r of all) grid[r.j * 8 + r.i] = 1;
+    const occ = (i, j) => grid[j * 8 + i] === 1, kc = k.j * 8 + k.i, struck = new Uint8Array(64), check = new Uint8Array(64);
+    for (const r of all) { struck[r.j * 8 + r.i] = 1; for (const c of attacks(r.type, r.i, r.j, occ)) struck[c] = 1; }
+    struck[kc] = 1;
+    const safe = [], good = []; let decoySafe = 0, decoyCheck = 0;
+    for (let c = 0; c < 64; c++) {
+      if (grid[c]) continue; const ch = attacks(you, c % 8, c >> 3, occ).includes(kc); if (ch) check[c] = 1;
+      if (!struck[c]) { safe.push(c); if (ch) good.push(c); else decoySafe++; } else if (ch) decoyCheck++;
+    }
+    return { struck, check, safe, good, decoySafe, decoyCheck };
+  }
+  // Plan one Gambit. ctx: { pieces: [{type,i,j,ref,mover}], k, pc, px, pz, rnd }. o: { types, fixed, pawns, T, lvl, you | youSeq, range }.
+  // Returns where movers go, what drops where, the player's piece and the evaluation, or null. Relaxes in the agreed order:
+  // decoy rules, then one fewer piece, then any good count. A reachable good cell is never relaxed.
+  function genPlan(ctx, o) {
+    const { k, pc, rnd } = ctx, ri = (a, b) => a + Math.floor(rnd() * (b - a + 1)), reach = reachOf(o.T);
+    const youList = o.you ? [o.you] : [...new Set(o.youSeq.concat(['R', 'B', 'N', 'Q']))];
+    let types = (o.types || []).slice(), range = o.range || GOOD[o.lvl], relax = 0;
+    const tries = o.fixed && !ctx.pieces.some((r) => r.mover) && !types.length ? 1 : 150;
+    for (let attempt = 0; attempt < tries; attempt++) {
+      if (attempt === 50) relax = 1; if (attempt === 90) { relax = 2; types = types.slice(0, -1); } if (attempt === 105) types = []; if (attempt === 120) relax = 3;
+      const pos = ctx.pieces.map((r) => ({ ref: r.ref, type: r.type, i: r.i, j: r.j, mover: r.mover })), moves = [], drops = [];
+      const taken = (i, j) => (i === k.i && j === k.j) || pos.some((r) => r.i === i && r.j === j) || drops.some((r) => r.i === i && r.j === j);
+      for (const r of pos) {
+        if (r.type === 'P') { if (o.pawns && r.j < 7 && !taken(r.i, r.j + 1)) { moves.push({ ref: r.ref, i: r.i, j: r.j + 1 }); r.j++; } continue; }
+        if (!r.mover) continue;
+        const opts = attacks(r.type, r.i, r.j, taken).map((c) => ({ i: c % 8, j: c >> 3 })).filter((c) => !taken(c.i, c.j) && !(c.i === pc.i && c.j === pc.j));
+        if (opts.length) { const d = opts[ri(0, opts.length - 1)]; moves.push({ ref: r.ref, i: d.i, j: d.j }); r.i = d.i; r.j = d.j; }
+      }
+      let ok = true;
+      for (const d of (o.fixed || [])) { if (!inB(d.i, d.j) || taken(d.i, d.j) || (d.i === pc.i && d.j === pc.j)) { ok = false; break; } drops.push({ type: d.type, i: d.i, j: d.j }); }
+      if (!ok) return null;
+      for (const type of types) {
+        let placed = false;
+        for (let t = 0; t < 30 && !placed; t++) { const i = ri(0, 7), j = type === 'P' ? ri(2, 4) : ri(0, 7); if (taken(i, j) || (i === pc.i && j === pc.j)) continue; drops.push({ type, i, j }); placed = true; }
+        if (!placed) ok = false;
+      }
+      if (!ok) continue;
+      const all = pos.map((r) => ({ type: r.type, i: r.i, j: r.j })).concat(drops);
+      for (const you of youList) {
+        const ev = evalBoard(all, k, you); let near = 1e9;
+        for (const c of ev.good) near = Math.min(near, Math.hypot(cx(c % 8) - ctx.px, cx(c >> 3) - ctx.pz));
+        if (near > reach) continue;
+        if (relax < 3 && (ev.good.length < range[0] || ev.good.length > range[1])) continue;
+        if (relax < 1 && (!ev.decoySafe || !ev.decoyCheck)) continue;
+        if (attempt < 30 && tries > 1 && ev.check[pc.j * 8 + pc.i] && !ev.struck[pc.j * 8 + pc.i]) continue; // no free answer where you already stand
+        return Object.assign(ev, { moves, drops, you, relax, attempt });
+      }
+    }
+    return null;
+  }
+  // </board>
+  const _a = new V3(), _b = new V3(), _m = new THREE.Object3D(), _c = new THREE.Color();
 
   // ---------- shader helpers ----------
   const NZ = `float h31(vec3 p){ p=fract(p*0.3183099+0.1); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
@@ -309,12 +367,11 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
     S.depthM = new THREE.MeshBasicMaterial({ colorWrite: false, transparent: true, depthWrite: true });
     S.pool = {}; for (const [t, n] of [['P', 5], ['R', 5], ['B', 5], ['N', 5], ['Q', 3]]) S.pool[t] = Array.from({ length: n }, () => { const mat = pieceMat(), gm = goldMat(), m = pieceMesh(t, mat, S.glowM, gm); m.visible = false; g.add(m); return { m, mat, gm, dm: prepass(m, [mat, gm], S.depthM), used: false }; });
     S.pieces = []; S.ver = 0;
-    // squares the strike will hit / you attack: crisp move-hint dots with a dark rim so they read on ivory and ebony alike
-    const dg = new THREE.PlaneGeometry(2, 2); dg.rotateX(-PI / 2);
-    S.dotI = new THREE.InstancedMesh(dg, new THREE.ShaderMaterial({ uniforms: { uT: S.T }, transparent: true, depthWrite: false,
-      vertexShader: 'varying vec2 vP; varying vec3 vC; void main(){ vP=position.xz; vC=vec3(1.0);\n#ifdef USE_INSTANCING_COLOR\nvC=instanceColor;\n#endif\nvec4 p=vec4(position,1.0);\n#ifdef USE_INSTANCING\np=instanceMatrix*p;\n#endif\ngl_Position=projectionMatrix*modelViewMatrix*p; }',
-      fragmentShader: 'uniform float uT; varying vec2 vP; varying vec3 vC; void main(){ float d=length(vP); float stud=1.0-smoothstep(0.52,0.58,d); float ring=(1.0-smoothstep(0.68,0.74,d))*(1.0-stud); float glow=(1.0-smoothstep(0.7,1.0,d))*(1.0-stud)*(1.0-ring); float a=stud+ring*0.9+glow*0.35; if(a<0.01) discard; float k=max(vC.r,0.0); float bev=clamp(0.75+0.5*dot(vP,vec2(-0.6,0.6)),0.0,1.3)*(1.0-0.35*smoothstep(0.3,0.55,d)); vec3 gold=vec3(1.0,0.74,0.32)*k*2.2*bev*(0.94+0.06*sin(uT*3.0)); vec3 col=gold*stud+vec3(0.06,0.035,0.02)*ring+vec3(1.0,0.7,0.3)*k*glow*1.4; gl_FragColor=vec4(col,a); }' }), 64);
-    S.dotI.frustumCulled = false; S.dotI.count = 0; S.dotI.renderOrder = 8; S.dotI.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(64 * 3), 3); g.add(S.dotI);
+    // pawn trails along the file ahead of each pawn (drawn even when empty so the shader compiles at load)
+    S.trailN = 5; const tg = new THREE.PlaneGeometry(0.55, 1); tg.rotateX(-PI / 2);
+    S.trail = new THREE.InstancedMesh(tg, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }), S.trailN);
+    S.trail.frustumCulled = false; S.trail.renderOrder = 8; S.trail.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(S.trailN * 3), 3);
+    _m.position.set(0, 0.06, 0); _m.scale.setScalar(0.0001); _m.updateMatrix(); for (let n = 0; n < S.trailN; n++) S.trail.setMatrixAt(n, _m.matrix); g.add(S.trail);
     // annotation arrows for pieces that move before they strike
     S.arrowM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffa030).multiplyScalar(1.4), transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide });
     S.arrows = Array.from({ length: 6 }, () => { const a = new THREE.Group(), sh = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 1), S.arrowM), hd = new THREE.Mesh(new THREE.CircleGeometry(1.3, 3), S.arrowM); sh.rotation.x = -PI / 2; hd.rotation.x = -PI / 2; hd.rotation.z = -PI / 2; a.add(sh); a.add(hd); a.sh = sh; a.hd = hd; a.visible = false; a.renderOrder = 9; g.add(a); return a; });
@@ -343,7 +400,7 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
     S.gemHaloM = new THREE.SpriteMaterial({ map: glowT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.3 }); for (let k = 0; k < 8; k++) { const a = k / 8 * TAU, s = new THREE.Sprite(S.gemHaloM); s.position.set(Math.sin(a) * 1.38, 6.62, Math.cos(a) * 1.38); s.scale.setScalar(1.1); S.rig.add(s); }
     S.light = new THREE.PointLight(EMBER, 3, 12, 1.6); S.light.position.set(0, 5, 0); b.group.add(S.light);
     S.cur = null; look(b, 0, true);
-    Object.assign(S, { lvl: 0, you: null, pending: null, inGambit: false, gcount: 0, checkT: 0, checkCd: 0, checkHold: 0, dotKey: '', hop: 0, safeHint: null, age: 0 });
+    Object.assign(S, { lvl: 0, you: null, pending: null, inGambit: false, gcount: 0, checkUntil: 0, hop: 0, safeHint: null, age: 0, glyphPulse: 0, log: [] });
     return {
       edge: 'wall', spawn: { x: cx(4), z: cx(7) }, bossStart: { x: cx(3), z: cx(1), face: 0 }, camDist: 17,
       contains: (x, z) => Math.abs(x) <= HALF - 0.4 && Math.abs(z) <= HALF - 0.4,
@@ -364,42 +421,31 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
     slot.m.visible = true; slot.m.scale.setScalar(1); slot.m.position.set(q.x, q.dropT > 0 ? 40 : 0, q.z); slot.m.rotation.y = 0;
     S.pieces.push(q); S.ver++; return q;
   }
-  function retire(b, q) { if (q.gone) return; q.gone = true; q.outT = 0.45; b.state.ver++; if (q.ent && q.ent.alive) { q.ent.onDeath = null; q.ent.alive = false; q.ent.removeT = 0.01; } }
+  function retire(b, q) { if (q.gone) return; q.gone = true; q.outT = 0.45; b.state.ver++; }
   const live = (S) => S.pieces.filter((q) => !q.gone);
-  function spawnPawnEnt(b, q) {
-    q.ent = b.spawnAdd({ name: 'Pawn', hp: 900, x: q.x, z: q.z, radius: 1.2, aimY: 1.7, color: EMBER, onDeath() { retire(b, q); } });
-  }
-
-  // Plan one Gambit: where movers go, where new pieces land, and which squares the strike hits.
-  function plan(b, o) {
-    const S = b.state, p = G.player, pc = cellOf(p.pos.x, p.pos.z) || { i: 4, j: 7 }, k = kingCell(b), reach = Math.max(8, (o.T - 1.5) * 7);
-    const base = live(S);
-    for (let attempt = 0; attempt < 80; attempt++) {
-      const pos = base.map((q) => ({ q, type: q.type, i: q.i, j: q.j })), moves = [], drops = [];
-      const taken = (i, j) => (i === k.i && j === k.j) || pos.some((r) => r.i === i && r.j === j) || drops.some((r) => r.i === i && r.j === j);
-      for (const r of pos) {
-        if (r.type === 'P') { if (o.pawns && r.j < 7 && !taken(r.i, r.j + 1) && !(pc.i === r.i && pc.j === r.j + 1)) { moves.push({ q: r.q, i: r.i, j: r.j + 1 }); r.j++; } continue; }
-        if (!o.movers || !o.movers.includes(r.q)) continue;
-        const opts = attacks(r.type, r.i, r.j, taken).map((c) => ({ i: c % 8, j: c >> 3 })).filter((c) => !taken(c.i, c.j) && !(c.i === pc.i && c.j === pc.j));
-        if (opts.length) { const d = pick(opts); moves.push({ q: r.q, i: d.i, j: d.j }); r.i = d.i; r.j = d.j; }
-      }
-      let ok = true;
-      for (const d of (o.fixed || [])) drops.push({ type: d.type, i: d.i, j: d.j });
-      for (const type of (o.types || [])) {
-        let placed = false;
-        for (let t = 0; t < 30 && !placed; t++) { const i = rndi(0, 7), j = type === 'P' ? rndi(0, 3) : rndi(0, 7); if (taken(i, j) || (i === pc.i && j === pc.j)) continue; drops.push({ type, i, j }); placed = true; }
-        if (!placed) ok = false;
-      }
-      if (!ok) continue;
-      const all = pos.map((r) => ({ type: r.type, i: r.i, j: r.j })).concat(drops), struck = new Uint8Array(64);
-      const occ = (i, j) => (i === k.i && j === k.j) || all.some((r) => r.i === i && r.j === j);
-      for (const r of all) { struck[r.j * 8 + r.i] = 1; for (const c of attacks(r.type, r.i, r.j, occ)) struck[c] = 1; }
-      const safe = []; let near = 1e9;
-      for (let c = 0; c < 64; c++) if (!struck[c] && !occ(c % 8, c >> 3)) { safe.push(c); const d = Math.hypot(cx(c % 8) - p.pos.x, cx(c >> 3) - p.pos.z); if (d < near) near = d; }
-      if (o.fixed || (safe.length >= 2 && safe.length <= (o.maxSafe || 40) && near <= reach)) return { moves, drops, struck, safe };
-      if (attempt === 60 && o.types && o.types.length > 1) o = Object.assign({}, o, { types: o.types.slice(0, -1), maxSafe: 64 });
+  // Plan a Gambit on the live board. If nothing passes even relaxed, retire the oldest piece that is not a Queen and try again.
+  function plan(b, o, anyQ) {
+    const S = b.state, p = G.player, pc = cellOf(p.pos.x, p.pos.z) || { i: 4, j: 7 }, k = kingCell(b);
+    for (let n = 0; n < 7; n++) {
+      const L = live(S), ctx = { pieces: L.map((q) => ({ ref: q, type: q.type, i: q.i, j: q.j, mover: !!(o.movers && o.movers.includes(q)) })), k, pc, px: p.pos.x, pz: p.pos.z, rnd: G.rng };
+      const r = genPlan(ctx, o); if (r) return r;
+      if (o.fixed) return null;
+      // last resort only (the King far from the hero behind a wall of Queens): a Queen leaves too
+      const old = L.filter((q) => q.type !== 'Q').sort((x, y) => x.born - y.born)[0] || (anyQ && L.sort((x, y) => x.born - y.born)[0]); if (!old) break; retire(b, old);
     }
     return null;
+  }
+  // scripted teaching boards, as offsets from the King (+z is toward the hero's side); mirrored and flipped at random
+  const OPEN1 = [
+    { you: 'R', fixed: [['R', 2, 3]] },                 // lines: line up with the King
+    { you: 'R', fixed: [['R', 3, 3], ['B', 3, 1]] },    // a piece blocks another's line
+    { you: 'B', fixed: [['R', 1, 1], ['N', -2, 3]] },   // your own diagonal can be blocked
+    { you: 'R', types: ['N', 'R'] },                    // a knight, and safe is not enough
+  ];
+  function scripted(b, base, d) {
+    const k = kingCell(b), vs = [[1, 1], [-1, 1], [1, -1], [-1, -1]].sort(() => G.rng() - 0.5);
+    if (d.fixed) for (const [sx, sz] of vs) { const o = Object.assign({}, base, { you: d.you, range: [1, 14], fixed: d.fixed.map(([type, dx, dz]) => ({ type, i: k.i + dx * sx, j: k.j + dz * sz })) }); const r = plan(b, o); if (r) return [o, r]; }
+    const o = Object.assign({}, base, { you: d.you, types: d.types || d.fixed.map((f) => f[0]) }); return [o, plan(b, o)];
   }
   let TEL = null;
   const sqHz = (i, j, delay, dmg, o) => (TEL && (TEL[j * 8 + i] = Math.max(TEL[j * 8 + i], G.now + delay)), Hz.rect(cx(i), cx(j) - C / 2 + 0.1, 0, C - 0.2, C - 0.2, delay, dmg, Object.assign({ quiet: true, silent: true }, o)));
@@ -422,42 +468,78 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
   function showArrows(S, moves) {
     S.arrows.forEach((a) => { a.visible = false; });
     moves.forEach((mv, n) => {
-      const a = S.arrows[n]; if (!a) return; const x0 = mv.q.x, z0 = mv.q.z, x1 = cx(mv.i), z1 = cx(mv.j), len = Math.hypot(x1 - x0, z1 - z0); if (len < 0.1) return;
+      const a = S.arrows[n]; if (!a) return; const x0 = mv.ref.x, z0 = mv.ref.z, x1 = cx(mv.i), z1 = cx(mv.j), len = Math.hypot(x1 - x0, z1 - z0); if (len < 0.1) return;
       a.visible = true; a.position.set(x0, 0.16, z0); a.rotation.y = Math.atan2(x1 - x0, z1 - z0);
       a.sh.scale.set(1, len - 1.2, 1); a.sh.position.set(0, 0, (len - 1.2) / 2); a.hd.position.set(0, 0, len - 1.0);
     });
   }
-  const YOU = [['R', 'R', 'R', 'B', 'B', 'R', 'B', 'B'], ['N', 'N', 'B', 'B'], ['Q']];
-  function setYou(b, t) { const S = b.state; if (S.you === t) return; S.you = t; S.dotKey = ''; for (const k in S.glyph) S.glyph[k].visible = k === t; Sound.sfx('ui', 0.8); if (!G.headless && G.player) FX.ring(G.player.pos.x, G.player.pos.z, { r0: 0.3, r1: 2.5, color: IVORY, dur: 0.4 }); }
+  // the player's piece, preferred order per act (the plan falls back to the others when a board needs it)
+  const YOU = [['R', 'B', 'R', 'B', 'N', 'R', 'B', 'N'], ['N', 'B', 'R', 'Q', 'B', 'N'], ['Q', 'N', 'R', 'B']];
+  function setYou(b, t) {
+    const S = b.state; S.you = t; for (const k in S.glyph) S.glyph[k].visible = k === t; S.glyphPulse = 1;
+    Sound.sfx('glint', 0.8, t === 'Q' ? 0.8 : t === 'N' ? 1.2 : 1); Sound.sfx('tick', 0.8, 0.7);
+    if (!G.headless && G.player) { FX.ring(G.player.pos.x, G.player.pos.z, { r0: 0.3, r1: 3.2, color: IVORY, dur: 0.5 }); FX.burst(G.player.pos.x, G.player.pos.y + 2.6, G.player.pos.z, { n: 18, color: IVORY, color2: GOLD, speed: [1, 4], life: [0.3, 0.7], size: [0.1, 0.3] }); }
+  }
+  // lock-in: the hero cannot leave the cell (no walking, jumping, dashes, Blink, Lunge, Overhead leap or roll); casting and attacking go on
+  function lockIn(b) {
+    const p = G.player; p.rooted = Math.max(p.rooted, LOCK + 0.05); p.lockT = LOCK + 0.05; p.dash = null; p.kb = null;
+    Sound.sfx('tick', 1.4, 0.45); Sound.sfx('boom', 0.5, 1.6); FX.shake(0.15);
+    if (!G.headless) { FX.ring(p.pos.x, p.pos.z, { r0: 3.4, r1: 0.9, color: IVORY, dur: 0.28, width: 0.2 }); FX.ring(p.pos.x, p.pos.z, { r0: 0.9, r1: 1.0, color: IVORY, dur: LOCK, width: 0.1, mult: 1.4 }); }
+    return cellOf(p.pos.x, p.pos.z);
+  }
+  // the outcome on the hero's locked cell: struck by a piece, safe without check (the King refutes it), or safe and giving check
+  function resolve(b, cell) {
+    const S = b.state, p = G.player; if (!p || !p.alive || !cell) return 'none';
+    const ev = evalBoard(live(S).map((q) => ({ type: q.type, i: q.i, j: q.j })), kingCell(b), S.you), c = cell.j * 8 + cell.i;
+    if (ev.struck[c]) { p.hurt(380, { blockable: true, src: { name: 'Gambit' } }); return 'struck'; }
+    if (!ev.check[c]) {
+      Sound.sfx('laser', 1, 0.55); Sound.sfx('boom', 0.8, 0.8); FX.shake(0.5);
+      if (!G.headless) { FX.beam(new V3(b.pos.x, 5.6, b.pos.z), new V3(p.pos.x, 1.2, p.pos.z), { color: EMBER, width: 0.9, dur: 0.55, mult: 4 }); FX.beam(new V3(b.pos.x, 5.6, b.pos.z), new V3(p.pos.x, 1.2, p.pos.z), { color: 0xfff0d0, width: 0.25, dur: 0.35, mult: 3 }); FX.burst(p.pos.x, 1.2, p.pos.z, { n: 30, color: EMBER, color2: 0xffe0b0, speed: [2, 9], life: [0.3, 0.8] }); }
+      p.hurt(S.refute || 350, { blockable: false, src: { name: 'Refutation' } }); S.hop = 0.5; return 'refuted';
+    }
+    S.checkUntil = G.now + 10; b.stagger = 1.5; S.hop = 0.6; Sound.sfx('bell', 1, 1.3); Sound.sfx('crit', 0.7);
+    if (!G.headless) { FX.ring(b.pos.x, b.pos.z, { r0: 0.5, r1: 7, color: GOLD, dur: 0.6 }); FX.num(b.aim(_a), 'CHECK', 'note'); FX.beam(new V3(p.pos.x, 1.2, p.pos.z), new V3(b.pos.x, 3, b.pos.z), { color: GOLD, width: 0.3, dur: 0.9, mult: 3 }); }
+    return 'check';
+  }
 
-  // The Gambit. o: {types, T, teach, pawns, movers, fixed, keep, name}
+  // The Gambit. o: {types, T, pawns, movers, fixed, keep, name, you, script}. Returns 'check', 'struck', 'refuted' or 'none'.
   function* gambit(b, o) {
-    const S = b.state; S.inGambit = true;
-    if (!o.fixed) { const seq = YOU[S.lvl]; setYou(b, seq[S.gcount % seq.length]); S.gcount++; }
-    const pl = plan(b, o); if (!pl) { S.inGambit = false; yield 0.5; return; }
-    showArrows(S, pl.moves);
+    const S = b.state; S.inGambit = true; S.checkUntil = 0;
+    const seq = YOU[S.lvl], base = Object.assign({ lvl: S.lvl, youSeq: seq.slice(S.gcount % seq.length).concat(seq.slice(0, S.gcount % seq.length)) }, o);
+    let pl = null, po = base;
+    if (o.script) [po, pl] = scripted(b, base, o.script);
+    else { pl = plan(b, base); if (!pl && o.fixed) { po = Object.assign({}, base, { fixed: null, types: o.fixed.map((f) => f.type) }); pl = plan(b, po); } }
+    if (!pl) { yield* march(b, 2); pl = plan(b, po, true); } // too far from the hero for any check square: the King advances first
+    if (!pl) { S.inGambit = false; yield 0.5; return 'none'; }
+    S.gcount++; setYou(b, pl.you); S.lastPlan = pl;
+    showArrows(S, pl.moves.filter((mv) => mv.ref.type !== 'P'));
     for (const d of pl.drops) {
-      const q = place(b, d.type, d.i, d.j, { dropT: 1.1, keep: !!o.keep || d.type === 'P' || (d.type === 'Q' && !o.fixed) }); if (!q) continue; d.q = q;
+      const q = place(b, d.type, d.i, d.j, { dropT: 1.1, keep: !!o.keep || d.type === 'P' }); if (!q) continue; d.q = q;
       sqHz(d.i, d.j, 1.1, 300, { name: 'Crushed', onFire() { Sound.sfx('boom', 0.7, 0.7); FX.shake(0.35); if (!G.headless) FX.burst(q.x, 0.2, q.z, { n: 16, color: 0xb09070, speed: [2, 7], life: [0.3, 0.8], size: [0.2, 0.6], radius: 1.4 }); } });
     }
     S.raise = 1;
-    let r = yield* b.cast({ name: o.name || 'Gambit', time: 1.1 }); if (r === 'dead') return;
-    for (const d of pl.drops) if (d.q && d.type === 'P' && !d.q.gone) spawnPawnEnt(b, d.q);
-    const T = o.T; S.pending = { struck: pl.struck, at: G.now + T }; S.safeHint = pl.safe;
-    const cells = []; for (let c = 0; c < 64; c++) if (pl.struck[c]) cells.push(c);
-    if (o.teach) for (const c of cells) sqHz(c % 8, c >> 3, T, 380, { name: 'Gambit' });
-    let moved = !pl.moves.length, flashed = !!o.teach;
+    let r = yield* b.cast({ name: o.name || 'Gambit', time: 1.1 }); if (r === 'dead') return 'none';
+    const T = o.T; S.pending = { struck: pl.struck, at: G.now + T };
+    const noCheck = pl.safe.filter((c) => !pl.check[c]); S.safeHint = (G.chessBot === 'nocheck' || (G.chessBot === 'mix' && vrand() < 0.25)) && noCheck.length ? noCheck : pl.good; // test-only bot modes (tools/chesssim.js)
+    let moved = !pl.moves.length, cell = null;
     r = yield* b.cast({ name: o.name || 'Gambit', time: T, onTick(k, cs) {
-      if (!moved && cs.t >= T - 1.25) { moved = true; S.arrows.forEach((a) => { a.visible = false; }); for (const mv of pl.moves) { if (mv.q.gone) continue; mv.q.mv = { x0: mv.q.x, z0: mv.q.z, x1: cx(mv.i), z1: cx(mv.j), t: 0 }; mv.q.i = mv.i; mv.q.j = mv.j; } S.ver++; Sound.sfx('dash', 0.5, 0.7); }
-      if (!flashed && cs.t >= T - 0.45) { flashed = true; for (const c of cells) sqHz(c % 8, c >> 3, 0.45, 380, { name: 'Gambit' }); Sound.sfx('warn', 0.5); }
+      if (!moved && cs.t >= T - 1.25) { moved = true; S.arrows.forEach((a) => { a.visible = false; }); for (const mv of pl.moves) { const q = mv.ref; if (q.gone) continue; q.mv = { x0: q.x, z0: q.z, x1: cx(mv.i), z1: cx(mv.j), t: 0 }; q.i = mv.i; q.j = mv.j; } S.ver++; Sound.sfx('dash', 0.5, 0.7); }
+      if (!cell && cs.t >= T - LOCK) cell = lockIn(b);
     } });
-    S.raise = 0; S.pending = null; S.safeHint = null; if (r === 'dead') return;
+    S.raise = 0; S.pending = null; S.safeHint = null; if (r === 'dead') return 'none';
+    for (const q of live(S)) if (q.mv) { q.x = q.mv.x1; q.z = q.mv.z1; q.mv = null; }
+    if (!cell) cell = cellOf(G.player.pos.x, G.player.pos.z);
     strikeFX(b);
-    // promotion: a pawn on the last rank becomes a queen
-    for (const q of live(S)) if (q.type === 'P' && q.j >= 7 && live(S).filter((x) => x.type === 'Q').length < 2) { const i = q.i, j = q.j; retire(b, q); const nq = place(b, 'Q', i, j, { keep: true }); if (nq) { Sound.sfx('bell', 0.9, 0.5); FX.pillar(nq.x, nq.z, { r: 1.6, h: 16, color: EMBER, dur: 0.8 }); } }
+    const res = resolve(b, cell); S.log && S.log.push(res);
+    // promotion: a pawn on the last rank becomes a Queen that stays to the end (three at most, so pawns stop dropping at the cap)
+    for (const q of live(S)) {
+      if (q.type !== 'P') continue;
+      if (q.j >= 7 && live(S).filter((x) => x.type === 'Q').length < 3) { const i = q.i, j = q.j; retire(b, q); const nq = place(b, 'Q', i, j, { keep: true }); if (nq) { Sound.sfx('bell', 0.9, 0.5); FX.pillar(nq.x, nq.z, { r: 1.6, h: 16, color: EMBER, dur: 0.8 }); } }
+      else if (q.j === 6 && !q.warned) { q.warned = true; Sound.sfx('bell', 0.7, 0.75); if (!G.headless) FX.ring(q.x, q.z, { r0: 0.5, r1: 3.5, color: EMBER, dur: 0.6 }); }
+    }
     yield 0.5;
     for (const q of live(S)) if (!q.keep) retire(b, q);
-    S.inGambit = false; yield 0.6;
+    S.inGambit = false; yield 0.6; return res;
   }
   function* edict(b) {
     const S = b.state, k = kingCell(b), hs = [];
@@ -481,11 +563,12 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
   function* castle(b) {
     const S = b.state, p = G.player, k = kingCell(b), occ = occFn(b, live(S)); let best = null, bd = -1;
     for (let t = 0; t < 24; t++) { const i = rndi(0, 7), j = rndi(0, 7); if (occ(i, j)) continue; const d = Math.hypot(cx(i) - p.pos.x, cx(j) - p.pos.z); if (d > bd && d < 26) { bd = d; best = [i, j]; } }
-    if (!best) return;
-    const r = yield* b.cast({ name: 'Castle', time: 0.9 }); if (r !== 'done') { yield 0.5; return; }
+    if (!best) return 'none';
+    const r = yield* b.cast({ name: 'Castle', time: 0.9 }); if (r !== 'done') { yield 0.5; return 'none'; }
     if (!G.headless) { FX.pillar(b.pos.x, b.pos.z, { r: 1.8, h: 18, color: EMBER, dur: 0.5 }); FX.pillar(cx(best[0]), cx(best[1]), { r: 1.8, h: 18, color: EMBER, dur: 0.5 }); }
     Sound.sfx('blink', 0.9, 0.6); b.pos.x = cx(best[0]); b.pos.z = cx(best[1]); S.ver++;
-    yield* gambit(b, { fixed: [{ type: 'R', i: k.i, j: k.j }], T: 2.0, teach: true, name: 'Castle' });
+    // a rook takes the King's old square; then a normal Gambit around it
+    return yield* gambit(b, { fixed: [{ type: 'R', i: k.i, j: k.j }], types: [pick(MIX)], T: 6.0, pawns: true, name: 'Castle' });
   }
   function* stalemate(b) {
     const S = b.state; S.raise = 1;
@@ -510,11 +593,14 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
     for (const q of live(S)) { if (q.mv) { q.x = q.mv.x1; q.z = q.mv.z1; q.mv = null; } if (!q.keep) retire(b, q); }
     look(b, n, false);
   }
-  const P1 = [['R'], ['R', 'B'], ['R', 'N'], ['B', 'B', 'N'], ['R', 'B', 'P', 'P'], ['N', 'N', 'R']], MIX = ['R', 'B', 'N'];
+  const P1 = [null, null, null, null, ['R', 'N', 'B'], ['N', 'N', 'R'], ['R', 'B', 'B']], MIX = ['R', 'B', 'N'];
+  // a pawn joins every other Gambit from the Queen on, while pawns plus Queens stay under the cap of three
+  const pawnDue = (S, n) => n % 2 === 0 && live(S).filter((q) => q.type === 'P' || q.type === 'Q').length < 3;
+  const oneQueen = (S) => { const Q = live(S).filter((q) => q.type === 'Q'); return Q.length ? [pick(Q)] : []; };
 
   G.bosses.push({
     id: 'chess', name: 'ZUGZWANG', title: 'The Last Grandmaster', hint: 'Your move', color: '#ffd9a0', telegraph: 0xff5a28,
-    hp: 24000, radius: 1.7, aimY: 3.4, enrage: 440,
+    hp: 22000, radius: 1.7, aimY: 3.4, enrage: 440,
     post: { bloom: 0.5, threshold: 0.86, radius: 0.7, exposure: 1.05, vig: 1.28, sat: 1.05, contrast: 1.08, tint: [1.04, 1.0, 0.94] },
     music: { bpm: 112, root: 38, scale: [0, 2, 3, 5, 7, 8, 11], prog: [0, 0, 3, 4, 0, 5, 3, 4],
       layers: [
@@ -534,8 +620,9 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
       { at: 1, *run(b) {
         const S = b.state; setAct(b, 0); yield 1.0; let n = 0;
         while (true) {
-          const types = n < P1.length ? P1[n] : [pick(MIX), pick(MIX), pick(['N', 'P', 'B']), pick(['R', 'P'])];
-          yield* gambit(b, { types, T: n < 2 ? 5.5 : n < 5 ? 5.0 : 4.5, teach: n < 2 && !S.taughtAll }); n++; if (n >= 2) S.taughtAll = true;
+          const T = n < 3 ? 7.0 : 6.0;
+          const res = n < OPEN1.length ? yield* gambit(b, { T, script: OPEN1[n] }) : yield* gambit(b, { types: n < P1.length ? P1[n] : [pick(MIX), pick(MIX), pick(['N', 'B'])], T });
+          n++; if (res === 'check') yield 3;
           yield* edict(b); yield* march(b, 2);
           if (n % 2 === 0) yield* edict(b);
         }
@@ -544,19 +631,21 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
         *enter(b) {
           const S = b.state; setAct(b, 1); S.raise = 1;
           yield* b.cast({ name: 'The Queen', time: 1.4, onTick: (k) => FX.shake(k * 0.2) });
-          const p = G.player, pc = cellOf(p.pos.x, p.pos.z) || { i: 4, j: 7 }, k = kingCell(b); let qi = 3, qj = 3; for (let t = 0; t < 30; t++) { qi = rndi(1, 6); qj = rndi(1, 5); if (!(qi === pc.i && qj === pc.j) && !(qi === k.i && qj === k.j)) break; }
-          const q = place(b, 'Q', qi, qj, { dropT: 1.3, keep: true });
-          sqHz(qi, qj, 1.3, 300, { name: 'Crushed', tag: 'fight', onFire() { Sound.sfx('bigboom', 1, 0.6); FX.shake(0.9); FX.flash(EMBER, 0.25, 0.8); if (!G.headless && q) { FX.ring(q.x, q.z, { r0: 1, r1: 16, color: EMBER, dur: 0.7 }); FX.burst(q.x, 0.3, q.z, { n: 50, color: EMBER, color2: 0xffffff, speed: [3, 14], life: [0.4, 1.1], size: [0.2, 0.6] }); } } });
+          const p = G.player, pc = cellOf(p.pos.x, p.pos.z) || { i: 4, j: 7 }, k = kingCell(b); let qi = 3, qj = 3;
+          for (let t = 0; t < 30; t++) { qi = rndi(1, 6); qj = rndi(1, 5); if (!(qi === pc.i && qj === pc.j) && !(qi === k.i && qj === k.j) && !live(S).some((x) => x.i === qi && x.j === qj)) break; }
+          const q = live(S).filter((x) => x.type === 'Q').length < 3 ? place(b, 'Q', qi, qj, { dropT: 1.3, keep: true }) : null;
+          if (q) sqHz(qi, qj, 1.3, 300, { name: 'Crushed', tag: 'fight', onFire() { Sound.sfx('bigboom', 1, 0.6); FX.shake(0.9); FX.flash(EMBER, 0.25, 0.8); if (!G.headless) { FX.ring(q.x, q.z, { r0: 1, r1: 16, color: EMBER, dur: 0.7 }); FX.burst(q.x, 0.3, q.z, { n: 50, color: EMBER, color2: 0xffffff, speed: [3, 14], life: [0.4, 1.1], size: [0.2, 0.6] }); } } });
           Co.start(Post.lerpTo({ tint: [1.05, 0.99, 0.95], bloom: 0.54 }, 3), 'fight'); yield 2.0; S.raise = 0;
         },
         *run(b) {
           const S = b.state; setAct(b, 1); yield 0.6; let n = 0;
           while (true) {
-            const queens = live(S).filter((q) => q.type === 'Q'), pawns = live(S).filter((q) => q.type === 'P').length;
-            const types = [pick(MIX)]; if (n % 2 === 1) types.push(pick(MIX)); if (pawns < 2 && n % 2 === 0) types.push('P');
-            yield* gambit(b, { types, T: 5.0, pawns: true, movers: queens }); n++;
+            let res;
+            if (n === 0) res = yield* gambit(b, { types: [pick(MIX)], T: 6.0, pawns: true, movers: oneQueen(S), you: 'N' }); // the Queen moves first; you are a knight
+            else { const types = [pick(MIX)]; if (n % 2 === 1) types.push(pick(MIX)); if (pawnDue(S, n)) types.push('P'); res = yield* gambit(b, { types, T: 6.0, pawns: true, movers: oneQueen(S) }); }
+            n++; if (res === 'check') yield 3;
             yield* edict(b); yield* march(b, 2);
-            if (n % 3 === 0) yield* castle(b);
+            if (n % 3 === 0) { if ((yield* castle(b)) === 'check') yield 3; }
           }
         } },
       { at: 0.33, skipTo(b) { look(b, 2, true); },
@@ -564,15 +653,16 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
           const S = b.state; setAct(b, 2); S.raise = 1; Sound.sfx('roar', 0.8, 0.5);
           yield* b.cast({ name: 'Blitz', time: 2.2, onTick: (k) => FX.shake(k * 0.3) }); S.raise = 0;
           FX.flash(EMBER, 0.3, 1.0); Co.start(Post.lerpTo({ tint: [0.99, 0.99, 1.05], bloom: 0.58, contrast: 1.12 }, 3), 'fight');
-          yield* gambit(b, { types: ['R', 'N'], T: 4.2, keep: true, pawns: true, name: 'Blitz' });
+          if ((yield* gambit(b, { types: ['R', 'N'], T: 4.5, keep: true, pawns: true, name: 'Blitz', you: 'R' })) === 'check') yield 2;
         },
         *run(b) {
           const S = b.state; setAct(b, 2); yield 0.4; let n = 0;
           while (true) {
             let L = live(S).filter((q) => q.type !== 'P'); L.sort((x, y) => x.born - y.born);
             while (L.length > 5) { const old = L.find((q) => q.type !== 'Q') || L[0]; retire(b, old); L = L.filter((q) => q !== old); }
-            const mover = L.length ? [pick(L)] : [];
-            yield* gambit(b, { types: [pick(MIX)], T: 3.2, keep: true, pawns: true, movers: mover, maxSafe: 30 }); n++;
+            const mover = L.length ? [pick(L)] : [], types = [pick(MIX)]; if (pawnDue(S, n + 1)) types.push('P');
+            const res = yield* gambit(b, { types, T: 4.5, keep: true, pawns: true, movers: mover }); n++;
+            if (res === 'check') yield 2;
             if (n % 2 === 0) { yield* edict(b); yield* march(b, 2); }
             if (n % 4 === 3) yield* stalemate(b);
           }
@@ -588,7 +678,6 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
         if (q.mv) { q.mv.t += dt / 0.6; const k = smooth(q.mv.t); q.x = lerp(q.mv.x0, q.mv.x1, k); q.z = lerp(q.mv.z0, q.mv.z1, k); m.position.y = Math.sin(k * PI) * 0.6; if (q.mv.t >= 1) { q.x = q.mv.x1; q.z = q.mv.z1; q.mv = null; } }
         if (q.kick > 0) { q.kick -= dt * 3; m.scale.set(1 + Math.max(0, q.kick) * 0.12, 1 - Math.max(0, q.kick) * 0.1, 1 + Math.max(0, q.kick) * 0.12); }
         m.position.x = q.x; m.position.z = q.z;
-        if (q.ent) { q.ent.pos.x = q.x; q.ent.pos.z = q.z; }
         if (q.topple) { q.topple += dt; if (q.topple > 0) { m.rotation.z = -Math.min(PI / 2, q.topple * q.topple * 9); m.rotation.y = 0.4 * q.born; } }
         if (q.gone) { q.outT -= dt; const k = Math.max(0, q.outT / 0.45); m.scale.setScalar(Math.max(0.001, k)); m.position.y = -(1 - k) * 1.5; if (q.outT <= 0) { m.visible = false; m.rotation.set(0, 0, 0); q.slot.used = false; S.pieces.splice(n, 1); } }
       }
@@ -634,37 +723,27 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
       else { S.rig.position.y = Math.sin(S.hop * PI) * 1.1 + S.raiseK * 0.5 + Math.sin(t * 1.6) * 0.04; S.rig.rotation.y = -b.facing + Math.sin(t * 0.7) * 0.05; }
       const hot = 2.2 + S.raiseK * (2.5 + Math.sin(t * 14)) + S.lvl * 0.8; S.glowM.color.setHex(EMBER).multiplyScalar(hot); S.light.intensity = 2.5 + S.lvl * 2.5 + S.raiseK * 6;
       if (!p) return;
-      // you are a piece: dots on the squares you attack; put the King under one to give check
-      S.checkCd = Math.max(0, S.checkCd - dt); S.checkT = Math.max(0, S.checkT - dt);
-      const fighting = G.state === 'fight' && p.alive && !!S.you, pc = cellOf(p.pos.x, p.pos.z), k = kingCell(b);
-      let check = false;
-      if (fighting && pc) {
-        const key = S.you + pc.i + pc.j + ':' + S.ver + (S.checkCd > 0 ? 'c' : '');
-        if (key !== S.dotKey) {
-          S.dotKey = key; const cells = attacks(S.you, pc.i, pc.j, occFn(b, live(S))); S.dotCells = cells; S.dotCheck = cells.includes(k.j * 8 + k.i);
-          let n = 0; for (const c of cells) { const i = c % 8, j = c >> 3, isK = i === k.i && j === k.j; if (!isK && live(S).some((q) => q.i === i && q.j === j)) continue; if (isK) continue; _m.position.set(cx(i), 0.07, cx(j)); _m.rotation.set(0, 0, 0); _m.scale.setScalar(0.36); _m.updateMatrix(); S.dotI.setMatrixAt(n, _m.matrix); _c.setHex(IVORY).multiplyScalar(S.checkCd > 0 ? 0.22 : 0.5); S.dotI.setColorAt(n, _c); n++; }
-          S.dotI.count = n; S.dotI.instanceMatrix.needsUpdate = true; S.dotI.instanceColor.needsUpdate = true;
-        }
-        check = S.dotCheck;
-      } else if (S.dotI.count) { S.dotI.count = 0; S.dotKey = ''; }
-      if (check && S.checkCd <= 0 && !b.transitioning && !b.immune) {
-        S.checkHold += dt;
-        if (S.checkHold >= 0.5) {
-          S.checkHold = 0; S.checkT = 8; S.checkCd = 13; S.dotKey = ''; Sound.sfx('bell', 1, 1.3); Sound.sfx('crit', 0.7);
-          if (!G.headless) { FX.ring(b.pos.x, b.pos.z, { r0: 0.5, r1: 7, color: GOLD, dur: 0.6 }); FX.num(b.aim(_a), 'CHECK', 'note'); FX.beam(new V3(p.pos.x, 1.2, p.pos.z), new V3(b.pos.x, 3, b.pos.z), { color: GOLD, width: 0.3, dur: 0.5, mult: 3 }); }
-          if (b.castState && !S.inGambit && !b.castState.int) { b.castState.result = 'interrupted'; b.stagger = 1.2; S.hop = 0.6; }
-        }
-      } else S.checkHold = 0;
-      b.dmgTaken = S.checkT > 0 ? 1.2 : 0.8;
-      S.crown.visible = (S.checkT > 0 || (check && S.checkCd <= 0)) && !S.falling; if (S.crown.visible) { S.crown.position.set(b.pos.x, 0.09, b.pos.z); S.crown.rotation.z = t * 0.8; S.crown.material.opacity = S.checkT > 0 ? 0.55 + Math.sin(t * 6) * 0.25 : 0.35; S.crown.scale.setScalar(S.checkT > 0 ? 1 : 0.8 + S.checkHold * 0.4); }
-      const gl = S.glyph[S.you]; if (gl) { gl.visible = fighting; gl.position.set(p.pos.x, p.pos.y + 2.55 + Math.sin(t * 2.2) * 0.06, p.pos.z); gl.rotation.y = t * 0.9; S.glyphM.color.setHex(S.checkT > 0 ? GOLD : IVORY).multiplyScalar(S.checkT > 0 ? 1.8 : 1.2); }
+      // you are a piece: the glyph over the hero is the only clue. Check opens a damage window until the next Gambit begins.
+      const fighting = G.state === 'fight' && p.alive && !!S.you, win = G.now < (S.checkUntil || 0);
+      b.dmgTaken = win ? 1.4 : 0.75;
+      S.crown.visible = win && !S.falling; if (S.crown.visible) { S.crown.position.set(b.pos.x, 0.09, b.pos.z); S.crown.rotation.z = t * 0.8; S.crown.material.opacity = 0.55 + Math.sin(t * 6) * 0.25; }
+      S.glyphPulse = Math.max(0, (S.glyphPulse || 0) - dt * 1.6);
+      const gl = S.glyph[S.you]; if (gl) { const gp = S.glyphPulse; gl.visible = fighting; gl.position.set(p.pos.x, p.pos.y + 2.55 + Math.sin(t * 2.2) * 0.06 + gp * 0.3, p.pos.z); gl.rotation.y = t * 0.9 + gp * 6; gl.scale.setScalar(0.17 * (1 + Math.sin(gp * PI) * 0.9)); S.glyphM.color.setHex(win ? GOLD : IVORY).multiplyScalar((win ? 1.8 : 1.2) + gp * 2.5); }
+      // pawn trails: a faint ember line up the file ahead of each pawn, bright and pulsing when the next step promotes it
+      let tn = 0;
+      for (const q of S.pieces) {
+        if (q.type !== 'P' || q.gone || q.dropT > 0 || tn >= S.trailN) continue; const len = (7 - q.j) * C; if (len <= 0.1) continue;
+        _m.position.set(q.x, 0.06, q.z + C * 0.5 + len / 2); _m.rotation.set(0, 0, 0); _m.scale.set(1, 1, len); _m.updateMatrix(); S.trail.setMatrixAt(tn, _m.matrix);
+        const warn = q.j >= 6; _c.setHex(EMBER).multiplyScalar(warn ? 1.1 + 0.9 * Math.sin(t * 9) : 0.32); S.trail.setColorAt(tn, _c); tn++;
+      }
+      _m.scale.setScalar(0.0001); _m.updateMatrix(); for (let n = tn; n < S.trailN; n++) S.trail.setMatrixAt(n, _m.matrix);
+      S.trail.instanceMatrix.needsUpdate = true; if (S.trail.instanceColor) S.trail.instanceColor.needsUpdate = true;
     },
     danger(b, x, z) { const P = b.state.pending; if (!P) return Infinity; const c = cellOf(x, z); if (!c || !P.struck[c.j * 8 + c.i]) return Infinity; return Math.max(0, P.at - G.now); },
     bot(b, p) {
       const S = b.state, L = live(S), avoid = (x, z) => L.some((q) => Math.hypot(x - q.x, z - q.z) < 2.1);
       if (S.safeHint && S.safeHint.length) { let best = -1, bd = 1e9; for (const c of S.safeHint) { const d = Math.hypot(cx(c % 8) - p.pos.x, cx(c >> 3) - p.pos.z) + Math.hypot(cx(c % 8) - b.pos.x, cx(c >> 3) - b.pos.z) * 0.15; if (d < bd) { bd = d; best = c; } } return { x: cx(best % 8), z: cx(best >> 3), w: 3, avoid }; }
-      let target = b; for (const q of L) if (q.ent && q.ent.alive && q.j >= 4) target = q.ent;
-      return { avoid, target };
+      return { avoid, target: b };
     },
   });
 })();

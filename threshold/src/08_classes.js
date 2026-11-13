@@ -60,7 +60,7 @@ G.classes.push({
       } },
     { id: 'storm', name: 'Bladestorm', icon: 'storm', cd: 80, gcd: false, act: (p) => p.hasBuff('storm'), desc: '10 s of frenzy: faster attacks, extra Momentum.',
       fire(p) { p.addBuff('storm', 10, 'storm'); Sound.sfx('roar', 0.5, 2); FX.dome(p.pos.x, 1, p.pos.z, { r: 5, color: 0xb070ff }); FX.burst(p.pos.x, 1, p.pos.z, { n: 60, color: 0xb070ff, color2: 0xff5a9c, speed: [4, 12], life: [0.4, 1] }); } },
-    { id: 'lunge', name: 'Lunge', icon: 'lunge', cd: 9, charges: 2, gcd: false, desc: 'Dash to your target. With no target in reach, dash where you are moving.',
+    { id: 'lunge', name: 'Lunge', icon: 'lunge', moves: true, cd: 9, charges: 2, gcd: false, desc: 'Dash to your target. With no target in reach, dash where you are moving.',
       fire(p, t) {
         let dir, dist; const far = t && t.alive && t.distTo(p.pos.x, p.pos.z) > 2.2 && t.distTo(p.pos.x, p.pos.z) < 28 && !p.moving;
         const toT = t && t.alive && t.distTo(p.pos.x, p.pos.z) > 2.2 && t.distTo(p.pos.x, p.pos.z) < 28 && (!p.moving || Math.abs(angDiff(Math.atan2(p.intentX, p.intentZ), angTo(p.pos.x, p.pos.z, t.pos.x, t.pos.z))) < 0.9);
@@ -125,7 +125,7 @@ G.classes.push({
       } },
     { id: 'tempest', name: 'Tempest', icon: 'tempest', cd: 80, gcd: false, act: (p) => p.hasBuff('tempest'), desc: '10 s of storm: Bolt casts in half the time and while moving.',
       fire(p) { p.addBuff('tempest', 10, 'tempest'); Sound.sfx('thunder', 0.6); FX.pillar(p.pos.x, p.pos.z, { r: 0.9, h: 26, color: 0x70d0ff, dur: 0.7 }); FX.burst(p.pos.x, 1, p.pos.z, { n: 60, color: 0x9fe6ff, color2: 0xfff0a0, speed: [4, 12], life: [0.4, 1] }); } },
-    { id: 'blink', name: 'Blink', icon: 'blink', cd: 11, charges: 2, gcd: false, desc: 'Teleport where you are moving. Your next Bolt is instant.',
+    { id: 'blink', name: 'Blink', icon: 'blink', moves: true, cd: 11, charges: 2, gcd: false, desc: 'Teleport where you are moving. Your next Bolt is instant.',
       fire(p) {
         const dir = p.moving ? Math.atan2(p.intentX, p.intentZ) : p.facing, A = G.arena; let d = 11;
         FX.burst(p.pos.x, 1, p.pos.z, { n: 30, color: 0x9fe6ff, speed: [1, 5], life: [0.3, 0.7] }); const ox = p.pos.x, oz = p.pos.z;
@@ -189,7 +189,7 @@ G.classes.push({
         FX.slash(p.pos.x + fx * 0.9, 1.3, p.pos.z + fz * 0.9, p.facing, { r: 3.3, color: hot ? 0xffc040 : 0xff8a3a, tilt: k ? -0.3 : 0.4, flip: !!k, dur: 0.24 });
         if (t && t.alive) { t.damage(48, { src: 'player' }); hitPoint(p, t, _hp); FX.burst(_hp.x, _hp.y, _hp.z, { n: hot ? 16 : 9, color: 0xffb060, color2: 0xff5a20, speed: [2, 9], life: [0.2, 0.55], size: [0.12, 0.36], grav: 6 }); Sound.sfx('hit', 0.7, 0.8); }
       } },
-    { id: 'heavy', name: 'Overhead', icon: 'heavy', range: MELEE + AW.REACH, interrupt: true, desc: 'Wind up, leap to the target, bring the blade down. Stops a cast, which refunds the stamina.',
+    { id: 'heavy', name: 'Overhead', icon: 'heavy', moves: true, range: MELEE + AW.REACH, interrupt: true, desc: 'Wind up, leap to the target, bring the blade down. Stops a cast, which refunds the stamina.',
       usable: awReady, rdy: (p) => p.opening > 0,
       cast: (p) => p.opening > 0 ? 0 : 0.5, moveCast: (p) => !p.dash && !p.kb,
       start(p) { p.model.swing(2, 0.5); if (!G.headless) FX.ring(p.pos.x, p.pos.z, { r0: 2.2, r1: 0.5, color: 0xff8a3a, dur: 0.45, y: p.pos.y + 0.08 }); },
@@ -213,7 +213,7 @@ G.classes.push({
     { id: 'kindle', name: 'Kindle', icon: 'kindle', gcd: false, desc: 'Pour a flask on the blade instead of drinking it: 15 s of heavier blows and faster stamina.',
       usable: (p) => p.hasBuff('kindle') ? 'no' : p.sk[6].uses > 0 || 'spent', act: (p) => p.hasBuff('kindle'),
       fire(p) { p.sk[6].uses--; p.addBuff('kindle', 15, 'kindle'); Sound.sfx('roar', 0.5, 1.6); Sound.sfx('steam', 0.6, 0.7); FX.pillar(p.pos.x, p.pos.z, { r: 1.1, h: 9, color: 0xff7a2a, dur: 0.7, y: p.pos.y }); FX.burst(p.pos.x, p.pos.y + 1, p.pos.z, { n: 50, color: 0xffb040, color2: 0xff4a10, speed: [2, 9], up: 3, life: [0.4, 1.1] }); FX.light(p.pos.x, p.pos.y + 1.5, p.pos.z, 0xff7a2a, 50, 0.5); } },
-    { id: 'roll', name: 'Roll', icon: 'roll', gcd: false, desc: 'Tumble where you are moving. Hits pass through you mid-roll; dodging one makes your next Overhead instant, free and brutal.',
+    { id: 'roll', name: 'Roll', icon: 'roll', moves: true, gcd: false, desc: 'Tumble where you are moving. Hits pass through you mid-roll; dodging one makes your next Overhead instant, free and brutal.',
       usable: (p) => p.rooted > 0 ? 'no' : awReady(p), act: (p) => p.dodgeT > 0,
       fire(p) {
         awSpend(p, AW.ROLL); const step = !p.moving, dir = step ? p.facing + PI : Math.atan2(p.intentX, p.intentZ), A = G.arena; let dist = step ? 1.7 : 5.4; // no direction held: a short hop back

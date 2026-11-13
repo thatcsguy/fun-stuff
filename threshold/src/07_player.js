@@ -128,7 +128,7 @@ class Player {
   constructor(cls) {
     this.cls = cls; this.maxHp = this.hp = cls.hp || 1000; this.pos = new V3(); this.facing = 0; this.alive = true; this.radius = 0.4;
     this.vy = 0; this.grounded = true; this.falling = false; this.moveSpeed = 0; this.speed = 7; this.speedMul = 1; this.push = { x: 0, z: 0 };
-    this.kb = null; this.dash = null; this.rooted = 0; this.invuln = 0; this.parryT = 0; this.shield = 0; this.shieldT = 0; this.shieldMax = 1; this.dmgMul = 1; this.dmgTakenMul = 1; this.flashT = 0;
+    this.kb = null; this.dash = null; this.rooted = 0; this.lockT = 0; this.invuln = 0; this.parryT = 0; this.shield = 0; this.shieldT = 0; this.shieldMax = 1; this.dmgMul = 1; this.dmgTakenMul = 1; this.flashT = 0;
     this.res = 0; this.resMax = cls.resource.max; this.gcd = 0; this.gcdMax = 1; this.casting = null; this.queue = -1; this.queueT = 0; this.combo = 0;
     this.target = null; this.buffs = []; this.stats = { dmg: 0, taken: 0, heals: 0 };
     this.sk = cls.skills.map((s) => s ? { def: s, cd: 0, charges: s.charges || 1, uses: s.limited || Infinity } : null);
@@ -152,6 +152,7 @@ class Player {
     const st = this.sk[i]; if (!st) return 'none'; const s = st.def;
     if (!this.alive || this.falling) return 'dead';
     if (this.dash || this.kb) return 'busy';
+    if (this.lockT > 0 && s.moves) return 'no'; // a boss lock-in (door XIII): no skill may carry you off your square
     if (st.uses <= 0) return 'spent';
     if (st.charges <= 0) return 'cd';
     if (s.gcd !== false && this.gcd > 0) return 'gcd';
@@ -219,7 +220,7 @@ class Player {
     this.flashT -= dt; if (this.hintT > 0) this.hintT -= dt;
     if (!this.alive) { this.deathT += dt; const k = Math.min(1, this.deathT / 0.7); this.model.body.rotation.x = -k * 1.45; this.model.body.position.y = -k * 0.1; if (this.falling) { this.vy -= 30 * dt; this.pos.y += this.vy * dt; } this.group.position.copy(this.pos); this.ring.visible = false; return; }
     // timers
-    if (this.gcd > 0) this.gcd -= dt; if (this.parryT > 0) this.parryT -= dt; if (this.dodgeT > 0) this.dodgeT -= dt; if (this.rollT > 0) this.rollT -= dt; if (this.aimT > 0) this.aimT -= dt; if (this.loadT > 0) this.loadT -= dt; if (this.invuln > 0) this.invuln -= dt; if (this.rooted > 0) this.rooted -= dt;
+    if (this.gcd > 0) this.gcd -= dt; if (this.parryT > 0) this.parryT -= dt; if (this.dodgeT > 0) this.dodgeT -= dt; if (this.rollT > 0) this.rollT -= dt; if (this.aimT > 0) this.aimT -= dt; if (this.loadT > 0) this.loadT -= dt; if (this.invuln > 0) this.invuln -= dt; if (this.rooted > 0) this.rooted -= dt; if (this.lockT > 0) this.lockT -= dt;
     if (this.shieldT > 0) { this.shieldT -= dt; if (this.shieldT <= 0) this.shield = 0; } else this.shield = 0;
     for (const st of this.sk) { if (!st) continue; const s = st.def; if (st.cd > 0) { st.cd -= dt; if (st.cd <= 0) { st.charges = Math.min(s.charges || 1, st.charges + 1); st.cd = st.charges < (s.charges || 1) ? s.cd : 0; } } }
     for (let i = this.buffs.length - 1; i >= 0; i--) { const b = this.buffs[i]; b.t -= dt; if (b.t <= 0) { this.buffs.splice(i, 1); if (this.cls.onBuffEnd) this.cls.onBuffEnd(this, b.id); } }

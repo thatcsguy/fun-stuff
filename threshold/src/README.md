@@ -78,6 +78,10 @@ Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `pit`.
 - `shot.js <query> <out.png> [evalJS] [frames]`: screenshot.
 - `diag.js <boss> <class> <expr> <seconds> [phase]`: autopilot run that prints `expr` (JS with `g, G, b, p, S` in scope) every half second, for tracing a mechanic.
 - `logicfuzz.js`: no browser; fuzzes the circuit generator of door `logic` (every circuit must be survivable).
+- `chessfuzz.js [N]`: no browser; fuzzes the Gambit board generator of door `chess` (N boards per act, default 10000). Every board must leave a reachable square that is safe and gives check. Prints good-square counts and how often each relaxation fired.
+- `chesssim.js <class> [runs] [mode]`: door `chess` autopilot fights with Gambit outcomes. Mode `mix` skips check on a quarter of Gambits, `nocheck` never gives check (that bot should die).
+- `chesslock.js`: door `chess` lock-in audit: every class presses every skill while locked; nobody may leave the square.
+- `chessshots.js <outDir> [class]`: door `chess` after a full normal entry (intro plays), screenshots of the Gambit beats.
 - `nanscan.js [boss ...]`: NaN audit (all doors if no args). Real GPUs turn out-of-domain shader math (`pow` of a negative, `normalize` of zero, ...) into NaN pixels that bloom spreads into black squares; SwiftShader hides most of these. This runs with `?strictmath`, which makes the sandbox return NaN the way a GPU does, plays every phase with every class, and counts NaN pixels. Should print `ALL CLEAN`; an occasional 1-2 pixel hit on a flat-shaded `MeshStandardMaterial` at the screen edge comes from three.js's own flat-shading normal (`normalize(cross(dFdx, dFdy))` on a sub-pixel sliver); door V swaps in a guarded copy of that chunk (`SAFE_FLAT` in `24_boss_titan.js`), which other doors can reuse if it shows up. Anything in the hundreds is a real bug (the Petal Storm bullet bug showed 600-900). `__game.nanScanBy()` names the mesh responsible. `NANSCAN_SAFE=1` runs it without `?strictmath`, to check the guards themselves.
 
 Run them with `NODE_PATH=<global node_modules with playwright> THREE_DIR=<unpacked three@0.170.0 package> node tools/smoke.js titan`.
