@@ -3312,9 +3312,11 @@ const Warm = (() => {
   }
   function glassWall(b, fromBack, gap, speed = 6.5) {
     const S = b.state, w = S.wallPool.find((q) => !q.grp.visible); if (!w) return;
-    w.z = fromBack ? HZ + 1 : -HZ + 2.5; w.v = fromBack ? -speed : speed; w.gap = gap; w.grp.visible = true; w.hit = false;
+    w.z = fromBack ? HZ + 1 : -HZ + 2.5; w.v = fromBack ? -speed : speed; w.gap = gap; w.grp.visible = true; w.hit = false; w.hold = WALL_HOLD; w.ht = 0;
     w.panes.forEach((m, i) => { m.visible = i !== gap; m.material.uniforms.uE.value.set(i - 1 === gap ? 1 : 0, i + 1 === gap ? 1 : 0); }); w.grp.position.z = w.z; S.walls.push(w); Sound.sfx('shield', 0.7, 0.6);
   }
+  // a new wall stands still where it spawned for WALL_HOLD seconds, so the open lane can be read before it starts to move
+  const WALL_HOLD = 1.1;
   function* walls(b, n, gapT = 2.3, bothWays = false) {
     yield* b.cast({ name: 'Lumen', time: 0.8 }); let last = laneOf(G.player.pos.x);
     for (let k = 0; k < n; k++) { let gap; do { gap = rndi(0, 4); } while (Math.abs(gap - last) < 1 || Math.abs(gap - last) > 3); last = gap; glassWall(b, bothWays && k % 2 === 1, gap); yield gapT; }
@@ -3354,20 +3356,20 @@ const Warm = (() => {
     const L = new THREE.PointLight(0xffa850, 2.2, 6, 1.6); L.position.set(0.3, 2.3, 1.6); g.add(L);
     g.userData.rings = rings; return g;
   }
-  function spawnChorister(b, x, z) {
+  function spawnChorister(b, x, z, wait = 1.2) {
     FX.pillar(x, z, { r: 1.2, h: 16, color: 0xffe0a0, dur: 0.9 }); Sound.sfx('bell', 0.5, 2);
     const mesh = choristerMesh();
     return b.spawnAdd({
-      name: 'Chorister', hp: 680, x, z, radius: 0.85, aimY: 1.7, mesh, color: 0xffe0a0, facing: angTo(x, z, 0, 0),
+      name: 'Chorister', hp: 520, x, z, radius: 0.85, aimY: 1.7, mesh, color: 0xffe0a0, facing: angTo(x, z, 0, 0),
       update(a) {
         a.pos.y = 0.25 + Math.sin(G.now * 2 + x) * 0.12; if (G.headless) return;
         const sing = a.castState ? 1 : 0.35; mesh.userData.rings.forEach((r, k) => { const ph = (G.now * (0.8 + sing) + k / 3) % 1; r.scale.setScalar(1 + ph * 5 * sing); r.position.z = 0.35 + ph * 0.9 * sing; r.material.opacity = (1 - ph) * (1 - ph) * 0.45 * sing; });
         if (a.castState && vrand() < 0.4) { FX.burst(a.pos.x, 2.6, a.pos.z, { n: 1, color: 0xffe0a0, dir: [-a.pos.x * 0.06, 0.5, (-15.6 - a.pos.z) * 0.06], spread: 0.2, speed: [5, 9], life: [0.5, 0.9], size: [0.15, 0.3] }); }
       },
       *run(a) {
-        yield 1.2;
+        yield wait;
         while (a.alive) {
-          const r = yield* a.cast({ name: 'Hymn', time: 9, interruptible: true });
+          const r = yield* a.cast({ name: 'Hymn', time: 11, interruptible: true });
           if (r === 'done') { b.hp = Math.min(b.maxHp, b.hp + b.maxHp * 0.035); FX.beam(a.aim(new V3()), b.aim(new V3()), { color: 0xffe0a0, width: 0.5, dur: 0.6 }); FX.flash(0xffe0a0, 0.3, 2.5); Sound.sfx('bell', 1, 1.5); FX.ring(a.pos.x, a.pos.z, { r1: 30, color: 0xffe0a0, dur: 0.8, width: 0.2 }); G.player.hurt(240, { blockable: false, src: { name: 'Hymn' } }); yield 1.5; }
           else if (r === 'interrupted') { a.dmgTaken = 2; yield 5; a.dmgTaken = 1; }
         }
@@ -3419,7 +3421,7 @@ const Warm = (() => {
         for (let i = 0; i < 5; i++) { playLane(b, i, true); yield 0.22; } yield 1.2;
       }, *run(b) {
         while (true) {
-          spawnChorister(b, -8.8, -8); spawnChorister(b, 8.8, -8); yield 1.5;
+          spawnChorister(b, -8.8, -8); spawnChorister(b, 8.8, -8, 4.5); yield 1.5; // staggered so their hymns don't finish together
           yield* fortissimo(b); yield 1.2; yield* fortissimo(b); yield 1.0;
           yield* chord(b, 3, 0.5, 0.85); yield 1.0;
           yield* fortissimo(b); { let w = 0; while (choirAlive() && w < 12) { w += G.dt; yield; } } yield 1.0;
@@ -3459,8 +3461,13 @@ const Warm = (() => {
       const S = b.state, p = G.player, t = G.now;
       // moving glass walls
       for (let i = S.walls.length - 1; i >= 0; i--) {
-        const w = S.walls[i], pz = w.z; w.z += w.v * dt; w.grp.position.z = w.z;
+        const w = S.walls[i], pz = w.z;
         for (const m of w.panes) m.material.uniforms.uT.value = t;
+        if (w.hold > 0) { // standing still: fade in with a pulse, then start moving with a chime
+          w.hold -= dt; w.ht += dt; const a = 0.55 * Math.min(1, w.ht / 0.25) * (0.8 + 0.2 * Math.sin(w.ht * 18)); for (const m of w.panes) m.material.uniforms.uA.value = a;
+          if (w.hold <= 0) { for (const m of w.panes) m.material.uniforms.uA.value = 0.55; Sound.sfx('shield', 0.5, 1.2); }
+          continue; }
+        w.z += w.v * dt; w.grp.position.z = w.z;
         if (!w.hit && p.alive && (p.pos.z - pz) * (p.pos.z - w.z) <= 0 && laneOf(p.pos.x) !== w.gap) { w.hit = true; p.hurt(300, { blockable: true, src: { name: 'Lumen' } }); FX.impact(p.pos.x, 1.2, p.pos.z, 0xa0b0ff, 1.2); }
         if (Math.abs(w.z) > HZ + 1.5 || G.state === 'win') { w.grp.visible = false; S.walls.splice(i, 1); }
       }
@@ -3524,7 +3531,7 @@ const Warm = (() => {
       if (S.flame && vrand() < dt * 16) { const i = Math.floor(vrand() * 5), tp = S.pipeTop(i); FX.burst(tp.x + (vrand() - 0.5) * 3, tp.y - vrand() * 4, tp.z, { n: 2, color: 0xffa030, color2: 0xff3010, speed: [0.5, 2], up: 6, life: [0.5, 1.2], size: [0.25, 0.6] }); }
       if (S.flame && vrand() < dt * 10) FX.burst((vrand() - 0.5) * 22, 16 + vrand() * 6, (vrand() - 0.5) * 34, { n: 1, color: vrand() < 0.5 ? 0xff4060 : 0x6080ff, speed: [0, 0.5], grav: 2.5, life: [2, 4], size: [0.08, 0.18] });
     },
-    danger(b, x, z) { let best = Infinity; for (const w of b.state.walls) { if (laneOf(x) === w.gap) continue; const tt = (z - w.z) / w.v; if (tt > -0.1 && tt < best) best = Math.max(0, tt); } return best; },
+    danger(b, x, z) { let best = Infinity; for (const w of b.state.walls) { if (laneOf(x) === w.gap) continue; const tt = (z - w.z) / w.v, th = tt + Math.max(0, w.hold || 0); if (tt > -0.1 && th < best) best = Math.max(0, th); } return best; },
     bot(b, p) {
       const add = G.ents.find((e) => e.isAdd && e.alive); const h = {};
       if (add) { h.target = add; h.saveInterrupt = true; if (p.cls.melee) { const d = Math.hypot(p.pos.x - add.pos.x, p.pos.z - add.pos.z) || 1; h.x = add.pos.x + (p.pos.x - add.pos.x) / d * 2.2; h.z = add.pos.z + (p.pos.z - add.pos.z) / d * 2.2; } } else h.target = b;
