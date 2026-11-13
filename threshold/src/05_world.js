@@ -35,7 +35,8 @@ const Cam = {
   release() { this.cine = null; },
   // Meshes with userData.fadeOcclude = true fade out while they sit between the camera and what it looks at (pillars, tree
   // canopies, a giant boss's limbs). The fade sets the mesh's own material(s) transparent, so give such meshes their own
-  // material; an InstancedMesh fades as a whole. userData.fadeMin sets how far it fades (default 0.18).
+  // material; an InstancedMesh fades as a whole. userData.fadeMin sets how far it fades (default 0.18). userData.fadeCol =
+  // {r, y0, y1} tests an upright column's axis instead of the bounding sphere. Meshes that share the faded material fade with it.
   occ: [], occScan: 0,
   fadeOccluders(rdt, lx, ly, lz) {
     if (G.headless) return;
@@ -44,12 +45,22 @@ const Cam = {
     const c = camera.position, sx = lx - c.x, sy = ly - c.y, sz = lz - c.z, sl2 = Math.max(sx * sx + sy * sy + sz * sz, 1e-6);
     for (const o of this.occ) {
       if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
-      const bs = o.geometry.boundingSphere; _occV.copy(bs.center).applyMatrix4(o.matrixWorld);
-      const r = bs.radius * Math.max(o.matrixWorld.getMaxScaleOnAxis(), 1e-4);
-      const k = clamp(((_occV.x - c.x) * sx + (_occV.y - c.y) * sy + (_occV.z - c.z) * sz) / sl2, 0, 1);
-      const dx = c.x + sx * k - _occV.x, dy = c.y + sy * k - _occV.y, dz = c.z + sz * k - _occV.z;
-      const hit = o.visible && k < 0.97 && dx * dx + dy * dy + dz * dz < r * r * 0.7;
-      const ud = o.userData, target = hit ? (ud.fadeMin === undefined ? 0.18 : ud.fadeMin) : 1;
+      const ud = o.userData; let hit;
+      if (ud.fadeCol) {
+        // upright column: test the view line against its vertical axis (radius r, from y0 to y1 above the mesh origin), so a
+        // tall pillar fades only when it really is in the way, and also while the camera itself sits inside it
+        const q = ud.fadeCol, e = o.matrixWorld.elements, ox = e[12], oy = e[13], oz = e[14], h2 = sx * sx + sz * sz;
+        const k = h2 > 1e-6 ? clamp(((ox - c.x) * sx + (oz - c.z) * sz) / h2, 0, 1) : 0;
+        const dx = c.x + sx * k - ox, dz = c.z + sz * k - oz, y = c.y + sy * k;
+        hit = o.visible && k < 0.97 && dx * dx + dz * dz < q.r * q.r && y > oy + q.y0 - 0.4 && y < oy + q.y1 + 0.4;
+      } else {
+        const bs = o.geometry.boundingSphere; _occV.copy(bs.center).applyMatrix4(o.matrixWorld);
+        const r = bs.radius * Math.max(o.matrixWorld.getMaxScaleOnAxis(), 1e-4);
+        const k = clamp(((_occV.x - c.x) * sx + (_occV.y - c.y) * sy + (_occV.z - c.z) * sz) / sl2, 0, 1);
+        const dx = c.x + sx * k - _occV.x, dy = c.y + sy * k - _occV.y, dz = c.z + sz * k - _occV.z;
+        hit = o.visible && k < 0.97 && dx * dx + dy * dy + dz * dz < r * r * 0.7;
+      }
+      const target = hit ? (ud.fadeMin === undefined ? 0.18 : ud.fadeMin) : 1;
       ud.fadeA = damp(ud.fadeA === undefined ? 1 : ud.fadeA, target, 8, rdt);
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       const fading = ud.fadeA < 0.995;
