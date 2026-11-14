@@ -50,7 +50,7 @@ const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i >
 const vrand = Math.random; // cosmetic-only randomness (never affects the sim)
 
 // ---------- settings ----------
-const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null },
+const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null, camY: 50 },
   (() => { try { return JSON.parse(localStorage.getItem('th_settings') || '{}'); } catch (e) { return {}; } })());
 function saveSettings() { try { localStorage.setItem('th_settings', JSON.stringify(Settings)); } catch (e) { /* private mode */ } }
 if (QS.get('quality')) Settings.q = QS.get('quality');

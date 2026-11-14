@@ -83,6 +83,12 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .set-col h2{margin:0 0 6px}
 .srow{display:grid;grid-template-columns:1fr 200px;align-items:center;gap:12px;padding:5px 8px;border:1px solid transparent;min-height:34px}
 .srow:has(.sv){grid-template-columns:1fr 160px 34px}
+#settings{transition:background .2s,backdrop-filter .2s}#settings .set-col,#settings>h1,#settings>.btn{transition:opacity .2s}
+#settings.in-fight:has(.srow-peek.focus),#settings.in-fight:has(.srow-peek:hover){background:transparent;backdrop-filter:none}
+#settings.in-fight:has(.srow-peek.focus) :is(.set-col,h1,.btn),#settings.in-fight:has(.srow-peek:hover) :is(.set-col,h1,.btn){opacity:.12}
+#settings.in-fight:has(.srow-peek.focus) .set-gen,#settings.in-fight:has(.srow-peek:hover) .set-gen{opacity:1;background:transparent;border-color:transparent}
+#settings.in-fight:has(.srow-peek.focus) .set-gen>:not(.srow-peek),#settings.in-fight:has(.srow-peek:hover) .set-gen>:not(.srow-peek){opacity:.12}
+.srow-peek{transition:background .2s}#settings.in-fight .srow-peek.focus,#settings.in-fight .srow-peek:hover{background:rgba(8,9,16,.82)}
 .srow .sv{font:12px ui-monospace,Consolas,monospace;color:#9d988b;text-align:right}
 .srow input[type=range]{width:100%;accent-color:var(--accent)}
 .nav.srow.focus,.nav.bk.focus{border-color:var(--accent);background:rgba(232,199,122,.08)}
@@ -267,6 +273,7 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
       <div class="srow nav" data-adj="mus"><label>Music</label><input type="range" id="set-mus" min="0" max="100" tabindex="-1"><span class="sv"></span></div>
       <div class="srow nav kbm-only" data-adj="sens"><label>Mouse sensitivity</label><input type="range" id="set-sens" min="10" max="300" tabindex="-1"><span class="sv"></span></div>
       <div class="srow nav pad-only" data-adj="psens"><label>Camera speed</label><input type="range" id="set-psens" min="10" max="300" tabindex="-1"><span class="sv"></span></div>
+      <div class="srow nav srow-peek" data-adj="camY"><label>Character height on screen</label><input type="range" id="set-camY" min="30" max="60" tabindex="-1"><span class="sv"></span></div>
       <div class="srow nav" data-adj="inv"><label>Invert camera Y</label><div class="seg" id="set-inv"><span data-v="0">Off</span><span data-v="1">On</span></div></div>
       <div class="srow nav" data-adj="q"><label>Graphics</label><div class="seg" id="set-q"><span data-v="low">Low</span><span data-v="med">Medium</span><span data-v="high">High</span></div></div>
       <h2 class="h2b">Fixed controls</h2>
@@ -344,7 +351,7 @@ const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i >
 const vrand = Math.random; // cosmetic-only randomness (never affects the sim)
 
 // ---------- settings ----------
-const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null },
+const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null, camY: 50 },
   (() => { try { return JSON.parse(localStorage.getItem('th_settings') || '{}'); } catch (e) { return {}; } })());
 function saveSettings() { try { localStorage.setItem('th_settings', JSON.stringify(Settings)); } catch (e) { /* private mode */ } }
 if (QS.get('quality')) Settings.q = QS.get('quality');
@@ -1314,7 +1321,8 @@ const Cam = {
     if (this.shakeAmt > 0.001) { const s = this.shakeAmt * 0.3; camera.position.x += (vrand() - 0.5) * s; camera.position.y += (vrand() - 0.5) * s; camera.position.z += (vrand() - 0.5) * s; this.shakeAmt *= Math.exp(-rdt * 6); }
     camera.lookAt(lx, ly, lz);
     if (G.player) this.fadeOccluders(rdt, G.player.pos.x, G.player.pos.y + 1.2, G.player.pos.z); // fade what hides the player, never the look target itself
-    const f = lerp(this.fov, this.cFov, w); if (Math.abs(camera.fov - f) > 0.01) { camera.fov = f; camera.updateProjectionMatrix(); }
+    const f = lerp(this.fov, this.cFov, w), sh = this.screenShift() * (1 - w);
+    if (Math.abs(camera.fov - f) > 0.01 || Math.abs(sh - this.shift) > 1e-5) { camera.fov = f; this.setShift(sh); camera.updateProjectionMatrix(); }
   },
   // generator: fly the cinematic camera from (p0,l0) to (p1,l1) over dur seconds. Arrays [x,y,z].
   *shot(p0, l0, p1, l1, dur, fov = 48) {
@@ -1322,6 +1330,19 @@ const Cam = {
     while (t < dur) { t += G.dt; const k = smooth(t / dur); c.pos.set(lerp(p0[0], p1[0], k), lerp(p0[1], p1[1], k), lerp(p0[2], p1[2], k)); c.look.set(lerp(l0[0], l1[0], k), lerp(l0[1], l1[1], k), lerp(l0[2], l1[2], k)); if (this.cine !== c) return; yield; }
   },
   release() { this.cine = null; },
+  // Character height on screen (Settings.camY, % up from the bottom; 50 = centred, the original framing). Applied as a vertical lens
+  // shift: the camera still orbits and looks at the player exactly as before, only the image is slid up or down, so the character
+  // stays fixed at that height while the camera moves. It is part of the projection matrix, so project()/unproject() and every
+  // screen pick stay exact. Cinematic shots (intros, boss cuts) fade it out so their framing is unchanged.
+  shift: 0,
+  screenShift() { return (50 - clamp(+Settings.camY || 50, 30, 60)) / 100; },
+  setShift(s) {
+    this.shift = s;
+    if (Math.abs(s) < 1e-5) { if (camera.view) camera.view.enabled = false; return; }
+    // camera.view written directly: setViewOffset() would also overwrite camera.aspect
+    if (!camera.view) camera.view = { enabled: true, fullWidth: 1, fullHeight: 1, offsetX: 0, offsetY: 0, width: 1, height: 1 };
+    camera.view.enabled = true; camera.view.offsetY = -s;
+  },
   // Meshes with userData.fadeOcclude = true fade out while they sit between the camera and what it looks at (pillars, tree
   // canopies, a giant boss's limbs). The fade sets the mesh's own material(s) transparent, so give such meshes their own
   // material; an InstancedMesh fades as a whole. userData.fadeMin sets how far it fades (default 0.18). userData.fadeCol =
@@ -2592,12 +2613,13 @@ const UI = (() => {
     else if (a === 'settings') openSettings('pause'); else if (a === 'back') show(settingsFrom);
   });
   // ---- settings: general options, the controller toggle, and the binding table for the current device ----
-  const RANGE = { vol: [0, 100, 5], mus: [0, 100, 5], sens: [10, 300, 10], psens: [10, 300, 10] };
+  const RANGE = { vol: [0, 100, 5], mus: [0, 100, 5], sens: [10, 300, 10], psens: [10, 300, 10], camY: [30, 60, 2] };
   const segOf = (k) => $('#set-' + k);
   function segSet(k, v) { for (const n of segOf(k).children) n.classList.toggle('on', n.dataset.v === String(v)); }
-  function openSettings(from) { settingsFrom = from; show('settings'); }
+  // opened from the pause menu, the screen turns see-through while the character-height row is focused or hovered, so the change shows live
+  function openSettings(from) { settingsFrom = from; el.settings.classList.toggle('in-fight', from === 'pause'); show('settings'); }
   function refreshSettings() {
-    for (const k in RANGE) { const n = $('#set-' + k); n.value = Settings[k]; n.nextElementSibling.textContent = Settings[k]; }
+    for (const k in RANGE) { const n = $('#set-' + k); n.value = Settings[k]; n.nextElementSibling.textContent = Settings[k] + (k === 'camY' ? '%' : ''); }
     segSet('inv', Settings.inv ? 1 : 0); segSet('q', Settings.q); segSet('pad', Settings.pad ? 1 : 0); segSet('glyphs', Settings.glyphs || 'auto');
     buildBinds();
     const items = navItems(); if (focusI >= items.length) focusI = items.length - 1; if (focusI >= 0 && items[focusI]) items[focusI].classList.add('focus');

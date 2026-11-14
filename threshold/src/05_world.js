@@ -25,7 +25,8 @@ const Cam = {
     if (this.shakeAmt > 0.001) { const s = this.shakeAmt * 0.3; camera.position.x += (vrand() - 0.5) * s; camera.position.y += (vrand() - 0.5) * s; camera.position.z += (vrand() - 0.5) * s; this.shakeAmt *= Math.exp(-rdt * 6); }
     camera.lookAt(lx, ly, lz);
     if (G.player) this.fadeOccluders(rdt, G.player.pos.x, G.player.pos.y + 1.2, G.player.pos.z); // fade what hides the player, never the look target itself
-    const f = lerp(this.fov, this.cFov, w); if (Math.abs(camera.fov - f) > 0.01) { camera.fov = f; camera.updateProjectionMatrix(); }
+    const f = lerp(this.fov, this.cFov, w), sh = this.screenShift() * (1 - w);
+    if (Math.abs(camera.fov - f) > 0.01 || Math.abs(sh - this.shift) > 1e-5) { camera.fov = f; this.setShift(sh); camera.updateProjectionMatrix(); }
   },
   // generator: fly the cinematic camera from (p0,l0) to (p1,l1) over dur seconds. Arrays [x,y,z].
   *shot(p0, l0, p1, l1, dur, fov = 48) {
@@ -33,6 +34,19 @@ const Cam = {
     while (t < dur) { t += G.dt; const k = smooth(t / dur); c.pos.set(lerp(p0[0], p1[0], k), lerp(p0[1], p1[1], k), lerp(p0[2], p1[2], k)); c.look.set(lerp(l0[0], l1[0], k), lerp(l0[1], l1[1], k), lerp(l0[2], l1[2], k)); if (this.cine !== c) return; yield; }
   },
   release() { this.cine = null; },
+  // Character height on screen (Settings.camY, % up from the bottom; 50 = centred, the original framing). Applied as a vertical lens
+  // shift: the camera still orbits and looks at the player exactly as before, only the image is slid up or down, so the character
+  // stays fixed at that height while the camera moves. It is part of the projection matrix, so project()/unproject() and every
+  // screen pick stay exact. Cinematic shots (intros, boss cuts) fade it out so their framing is unchanged.
+  shift: 0,
+  screenShift() { return (50 - clamp(+Settings.camY || 50, 30, 60)) / 100; },
+  setShift(s) {
+    this.shift = s;
+    if (Math.abs(s) < 1e-5) { if (camera.view) camera.view.enabled = false; return; }
+    // camera.view written directly: setViewOffset() would also overwrite camera.aspect
+    if (!camera.view) camera.view = { enabled: true, fullWidth: 1, fullHeight: 1, offsetX: 0, offsetY: 0, width: 1, height: 1 };
+    camera.view.enabled = true; camera.view.offsetY = -s;
+  },
   // Meshes with userData.fadeOcclude = true fade out while they sit between the camera and what it looks at (pillars, tree
   // canopies, a giant boss's limbs). The fade sets the mesh's own material(s) transparent, so give such meshes their own
   // material; an InstancedMesh fades as a whole. userData.fadeMin sets how far it fades (default 0.18). userData.fadeCol =
