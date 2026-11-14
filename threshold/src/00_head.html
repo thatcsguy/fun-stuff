@@ -83,6 +83,12 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .set-col h2{margin:0 0 6px}
 .srow{display:grid;grid-template-columns:1fr 200px;align-items:center;gap:12px;padding:5px 8px;border:1px solid transparent;min-height:34px}
 .srow:has(.sv){grid-template-columns:1fr 160px 34px}
+#settings{transition:background .2s,backdrop-filter .2s}#settings .set-col,#settings>h1,#settings>.btn{transition:opacity .2s}
+#settings.in-fight:has(.srow-peek.focus),#settings.in-fight:has(.srow-peek:hover){background:transparent;backdrop-filter:none}
+#settings.in-fight:has(.srow-peek.focus) :is(.set-col,h1,.btn),#settings.in-fight:has(.srow-peek:hover) :is(.set-col,h1,.btn){opacity:.12}
+#settings.in-fight:has(.srow-peek.focus) .set-gen,#settings.in-fight:has(.srow-peek:hover) .set-gen{opacity:1;background:transparent;border-color:transparent}
+#settings.in-fight:has(.srow-peek.focus) .set-gen>:not(.srow-peek),#settings.in-fight:has(.srow-peek:hover) .set-gen>:not(.srow-peek){opacity:.12}
+.srow-peek{transition:background .2s}#settings.in-fight .srow-peek.focus,#settings.in-fight .srow-peek:hover{background:rgba(8,9,16,.82)}
 .srow .sv{font:12px ui-monospace,Consolas,monospace;color:#9d988b;text-align:right}
 .srow input[type=range]{width:100%;accent-color:var(--accent)}
 .nav.srow.focus,.nav.bk.focus{border-color:var(--accent);background:rgba(232,199,122,.08)}

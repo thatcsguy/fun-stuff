@@ -130,12 +130,13 @@ const UI = (() => {
     else if (a === 'settings') openSettings('pause'); else if (a === 'back') show(settingsFrom);
   });
   // ---- settings: general options, the controller toggle, and the binding table for the current device ----
-  const RANGE = { vol: [0, 100, 5], mus: [0, 100, 5], sens: [10, 300, 10], psens: [10, 300, 10] };
+  const RANGE = { vol: [0, 100, 5], mus: [0, 100, 5], sens: [10, 300, 10], psens: [10, 300, 10], camY: [30, 60, 2] };
   const segOf = (k) => $('#set-' + k);
   function segSet(k, v) { for (const n of segOf(k).children) n.classList.toggle('on', n.dataset.v === String(v)); }
-  function openSettings(from) { settingsFrom = from; show('settings'); }
+  // opened from the pause menu, the screen turns see-through while the character-height row is focused or hovered, so the change shows live
+  function openSettings(from) { settingsFrom = from; el.settings.classList.toggle('in-fight', from === 'pause'); show('settings'); }
   function refreshSettings() {
-    for (const k in RANGE) { const n = $('#set-' + k); n.value = Settings[k]; n.nextElementSibling.textContent = Settings[k]; }
+    for (const k in RANGE) { const n = $('#set-' + k); n.value = Settings[k]; n.nextElementSibling.textContent = Settings[k] + (k === 'camY' ? '%' : ''); }
     segSet('inv', Settings.inv ? 1 : 0); segSet('q', Settings.q); segSet('pad', Settings.pad ? 1 : 0); segSet('glyphs', Settings.glyphs || 'auto');
     buildBinds();
     const items = navItems(); if (focusI >= items.length) focusI = items.length - 1; if (focusI >= 0 && items[focusI]) items[focusI].classList.add('focus');
