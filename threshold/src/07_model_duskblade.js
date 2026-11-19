@@ -14,14 +14,14 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
   const glowC = new THREE.Color(C.glow), clothC = new THREE.Color(C.cloth), hotC = glowC.clone().lerp(new THREE.Color(0xff5a9c), 0.5);
   // three values: dark blackened under-plate (gauntlets, cuisses, sabatons, faulds), mid violet plate, and a cape shifted
   // toward magenta-violet (darker outside, a bright magenta lining); pale silver trim sits on the top of the silhouette
-  const armorC = new THREE.Color(C.armor).multiplyScalar(2.1).lerp(new THREE.Color(pick(C.metal, 0xb9b2cc)), 0.2), darkC = new THREE.Color(C.armor).multiplyScalar(0.62).lerp(new THREE.Color(pick(C.inner, 0x1b1622)), 0.3);
-  const linC = new THREE.Color(pick(C.lining, clothC.clone().multiplyScalar(0.5).getHex())), capeC = clothC.clone().lerp(linC, 0.38).multiplyScalar(2.3), tabC = clothC.clone().lerp(linC, 0.25).multiplyScalar(1.7);
-  const rimBase = glowC.clone().lerp(new THREE.Color(1, 1, 1), 0.5).multiplyScalar(0.5), rimU = { value: rimBase.clone() };
+  const armorC = new THREE.Color(C.armor).multiplyScalar(2.4).lerp(new THREE.Color(pick(C.metal, 0xb9b2cc)), 0.2), darkC = new THREE.Color(C.armor).multiplyScalar(0.62).lerp(new THREE.Color(pick(C.inner, 0x1b1622)), 0.3);
+  const linC = new THREE.Color(pick(C.lining, clothC.clone().multiplyScalar(0.5).getHex())), capeC = clothC.clone().lerp(linC, 0.15).multiplyScalar(1.9), tabC = clothC.clone().lerp(linC, 0.25).multiplyScalar(1.7);
+  const rimBase = glowC.clone().lerp(new THREE.Color(1, 1, 1), 0.5).multiplyScalar(0.6), rimU = { value: rimBase.clone() };
   const lining = linC.clone().multiplyScalar(2.2).lerp(new THREE.Color(0xe0408f), 0.2).getHex();
-  const plateM = K.mat({ color: armorC, roughness: 0.34, metalness: 0.5, envMapIntensity: 1.4 }, rimU, 1.4);
+  const plateM = K.mat({ color: armorC, roughness: 0.48, metalness: 0.42, envMapIntensity: 1.3 }, rimU, 1.4);
   const darkM = K.mat({ color: darkC, roughness: 0.4, metalness: 0.6, envMapIntensity: 1.2 }, rimU, 1.1);
-  const shellM = K.mat({ color: armorC, roughness: 0.34, metalness: 0.5, envMapIntensity: 1.4, side: THREE.DoubleSide }, rimU, 1.4, darkC.getHex()); // open shells seen from below
-  const metalC = new THREE.Color(pick(C.metal, 0xb9b2cc)).lerp(new THREE.Color(1, 1, 1), 0.45), trimM = K.mat({ color: metalC, roughness: 0.2, metalness: 0.85, envMapIntensity: 1.9, emissive: metalC, emissiveIntensity: 0.16 }, rimU, 1.2);
+  const shellM = K.mat({ color: armorC, roughness: 0.56, metalness: 0.38, envMapIntensity: 1.1, side: THREE.DoubleSide }, rimU, 1.4, darkC.getHex()); // open shells seen from below
+  const metalC = new THREE.Color(pick(C.metal, 0xb9b2cc)).lerp(new THREE.Color(1, 1, 1), 0.45), trimM = K.mat({ color: metalC, roughness: 0.2, metalness: 0.85, envMapIntensity: 1.9, emissive: metalC, emissiveIntensity: 0.08 }, rimU, 1.2);
   const clothM = K.mat({ color: tabC, roughness: 0.8, side: THREE.DoubleSide }, rimU, 1.0, lining);
   const capeM = K.mat({ color: capeC, roughness: 0.82, side: THREE.DoubleSide, vertexColors: true }, rimU, 1.0, lining);
   const plumeM = K.mat({ color: lining, roughness: 0.7, side: THREE.DoubleSide, emissive: lining, emissiveIntensity: 0.25 }, rimU, 0.9);
@@ -40,7 +40,8 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
   // crescent: an arc of a torus with its opening up
   const crescent = (r, tube, arc = PI * 1.25) => { const t = new THREE.TorusGeometry(r, tube, 4, 20, arc); t.rotateZ(-PI / 2 - arc / 2); return t; };
   // flared plate cup (couter, poleyn): a low dome along +y
-  const cup = (r, h) => K.lathe([[r, -0.005], [r * 0.92, h * 0.3], [r * 0.55, h * 0.78], [0.0, h]], 10);
+  // angular cop (couter, poleyn): a faceted six-sided point along +y, flat-shaded so it reads as plate, not a ball
+  const cop = (r, h) => { const q = K.lathe([[r, -0.005], [r * 0.9, h * 0.32], [r * 0.42, h * 0.78], [0.0, h]], 6, PI / 6).toNonIndexed(); q.computeVertexNormals(); return q; };
 
   // ---- skeleton ----
   const body = grp(g), hips = grp(body, 0, 0.95, 0), torso = grp(hips, 0, 0.02, 0), head = grp(torso, 0, 0.69, 0);
@@ -49,10 +50,6 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
   const TP = [[0.148, -0.06], [0.15, 0.06], [0.178, 0.2], [0.228, 0.34], [0.236, 0.44], [0.212, 0.53], [0.158, 0.61], [0.09, 0.67], [0.075, 0.72]], TZ = 0.78;
   const rAt = (y) => { for (let i = 1; i < TP.length; i++) if (y <= TP[i][1]) return lerp(TP[i - 1][0], TP[i][0], (y - TP[i - 1][1]) / (TP[i][1] - TP[i - 1][1])); return TP[TP.length - 1][0]; };
   P.add(torso, plateM, K.lathe(TP, 26), 0, 0, 0, 0, 0, 0, 1, 1, TZ);
-  { const keel = []; for (let k = 0; k <= 10; k++) { const y = 0.1 + k * 0.05; keel.push([0, y, rAt(y) * TZ + 0.004]); } P.add(torso, trimM, K.tube(keel, 0.009, 20, 5)); }
-  for (const s of [1, -1]) { const fl = []; for (let k = 0; k <= 8; k++) { const y = 0.14 + k * 0.05, a = s * (0.55 + 0.25 * k / 8); fl.push([Math.sin(a) * rAt(y) * 1.004, y, Math.cos(a) * rAt(y) * TZ * 1.004]); } P.add(torso, trimM, K.tube(fl, 0.006, 16, 4)); }
-  { const pr = []; for (let k = 0; k <= 12; k++) { const a = -1.2 + k / 12 * 2.4, y = 0.19 + 0.05 * Math.cos(a * 1.3); pr.push([Math.sin(a) * rAt(y) * 1.01, y, Math.cos(a) * rAt(y) * TZ * 1.01 + 0.002]); } P.add(torso, trimM, K.tube(pr, 0.008, 24, 4)); }
-  P.add(torso, trimM, K.lathe([[rAt(0.03) + 0.004, 0.03], [rAt(0.075) + 0.004, 0.075]], 26), 0, 0, 0, 0, 0, 0, 1, 1, TZ * 1.02);
   P.add(torso, sigilM, crescent(0.064, 0.009), 0, 0.4, rAt(0.4) * TZ + 0.014);
   P.add(torso, sigilM, new THREE.OctahedronGeometry(0.026), 0, 0.41, rAt(0.41) * TZ + 0.016, 0, 0, 0, 0.8, 1.2, 0.4);
   P.add(torso, plateM, K.lathe([[0.175, 0.575], [0.168, 0.62], [0.138, 0.655]], 20), 0, 0, 0, 0, 0, 0, 1, 1, 0.9);
@@ -65,7 +62,7 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
   P.add(hips, beltM, new THREE.OctahedronGeometry(0.014), 0, 0.0, 0.168, 0, 0, 0, 1, 1.3, 0.5);
   for (let k = 0; k < 3; k++) { const y0 = -0.025 - k * 0.062, r0 = 0.19 + k * 0.013, r1 = 0.205 + k * 0.015;
     P.add(hips, darkM, K.lathe([[r1, y0 - 0.075], [r0, y0]], 14, -1.3, 2.6), 0, 0, 0, 0, 0, 0, 1, 1, 0.86);
-    P.add(hips, trimM, K.lathe([[r1 + 0.003, y0 - 0.08], [r1 + 0.001, y0 - 0.068]], 14, -1.3, 2.6), 0, 0, 0, 0, 0, 0, 1, 1, 0.86); }
+    if (k === 2) P.add(hips, trimM, K.lathe([[r1 + 0.003, y0 - 0.08], [r1 + 0.001, y0 - 0.068]], 14, -1.3, 2.6), 0, 0, 0, 0, 0, 0, 1, 1, 0.86); }
 
   // ---- head: close helm, snouted visor under a brow ridge, lit eye slits, crescent crest, swept horns ----
   P.add(head, plateM, new THREE.SphereGeometry(0.128, 18, 14), 0, 0.135, -0.008, 0, 0, 0, 1, 1.08, 1.12);
@@ -90,33 +87,35 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
   // ---- arms: the off hand (left, +x) carries the big crescent pauldron; heavy vambraces, flared couters, gauntlet fists ----
   const HS = 1.3;
   const mkArm = (side) => {
-    const big = side > 0, sh = grp(torso, side * 0.25, 0.55, -0.01), n = big ? 3 : 2, R = big ? 0.118 : 0.1, ps = big ? 1.22 : 1.15;
+    const big = side > 0, sh = grp(torso, side * 0.25, 0.55, -0.01), R = big ? 0.118 : 0.1, ps = big ? 1.22 : 1.15;
     const pad = (mat, geo, x, y, z, rx, ry, rz, sx = 1, sy = sx, sz = sx) => P.add(sh, mat, geo.scale(ps, ps, ps), x * ps, y * ps, z * ps, rx, ry, rz, sx, sy, sz);
-    // a low flat cap, then overlapping plate lames down the arm, each flaring out to a sharp lower edge with a silver rim
-    pad(shellM, new THREE.SphereGeometry(R * 0.96, 18, 5, 0, TAU, 0, PI * 0.5), side * 0.005, 0.045, 0, 0, 0, side * -0.28, 1.05, 0.5, 1.05);
-    { const rim = new THREE.TorusGeometry(R * 0.96, 0.009, 4, 26); rim.rotateX(PI / 2); pad(trimM, rim, side * 0.005, 0.045, 0, 0, 0, side * -0.28, 1.05, 0.5, 1.05); }
-    const ph0 = side > 0 ? PI / 2 - 1.75 : -PI / 2 - 1.75;
-    for (let k = 0; k < n; k++) { const r = R * (1.0 - k * 0.04), x = side * (0.03 + k * 0.03), y = 0.01 - k * 0.046, rz = side * -(0.5 + k * 0.2);
-      pad(shellM, K.lathe([[r * 0.78, 0.03], [r * 0.97, 0.004], [r * 1.05, -0.03], [r * 1.17, -0.048]], 16, ph0, 3.5), x, y, 0, 0, 0, rz);
-      pad(trimM, K.lathe([[r * 1.18, -0.054], [r * 1.18, -0.044], [r * 1.12, -0.038]], 16, ph0, 3.5), x, y, 0, 0, 0, rz); }
-    if (big) pad(sigilM, crescent(0.034, 0.006), side * 0.118, -0.025, 0, 0, side * PI / 2, side * -0.62);
+    // a flattened shell (a shallow dome stretched to a point that juts outward and turns up at the tip, with a low ridge along
+    // the top), then two stepped plate lames under its outer edge, each with a silver rim
+    { const TH = 1.15, cy = R * Math.cos(TH), def = (v) => { const o = Math.max(0, side * v.x / R), z = v.z;
+        v.x *= o > 0 ? 1.12 + 0.55 * o * o : 1.0; v.z = z * 0.92 * (1 - 0.3 * o * o); v.y = (v.y - cy) * 0.7 + R * 0.26 * o * o * o + R * 0.07 * Math.max(0, 1 - Math.abs(z) / (0.35 * R)); return v; };
+      const cg = new THREE.SphereGeometry(R, 20, 6, 0, TAU, 0, TH), pa = cg.attributes.position, v = new V3();
+      for (let i = 0; i < pa.count; i++) { def(v.fromBufferAttribute(pa, i)); pa.setXYZ(i, v.x, v.y, v.z); } cg.computeVertexNormals();
+      pad(shellM, cg, side * 0.012, 0.035, 0, 0, 0, side * -0.12);
+      const rp = []; for (let k = 0; k <= 32; k++) { const ph = k / 32 * TAU; def(v.set(-Math.cos(ph) * Math.sin(TH) * R, cy, Math.sin(ph) * Math.sin(TH) * R)); rp.push([v.x, v.y - 0.004, v.z]); }
+      pad(trimM, K.tube(rp, 0.0085, 48, 4), side * 0.012, 0.035, 0, 0, 0, side * -0.12); }
+    const ph0 = side * PI / 2 - 1.35;
+    for (let k = 0; k < 2; k++) { const r = R * (0.98 + k * 0.05), x = side * (0.04 + k * 0.035), y = -0.012 - k * 0.058, rz = side * -(0.38 + k * 0.16);
+      pad(shellM, K.lathe([[r * 0.86, 0.022], [r * 0.98, 0.0], [r * 1.1, -0.036], [r * 1.2, -0.05]], 14, ph0, 2.7), x, y, 0, 0, 0, rz);
+      pad(trimM, K.lathe([[r * 1.21, -0.056], [r * 1.21, -0.046], [r * 1.15, -0.04]], 14, ph0, 2.7), x, y, 0, 0, 0, rz); }
+    if (big) pad(sigilM, crescent(0.034, 0.006), side * 0.135, -0.04, 0, 0, side * PI / 2, side * -0.55);
     P.add(sh, innerM, K.lathe([[0.058, -0.3], [0.064, -0.18], [0.07, -0.05], [0.068, 0.03]], 12));
     P.add(sh, plateM, K.lathe([[0.064, -0.27], [0.07, -0.17], [0.076, -0.07], [0.072, -0.01]], 12, -side * 0.2 + PI / 2 * side - 1.6, 3.2));
-    P.add(sh, trimM, new THREE.TorusGeometry(0.066, 0.006, 4, 16), 0, -0.26, 0, PI / 2, 0, 0);
     const el = grp(sh, 0, -0.29, 0);
-    P.add(el, plateM, cup(0.074, 0.075), 0, 0.0, -0.01, -PI / 2, 0, 0);
-    P.add(el, plateM, new THREE.SphereGeometry(0.085, 10, 8), side * 0.06, 0.0, -0.015, 0, 0, 0, 0.24, 1, 1);
-    P.add(el, trimM, new THREE.TorusGeometry(0.072, 0.006, 4, 16), 0, 0.0, -0.012);
+    P.add(el, plateM, cop(0.074, 0.085), 0, 0.0, -0.01, -PI / 2, 0, 0);
+    P.add(el, plateM, new THREE.OctahedronGeometry(0.088), side * 0.06, 0.0, -0.02, 0, 0, side * 0.2, 0.26, 1, 0.8);
     P.add(el, innerM, K.lathe([[0.05, -0.08], [0.056, 0.03]], 10));
     P.add(el, plateM, K.lathe([[0.064, -0.24], [0.076, -0.16], [0.084, -0.07], [0.076, -0.02]], 12));
-    for (const [y, r] of [[-0.035, 0.08], [-0.228, 0.067]]) P.add(el, trimM, new THREE.TorusGeometry(r, 0.0065, 4, 16), 0, y, 0, PI / 2, 0, 0);
     P.add(el, side > 0 ? dagM : sigilM, new THREE.BoxGeometry(0.009, 0.12, 0.009), side * 0.082, -0.13, 0);
     const hand = grp(el, 0, -0.275, 0); hand.scale.setScalar(HS);
     P.add(hand, plateM, K.lathe([[0.068, -0.045], [0.058, -0.0], [0.05, 0.04]], 12));
     P.add(hand, leatherM, new THREE.SphereGeometry(0.046, 10, 8), 0, -0.075, 0.008, 0, 0, 0, 0.95, 1.05, 1.15);
     P.add(hand, darkM, new THREE.BoxGeometry(0.078, 0.05, 0.03), 0, -0.07, -0.032, 0, 0, 0);
     P.add(hand, darkM, new THREE.BoxGeometry(0.084, 0.026, 0.06), 0, -0.108, 0.006, 0.3, 0, 0);
-    P.add(hand, trimM, new THREE.BoxGeometry(0.088, 0.01, 0.012), 0, -0.118, 0.036, 0.3, 0, 0);
     P.add(hand, darkM, new THREE.CapsuleGeometry(0.017, 0.035, 3, 6), side * -0.038, -0.07, 0.035, 0.9, 0, side * 0.5);
     return { sh, el, hand };
   };
@@ -125,31 +124,27 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
   const mkLeg = (side) => {
     const hip = grp(hips, side * 0.112, -0.02, 0);
     P.add(hip, innerM, K.lathe([[0.072, -0.45], [0.09, -0.3], [0.112, -0.12], [0.12, 0.02]], 12));
-    P.add(hip, darkM, K.lathe([[0.084, -0.42], [0.103, -0.3], [0.122, -0.13], [0.127, -0.05]], 12, -1.45 + side * 0.25, 2.9));
-    P.add(hip, trimM, K.lathe([[0.085, -0.425], [0.088, -0.405]], 12, -1.45 + side * 0.25, 2.9));
+    P.add(hip, darkM, K.lathe([[0.084, -0.42], [0.103, -0.3], [0.122, -0.13], [0.127, -0.05]], 12));
     const knee = grp(hip, 0, -0.45, 0);
-    P.add(knee, plateM, cup(0.082, 0.08), 0, 0.01, 0.03, PI / 2, 0, 0, 1, 1, 1.2);
-    P.add(knee, trimM, new THREE.TorusGeometry(0.078, 0.0065, 4, 18), 0, 0.01, 0.03, 0, 0, 0, 1, 1.2, 1);
-    P.add(knee, plateM, new THREE.SphereGeometry(0.09, 10, 8), side * 0.068, 0.0, 0.02, 0, 0, 0, 0.24, 1, 1);
-    P.add(knee, plateM, K.lathe([[0.075, -0.4], [0.078, -0.32], [0.094, -0.2], [0.1, -0.1], [0.09, -0.02], [0.082, 0.03]], 12));
-    P.add(knee, trimM, new THREE.TorusGeometry(0.078, 0.0065, 4, 16), 0, -0.385, 0, PI / 2, 0, 0);
-    const ankle = grp(knee, 0, -0.42, 0); ankle.scale.setScalar(1.25);
+    P.add(knee, plateM, cop(0.084, 0.095), 0, 0.01, 0.03, PI / 2, 0, 0, 1, 1.15, 1.1);
+    P.add(knee, plateM, new THREE.OctahedronGeometry(0.094), side * 0.07, 0.0, 0.02, 0, 0, side * -0.15, 0.26, 1, 0.8);
+    P.add(knee, plateM, K.lathe([[0.078, -0.4], [0.088, -0.33], [0.112, -0.2], [0.113, -0.11], [0.094, -0.02], [0.084, 0.03]], 12));
+    const ankle = grp(knee, 0, -0.42, 0); ankle.scale.set(1.5, 1.25, 1.45);
     P.add(ankle, darkM, new THREE.SphereGeometry(0.068, 12, 8), 0, -0.034, 0.048, 0, 0, 0, 0.8, 0.55, 1.6);
     P.add(ankle, darkM, new THREE.ConeGeometry(0.032, 0.09, 6), 0, -0.045, 0.19, PI / 2, 0, 0, 1, 1, 0.55);
-    for (let k = 0; k < 3; k++) P.add(ankle, trimM, new THREE.TorusGeometry(0.06 - k * 0.006, 0.005, 3, 14, PI), 0, -0.035, 0.03 + k * 0.045, 0, 0, 0, 0.8, 0.55, 1);
     P.add(ankle, leatherM, new THREE.BoxGeometry(0.1, 0.018, 0.24), 0, -0.063, 0.06);
     return { hip, knee, ankle };
   };
   const legL = mkLeg(1), legR = mkLeg(-1);
   // tassets: plates hinged under the faulds that follow the thighs
   const tassets = []; for (const s of [1, -1]) { const ts = grp(hips, s * 0.1, -0.2, 0); ts.rotation.order = 'YXZ';
-    P.add(ts, plateM, K.lathe([[0.112, -0.17], [0.1, 0.0]], 8, s * 0.35 - 0.75, 1.5)); P.add(ts, trimM, K.lathe([[0.114, -0.176], [0.112, -0.162]], 8, s * 0.35 - 0.75, 1.5));
+    P.add(ts, plateM, K.lathe([[0.112, -0.17], [0.1, 0.0]], 8, s * 0.35 - 0.75, 1.5));
     tassets.push({ o: ts, s, spr: K.spring(120, 14) }); }
   // front tabard with a crescent, and two long split tails at the back
   const tabard = grp(hips, 0, -0.03, 0.2), tabSpr = K.spring(60, 7);
-  { const sh = new THREE.Shape([new THREE.Vector2(-0.085, 0), new THREE.Vector2(0.085, 0), new THREE.Vector2(0.075, -0.46), new THREE.Vector2(0, -0.56), new THREE.Vector2(-0.075, -0.46)]);
+  { const sh = new THREE.Shape([new THREE.Vector2(-0.11, 0), new THREE.Vector2(0.11, 0), new THREE.Vector2(0.098, -0.46), new THREE.Vector2(0, -0.57), new THREE.Vector2(-0.098, -0.46)]);
     P.add(tabard, clothM, new THREE.ExtrudeGeometry(sh, { depth: 0.01, bevelEnabled: false }), 0, 0, -0.005);
-    P.add(tabard, beltM, crescent(0.034, 0.006), 0, -0.24, 0.008); P.add(tabard, trimM, new THREE.BoxGeometry(0.18, 0.022, 0.022), 0, -0.006, 0.004); }
+    P.add(tabard, beltM, crescent(0.034, 0.006), 0, -0.24, 0.008); P.add(tabard, trimM, new THREE.BoxGeometry(0.23, 0.022, 0.022), 0, -0.006, 0.004); }
   const tails = [];
   for (const [sx, n] of [[0.075, 4], [-0.075, 3]]) { let par = grp(hips, sx, -0.03, -0.17); const chain = [];
     for (let k = 0; k < n; k++) { const seg = grp(par, 0, k ? -0.17 : 0, 0), w = 0.12 - k * 0.012;
@@ -168,7 +163,7 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
     cLen.push(0.86 + 0.26 * Math.sin(sat((phi - 1.5) / 2.5) * PI) - (i % 2 ? 0.07 + 0.11 * rnd(i) : 0.05 * rnd(i)) - (i === 5 || i === 12 ? 0.08 : 0)); }
   const cNV = CN * (CR + 1), cPos = new Float32Array(cNV * 3), cCol = new Float32Array(cNV * 3), cGeo = new THREE.BufferGeometry(), cIdx = [];
   for (let i = 0; i < CN; i++) for (let j = 0; j <= CR; j++) { const o = (i * (CR + 1) + j) * 3, hem = j >= CR ? 1 : 0, sh = 1 + 0.32 * cFold[i] * Math.min(1, 0.25 + j / CR);
-    cCol[o] = sh * (1 + hem * 0.9); cCol[o + 1] = sh * (1 + hem * 1.2); cCol[o + 2] = sh * (1 + hem * 0.6); }
+    cCol[o] = sh * (1 + hem * 0.5); cCol[o + 1] = sh * (1 + hem * 0.6); cCol[o + 2] = sh * (1 + hem * 0.45); }
   for (let i = 0; i < CN - 1; i++) for (let j = 0; j < CR; j++) { const a = i * (CR + 1) + j, b = a + 1, c = a + CR + 1, d = c + 1; cIdx.push(a, b, c, c, b, d); }
   cGeo.setAttribute('position', new THREE.BufferAttribute(cPos, 3)); cGeo.setAttribute('color', new THREE.BufferAttribute(cCol, 3)); cGeo.setIndex(cIdx);
   const capeMesh = new THREE.Mesh(cGeo, capeM); capeMesh.frustumCulled = false; capeMesh.castShadow = true; torso.add(capeMesh);
@@ -218,6 +213,12 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
   const sR = [], sD = [], sT = new Float32Array(TS), sA = new Float32Array(TS), sL = new Float32Array(TS); for (let i = 0; i < TS; i++) { sR.push(new V3()); sD.push(new V3(0, 1, 0)); }
   P.finish();
   const aura = new THREE.PointLight(C.glow, 1.0, 7, 1.5); aura.position.set(0, 2.1, 0.9); g.add(aura);
+  // a faint violet pool on the floor under the feet, so the hero separates from dark blue floors
+  const poolG = new THREE.RingGeometry(0.001, 0.95, 24, 4), poolA = poolG.attributes.position, poolC = new Float32Array(poolA.count * 3), pc = glowC.clone().multiplyScalar(0.2);
+  for (let i = 0; i < poolA.count; i++) { const k = Math.pow(1 - Math.min(1, Math.hypot(poolA.getX(i), poolA.getY(i)) / 0.95), 1.6); poolC[i * 3] = pc.r * k; poolC[i * 3 + 1] = pc.g * k; poolC[i * 3 + 2] = pc.b * k; }
+  poolG.setAttribute('color', new THREE.BufferAttribute(poolC, 3));
+  const poolM = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), pool = new THREE.Mesh(poolG, poolM);
+  pool.rotation.x = -PI / 2; pool.position.y = 0.025; pool.renderOrder = 2; g.add(pool);
 
   // ---- poses ----
   // hy/hd/hz hips yaw, drop, forward; bx body pitch; tx/ty/tz torso; hx/hw head; tl/tr/zl/zr/kl/kr legs; r*/l* arms (shoulder x,y,z,
@@ -237,10 +238,10 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
   const STORM = { tl: -0.5, kl: 0.85, tr: 0.45, kr: 0.82, zl: 0.24, zr: -0.24, tx: 0.18, ty: -0.2, rx: -0.85, rz: -0.75, re: -0.45, be: -0.05, by: -1.85, bz: 0.4, lx: -0.75, lz: 0.45, le: -1.2 };
   const fol = (o, d) => Object.assign({}, o, d);
   // each swing: [time 0..1, pose, ease, recover]. Wind-up held to ~12%; a fast strike that is still moving at contact (~27%);
-  // the follow-through keeps travelling and decelerates to ~50% (blade a further 30-35 degrees, torso and head turning
-  // through, the hips sinking); then from there a recovery 60% of the way back to the stance by ~82%, and the blend out from SWO (~78%).
+  // the follow-through keeps travelling and decelerates to ~44% (blade a further 30-35 degrees, torso and head turning
+  // through, the hips sinking); then a visible recovery, 70% of the way back to the stance by ~72%, and the blend out from SWO (~78%).
   // ease: 0 smooth, 1 snap (ease-out cubic), 2 strike (fast, arrives with speed), 3 decelerate (ease-out quad)
-  const SW = {}, SWO = {}, cut = (w, s, f, tw = 0.12, ts = 0.27, tf = 0.5, tr = 0.82, rf = 0.6) => [[0, w], [tw, w], [ts, s, 2], [tf, fol(s, f), 3], [tr, {}, 0, rf]];
+  const SW = {}, SWO = {}, cut = (w, s, f, tw = 0.12, ts = 0.27, tf = 0.44, tr = 0.72, rf = 0.7) => [[0, w], [tw, w], [ts, s, 2], [tf, fol(s, f), 3], [tr, {}, 0, rf]];
   // Slash 1: forehand diagonal, high right to low left, stepping in on the left foot
   SW[0] = cut({ hy: -0.25, ty: -0.6, tx: -0.02, tl: -0.25, kl: 0.35, tr: 0.28, kr: 0.4, rx: -2.5, rz: -0.55, re: -1.1, be: 0.9, by: -2.4, bz: -0.4, lx: -0.95, lz: 0.25, le: -0.9 },
     { hy: 0.2, ty: 0.45, tx: 0.18, bx: 0.08, hz: 0.06, tl: -0.7, kl: 0.72, tr: 0.45, kr: 0.28, rx: -1.25, rz: 0.6, re: -0.15, be: -0.35, by: 0.6, bz: -0.9, lx: 0.45, lz: 0.4, le: -0.5 },
@@ -252,27 +253,29 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
   // Slash 3: overhead finisher, a deep lunge on the right foot, the off arm flung back
   SW[2] = cut({ hy: -0.15, ty: -0.35, tx: -0.22, bx: -0.04, tl: -0.15, kl: 0.25, tr: 0.25, kr: 0.3, rx: -3.0, rz: -0.3, re: -0.9, be: 1.9, by: -0.3, bz: 1.57, lx: -1.2, lz: 0.3, le: -0.6 },
     { hy: 0.15, ty: 0.3, tx: 0.35, bx: 0.18, hz: 0.12, tl: 0.65, kl: 0.15, tr: -0.95, kr: 0.95, rx: -1.35, rz: 0.15, re: -0.05, be: -0.25, by: 0.0, bz: 1.57, lx: 0.85, lz: 0.55, le: -0.2 },
-    { ty: 0.48, tx: 0.55, bx: 0.26, hz: 0.18, hw: 0.15, hx: 0.12, tr: -1.05, kr: 1.15, rx: -0.85, re: -0.2, be: -0.85, lx: 1.05, lz: 0.65 }, 0.13, 0.29, 0.52);
+    { ty: 0.48, tx: 0.55, bx: 0.26, hz: 0.18, hw: 0.15, hx: 0.12, tr: -1.05, kr: 1.15, rx: -0.85, re: -0.2, be: -0.85, lx: 1.05, lz: 0.65 }, 0.13, 0.29, 0.48, 0.74);
   // Sunder: a two-handed overhead slam into the floor from a deep crouch, an impact squash (knees give, the blade bounces),
-  // a rebound, a settle, then the recovery
+  // (hips sunk, helm dipped, held a beat), a rebound that lifts the blade, a settle, then the recovery
   { const w = { tx: -0.22, bx: -0.05, ty: -0.15, tl: -0.2, kl: 0.15, tr: 0.2, kr: 0.2, rx: -2.9, rz: -0.1, re: -1.0, lx: -2.85, lz: -0.35, le: -1.05, be: 2.1, by: 0, bz: 1.57 },
       s = { tx: 0.5, bx: 0.15, ty: 0.05, hz: 0.05, tl: -0.85, kl: 1.3, tr: 0.55, kr: 1.0, zl: 0.15, zr: -0.15, rx: -1.0, rz: 0.15, re: -0.25, lx: -1.0, lz: -0.4, le: -0.25, be: -0.9, by: 0, bz: 1.57 };
-    SW[3] = [[0, w], [0.16, w], [0.36, s, 2], [0.43, fol(s, { tx: 0.64, bx: 0.2, hx: 0.14, tl: -0.98, kl: 1.62, tr: 0.66, kr: 1.28, re: -0.4, le: -0.4, be: -1.22 }), 3],
-      [0.54, fol(s, { tx: 0.46, kl: 1.12, kr: 0.86, tl: -0.8, tr: 0.5, re: -0.15, be: -0.78 })], [0.64, fol(s, { tx: 0.54, kl: 1.3, kr: 1.0, be: -0.95 })], [0.94, {}, 0, 0.45]]; SWO[3] = 0.76; }
+    const sq = fol(s, { tx: 0.64, bx: 0.2, hx: 0.3, hz: 0.08, tl: -1.0, kl: 1.66, tr: 0.7, kr: 1.34, zl: 0.24, zr: -0.24, rx: -0.85, re: -0.45, le: -0.45, be: -1.3 });
+    SW[3] = [[0, w], [0.14, w], [0.32, s, 2], [0.4, sq, 3], [0.5, fol(sq, { tx: 0.6, kl: 1.6, kr: 1.28 })],
+      [0.6, fol(s, { tx: 0.3, bx: 0.08, hx: -0.05, kl: 0.95, kr: 0.72, tl: -0.7, tr: 0.45, rx: -1.25, re: -0.1, le: -0.15, be: -0.45 })], [0.7, fol(s, { tx: 0.42, kl: 1.12, kr: 0.88, be: -0.7 })], [0.92, {}, 0, 0.55]]; SWO[3] = 0.8; }
   SW[4] = [[0, {}], [0.3, { tx: -0.08, rx: -0.9, re: -0.85 }, 1], [1, {}]];
   // Sever: a wide two-handed horizontal cleave from the right hip, the off hand letting go on a long follow-through
   SW[5] = cut({ hy: -0.35, ty: -0.95, tx: 0.08, tl: -0.35, kl: 0.55, tr: 0.3, kr: 0.55, zl: 0.15, zr: -0.15, rx: -0.7, rz: -0.3, re: -1.2, lx: -0.9, lz: -0.65, le: -1.3, be: 0.15, by: -2.6, bz: 0 },
-    { hy: 0.2, ty: 0.4, tx: 0.2, bx: 0.08, hz: 0.06, tl: -0.75, kl: 0.8, tr: 0.45, kr: 0.3, rx: -1.45, rz: 0.55, re: -0.05, lx: -1.35, lz: -0.25, le: -0.25, be: 0.05, by: 0.5, bz: 0 },
-    { hy: 0.6, ty: 1.2, tx: 0.26, tz: -0.08, hw: 0.45, kl: 1.0, rx: -1.2, rz: 1.0, lx: 0.35, lz: 0.65, le: -0.6, be: 0.12, by: 1.55 }, 0.16, 0.34, 0.56, 0.86); SWO[5] = 0.82;
+    { hy: 0.2, ty: 0.4, tx: 0.2, bx: 0.08, hz: 0.06, tl: -0.75, kl: 0.8, tr: 0.45, kr: 0.3, rx: -1.45, rz: 0.55, re: -0.05, lx: -1.35, lz: -0.25, le: -0.25, be: 0.05, by: 0.5, bz: 0.5 },
+    { hy: 0.65, ty: 1.3, tx: 0.28, tz: -0.08, hw: 0.45, kl: 1.05, rx: -1.15, rz: 1.05, lx: 0.75, lz: 0.15, le: -1.0, be: 0.1, by: 1.75, bz: 0.55 }, 0.14, 0.3, 0.46, 0.76); SWO[5] = 0.8;
   // Lunge strike: the arrival thrust out of the dash
   SW[6] = cut({ ty: -0.45, rx: -0.95, rz: -0.35, re: -1.65, be: 0.05, by: -0.05, bz: 1.57, lx: -0.6, le: -0.9 },
     { ty: 0.35, tx: 0.16, bx: 0.22, hz: 0.1, tl: -0.8, kl: 0.8, tr: 0.55, kr: 0.3, rx: -1.85, rz: -0.38, re: -0.02, be: 0.04, by: 0.02, bz: 1.57, lx: 0.75, lz: 0.4, le: -0.2 },
-    { tx: 0.3, bx: 0.3, hz: 0.18, ty: 0.5, hw: 0.2, kl: 1.0, tl: -0.95, rx: -1.95, rz: -0.48, be: -0.2, lx: 0.95 }, 0.12, 0.28, 0.5);
+    { tx: 0.32, bx: 0.32, hz: 0.2, ty: 0.7, hw: 0.2, kl: 1.05, tl: -1.0, rx: -1.7, rz: -0.2, be: -0.5, by: 0.35, lx: 1.0, lz: 0.2 }, 0.12, 0.28, 0.44);
   // Riposte counter: out of the crouched guard, an explosive full-extension thrust on a long step with the right foot, held:
-  // sword arm straight at shoulder height, blade level along the facing, rear leg straight, off arm thrown back
+  // side-on (chest turned ~70 degrees, sword shoulder leading), sword arm straight at shoulder height, blade level along the facing
+  // with its flat to the side, rear leg straight, front knee deep, head over it, off arm tucked down and back behind the hip
   { const w = { hy: -0.2, ty: -0.55, tx: 0.05, tl: -0.25, kl: 0.45, tr: 0.35, kr: 0.6, rx: -0.75, rz: -0.15, re: -1.75, be: 0.05, by: 0.05, bz: 0, lx: -1.1, lz: 0.1, le: -0.6 },
-      s = { hy: 0.25, ty: 0.5, tx: 0.24, bx: 0.18, hz: 0.2, hw: 0.25, tl: 0.72, kl: 0.05, tr: -1.05, kr: 1.0, rx: -1.92, ry: 0, rz: -0.7, re: 0, be: 0, by: 0, bz: 0, lx: 1.1, lz: 0.55, le: -0.08 };
-    const f = fol(s, { ty: 0.6, hy: 0.3, tx: 0.28, bx: 0.22, hz: 0.28, kr: 1.14, rx: -1.96, rz: -0.78 });
+      s = { hy: 0.35, ty: 0.72, tx: 0.22, bx: 0.24, hz: 0.24, hw: -0.15, tl: 0.85, kl: 0.05, zl: 0.08, tr: -1.15, kr: 1.3, rx: -1.92, ry: 0, rz: -0.98, re: 0, be: 0, by: 0, bz: 1.35, lx: 0.32, lz: 0.08, le: -0.6 };
+    const f = fol(s, { ty: 0.82, hy: 0.4, tx: 0.26, bx: 0.28, hz: 0.32, kr: 1.45, rx: -1.96, rz: -1.07, lx: 0.38 });
     SW[7] = [[0, w], [0.05, w], [0.19, s, 1], [0.42, f, 3], [0.92, f]]; SWO[7] = 0.84; }
   function keyed(keys, k, base, out) {
     let i = 0; while (i < keys.length - 1 && k > keys[i + 1][0]) i++;
@@ -308,13 +311,13 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
 
     // ---- base: a staggered duelist's stance (sword side back, knees soft, blade low behind), blended into the run ----
     const kc = Math.cos(ph - 0.45);
-    B.hy = lerp(-0.14 + sway * 0.03, s * 0.16, L); B.hd = lerp(-0.035, Math.abs(c) * 0.05 - 0.035, L); B.hz = 0;
-    B.bx = lerp(0.03, 0.075, L); B.tx = lerp(0.06 + br * 0.012, 0.05, L); B.ty = lerp(-0.28 + Math.sin(t * 0.5) * 0.03, -s * 0.22, L); B.tz = lerp(sway * 0.02, 0, L);
+    B.hy = lerp(-0.14 + sway * 0.03, s * 0.2, L); B.hd = lerp(-0.035, Math.abs(c) * 0.065 - 0.04, L); B.hz = 0;
+    B.bx = lerp(0.03, 0.075, L); B.tx = lerp(0.06 + br * 0.012, 0.05, L); B.ty = lerp(-0.28 + Math.sin(t * 0.5) * 0.03, -s * 0.36, L); B.tz = lerp(sway * 0.02, 0, L);
     B.hx = lerp(0.05, -0.04 + c * 0.03, L); B.hw = lerp(Math.sin(t * 0.37) * 0.08, s * 0.08, L);
-    B.tl = lerp(-0.28, -s * 0.72, L); B.tr = lerp(0.22, s * 0.72, L); B.zl = lerp(0.16 + sway * 0.025, 0.04, L); B.zr = lerp(-0.14 + sway * 0.025, -0.04, L);
+    B.tl = lerp(-0.28, -s * 0.86, L); B.tr = lerp(0.22, s * 0.86, L); B.zl = lerp(0.16 + sway * 0.025, 0.04, L); B.zr = lerp(-0.14 + sway * 0.025, -0.04, L);
     B.kl = lerp(0.3, 0.12 + Math.pow(Math.max(0, kc), 1.5), L); B.kr = lerp(0.32, 0.12 + Math.pow(Math.max(0, -kc), 1.5), L);
     B.rx = lerp(-0.22 + br * 0.02, 0.2 - s * 0.35, L); B.ry = 0; B.rz = lerp(-0.2, -0.2, L); B.re = lerp(-0.7, -0.35, L);
-    B.lx = lerp(-0.4 + br * 0.02, s * 0.62, L); B.ly = 0; B.lz = lerp(0.16, 0.03, L); B.le = lerp(-1.3, -0.8, L);
+    B.lx = lerp(-0.4 + br * 0.02, s * 0.62, L); B.ly = 0; B.lz = lerp(0.16, 0.02, L); B.le = lerp(-1.3, -1.0, L);
     B.be = lerp(-0.55 + br * 0.015, -0.52 + c * 0.05, L); B.by = lerp(-2.35, -2.65, L); B.bz = lerp(0.2, 0.3, L);
     mix(B, STORM, A.storm * (1 - L) * 0.75);
     mix(B, GUARD, A.guard); mix(B, DASH, A.dash); mix(B, AIR, A.air * (1 - A.dash));
@@ -363,10 +366,10 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
     _q.copy(body.quaternion).multiply(hips.quaternion).multiply(torso.quaternion).invert();
     _gv.set(0, -1, 0).applyQuaternion(_q); _wv.set(-A.vx, 0, -A.vz).applyQuaternion(_q);
     const fa = 0.04 + 0.1 * L + 0.2 * A.dash + 0.08 * A.storm + 0.15 * A.spinW;
-    for (let i = 0; i < CN; i++) { const out = cOut[i], tan = cTan[i], fo0 = cFold[i]; _p.copy(cTop[i]); let o = i * (CR + 1) * 3; cPos[o] = _p.x; cPos[o + 1] = _p.y; cPos[o + 2] = _p.z;
+    for (let i = 0; i < CN; i++) { const out = cOut[i], tan = cTan[i], fo0 = cFold[i], cu = -(2 * i / (CN - 1) - 1) * crouch; _p.copy(cTop[i]); let o = i * (CR + 1) * 3; cPos[o] = _p.x; cPos[o + 1] = _p.y; cPos[o + 2] = _p.z;
       for (let j = 0; j < CR; j++) { const u = (CFR[j] + CFR[j + 1]) / 2, sl = (CFR[j + 1] - CFR[j]) * cLen[i];
         const fl = 0.04 + 0.12 * (1 - u) + F * (0.3 + 0.7 * u) + Math.sin(t * 8.5 - j * 0.9 + i * 0.55) * fa * u;
-        _dv.copy(_gv).addScaledVector(out, fl); _dv.z += crouch * 0.7 * (1 - 0.5 * u); _dv.addScaledVector(tan, lag * (0.25 + 0.9 * u)).addScaledVector(_wv, 0.04 + 0.06 * u);
+        _dv.copy(_gv).addScaledVector(out, fl); _dv.z += crouch * 0.75 * (1 - u) * (1 - u); _dv.addScaledVector(tan, lag * (0.25 + 0.9 * u) + cu * 0.6 * u * u).addScaledVector(_wv, 0.04 + 0.06 * u);
         const dOut = _dv.dot(out), dMin = 0.03 * (1 - crouch); if (dOut < dMin) _dv.addScaledVector(out, dMin - dOut);
         _p.addScaledVector(_dv.normalize(), sl);
         // keep the sheet outside the breastplate, faulds and seat
@@ -380,10 +383,11 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
     edgeM.color.copy(edgeBase).lerp(hotEdge, A.full * 0.8 + A.storm * 0.3).multiplyScalar(pump);
     sigilM.color.copy(sigilBase).multiplyScalar(0.85 + 0.15 * Math.sin(t * 2.3) + A.full * 0.3 * pulse + A.storm * 0.2);
     visorM.color.copy(visorBase).multiplyScalar(1 + A.guard * 0.6 + A.full * 0.4 * pulse + A.storm * 0.4);
-    trimM.emissiveIntensity = 0.16 + A.full * (0.18 + 0.12 * pulse) + A.storm * 0.1;
+    trimM.emissiveIntensity = 0.08 + A.full * (0.26 + 0.12 * pulse) + A.storm * 0.1;
     const counter = A.swingKind === 7 ? sw : 0, abil = Math.max(A.guard, counter, A.storm, A.spinW);
     dagM.color.copy(dagBase).multiplyScalar(0.6 + abil * 5);
     rimU.value.copy(rimBase).multiplyScalar(1 + A.guard * 0.8 + A.storm * 0.3 + counter * 1.2 + A.dash * 0.5);
+    pool.visible = p.pose !== 'fall'; poolM.color.setScalar((1 - A.air) * (1 + A.guard * 0.6 + A.storm * 0.5 + A.full * 0.3));
     aura.intensity = 1.0 + A.guard * 1.5 + A.storm * 1.0 + sw * 0.4 + A.full * 0.4 + counter * 2.5 + (p.flashT > 0 ? 4 : 0);
     // ---- Bladestorm blades ----
     const gv = A.storm > 0.02 && !G.headless;
@@ -392,7 +396,7 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
     ghostM.opacity = 0.6 + 0.25 * Math.sin(t * 7);
     // ---- trail ----
     if (G.headless || !g.visible) { trail.visible = false; return; }
-    A.ringW = damp(A.ringW, A.spin > 0 ? 1 : 0, 5, dt); const trl = lerp(TRL, 0.6, A.ringW);
+    A.ringW = damp(A.ringW, A.spin > 0 ? 1 : 0, 5, dt); const trl = lerp(TRL, 0.6, A.ringW), tk = A.swingKind === 1 && A.spin <= 0 ? 0.5 : 1; // the rising backhand sweeps toward the camera: half width and brightness
     const act = Math.min(1, sat(sw * 1.4) * (A.swingKind === 4 ? 0 : 1) + A.dash * 0.5 + A.spinW);
     if (act > 0.01) A.trOn = t;
     if (t - A.trOn > trl + 0.03) { trail.visible = false; A.trFresh = true; return; }
@@ -406,10 +410,10 @@ HERO_MODELS.duskblade = function buildDuskblade(cls) {
     sR[0].copy(_a); sD[0].copy(_b); sL[0] = bl; sT[0] = t; sA[0] = act;
     for (let cI = 0; cI < TCOL; cI++) { const sc = cI / TSUB, i0 = Math.min(TS - 2, Math.floor(sc)), fr = sc - i0, i1 = i0 + 1, o = cI * 6;
       _c.copy(sR[i0]).lerp(sR[i1], fr); _d.copy(sD[i0]).lerp(sD[i1], fr).normalize(); const ln = lerp(sL[i0], sL[i1], fr);
-      const u = sat((t - lerp(sT[i0], sT[i1], fr)) / trl), ac = lerp(sA[i0], sA[i1], fr) * (1 - u), wf = u >= 1 ? 0 : Math.pow(Math.sin(PI * (0.12 + 0.88 * u)), 0.6) * lerp(0.46, 0.3, A.ringW);
+      const u = sat((t - lerp(sT[i0], sT[i1], fr)) / trl), ac = lerp(sA[i0], sA[i1], fr) * (1 - u), wf = u >= 1 ? 0 : Math.pow(Math.sin(PI * (0.12 + 0.88 * u)), 0.6) * lerp(0.46, 0.3, A.ringW) * tk;
       _p.copy(_c).addScaledVector(_d, ln); _c.copy(_p).addScaledVector(_d, -ln * wf);
       trPos[o] = _c.x; trPos[o + 1] = _c.y; trPos[o + 2] = _c.z; trPos[o + 3] = _p.x; trPos[o + 4] = _p.y; trPos[o + 5] = _p.z;
-      const ti = ac * Math.pow(1 - u, 0.6); _tc.copy(trHot).lerp(trCool, Math.min(1, u * 1.6)).multiplyScalar(ti);
+      const ti = ac * Math.pow(1 - u, 0.6) * (tk < 1 ? 0.55 : 1); _tc.copy(trHot).lerp(trCool, Math.min(1, u * 1.6)).multiplyScalar(ti);
       trCol[o] = 0; trCol[o + 1] = 0; trCol[o + 2] = 0; trCol[o + 3] = _tc.r; trCol[o + 4] = _tc.g; trCol[o + 5] = _tc.b; }
     trGeo.attributes.position.needsUpdate = true; trGeo.attributes.color.needsUpdate = true;
     trail.matrix.copy(_m.copy(g.matrixWorld).invert()); trail.visible = true;

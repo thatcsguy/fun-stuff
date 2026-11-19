@@ -15,8 +15,8 @@ const fs = require('fs'), path = require('path');
   const follow = (v) => page.evaluate((v) => {
     const g = window.__game, C = g.Cam; window.__follow = v;
     if (!window.__followLoop) { window.__followLoop = true; const V = g.camera.position.constructor; const c = { pos: new V(), look: new V(), fov: 34 };
-      const f = () => { const q = window.__follow, p = g.G.player; if (q && p) { const a = (q.abs ? 0 : p.facing) + q.yaw; c.fov = q.fov || 34;
-        c.pos.set(p.pos.x + Math.sin(a) * q.d, p.pos.y + q.h, p.pos.z + Math.cos(a) * q.d); c.look.set(p.pos.x, p.pos.y + (q.ly || 1.05), p.pos.z); C.cine = c; C.cineW = 1; }
+      const f = () => { const q = window.__follow, p = g.G.player; if (q && p) { const a = (q.abs ? 0 : p.facing) + q.yaw, fw = q.fwd || 0, ox = Math.sin(p.facing) * fw, oz = Math.cos(p.facing) * fw; c.fov = q.fov || 34;
+        c.pos.set(p.pos.x + ox + Math.sin(a) * q.d, p.pos.y + q.h, p.pos.z + oz + Math.cos(a) * q.d); c.look.set(p.pos.x + ox, p.pos.y + (q.ly || 1.05), p.pos.z + oz); C.cine = c; C.cineW = 1; }
         requestAnimationFrame(f); }; requestAnimationFrame(f); }
     if (!v) { C.cine = null; C.cineW = 0; }
   }, v);
@@ -56,7 +56,7 @@ const fs = require('fs'), path = require('path');
     await follow({ yaw: 0.35, d: 2.0, h: 1.75, ly: 1.6, fov: 30 }); await frames(8); await shot(P + 'idle_face');
     // walk a lap around the boss so the run never meets a wall (the boss is on the hero's left, so the cameras stay on the right)
     await ev(() => { window.__walkLoop = true; const g = window.__game; const f = () => { if (!window.__walkLoop) return; const p = g.G.player, b = g.G.boss; const a = Math.atan2(p.pos.x - b.pos.x, p.pos.z - b.pos.z) + Math.PI / 2; window.__mv = { moveX: Math.sin(a), moveZ: Math.cos(a) }; requestAnimationFrame(f); }; f(); });
-    for (const [n, yaw] of [['side', -1.57], ['front', -0.6], ['back', -2.6]]) { await follow({ yaw, d: 4.2, h: 1.4 }); await frames(23); await shot(P + 'walk_' + n); await frames(11); await shot(P + 'walk_' + n + '2'); }
+    for (const [n, yaw] of [['side', -1.57], ['front', -0.6], ['back', -2.6]]) { await follow({ yaw, d: 4.2, h: 1.4 }); await frames(23); await shot(P + 'walk_' + n); await frames(17); await shot(P + 'walk_' + n + '2'); }
     await ev(() => { window.__walkLoop = false; window.__mv = { moveX: 0, moveZ: 0 }; }); await frames(40);
     await ev(() => { const g = window.__game, p = g.G.player, b = g.G.boss; const d = Math.hypot(b.pos.x - p.pos.x, b.pos.z - p.pos.z), k = Math.max(0, d - b.radius - 2.2) / d; p.pos.x += (b.pos.x - p.pos.x) * k; p.pos.z += (b.pos.z - p.pos.z) * k; p.facing = Math.atan2(b.pos.x - p.pos.x, b.pos.z - p.pos.z); p.combo = 0; });
     await frames(20);
@@ -68,10 +68,10 @@ const fs = require('fs'), path = require('path');
     await press(4); await frames(12); await shot(P + 'riposte_guard');
     await frames(60);
     // god mode makes hurt() return early, so the parry is fired directly; its burst is cleared so the counter pose shows
-    await ev(() => { const p = window.__game.G.player; p.parryT = 0; p.cls.onParry(p, { blockable: true, src: 'test' }); }); await frames(14); await ev(() => window.__game.FX.clear()); await shot(P + 'riposte_counter');
+    await ev(() => { const p = window.__game.G.player; p.parryT = 0; p.cls.onParry(p, { blockable: true, src: 'test' }); }); await follow({ yaw: 1.45, d: 5.0, h: 1.4, fwd: 0.75 }); await frames(14); await ev(() => window.__game.FX.clear()); await shot(P + 'riposte_counter');
     await frames(60);
     await follow({ yaw: 1.2, d: 4.2, h: 1.5 });
-    await press(5); await frames(6); await shot(P + 'sunder_a'); await frames(7); await shot(P + 'sunder_b'); await frames(60);
+    await press(5); await frames(8); await shot(P + 'sunder_a'); await frames(5); await shot(P + 'sunder_b'); await frames(60);
     // lunge from a distance onto the boss
     await clear(); await ev(() => { const g = window.__game, p = g.G.player, b = g.G.boss; p.facing = Math.atan2(b.pos.x - p.pos.x, b.pos.z - p.pos.z); }); await frames(20);
     await follow({ yaw: 1.4, d: 5.5, h: 1.6 });
