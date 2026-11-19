@@ -76,6 +76,7 @@ const fs = require('fs'), path = require('path');
     await home(0); await frames(10);
     await follow({ yaw: 0.6, d: 4, h: 1.5 });
     await ev(() => window.__game.G.player.press(4)); await frames(30); await shot(P + 'aegis');
+    await follow({ yaw: 0.6, d: 5.2, h: 1.9, ly: 1.5 });
     await ev(() => { const p = window.__game.G.player; p.sk[2].cd = 0; p.sk[2].charges = 1; p.press(2); }); await frames(40); await shot(P + 'tempest');
     await follow(null); await frames(40);
     const st = await ev(() => window.__game.state()); console.log('state', JSON.stringify(st));
