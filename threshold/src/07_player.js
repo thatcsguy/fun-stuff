@@ -1,6 +1,6 @@
 // The player: procedural hero model, MMO movement, targeting, GCD/cast/cooldown engine, damage intake.
 function buildHero(cls) {
-  if (HERO_MODELS[cls.id]) return HERO_MODELS[cls.id](cls); // a class with its own model (07_hero.js)
+  if (HERO_MODELS[cls.id] && !cls.look.generic) return HERO_MODELS[cls.id](cls); // a class with its own model (07_hero.js); look.generic keeps this one
   const g = new THREE.Group(), C = cls.look;
   const armor = W.mat({ color: C.armor, roughness: 0.42, metalness: 0.75 }), cloth = W.mat({ color: C.cloth, roughness: 0.9, side: THREE.DoubleSide }), skin = W.mat({ color: 0x1a1a22, roughness: 0.6 });
   const trim = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: C.glow, emissiveIntensity: 2.2, roughness: 0.4 });
