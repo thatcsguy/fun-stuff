@@ -15,6 +15,7 @@ A PC-first 3D raid game: unrelated boss fights, one behind each door, four class
 | `05_world.js` | `Cam` (orbit camera + cinematic shots) and `W` (procedural textures, sky, water, lava, lights, motes) |
 | `06_combat.js` | `Hz` telegraphed hazards, `Bul` bullets, `Ent` and `Boss` |
 | `07_hero.js` | Hero model kit (`HeroKit`: rim-lit materials, parts merged per bone and material, lathe/tube helpers, cloth springs) and the per-class models in `HERO_MODELS` (Stormcaller so far) |
+| `07_hexslinger.js` | Hexslinger model: witch-crown cattleman hat, duster on hinged panels, bandolier of salve vials, a revolver whose six chambers show the loaded rounds; two-bone IK arms (fan, load, spin, salve twirl) |
 | `07_player.js` | Generic procedural hero model (used by classes without their own), `Player` (movement, casting, GCD, buffs, dashes, damage) |
 | `08_classes.js` | The four classes and their autopilot rotations (see "Classes" below) |
 | `09_ui.js`, `10_game.js` | HUD/menus, fight lifecycle (including the hidden rehearsal at load), the hall-of-doors menu scene |
@@ -86,6 +87,7 @@ Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `pit`.
 - `hitch.js <boss>`: plays each phase in real frames and lists every shader compiled after the fight started (should be none).
 - `warmcheck.js [boss...]`: loads fights through the real loading path and prints rehearsal and warm-up times.
 - `shot.js <query> <out.png> [evalJS] [frames]`: screenshot.
+- `hexcap.js <outDir> [boss,boss] [groups]`: herocap.js for the Hexslinger: idle, walk, fire and recoil, Load, Spin, Salve twirl, Silver, the Last Word, airborne, plus gun close-ups and the same perf line. `groups` (play,idle,walk,fire,load,spin,salve,last,air) keeps a review loop short.
 - `herocap.js <outDir> [class] [boss,boss]`: player-model review. Enters each door normally (intro plays), then screenshots the hero with the play camera and with a follow camera (front, side, back, face) idle, walking, casting, on the spender, Blink, the barrier and Tempest; prints the hero's mesh and triangle counts and the frame time.
 - `montage.js <out.png> <cols> <x,y,w,h | full> img...`: tiles (optionally cropped) screenshots into one contact sheet.
 - `diag.js <boss> <class> <expr> <seconds> [phase]`: autopilot run that prints `expr` (JS with `g, G, b, p, S` in scope) every half second, for tracing a mechanic.
