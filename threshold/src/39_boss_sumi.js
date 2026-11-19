@@ -26,13 +26,22 @@
   }
   const INK = `uniform float uTime, uReveal, uStorm, uSun, uBloom, uPetal, uGale, uCut; uniform vec2 uWind;
 const vec3 PAPER = ${vc(0xefe7d3)}, PSH = ${vc(0xd8cdb4)}, I0 = ${vc(0x14130f)}, I1 = ${vc(0x34322c)}, I2 = ${vc(0x6b675d)}, I3 = ${vc(0xa39e90)}, I4 = ${vc(0xcfc8b6)};
-const vec3 VER = ${vc(VERM)}, PK = ${vc(0xf2a6b8)}, PK2 = ${vc(0xd9728c)}, GLD = ${vc(0xf3dca0)}, SILK = ${vc(0x2e3a34)}, SILK2 = ${vc(0x48574c)}, OCH = ${vc(0xb8955a)};
+const vec3 VER = ${vc(VERM)}, PK = ${vc(0xf2a6b8)}, PK2 = ${vc(0xd9728c)}, GLD = ${vc(0xf3dca0)}, SILK = ${vc(0x2e3a34)}, SILK2 = ${vc(0x48574c)}, OCH = ${vc(0xb8955a)}, CRM = ${vc(0xb0203a)};
 const mat3 MINI = ${g3(MIN)}, MOUTI = ${g3(MOUT)};
 float hh(vec2 p){ vec3 q = fract(vec3(p.xyx) * 0.1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
 float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(hh(i), hh(i + vec2(1.0, 0.0)), f.x), mix(hh(i + vec2(0.0, 1.0)), hh(i + vec2(1.0, 1.0)), f.x), f.y); }
 float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * vn(p); p = p * 2.03 + vec2(17.1, 9.3); a *= 0.5; } return s * 1.0667; }
 vec3 tone(float s, float n){ s = clamp(s + (n - 0.5) * 0.08, 0.0, 1.0); vec3 c = mix(I0, I1, smoothstep(0.13, 0.18, s)); c = mix(c, I2, smoothstep(0.33, 0.38, s)); c = mix(c, I3, smoothstep(0.53, 0.58, s)); c = mix(c, I4, smoothstep(0.72, 0.77, s)); return mix(c, PAPER, smoothstep(0.89, 0.94, s)); }
 float kas(vec2 uv, float amt){ float n = vn(vec2(uv.x * 2.0, uv.y * 40.0)) * 0.6 + vn(vec2(uv.x * 5.0, uv.y * 110.0)) * 0.4; return smoothstep(amt - 0.1, amt + 0.1, n); }
+// dry-brush streaks that never get thinner than about two pixels: an octave fades to its mean (and the edge widens) before it can alias
+float kasA(vec2 uv, float amt){ float px = max(fwidth(uv.y), 1e-5), o1 = 1.0 - smoothstep(0.1, 0.25, px * 40.0), o2 = 1.0 - smoothstep(0.1, 0.25, px * 110.0);
+  float n = mix(0.5, vn(vec2(uv.x * 2.0, uv.y * 40.0)), o1) * 0.6 + mix(0.5, vn(vec2(uv.x * 5.0, uv.y * 110.0)), o2) * 0.4, wd = 0.1 + 0.3 * (1.0 - o1);
+  return smoothstep(amt - wd, amt + wd, n); }
+// dragon body hair noise in body space (x along, y around): long thin streaks, fine octave faded before it aliases
+float hairN(vec2 q){ float px = max(fwidth(q.y), 1e-5), o1 = 1.0 - smoothstep(0.15, 0.4, px * 12.0), o2 = 1.0 - smoothstep(0.1, 0.3, px * 28.0);
+  return mix(0.5, vn(vec2(q.x * 0.25, q.y * 12.0)), o1) * 0.65 + mix(0.5, vn(vec2(q.x * 0.6, q.y * 28.0 + 7.0)), o2) * 0.35; }
+float sq1(float x){ return exp(-x * x); } // a gaussian bump (no pow of a negative base)
+float tailEr(vec2 q){ return vn(vec2(q.x * 0.9, q.y * 2.2)) * 0.55 + vn(vec2(q.x * 2.4, q.y * 6.0 + 3.0)) * 0.45; }
 vec3 outc(vec3 y){ y = clamp(MOUTI * clamp(y, 0.0, 1.0), 0.0, 0.985); vec3 A = 0.983729 * y - 1.0, B = 0.432951 * y - 0.0245786, C = 0.238081 * y + 0.000090537;
   vec3 x = (-B - sqrt(max(B * B - 4.0 * A * C, 0.0))) / (2.0 * A); return max(MINI * x, 0.0) * ${(0.6 / EXPO).toFixed(5)}; }
 float ign(vec2 p){ return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715)))); }
@@ -101,14 +110,43 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
 
   // ---------------------------------------------------------------------------------------------------------------------
   // the painted world
+  // (r3) the sky inscription, drawn once into a canvas: R = ink of a vertical column (画竜点睛, "paint the dragon, dot the eyes"),
+  // G = a small vermilion seal under it with one carved character. Without a CJK font the column falls back to abstract brush glyphs.
+  function makeCal() {
+    const W2 = 128, H2 = 512, cv = document.createElement('canvas'); cv.width = W2; cv.height = H2; const x = cv.getContext('2d');
+    x.fillStyle = '#000'; x.fillRect(0, 0, W2, H2);
+    const FONT = '"Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "MS Mincho", "Noto Serif CJK JP", "Noto Serif JP", "Source Han Serif", serif';
+    // tofu test: two different characters that render identically mean there is no font for them
+    const probe = (ch) => { const c2 = document.createElement('canvas'); c2.width = c2.height = 40; const q = c2.getContext('2d'); q.fillStyle = '#fff'; q.font = '32px ' + FONT; q.textBaseline = 'top'; q.fillText(ch, 4, 4); return q.getImageData(0, 0, 40, 40).data; };
+    let hasCJK = false; try { const a = probe('画'), b2 = probe('竜'); let diff = 0, ink = 0; for (let i = 0; i < a.length; i += 4) { diff += Math.abs(a[i] - b2[i]); ink += a[i]; } hasCJK = diff > 2000 && ink > 2000; } catch (e) { hasCJK = false; }
+    const rng = mulberry(77); x.fillStyle = 'rgb(255,0,0)'; x.strokeStyle = 'rgb(255,0,0)'; x.lineCap = 'round';
+    const chars = ['画', '竜', '点', '睛'];
+    for (let i = 0; i < 4; i++) { const cy = 22 + i * 98, cx = W2 / 2;
+      if (hasCJK) { x.font = '700 92px ' + FONT; x.textAlign = 'center'; x.textBaseline = 'top'; x.lineWidth = 7; x.lineJoin = 'round'; const ox = cx + (rng() - 0.5) * 6; x.fillText(chars[i], ox, cy); x.strokeText(chars[i], ox, cy); }
+      else for (let k = 0; k < 4 + Math.floor(rng() * 3); k++) { x.lineWidth = 6 + rng() * 10; x.beginPath(); const x0 = cx + (rng() - 0.5) * 70, y0 = cy + 8 + rng() * 70; x.moveTo(x0, y0);
+        x.quadraticCurveTo(x0 + (rng() - 0.5) * 50, y0 + (rng() - 0.5) * 50, x0 + (rng() - 0.5) * 80, y0 + (rng() - 0.3) * 40); x.stroke(); } }
+    // the seal: a slightly rough square, one character carved out of it
+    x.fillStyle = 'rgb(0,255,0)'; x.beginPath(); x.moveTo(40, 432); x.lineTo(90, 430); x.lineTo(91, 482); x.lineTo(39, 481); x.closePath(); x.fill();
+    x.fillStyle = 'rgb(0,0,0)';
+    if (hasCJK) { x.font = '700 40px ' + FONT; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('竜', 65, 457); }
+    else { x.fillRect(50, 442, 30, 5); x.fillRect(50, 455, 30, 5); x.fillRect(62, 442, 6, 30); x.fillRect(50, 468, 30, 5); }
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.NoColorSpace; t.anisotropy = 4; return t;
+  }
   function buildSky(S, g) {
-    S.skyU = { uSunD: { value: new V3(0, -0.12, -1).normalize() }, uBolt: { value: 0 }, uBoltA: { value: 0.5 } };
+    S.skyU = { uSunD: { value: new V3(0, -0.12, -1).normalize() }, uBolt: { value: 0 }, uBoltA: { value: 0.5 }, uCal: { value: makeCal() } };
     const m = new THREE.Mesh(new THREE.SphereGeometry(1500, 48, 24), smat(S.U, 'varying vec3 vD; void main(){ vD = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }', `
-      varying vec3 vD; uniform vec3 uSunD; uniform float uBolt, uBoltA;
+      varying vec3 vD; uniform vec3 uSunD; uniform float uBolt, uBoltA; uniform sampler2D uCal;
       void main(){
         vec3 d = vD / max(length(vD), 1e-4); float h = d.y; float hz = length(d.xz); vec2 cs = d.xz / max(hz, 1e-4); float az = atan(d.x, -d.z);
         float n = vn(cs * 3.0 + vec2(h * 4.0, 0.0)), n2 = vn(cs * 9.0 + vec2(0.0, h * 9.0));
-        vec3 col = mix(PAPER, PSH, clamp(smoothstep(0.05, 0.9, h) * 0.3 + (n - 0.5) * 0.18 + (n2 - 0.5) * 0.05, 0.0, 1.0));
+        // (r3) bokashi: one tone darker at the top of the sky, palest at the horizon
+        vec3 col = mix(PAPER, mix(PSH, I4, 0.25), clamp(smoothstep(-0.02, 0.3, h) * 0.85 + (n - 0.5) * 0.14 + (n2 - 0.5) * 0.04, 0.0, 1.0));
+        // three very pale horizontal haze washes, each with a slightly darker wet lower edge, broken along their length
+        for (int i = 0; i < 3; i++) { float fi = float(i), y0 = 0.032 + fi * 0.05 + fi * fi * 0.012 + (vn(vec2(az * 3.0 + fi * 3.1, fi)) - 0.5) * 0.018, w = 0.011 + fi * 0.006;
+          float on = smoothstep(0.3, 0.55, vn(vec2(az * 2.2 + fi * 5.0, fi * 2.0 + 1.0))) * (0.7 + 0.3 * vn(vec2(az * 9.0, h * 40.0 + fi)));
+          float ws = smoothstep(y0 - w, y0 - w * 0.4, h) * (1.0 - smoothstep(y0 + w * 0.2, y0 + w * 1.2, h)) * on;
+          float we = (1.0 - smoothstep(0.0, w * 0.35, abs(h - y0 + w * 0.75))) * on;
+          col = mix(col, mix(PSH, I4, 0.4), ws * 0.32 + we * 0.18); }
         if (uStorm > 0.002) {
           // the whole sky drops to a grey wash, then haboku clouds (broken, wet-in-wet ink) own the upper sky
           col = mix(col, mix(I4, I3, 0.55 + (n - 0.5) * 0.4), uStorm * 0.8);
@@ -128,15 +166,27 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
           if (uBolt > 0.002) { float bx = uBoltA + (vn(vec2(h * 14.0, 3.0)) - 0.5) * 0.08 + (vn(vec2(h * 45.0, 9.0)) - 0.5) * 0.025; float bw = 0.004 + 0.004 * (1.0 - h);
             float bolt = (1.0 - smoothstep(bw * 0.5, bw, abs(az - bx))) * smoothstep(0.02, 0.12, h) * (1.0 - smoothstep(0.75, 0.95, h)); col = mix(col, PAPER, uBolt * 0.6 * (1.0 - bolt)); col = mix(col, I0, bolt * uBolt); }
         }
+        // (r3) the inscription: a vertical column of brush calligraphy and a small vermilion seal, fixed on the sky right of the valley
+        { float e = asin(clamp(h, -1.0, 1.0)); vec2 cu = vec2((az - 0.6) / 0.035 + 0.5, (e - 0.046) / 0.13);
+          if (cu.x > 0.0 && cu.x < 1.0 && cu.y > 0.0 && cu.y < 1.0) { vec4 tx = texture2D(uCal, cu); float vis = 1.0 - uStorm;
+            float ik = tx.r * (0.55 + 0.45 * kas(vec2(cu.y * 3.0, cu.x * 0.6), 0.18));
+            col = mix(col, mix(I1, I0, 0.5), ik * 0.95 * vis); col = mix(col, mix(VER, I1, 0.08), tx.g * 0.9 * (0.88 + 0.12 * vn(cu * 90.0)) * vis); } }
         float disc = 0.0;
         if (uSun > 0.002) {
           float cd = clamp(dot(d, uSunD), -1.0, 1.0), ang = acos(cd);
-          col = mix(col, GLD, uSun * (exp(-ang * 2.2) * 0.75 + (1.0 - smoothstep(-0.05, 0.5, h)) * 0.2));
-          float edge = 0.039 + (vn(d.xy * 160.0 + d.z * 70.0) - 0.5) * 0.004;
-          disc = (1.0 - smoothstep(edge - 0.003, edge + 0.004, ang)) * uSun;
-          col = mix(col, VER, disc);
+          // dawn grade: warm gold at the horizon to a pale rose above, a pale halo wash round the sun
+          col = mix(col, mix(mix(GLD, PAPER, 0.15), mix(PAPER, PK, 0.3), smoothstep(0.02, 0.26, h)), uSun * 0.6);
+          col = mix(col, mix(GLD, PAPER, 0.3), uSun * (1.0 - smoothstep(0.07, 0.34, ang)) * 0.6);
+          col = mix(col, GLD, uSun * exp(-ang * 3.0) * 0.35);
+          // a flat vermilion disc ~8.6 deg wide with a soft wet edge (pigment pooled at the rim), no bands
+          vec3 sr = normalize(cross(uSunD, vec3(0.0, 1.0, 0.0)) + vec3(1e-5)), su = cross(sr, uSunD); float sa = atan(dot(d, su), dot(d, sr));
+          float edge = 0.075 * (1.0 + (vn(vec2(sa * 2.2, 3.0)) - 0.5) * 0.05 + (vn(vec2(sa * 8.0, 7.0)) - 0.5) * 0.018);
+          disc = (1.0 - smoothstep(edge - 0.0025, edge + 0.0015, ang)) * uSun;
+          float rim = smoothstep(edge - 0.012, edge - 0.002, ang);
+          vec3 sc = mix(mix(VER, GLD, 0.06 + 0.06 * fbm(vec2(sa * 1.5, ang * 30.0))), mix(VER, I1, 0.16), rim * 0.65);
+          col = mix(col, sc, disc);
         }
-        gl_FragColor = vec4(outc(col) + vec3(0.9, 0.02, 0.0) * disc, 1.0);
+        gl_FragColor = vec4(outc(col) + vec3(0.55, 0.03, 0.0) * disc, 1.0);
       }`, S.skyU, { side: THREE.BackSide, depthWrite: false }));
     m.renderOrder = -100; m.frustumCulled = false; m.onBeforeRender = () => { m.position.copy(camera.position); }; g.add(m); S.sky = m;
   }
@@ -175,7 +225,8 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         float rimR = ${R.toFixed(1)} + (vn(cs * 3.0) - 0.5) * 0.8 + (vn(cs * 26.0) - 0.5) * 0.12;
         float wm = mix(0.2, 2.0, smoothstep(0.25, 0.75, vn(cs * 4.2 + 2.0) * 0.75 + vn(cs * 11.0 + 5.0) * 0.25));
         float wid = 0.22 * wm + 0.03, dr = r - rimR, brk = smoothstep(0.2, 0.27, vn(cs * 7.0 + 9.0));
-        float rimL = (1.0 - smoothstep(wid * 0.55, wid, abs(dr))) * mix(1.0, kas(vec2(az * r * 0.05, dr / max(wid, 0.05) * 0.3), 0.2 + 0.4 * (1.0 - smoothstep(0.3, 1.2, wm))), 0.85) * brk;
+        float raa = max(fwidth(dr), 1e-4); // (r3) antialiased: never thinner than a pixel, streaks fade before they alias
+        float rimL = (1.0 - smoothstep(wid * 0.55 - raa * 0.5, wid + raa, abs(dr))) * mix(1.0, kasA(vec2(az * r * 0.05, dr / max(wid, 0.05) * 0.3), 0.2 + 0.4 * (1.0 - smoothstep(0.3, 1.2, wm))), 0.85) * brk;
         float af = abs(az) / 3.14159;
         rimL *= step(af, rvR * 1.03);
         ink = max(ink, rimL * 0.96);
@@ -209,7 +260,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         // the dragon diving into the paper: rings spreading from where he went in
         if (uRip.w > 0.002) { float d = length(p - uRip.xy), ph = d - (uTime - uRip.z) * 6.0;
           ink = max(ink, smoothstep(0.86, 0.98, cos(ph * 2.0)) * step(ph, 0.0) * exp(ph * 0.12) * uRip.w * (1.0 - smoothstep(12.0, 24.0, d)) * 0.7); }
-        vec3 cw = mix(base, mix(I3, I2, 0.35), clamp(ink * 2.4, 0.0, 1.0));
+        vec3 cw = mix(base, mix(mix(I3, I2, 0.35), mix(OCH, I2, 0.4), uSun * 0.7), clamp(ink * 2.4, 0.0, 1.0)); // (r3) warm washes under the dawn
         vec3 c = min(mix(cw, tone(1.0 - ink, n3), smoothstep(0.3, 0.42, ink)), base);
         // fallen petals
         if (uPetal > 0.002) { vec2 pg = p / 0.8, pi = floor(pg), pf = fract(pg) - 0.5 - (vec2(hh(pi + 1.1), hh(pi + 2.2)) - 0.5) * 0.5;
@@ -222,32 +273,38 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
 
   function buildMountains(S, g) {
     // radius, peak height, ink strength, seed, base fade
-    const L = [[58, 44, 1.3, 3.1], [84, 33, 0.92, 11.7], [112, 19, 0.62, 23.3], [150, 13, 0.5, 37.9], [210, 11, 0.38, 51.1]];
+    const L = [[58, 44, 1.3, 3.1], [84, 33, 0.92, 11.7], [112, 19, 0.62, 23.3], [150, 16, 0.5, 37.9], [210, 16, 0.38, 51.1]];
     // crest elevation range (deg) per layer, seen from the fight eye (about 7 m up, 12 m behind the terrace centre)
-    const EL = [[-6.5, -1.4], [-4.8, -0.5], [-3.2, 0.5], [-2.2, 1.3], [-1.6, 2.0]];
+    // (r3) [low, crest cap in the centre of the default view (the sun's valley, under the HP bar), crest cap on the flanks, near?] in degrees.
+    // From the fight eye the horizon sits at y~176 (720p); +5 deg is y~110 and +10 deg is y~40. The far layers rise highest so three
+    // ridgelines stack behind one another; the near layers sink into a valley at the centre.
+    const EL = [[-5.5, -2.2, 4.2, 1], [-3.6, -1.2, 6.6, 1], [-2.4, -0.4, 8.6, 1], [-1.6, 0.1, 9.8, 0], [-1.1, -0.2, 7.6, 0]];
     const mat0 = smat(S.U, VW, `
       varying vec3 vW; uniform vec4 uL, uL2; uniform vec2 uRW; uniform float uFall;
-      float ridge(vec2 cs){ float s = 0.0, a = 0.5, f = 1.0; for (int i = 0; i < 4; i++){ float n = vn(cs * (2.4 * f) + uL.w + float(i) * 7.3); s += a * (1.0 - abs(n * 2.0 - 1.0)); f *= 2.3; a *= 0.5; } return s / 0.9375; }
+      // two octaves of sharp ridged noise: pointed crests, concave flanks
+      float ridge(vec2 cs){ float n1 = 1.0 - abs(vn(cs * 2.6 + uL.w) * 2.0 - 1.0), n2 = 1.0 - abs(vn(cs * 6.1 + uL.w + 7.3) * 2.0 - 1.0);
+        return clamp(pow(max(n1, 0.0), 2.2) * 0.72 + n2 * n2 * 0.28, 0.0, 1.0); }
       void main(){
-        float r = length(vW.xz); vec2 cs = vW.xz / max(r, 1e-3); float az = atan(vW.x, -vW.z);
-        float rg = clamp(ridge(cs), 0.0, 1.0);
-        float mass = 0.35 + 0.65 * vn(cs * 1.3 + uL.w + 50.0);
-        float e = mix(uL2.x, uL2.y, min(pow(rg, 2.0) * mass * 1.35, 1.15));
-        // near ridges dip in the middle (the valley the sun rises in); the two far ridges flank a notch at the centre
-        e = mix(uL2.x - 0.5, e, mix(1.0, smoothstep(0.08, 0.42, abs(az)), uL2.z));
-        float nt = exp(-pow(az / 0.075, 2.0)), fl = exp(-pow((abs(az) - 0.17) / 0.06, 2.0));
-        e = mix(e, uL2.y + 0.4, fl * uL2.w); e = mix(e, uL2.x - 0.6, nt * uL2.w);
-        float H = 7.0 + tan(e * 0.017453) * (r + 12.0);
+        float r = length(vW.xz); vec2 cs = vW.xz / max(r, 1e-3); float az = atan(vW.x, -vW.z), aaz = abs(az);
+        float rg = ridge(cs), mass = 0.5 + 0.5 * vn(cs * 1.2 + uL.w + 50.0);
+        float cap = mix(uL2.y, uL2.z, smoothstep(0.34, 0.68, aaz));
+        cap = mix(cap, min(cap, 2.2), sq1((az - 0.6) / 0.12)); // room under the sky inscription
+        float e = mix(uL2.x, cap, clamp(rg * mass * 1.25, 0.0, 1.0));
+        // the near ridges dip to a valley at the centre; every layer leaves a notch for the sun
+        float hill = uL2.x - 0.5 + rg * mass * 1.7; // the valley still rolls (no flat strip)
+        e = mix(hill, e, mix(1.0, smoothstep(0.06, 0.36, aaz), uL2.w));
+        e = mix(e, min(e, uL2.x + 0.3 + rg * 1.4), sq1(az / 0.12));
+        float H = 7.0 + tan(e * 0.017453) * (r + 12.0), yb = 7.0 + tan((uL2.x - 1.5) * 0.017453) * (r + 12.0);
         float y = vW.y, dy = H - y, aa = max(fwidth(y), 1e-3) * 1.2;
         float sil = smoothstep(-aa, aa, dy);
         if (sil < 0.004) discard;
         float lw = (0.35 + r * 0.006) * (1.0 + uStorm * 1.4);
         float line = 1.0 - smoothstep(lw * 0.4, lw * 1.5, dy + (vn(cs * 70.0 + y * 0.3) - 0.5) * lw * 1.2);
-        float fade = exp(-max(dy, 0.0) / (5.0 + uL.y * 0.2 + uStorm * 6.0));
+        // darkest at the crest, dissolving to paper by ~40% of the height of the peak
+        float hgt = max(H - yb, 2.0), fade = 1.0 - smoothstep(0.0, hgt * 0.4, max(dy, 0.0) + (fbm(cs * 9.0 + vec2(y * 0.05, uL.w)) - 0.5) * hgt * 0.18);
         float cun = kas(vec2(y * 0.05, az * r * 0.035 + uL.w), 0.5);
-        float dark = max(line * 0.95, fade * (0.42 + 0.4 * cun) * (0.55 + 0.45 * vn(cs * 18.0 + y * 0.06)));
+        float dark = max(line * 0.95, fade * (0.5 + 0.4 * cun) * (0.6 + 0.4 * vn(cs * 18.0 + y * 0.06)));
         dark *= uL.z * (1.0 - uStorm * 0.3);
-        dark *= smoothstep(-4.0, uL.y * 0.5, y + (fbm(cs * 7.0 + vec2(y * 0.04, 0.0)) - 0.5) * uL.y * 0.35);
         if (uFall > 0.5) { float fa = abs(az - 0.42) + (vn(vec2(y * 0.15, 1.0)) - 0.5) * 0.004;
           float band = 1.0 - smoothstep(0.011, 0.018, fa); dark *= 1.0 - band;
           float ln = band * step(0.82, hh(vec2(floor((az - 0.42) * 1500.0), 3.0))) * step(0.45, fract(y * 0.08 + uTime * (0.5 + uStorm) + hh(vec2(floor((az - 0.42) * 1500.0), 5.0))));
@@ -263,7 +320,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     S.mtn = L.map(([r, h, k, seed], i) => {
       const mt = mat0.clone(); // clone() copies uniforms: re-link the shared block
       for (const key in S.U) mt.uniforms[key] = S.U[key];
-      mt.uniforms.uL = { value: new THREE.Vector4(r, 9 + Math.tan(EL[i][1] * PI / 180) * (r + 12), k, seed) }; mt.uniforms.uL2 = { value: new THREE.Vector4(EL[i][0], EL[i][1], i < 3 ? 1 : 0, i >= 3 ? 1 : 0) }; mt.uniforms.uRW = { value: new THREE.Vector2(0.02 + (4 - i) * 0.07, 0.3 + (4 - i) * 0.07) }; mt.uniforms.uFall = { value: i === 0 ? 1 : 0 };
+      mt.uniforms.uL = { value: new THREE.Vector4(r, 9 + Math.tan(EL[i][2] * PI / 180) * (r + 12), k, seed) }; mt.uniforms.uL2 = { value: new THREE.Vector4(...EL[i]) }; mt.uniforms.uRW = { value: new THREE.Vector2(0.02 + (4 - i) * 0.07, 0.3 + (4 - i) * 0.07) }; mt.uniforms.uFall = { value: i === 0 ? 1 : 0 };
       const geo = new THREE.CylinderGeometry(r, r, h * 2 + 30, 160, 1, true); geo.translate(0, h - 3, 0);
       const m = new THREE.Mesh(geo, mt); m.renderOrder = -90 + (4 - i) * 2; m.frustumCulled = false; g.add(m); return m;
     });
@@ -278,6 +335,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         float r = length(vW.xz); vec2 cs = vW.xz / max(r, 1e-3); float y = vW.y;
         float n = vn(cs * 5.0 + vec2(y * 0.12, uTime * 0.025 + uM.x)) * 0.65 + vn(cs * 13.0 + vec2(-uTime * 0.04, y * 0.25)) * 0.35;
         float a = (1.0 - smoothstep(uM.y, uM.z, y + (n - 0.5) * (uM.z - uM.y) * 1.1)) * uM.w * (0.75 + 0.25 * n);
+        a *= 1.0 - uSun * 0.8 * sq1(atan(vW.x, -vW.z) / 0.16) ; // no streaks of mist across the rising sun or its glitter path
         vec3 c = mix(PAPER, I4, uStorm * 0.35 * n);
         gl_FragColor = vec4(outc(c), clamp(a, 0.0, 1.0));
       }`, {}, { transparent: true, depthWrite: false, side: THREE.BackSide });
@@ -298,11 +356,11 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     const n = MID.length, qg = new THREE.PlaneGeometry(1, 1); qg.translate(0, 0.5, 0); const aM = iattr(n, 4), aN = iattr(n, 4);
     MID.forEach(([t, r, w, h, k, y0, ink], i) => { aM.setXYZW(i, Math.sin(t) * r, -Math.cos(t) * r, w, h); aN.setXYZW(i, k, i * 7.31 + 1.7, ink, y0); });
     qg.setAttribute('aM', aM); qg.setAttribute('aN', aN);
-    const mm = smat(S.U, `attribute vec4 aM, aN; varying vec2 vUv; varying vec4 vN; varying float vY;
+    const mm = smat(S.U, `attribute vec4 aM, aN; varying vec2 vUv, vXZ; varying vec4 vN; varying float vY;
       void main(){ vec3 c = vec3(aM.x, aN.w, aM.y); vec2 d = c.xz - cameraPosition.xz; float l = length(d); vec2 rt = l > 1e-3 ? vec2(-d.y, d.x) / l : vec2(1.0, 0.0);
         vec3 wp = c + vec3(rt.x, 0.0, rt.y) * position.x * aM.z + vec3(0.0, position.y * aM.w, 0.0);
-        vUv = vec2(position.x + 0.5, position.y); vN = aN; vY = wp.y; gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0); }`, `
-      varying vec2 vUv; varying vec4 vN; varying float vY;
+        vUv = vec2(position.x + 0.5, position.y); vN = aN; vY = wp.y; vXZ = wp.xz; gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0); }`, `
+      varying vec2 vUv, vXZ; varying vec4 vN; varying float vY;
       float xcAt(float y, float s){ return 0.13 * sin(y * 4.2 + s) + 0.05 * sin(y * 9.7 + s * 2.0) - 0.06 * y; }
       void main(){
         float s = vN.y, x = vUv.x - 0.5, y = vUv.y, a = 0.0, dark = 0.0; vec3 col;
@@ -341,7 +399,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         } else {
           // a low bank of mist drifting across the foot of the rocks
           vec2 q = (vUv - 0.5) * vec2(2.0, 2.0); float m = length(q * vec2(1.0, 1.6)) + (fbm(vUv * vec2(5.0, 2.0) + s + vec2(uTime * 0.02, 0.0)) - 0.5) * 0.7;
-          a = (1.0 - smoothstep(0.35, 1.0, m)) * vN.z; dark = 0.04 + uStorm * 0.25;
+          a = (1.0 - smoothstep(0.35, 1.0, m)) * vN.z * (1.0 - uSun * 0.7 * sq1(atan(vXZ.x, -vXZ.y) / 0.14)); dark = 0.04 + uStorm * 0.25;
         }
         if (a < 0.01) discard;
         col = tone(1.0 - clamp(dark, 0.0, 1.0), vn(vUv * 30.0 + s));
@@ -363,18 +421,19 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
           float al = dot(p - q.xy, dn), sd = abs(dot(p - q.xy, vec2(-dn.y, dn.x)));
           float sm = smoothstep(-1.0, 0.5, al) * (1.0 - smoothstep(q.z * 0.25, q.z * 0.55, al)) * (1.0 - smoothstep(q.w * 0.2, q.w * 0.42, sd));
           ink = max(ink, sm * smoothstep(0.3, 0.6, vn(vec2(sd * 1.5 + q.x, al * 2.5 - uTime * 0.3))) * 0.5); }
-        vec3 c = min(mix(mix(PAPER, I4, 0.35 + uStorm * 0.4), tone(1.0 - ink, 0.5), smoothstep(0.02, 0.1, ink)), mix(PAPER, I4, 0.35 + uStorm * 0.4));
+        vec3 c = min(mix(mix(PAPER, I4, 0.35 + uStorm * 0.4), tone(1.0 - ink, 0.5), smoothstep(0.02, 0.1, ink)), mix(PAPER, I4, 0.35 + uStorm * 0.4)); float glit = 0.0;
         if (uSun > 0.002) { vec2 sd2 = normalize(uSunD.xz + vec2(1e-5)), rel = p - cameraPosition.xz; float al = dot(rel, sd2), sd = abs(rel.x * sd2.y - rel.y * sd2.x);
-          float st = (1.0 - smoothstep(0.3, 1.2 + al * 0.025, sd + (vn(vec2(al * 0.7, 3.0)) - 0.5) * 0.8)) * smoothstep(0.32, 0.6, vn(vec2(sd * 0.9, al * 1.1 + uTime * 0.25)));
-          c = mix(c, mix(VER, GLD, 0.15), st * uSun * 0.85); }
+          // (r3) the glitter path: three times wider, brighter, broken into flickering horizontal dabs
+          float st = (1.0 - smoothstep(0.9, 3.6 + al * 0.075, sd + (vn(vec2(al * 0.5, 3.0)) - 0.5) * 2.0)) * smoothstep(0.28, 0.55, vn(vec2(sd * 0.6, al * 1.1 + uTime * 0.25)));
+          c = mix(c, mix(VER, GLD, 0.3 + 0.3 * smoothstep(0.6, 0.9, vn(vec2(sd * 2.0, al * 3.0 - uTime * 0.6)))), st * uSun * 0.95); glit = st * uSun; }
         float a = smoothstep(26.5, 29.0, r) * (1.0 - smoothstep(42.0, 52.0, r));
-        gl_FragColor = vec4(outc(c), a * rv);
+        gl_FragColor = vec4(outc(c) + vec3(0.35, 0.08, 0.0) * glit, a * rv);
       }`, S.wU, { transparent: true, depthWrite: false });
     const wmsh = new THREE.Mesh(wg, wm); wmsh.position.y = -1.2; wmsh.renderOrder = -80.5; g.add(wmsh); S.water = wmsh;
   }
 
   function buildBamboo(S, g, low) {
-    const rng = mulberry(91), stalks = [], groves = [[0.3, 1.95, 34], [-1.95, -0.3, 32], [2.2, 2.62, 8]];
+    const rng = mulberry(91), stalks = [], groves = [[0.3, 1.95, 34], [-1.95, -0.3, 32]]; // (r3) the small back-right grove is gone: that sky holds the inscription
     for (const [a0, a1, n0] of groves) { const n = low ? Math.ceil(n0 / 2) : n0; for (let i = 0; i < n; i++) {
       const a = lerp(a0, a1, rng()), r = 23 + Math.pow(rng(), 1.6) * 17, x = Math.sin(a) * r, z = Math.cos(a) * r, H = 9 + rng() * 9 + (40 - r) * 0.18, la = rng() * TAU, lean = rng() * 0.1 * H;
       stalks.push({ x, z, H, lx: Math.sin(la) * lean + x / r * H * 0.04, lz: Math.cos(la) * lean + z / r * H * 0.04, w: 0.17 + rng() * 0.13 + (40 - r) * 0.004, tone: sat((r - 23) / 17 * 0.8 + rng() * 0.2), ph: rng(), ord: rng() });
@@ -394,12 +453,13 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         float grow = clamp((uReveal - 0.55) / 0.4 * 10.0 - aL.w - aP.w * 3.0, 0.0, 1.0);
         float h = mix(aS.z, aS.w, position.y * grow); vec3 c = stalkAt(h, aL.x, aL.yz, aP.z, aS.xy);
         vec2 d = c.xz - cameraPosition.xz; float l = length(d); vec2 rt = l > 1e-3 ? vec2(d.y, -d.x) / l : vec2(1.0, 0.0);
-        vec3 wp = c + vec3(rt.x, 0.0, rt.y) * position.x * aP.x * 1.8;
-        vUv = vec2(position.x + 0.5, position.y); vTone = aP.y; vSegL = (aS.w - aS.z) * grow; vSeed = aP.z; vNear = smoothstep(2.0, 6.0, length(wp - cameraPosition));
+        vNear = smoothstep(6.0, 9.0, length(aS.xy - cameraPosition.xz)); // (r3) a stalk near the lens thins away whole
+        vec3 wp = c + vec3(rt.x, 0.0, rt.y) * position.x * aP.x * 1.8 * vNear;
+        vUv = vec2(position.x + 0.5, position.y); vTone = aP.y; vSegL = (aS.w - aS.z) * grow; vSeed = aP.z;
         gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
       }`, `varying vec2 vUv; varying float vTone, vSegL, vSeed, vNear;
       void main(){
-        if (bayer(gl_FragCoord.xy) > vNear) discard;
+        if (vNear < 0.004) discard;
         float u = vUv.x, v = clamp(vUv.y, 0.0, 1.0), x = abs(u - 0.5) * 1.8, ym = v * vSegL;
         float body = 1.0 - smoothstep(0.42, 0.5, x + (vn(vec2(ym * 3.0, vSeed * 50.0)) - 0.5) * 0.08);
         float gap = smoothstep(0.05, 0.12, ym) * (1.0 - smoothstep(vSegL - 0.12, vSegL - 0.06, ym));
@@ -424,12 +484,13 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         vec3 dir = aD.xyz + vec3(uWind.x, 0.0, uWind.y) * 0.45 + vec3(sin(uTime * 2.3 + aQ.z * 40.0), sin(uTime * 3.1 + aQ.z * 20.0) * 0.5, cos(uTime * 2.1 + aQ.z * 30.0)) * (0.1 + length(uWind) * 0.06);
         dir /= max(length(dir), 1e-3);
         vec3 side = cross(dir, cameraPosition - base); float sl = length(side); side = sl > 1e-4 ? side / sl : vec3(1.0, 0.0, 0.0);
-        vec3 wp = base + dir * position.y * aD.w * grow + side * position.x * aQ.x * grow * 2.0;
-        vUv = vec2(position.x + 0.5, position.y); vTone = aQ.y; vSeed = aQ.z; vNear = smoothstep(2.0, 6.0, length(wp - cameraPosition));
+        vNear = smoothstep(6.0, 9.0, length(aN.xy - cameraPosition.xz));
+        vec3 wp = base + (dir * position.y * aD.w + side * position.x * aQ.x * 2.0) * grow * vNear;
+        vUv = vec2(position.x + 0.5, position.y); vTone = aQ.y; vSeed = aQ.z;
         gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
       }`, `varying vec2 vUv; varying float vTone, vNear, vSeed;
       void main(){
-        if (bayer(gl_FragCoord.xy) > vNear) discard;
+        if (vNear < 0.004) discard;
         float t = clamp(vUv.y, 0.0, 1.0); float hw = 0.5 * sin(3.14159 * pow(t, 0.55)) * (0.85 + 0.15 * vn(vec2(t * 6.0, vSeed * 20.0)));
         float a = 1.0 - smoothstep(hw - 0.08, hw, abs(vUv.x - 0.5));
         a *= kas(vec2(t * 0.5 + vSeed, vUv.x * 0.6), 0.1 + 0.4 * smoothstep(0.55, 1.0, t));
@@ -442,7 +503,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
   }
 
   // a gnarled cherry: tapered branch tubes merged into one mesh, blossoms as instanced dabs that open in order along each branch
-  const TREE = [-18.7, -14.3];
+  const TREE = [-18.7, -14.3], TREE_C = [-15.4, -10.8]; // trunk foot, canopy centre (it leans over the terrace)
   function buildTree(S, g, low) {
     const rng = mulberry(7), tubes = [], buds = [];
     const rec = (p, dir, len, r, depth, t) => {
@@ -469,19 +530,21 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       for (const ix of tb.geo.index.array) I.push(ix + o); tb.geo.dispose();
     }
     const tg = new THREE.BufferGeometry(); tg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); tg.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); tg.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2)); tg.setAttribute('aT', new THREE.Float32BufferAttribute(AT, 1)); tg.setIndex(I); tg.computeBoundingSphere();
+    S.trU = { uTreeA: { value: 1 } }; S.treePts = tubes.flatMap((u) => u.pts); S.treeHide = 0;
     const tm = smat(S.U, `attribute float aT; varying vec3 vN, vW; varying vec2 vUv; varying float vT;
       void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz; vN = mat3(modelMatrix) * normal; vUv = uv; vT = aT; gl_Position = projectionMatrix * viewMatrix * wp; }`, `
-      varying vec3 vN, vW; varying vec2 vUv; varying float vT;
+      uniform float uTreeA; varying vec3 vN, vW; varying vec2 vUv; varying float vT;
       void main(){
         if (vT > (uReveal - 0.6) / 0.3) discard;
-        if (ign(gl_FragCoord.xy) > smoothstep(3.0, 8.0, length(vW - cameraPosition))) discard;
+        // (r3) never cut piecewise by distance (that left floating branch bars): the whole tree fades out briefly when the lens is inside it
+        if (uTreeA < 0.999 && ign(gl_FragCoord.xy) > uTreeA) discard;
         vec3 n = vN / max(length(vN), 1e-4), vd = cameraPosition - vW; vd /= max(length(vd), 1e-4);
         float fr = 1.0 - clamp(abs(dot(n, vd)), 0.0, 1.0), ndl = dot(n, normalize(vec3(-0.4, 0.75, 0.5))) * 0.5 + 0.5;
         float k = kas(vec2(vUv.y * 0.6, vUv.x * 1.5), 0.42);
         float bark = smoothstep(0.7, 0.8, vn(vec2(vUv.x * 5.0, vUv.y * 9.0)));
         float dark = max(smoothstep(0.45, 0.85, fr), (0.35 + 0.45 * (1.0 - ndl)) * (0.45 + 0.55 * k) + bark * 0.3);
         gl_FragColor = vec4(outc(tone(1.0 - clamp(dark, 0.0, 1.0), vn(vUv * 9.0))), 1.0);
-      }`);
+      }`, S.trU);
     const tree = new THREE.Mesh(tg, tm); g.add(tree);
     // blossoms
     const nB = low ? 600 : 1200, bg = new THREE.PlaneGeometry(1, 1), aB = iattr(nB, 4), aC = iattr(nB, 4);
@@ -490,16 +553,16 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     for (let i = 0; i < nB; i++) { const [bp, bt, dep] = buds[Math.floor(rng() * buds.length)], rr = 0.35 + rng() * (dep >= 4 ? 1.1 : 0.7); const a = rng() * TAU, e = (rng() - 0.3) * 1.6, wsh = i < nW, sz = rng();
       aB.setXYZW(i, bp.x + Math.cos(e) * Math.sin(a) * rr * (wsh ? 0.6 : 1), bp.y + Math.sin(e) * rr * 0.7 - (wsh ? 0.15 : 0), bp.z + Math.cos(e) * Math.cos(a) * rr * (wsh ? 0.6 : 1), wsh ? 0.9 + sz * 0.8 : 0.1 + sz * sz * 0.36); aC.setXYZW(i, bt / tmax * 0.85 + rng() * 0.12, rng() * TAU, rng(), wsh ? 1 : 0); }
     bg.setAttribute('aB', aB); bg.setAttribute('aC', aC);
-    const bm = smat(S.U, `attribute vec4 aB, aC; varying vec2 vUv; varying float vRot, vSeed, vNear, vWash;
+    // (r3) near the lens a blossom shrinks to nothing between 7 and 4 m (no dithering, no halftone)
+    const bm = smat(S.U, `attribute vec4 aB, aC; uniform float uTreeA; varying vec2 vUv; varying float vRot, vSeed, vWash;
       void main(){
-        float sc = aB.w * smoothstep(aC.x, aC.x + (aC.w > 0.5 ? 0.15 : 0.04), uBloom);
+        float sc = aB.w * smoothstep(aC.x, aC.x + (aC.w > 0.5 ? 0.15 : 0.04), uBloom) * smoothstep(4.0, 7.0, length(aB.xyz - cameraPosition)) * uTreeA;
         vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]), up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
         vec3 wp = aB.xyz + (right * position.x + up * position.y) * sc * 2.0;
-        vUv = position.xy * 2.0; vRot = aC.y; vSeed = aC.z; vWash = aC.w; vNear = smoothstep(3.5, 9.0, length(aB.xyz - cameraPosition));
+        vUv = position.xy * 2.0; vRot = aC.y; vSeed = aC.z; vWash = aC.w;
         gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
-      }`, `varying vec2 vUv; varying float vRot, vSeed, vNear, vWash;
+      }`, `varying vec2 vUv; varying float vRot, vSeed, vWash;
       void main(){
-        if (ign(gl_FragCoord.xy) > vNear) discard;
         float r = length(vUv), a = atan(vUv.y, vUv.x) + vRot;
         if (vWash > 0.5) {
           // a soft wash of pink laid in first, wet edge slightly darker
@@ -518,7 +581,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         c = mix(c, I1, (1.0 - smoothstep(0.03, 0.06, abs(r - 0.32))) * step(0.85, abs(cos(a * 2.5 + 1.57))) * 0.8);
         c = mix(c, PK2, smoothstep(pet * 0.75, pet * 0.95, r) * (0.25 + 0.35 * tn));
         gl_FragColor = vec4(outc(c), m);
-      }`, {}, { side: THREE.DoubleSide, alphaToCoverage: A2C() });
+      }`, S.trU, { side: THREE.DoubleSide, alphaToCoverage: A2C() });
     const bl = new THREE.InstancedMesh(bg, bm, nB); bl.frustumCulled = false; g.add(bl);
     // falling petals: one looping cloud over the whole terrace, densest around the tree
     const nP = low ? 400 : 800, pg = new THREE.PlaneGeometry(0.16, 0.12), aP = iattr(nP, 4);
@@ -543,9 +606,9 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     for (let i = 0; i < n; i++) { const k = i - 5.5; aB.setXYZW(i, -Math.abs(k) * 3.2 + rng() * 1.5, (rng() - 0.5) * 3, k * 3.0, rng()); }
     bg.setAttribute('aB', aB); S.birdU = { uBirdT: { value: 0 }, uBirdA: { value: 0 } };
     const bm = smat(S.U, `attribute vec4 aB; uniform float uBirdT; varying vec2 vUv; varying float vPh;
-      void main(){ vec3 c = vec3(mix(-120.0, 120.0, uBirdT), 36.0 + sin(uBirdT * 6.0) * 3.0, -95.0) + aB.xyz;
+      void main(){ vec3 c = vec3(mix(-120.0, 120.0, uBirdT), 15.5 + sin(uBirdT * 6.0) * 1.6, -95.0) + aB.xyz * vec3(1.3, 0.6, 1.0);
         vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]), up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-        vUv = position.xy; vPh = aB.w; gl_Position = projectionMatrix * viewMatrix * vec4(c + (right * position.x + up * position.y) * 3.4, 1.0); }`,
+        vUv = position.xy; vPh = aB.w; gl_Position = projectionMatrix * viewMatrix * vec4(c + (right * position.x + up * position.y) * (4.4 + aB.w * 1.6), 1.0); }`,
     `uniform float uBirdA; varying vec2 vUv; varying float vPh;
       void main(){ float fl = sin(uTime * 6.0 + vPh * 6.283), x = abs(vUv.x); if (x > 0.48) discard;
         float f = x * (0.45 + 0.4 * fl) - x * x * 0.7 * fl - 0.05, w = 0.055 * (1.0 - x * 1.5);
@@ -561,16 +624,14 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     const dm = smat(S.U, `attribute vec4 aA, aB; varying vec2 vL; varying vec4 vA, vB;
       void main(){ vL = vec2(position.x + 0.5, position.z + 0.5); vA = aA; vB = aB; gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0); }`, `
       varying vec2 vL; varying vec4 vA, vB;
-      // dry-brush streaks that never get thinner than about two pixels: an octave fades to its mean (and the edge widens) before it can alias
-      float kasA(vec2 uv, float amt){ float px = max(fwidth(uv.y), 1e-5), o1 = 1.0 - smoothstep(0.1, 0.25, px * 40.0), o2 = 1.0 - smoothstep(0.1, 0.25, px * 110.0);
-        float n = mix(0.5, vn(vec2(uv.x * 2.0, uv.y * 40.0)), o1) * 0.6 + mix(0.5, vn(vec2(uv.x * 5.0, uv.y * 110.0)), o2) * 0.4, wd = 0.1 + 0.3 * (1.0 - o1);
-        return smoothstep(amt - wd, amt + wd, n); }
       void main(){
         float age = uTime - vA.x; if (age < 0.0) age += 3600.0;
         float kind = vA.z, seed = vA.w, len = vB.x, w = vB.y;
         float fade = 1.0 - smoothstep(vB.w - 2.0, vB.w, age);
         if (fade <= 0.001) discard;
         float dry = smoothstep(vB.z, vB.z + 3.0, age), prog = clamp(age / max(vA.y, 0.01), 0.0, 1.0);
+        if (kind < 1.5 || (kind > 2.5 && kind < 3.5)) fade *= 1.0 - smoothstep(vB.z + 1.2, vB.z + 3.2, age); // (r3) dried strokes leave no compass rings or rulers
+        if (fade <= 0.001) discard;
         float u = clamp(vL.y, 0.0, 1.0), v = clamp(vL.x, 0.0, 1.0), a = 0.0; vec3 col = I0;
         if (kind < 0.5 || (kind > 2.5 && kind < 3.5)) {
           float xm = u * len, nA = vn(vec2(xm * 0.35, seed * 7.0));
@@ -692,22 +753,24 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         else { d = max(abs(vP.x) - vT0.z * 0.5, max(-vP.y, vP.y - vT0.y)); f = vP.y / max(vT0.y, 1e-3); }
         vec2 wq = vW.xz; float seed = vT2.y, kind = vT2.z, prog = vT1.x, fire = vT1.y, mode = vT1.z;
         float big = smoothstep(6.0, 16.0, vT2.x);
-        d += (vn(wq * 0.9 + seed) - 0.5) * 0.28 + (vn(wq * 3.3 + seed) - 0.5) * 0.07;
+        d += (fbm(wq * 0.6 + seed) - 0.5) * 0.34 + (vn(wq * 3.3 + seed) - 0.5) * 0.05 * (1.0 - uStorm);
         if (d > 0.3) discard;
         float inside = 1.0 - smoothstep(-0.03, 0.03, d);
-        float ew = 0.13 + 0.12 * vn(wq * 1.4 + seed + 4.0), edge = 1.0 - smoothstep(ew * 0.45, ew, abs(d + ew * 0.5));
+        float ew = (0.13 + 0.12 * fbm(wq * 0.9 + seed + 4.0)) * (1.0 - 0.5 * uStorm), edge = 1.0 - smoothstep(ew * 0.45, ew, abs(d + ew * 0.5));
         float g = fbm(wq * 0.45 + seed), gr = vn(wq * 9.0) * 0.5 + vn(wq * 23.0 + 3.0) * 0.5;
         float ff = f + (vn(wq * 1.2 + seed) - 0.5) * 0.1, filled = mode > 0.5 ? 1.0 : 1.0 - smoothstep(prog - 0.05, prog, ff);
         float front = mode > 0.5 ? 0.0 : (smoothstep(prog - 0.14, prog - 0.02, ff) - smoothstep(prog - 0.02, prog + 0.005, ff)) * step(prog, 0.995);
         float pulse = smoothstep(0.78, 1.0, prog) * (0.5 + 0.5 * sin(uTime * 14.0)) * step(mode, 0.5);
         // a readable wash: ~0.4 when the cast starts, ~0.6 when it lands, and a darker band 0.5 m inside the edge (the wet edge pulls
         // pigment inward) so the deadly side of every line is plain. The storm floor is grey, so the wash is stronger there.
-        float base = mode > 0.5 ? 0.42 : mix(0.38, 0.6, prog), stormK = 1.0 + 0.4 * uStorm;
+        float narrow = max(step(2.5, ty) * (1.0 - step(3.0, vT0.z)), step(1.5, ty) * step(ty, 2.5)); // (r3) lanes under 3 m and cones start half full
+        float base = mode > 0.5 ? 0.42 : mix(mix(0.38, 0.5, narrow), 0.6, prog), stormK = 1.0 + 0.4 * uStorm;
         float band = inside * smoothstep(-0.6, -0.12, d);
-        float wa = (inside * (base * (0.55 + 0.45 * filled) + 0.07 * pulse) * (0.8 + 0.35 * g) * (0.88 + 0.24 * gr) * (1.0 - 0.3 * big) + band * 0.2) * stormK;
+        float wa = (inside * (base * (mix(0.55, 0.8, narrow) + mix(0.45, 0.2, narrow) * filled) + 0.07 * pulse) * (0.8 + 0.35 * g) * (0.88 + 0.24 * gr) * (1.0 - 0.3 * big) + band * 0.2) * stormK;
         float fa = inside * front * 0.35, ea = edge * (0.8 + 0.15 * vn(wq * 2.0 + seed)) * min(stormK, 1.25);
         vec3 wc, ec, fc;
-        if (kind < 0.5) { wc = mix(mix(VER, PAPER, 0.16), mix(VER, I0, 0.25), band * 0.6); ec = mix(VER, I0, 0.3); fc = mix(VER, I0, 0.22); }
+        if (kind < 0.5) { wc = mix(mix(VER, PAPER, 0.16), mix(VER, I0, 0.25), band * 0.6); ec = mix(VER, I0, 0.3); fc = mix(VER, I0, 0.22);
+          wc = mix(wc, mix(CRM, I0, band * 0.3), uSun * 0.75); ec = mix(ec, mix(CRM, I0, 0.3), uSun * 0.6); } // crimson on the gold dawn floor
         else if (kind < 1.5) { wc = I1; ec = I0; fc = I1; wa *= 1.3; ea *= 0.9; ea = max(ea, (1.0 - smoothstep(0.02, 0.06, abs(d + ew + 0.05))) * inside * 0.75); }
         else { wc = mix(PAPER, GLD, 0.35); ec = mix(OCH, VER, 0.15); fc = wc; wa = inside * 0.5; }
         vec3 col = wc; float a = wa;
@@ -760,15 +823,20 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         vec2 cs = p / max(r, 1e-3);
         float r0 = 9.5 + (fbm(cs * 1.6 + 3.0) - 0.5) * 0.6, r1 = 12.5 + (fbm(cs * 1.6 + 9.0) - 0.5) * 0.6;
         float inb = smoothstep(r0 - 0.07, r0 + 0.07, r) * (1.0 - smoothstep(r1 - 0.07, r1 + 0.07, r)) * on;
+        // (r3) the stroke starts in a round, slightly ragged blob where the brush landed (no straight radial cut)
+        float rmid = 0.5 * (r0 + r1), hwb = 0.5 * (r1 - r0), sl0 = rel * r;
+        float capD = length(vec2(max(hwb - sl0, 0.0), r - rmid)) - hwb * (0.97 + (fbm(p * 1.3 + 2.0) - 0.5) * 0.3);
+        inb *= mix(1.0, 1.0 - smoothstep(-0.07, 0.07, capD), step(sl0, hwb));
         float v = clamp((r - r0) / max(r1 - r0, 0.5), 0.0, 1.0), sl = rel * 11.0;
         // the brush: drawn up to uE.z with a soft wet head; loaded at the start, kasure growing toward the dry end
         float drawn = 1.0 - smoothstep(uE.z - 0.04, uE.z, rel), head = (1.0 - smoothstep(0.0, 0.16, abs(rel - uE.z + 0.06))) * step(uE.z, L - 0.02) * step(0.01, uE.z);
-        float k = kas(vec2(sl * 0.06, v * 0.34), smoothstep(0.55, 1.0, u) * 0.58 + uE2.y * 0.12);
+        float k = kasA(vec2(sl * 0.06, v * 0.34), smoothstep(0.55, 1.0, u) * 0.58 + uE2.y * 0.12 + (1.0 - smoothstep(0.0, hwb * 2.2, sl0)) * 0.16);
         float wetE = 1.0 - smoothstep(0.0, 0.22, min(r - r0, r1 - r));
         float gr = fbm(p * 0.7 + 4.0);
         vec3 ink = mix(I0, I1, clamp(smoothstep(0.2, 0.85, u) * 0.75 + (gr - 0.5) * 0.3, 0.0, 1.0));
         ink = mix(ink, I2, smoothstep(0.8, 1.0, u) * 0.35 + uE2.y * 0.35);
         ink = mix(ink, I0, max(wetE * 0.75, head));
+        ink = mix(ink, ink * vec3(0.9, 0.97, 1.12), uSun); // (r3) cancel the warm dawn grade so the stroke stays ink, not brown
         float ia = inb * drawn * k * (0.95 - 0.15 * u) * (1.0 - 0.4 * uE2.y);
         // the wet wash ahead of the brush: the band that will be painted
         float wa = inb * (1.0 - drawn) * mix(0.36, 0.58, uE2.x) * (0.85 + 0.3 * gr);
@@ -865,32 +933,40 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
   // He is the blackest thing on the page: three tone bands of a loaded brush, wet edges where the stroke turns away, a black spine
   // line, a pale belly wash, and dryness shown as kasure (paper through the stroke), never as a grey body.
   const CP0 = [[0, 2.3, 0.9], [0, 1.95, -0.8], [0.8, 2.0, -2.6], [2.9, 3.1, -3.6], [4.4, 5.0, -4.6], [3.5, 6.6, -5.6], [0.4, 7.0, -6.2], [-2.9, 5.8, -6.6], [-4.7, 3.3, -7.4], [-5.4, 1.7, -9.6], [-6.8, 2.9, -11.6], [-6.6, 5.2, -13.2]];
-  const NB = 48, NSP = 96, NTT = 12, NHC = 52, NCARD = NSP + NTT + NHC, NPUFF = 10;
+  const NB = 48, NSP = 96, NTT = 12, NHC = 52, NCARD = NSP + NTT + NHC, NPUFF = 5;
   // a strong belly swell at the shoulders, then a long taper to a thin whip of a tail
-  const bodyR = (s) => 1.2 * (s < 0.06 ? lerp(0.55, 0.8, s / 0.06) : s < 0.2 ? lerp(0.8, 1.05, smooth((s - 0.06) / 0.14)) : 1.05 * Math.pow(Math.max(0, 1 - (s - 0.2) / 0.8), 1.35) + 0.03);
+  // (r3) the last three rings taper to a point (no flat pipe-end cap)
+  const TIP = 3 / (NB - 1);
+  const bodyR = (s) => 1.2 * (s < 0.06 ? lerp(0.55, 0.8, s / 0.06) : s < 0.2 ? lerp(0.8, 1.05, smooth((s - 0.06) / 0.14)) : 1.05 * Math.pow(Math.max(0, 1 - (s - 0.2) / 0.8), 1.35) + 0.03) * (s > 1 - TIP ? Math.pow(Math.max(0, (1 - s) / TIP), 0.6) : 1);
   function buildDragon(S, b) {
     const D = S.D = {}, root = D.root = new THREE.Group(); b.group.add(root);
-    D.U = { uInk: { value: 1 }, uDraw: { value: 1.2 }, uGrind: { value: 0 }, uFade: { value: 1 }, uFadeH: { value: 1.01 }, uFlat: { value: 0 }, uWetG: { value: 0 }, uLd: { value: new V3(-0.4, 0.8, 0.45).normalize() }, uOut: { value: 0.085 } };
+    D.U = { uInk: { value: 1 }, uDraw: { value: 1.2 }, uGrind: { value: 0 }, uFade: { value: 1 }, uFadeH: { value: 1.01 }, uFlat: { value: 0 }, uWetG: { value: 0 }, uNear: { value: 0 }, uLd: { value: new V3(-0.4, 0.8, 0.45).normalize() }, uOut: { value: 0.085 } };
     // aFd: per body ring, 0..1 washed out because it lies on the line to the hero, > 1.5 cut away because it is at the lens
     const SKV = `attribute float aS, aK, aBelly, aFd; attribute vec2 aSc; varying vec3 vN, vW; varying float vS, vK, vBelly, vFd; varying vec2 vSc;
       void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz; vN = mat3(modelMatrix) * normal; vS = aS; vK = aK; vBelly = aBelly; vFd = aFd; vSc = aSc; gl_Position = projectionMatrix * viewMatrix * wp; }`;
     const skin = smat(S.U, SKV, `
-      uniform float uInk, uDraw, uGrind, uFade, uFadeH, uFlat, uWetG; uniform vec3 uLd;
+      uniform float uInk, uDraw, uGrind, uFade, uFadeH, uFlat, uWetG, uNear; uniform vec3 uLd;
       varying vec3 vN, vW; varying float vS, vK, vBelly, vFd; varying vec2 vSc;
       void main(){
         float s = vS; if (s < 1.0 - uDraw || vFd > 1.5) discard;
         // washed out (not dithered) when he hides the hero: the colour runs to pale paper and the stroke turns see-through
-        float wo = s > 0.1 ? clamp(vFd, 0.0, 1.0) : clamp((1.0 - uFadeH) * 1.6, 0.0, 1.0), al = 1.0 - wo * 0.96;
-        if (uCut > 0.3 && al < 0.999 && al < ign(gl_FragCoord.xy)) discard;
+        // (r3) the head (and legs) wash to a flat grey I3 at half strength with the silhouette line kept, never a beige ghost
+        // near the lens (6-11 m) body, legs and cards wash out the same way, and the washed silhouette softens so no facets show
+        float hw = s > 0.1 ? 0.0 : clamp((1.0 - uFadeH) * 1.6, 0.0, 1.0), bw = s > 0.1 ? clamp(vFd, 0.0, 1.0) : 0.0;
+        float ww = max(bw, (1.0 - smoothstep(6.0, 11.0, length(cameraPosition - vW))) * uNear * step(0.0, s)), wo = max(ww, hw);
         vec3 n = vN / max(length(vN), 1e-4), vd = cameraPosition - vW; vd /= max(length(vd), 1e-4);
         float ndl = dot(n, uLd) * 0.5 + 0.5, fr = 1.0 - clamp(abs(dot(n, vd)), 0.0, 1.0), nz = vn(vSc * 1.3);
-        vec2 sc = vSc + vec2(0.0, mod(floor(vSc.x), 2.0) * 0.5); vec2 cf = fract(sc) - 0.5;
-        float scale = (1.0 - smoothstep(0.34, 0.46, length(cf * vec2(1.0, 1.3)))) - (1.0 - smoothstep(0.24, 0.36, length((cf - vec2(0.14, 0.0)) * vec2(1.0, 1.3))));
+        float al = (1.0 - max(smoothstep(0.0, 0.7, ww) * 0.96, hw * 0.55)) * (1.0 - ww * smoothstep(0.45, 0.95, fr)); // see-through before it greys: diluted ink, not a grey tube
+        if (uCut > 0.3 && al < 0.999 && al < ign(gl_FragCoord.xy)) discard;
+        // (r3) scales: jittered size and offset, 40% of the cells dropped, so they never read as a tiled chain of rings
+        vec2 sc = vSc + vec2(0.0, mod(floor(vSc.x), 2.0) * 0.5), ci = floor(sc); vec2 cf = fract(sc) - 0.5 - (vec2(hh(ci + 3.1), hh(ci + 8.3)) - 0.5) * 0.12;
+        float rs = 0.62 + 0.4 * hh(ci + 5.7), keep = step(0.4, hh(ci + 1.9));
+        float scale = keep * ((1.0 - smoothstep(0.34 * rs, 0.46 * rs, length(cf * vec2(1.0, 1.3)))) - (1.0 - smoothstep(0.24 * rs, 0.36 * rs, length((cf - vec2(0.14 * rs, 0.0)) * vec2(1.0, 1.3)))));
         float streak = vn(vec2(vSc.x * 0.07, vSc.y * 2.2)), patch_ = smoothstep(0.5, 0.7, vn(vSc * vec2(0.18, 0.5) + 7.0));
         // three bands: black in shadow, charcoal, and a lit band that is still dark ink
         float lit = ndl + (nz - 0.5) * 0.14 + (streak - 0.5) * 0.12;
         float dark = mix(0.98, 0.84, smoothstep(0.46, 0.6, lit)); dark = mix(dark, 0.7, smoothstep(0.7, 0.84, lit) * (0.5 + 0.5 * uWetG));
-        dark += scale * 0.12 * patch_ * smoothstep(0.55, 0.8, lit) * (1.0 - vBelly);
+        dark += scale * 0.08 * patch_ * smoothstep(0.55, 0.8, lit) * (1.0 - vBelly);
         // the belly: a mid-grey wash with plate strokes (never a pale stripe when a coil arches overhead)
         float bp = smoothstep(0.45, 0.9, vBelly) * step(vK, 0.5);
         float plate = 1.0 - smoothstep(0.0, 0.12, abs(fract(vSc.x * 0.5) - 0.5) - 0.36);
@@ -901,19 +977,24 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         float spine = (1.0 - smoothstep(0.45, 0.9, min(vSc.y, 9.0 - vSc.y))) * step(0.0, s) * step(vK, 0.5);
         dark = max(dark, spine * 0.99);
         // dry brush: paper shows through in streaks along the body, more as the ink runs low and toward the tail
-        float k = kas(vec2(vSc.x * 0.04, vSc.y * 0.12), smoothstep(0.45, 1.0, s) * 0.5 + (1.0 - uInk) * 0.42);
+        // (r3) hair streaks stretched ~20:1 along the body (vSc.x is ~2.8 per metre) and cut by a low-frequency mask so none runs much past
+        // 2 m. At full ink they only lift to I2; paper shows only when the ink is low (< ~0.45) or in the last quarter of the tail.
         float flank = (1.0 - spine) * (1.0 - smoothstep(0.7, 0.92, fr)) * step(0.0, s) * step(vK, 0.5);
-        // fine hair streaks of a dry sweep run the whole length of the body: grey, not paper (paper only where the ink is low)
-        float kb = kas(vec2(vSc.x * 0.035, vSc.y * 0.26), 0.12 + 0.1 * vn(vec2(vSc.x * 0.05, 3.0)));
-        dark = mix(dark, dark * 0.55, (1.0 - kb) * flank * 0.85);
-        dark = mix(dark, 0.08 + dark * 0.2, (1.0 - k) * flank);
-        if (s > 0.8 && k < smoothstep(0.8, 1.0, s) * 0.9) discard;
+        float hn = hairN(vSc), sm = smoothstep(0.42, 0.62, vn(vec2(vSc.x * 0.42 + 5.0, vSc.y * 1.1 + 2.0)));
+        float hairM = smoothstep(0.62, 0.72, hn) * sm;
+        float amt = smoothstep(0.55, 1.0, s) * 0.42 + (1.0 - uInk) * 0.42;
+        float kasM = (1.0 - smoothstep(amt - 0.06, amt + 0.06, hn)) * mix(sm, 1.0, smoothstep(0.88, 1.0, s) * 0.7);
+        float paperOK = max(1.0 - smoothstep(0.35, 0.5, uInk), smoothstep(0.72, 0.8, s));
+        dark = mix(dark, min(dark, 0.56), hairM * flank * 0.85);
+        dark = mix(dark, min(dark, mix(0.56, 0.14 + dark * 0.2, paperOK)), kasM * flank);
+        // the tail tip frays away in ragged dry hairs (no clean ring cut)
+        if (s > 0.8 && tailEr(vSc) < smoothstep(0.8, 1.0, s) * 0.85) discard;
         if (s > 0.0) dark = mix(dark, 1.0, smoothstep(1.0 - uGrind, 1.04 - uGrind, s) * step(0.001, uGrind) * 0.92);
         dark = mix(dark, 1.0, (1.0 - smoothstep(0.0, 0.05, s - (1.0 - uDraw))) * step(uDraw, 1.04) * 0.9);
         if (vK > 0.5 && vK < 1.5) dark = 0.62 + 0.3 * (1.0 - ndl) + smoothstep(0.5, 0.85, fr) * 0.4 - (1.0 - smoothstep(0.0, 0.1, abs(fract(vSc.x * 0.8) - 0.5))) * 0.25;
         if (vK > 1.5 && vK < 2.5) dark = 0.08 + smoothstep(0.62, 0.92, fr) * 0.85;
         if (vK > 2.5) dark = 0.98;
-        dark = mix(dark, 0.42 + (1.0 - k) * -0.2 + smoothstep(0.6, 0.9, fr) * 0.3, uFlat);
+        dark = mix(dark, 0.42 - kasM * 0.2 + smoothstep(0.6, 0.9, fr) * 0.3, uFlat);
         vec3 c = tone(1.0 - clamp(dark, 0.0, 1.0), nz);
         vec3 rf = reflect(-vd, n); c = mix(c, I3, smoothstep(0.9, 0.97, dot(rf, uLd)) * uWetG * step(vK, 0.5) * (1.0 - uFlat));
         // the finale: a warm rim on the lit side and flecks of gold leaf
@@ -929,20 +1010,22 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
           float ro = hh(pi + 5.5) * 3.14159; pf = mat2(cos(ro), -sin(ro), sin(ro), cos(ro)) * pf;
           float pet = step(hh(pi + 3.7), 0.3 * uPetal) * (1.0 - smoothstep(0.2, 0.27, length(pf * vec2(1.0, 1.8)))) * smoothstep(0.35, 0.7, n.y) * step(vK, 0.5) * step(0.0, s);
           c = mix(c, mix(mix(PAPER, PK, 0.6), PK2, hh(pi) * 0.7 + pf.x), pet); }
-        c = mix(c, mix(I4, PAPER, 0.5), wo * 0.85);
+        c = mix(c, I3, hw); c = mix(c, mix(I4, PAPER, 0.5), ww * ww * 0.85);
         gl_FragColor = vec4(outc(c), al);
       }`, D.U, { alphaToCoverage: A2C() });
     const outl = smat(S.U, `attribute float aS, aK, aFd; attribute vec2 aSc; uniform float uOut; varying float vS, vFd; varying vec2 vSc; varying vec3 vN2, vW2;
       void main(){ float w = uOut * (0.6 + 0.4 * sin(aSc.x * 0.37 + aSc.y * 0.9) + 0.35 * sin(aSc.x * 1.3)) * (1.0 - clamp(aS, 0.0, 1.0) * 0.75) * (aK > 1.5 && aK < 2.5 ? 0.4 : 1.0);
         vS = aS; vFd = aFd; vSc = aSc; vN2 = mat3(modelMatrix) * normal; vec4 wp = modelMatrix * vec4(position + normal * w, 1.0); vW2 = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }`, `
-      uniform float uDraw, uFade, uFadeH, uFlat; varying float vS, vFd; varying vec2 vSc; varying vec3 vN2, vW2;
+      uniform float uDraw, uFade, uFadeH, uFlat, uNear; varying float vS, vFd; varying vec2 vSc; varying vec3 vN2, vW2;
       void main(){ if (vS < 1.0 - uDraw || vFd > 1.5) discard;
         // faded: only the rim of the hull is left, a faint drawn contour
-        float wo = vS > 0.1 ? clamp(vFd, 0.0, 1.0) : clamp((1.0 - uFadeH) * 1.6, 0.0, 1.0);
+        // (r3) near the lens (6-11 m) a coil washes out smoothly instead of standing as a black wall in the foreground; the pale head keeps its line
+        float hw = vS > 0.1 ? 0.0 : clamp((1.0 - uFadeH) * 1.6, 0.0, 1.0), ww = max(vS > 0.1 ? clamp(vFd, 0.0, 1.0) : 0.0, (1.0 - smoothstep(6.0, 11.0, length(cameraPosition - vW2))) * uNear * step(0.0, vS));
         vec3 n = vN2 / max(length(vN2), 1e-4), v = cameraPosition - vW2; v /= max(length(v), 1e-4);
-        float al = mix(1.0, 0.22 * (1.0 - smoothstep(0.25, 0.6, abs(dot(n, v)))), wo);
+        float rimO = 1.0 - smoothstep(0.25, 0.6, abs(dot(n, v)));
+        float al = min(mix(1.0, 0.22 * rimO, ww), mix(1.0, 0.9 * rimO, hw));
         if (al < 0.01 || (uCut > 0.3 && al < 0.999 && al < ign(gl_FragCoord.xy + 3.0))) discard;
-        float k = kas(vec2(vSc.x * 0.04, vSc.y * 0.12), smoothstep(0.45, 1.0, vS) * 0.6); if (vS > 0.8 && k < smoothstep(0.8, 1.0, vS) * 0.9) discard;
+        if (vS > 0.8 && tailEr(vSc) < smoothstep(0.8, 1.0, vS) * 0.85) discard;
         gl_FragColor = vec4(outc(mix(I0, I2, uFlat)), al); }`, D.U, { side: THREE.BackSide, alphaToCoverage: A2C() });
     D.skin = skin; D.outl = outl;
     // body tube
@@ -966,7 +1049,11 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       add(T(new THREE.SphereGeometry(0.17, 12, 10), sx * 0.43, 0.4, 1.12, 0, 0, 0, 0.8, 0.85, 1.2), 2);
       add(T(new THREE.SphereGeometry(0.16, 10, 8), sx * 0.42, 0.74, 1.22, 0, sx * 0.3, sx * 0.4, 1.5, 0.5, 0.95), 3); // brow: a black stroke over the eye
       add(T(new THREE.ConeGeometry(0.075, 0.46, 6), sx * 0.22, -0.26, 2.32, PI, 0, 0), 2);
-      for (let i = 0; i < 4; i++) add(T(new THREE.ConeGeometry(0.045, 0.17, 5), sx * (0.26 - i * 0.012), -0.12, 2.1 - i * 0.26, PI, 0, 0), 2);
+      // (r3) separate, uneven fangs (no zigzag), an upper lip line that curls up at the corner, a nostril stroke
+      const FU = sx < 0 ? [[1.95, 0.24, 0.05, 0.1], [1.52, 0.33, 0.062, -0.18], [1.2, 0.13, 0.04, 0.05]] : [[1.88, 0.18, 0.045, -0.08], [1.58, 0.36, 0.065, -0.22], [1.24, 0.16, 0.042, 0.12]];
+      for (const [z, l, r, tl] of FU) add(T(new THREE.ConeGeometry(r, l, 6), sx * (0.255 - (2.1 - z) * 0.03), -0.1 - l * 0.35, z, PI + tl, 0, sx * 0.08), 2);
+      add(taper([[sx * 0.22, -0.08, 2.82], [sx * 0.33, -0.15, 2.25], [sx * 0.37, -0.13, 1.6], [sx * 0.39, 0.0, 1.22], [sx * 0.34, 0.16, 1.12]], 0.05, 0.018, 6, 12), 3);
+      add(taper([[sx * 0.08, 0.35, 2.86], [sx * 0.2, 0.39, 2.73], [sx * 0.28, 0.35, 2.58]], 0.042, 0.014, 5, 6), 3);
       add(orient(new THREE.ConeGeometry(0.26, 1.4, 8), sx * 0.75, 0.0, -0.05, sx * 0.6, 0.1, -1, 1, 1, 0.42), 0); // cheek frill
       add(taper([[sx * 0.3, 0.72, 0.35], [sx * 0.5, 1.15, -0.2], [sx * 0.72, 1.55, -0.9], [sx * 0.8, 1.85, -1.65]], 0.14, 0.025, 7), 1);
       add(taper([[sx * 0.55, 1.25, -0.35], [sx * 0.92, 1.7, -0.15], [sx * 1.08, 2.05, 0.25]], 0.075, 0.02, 6, 7), 1);
@@ -977,7 +1064,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     addJ(T(new THREE.CylinderGeometry(0.24, 0.38, 1.8, 16, 2), 0, -0.1, 0.9, PI / 2, 0, 0, 0.72, 1, 0.55), 0);
     addJ(T(new THREE.SphereGeometry(0.3, 12, 8), 0, -0.08, 1.8, 0, 0, 0, 0.72, 0.5, 0.8), 0);
     addJ(T(new THREE.BoxGeometry(0.26, 0.05, 1.4), 0, 0.06, 0.95), 3);
-    for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) addJ(T(new THREE.ConeGeometry(0.045, 0.17, 5), sx * (0.18 - i * 0.01), 0.08, 1.62 - i * 0.26), 2);
+    for (const sx of [-1, 1]) for (const [z, l, r] of (sx < 0 ? [[1.72, 0.3, 0.058], [1.22, 0.15, 0.042]] : [[1.66, 0.26, 0.052], [1.3, 0.12, 0.038]])) addJ(T(new THREE.ConeGeometry(r, l, 6), sx * 0.17, 0.04 + l * 0.4, z, -0.12, 0, -sx * 0.06), 2);
     const jaw = D.jaw = new THREE.Group(); jaw.position.set(0, -0.12, 0.55); head.add(jaw);
     const jg = mergeParts(J); jaw.add(new THREE.Mesh(jg, skin), new THREE.Mesh(jg, outl));
     // eyes: blank until the dot; then the only saturated thing on him
@@ -1002,10 +1089,10 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     const cg = new THREE.PlaneGeometry(1, 1); cg.translate(0, 0.5, 0); const aCd = iattr(NCARD, 4), rng = mulberry(17);
     for (let i = 0; i < NCARD; i++) aCd.setXYZW(i, rng(), rng() * 10, i < NSP ? 0.03 + i / (NSP - 1) * 0.92 : i < NSP + NTT ? 0.97 : -0.05, 0);
     cg.setAttribute('aCd', aCd); aCd.setUsage(THREE.DynamicDrawUsage); D.aCd = aCd;
-    const cm = smat(S.U, `attribute vec4 aCd; varying vec2 vUv; varying vec4 vCd; void main(){ vUv = vec2(position.x + 0.5, position.y); vCd = aCd; gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0); }`, `
-      uniform float uDraw, uFlat, uInk, uFade, uFadeH; varying vec2 vUv; varying vec4 vCd;
+    const cm = smat(S.U, `attribute vec4 aCd; varying vec2 vUv; varying vec4 vCd; varying vec3 vWc; void main(){ vUv = vec2(position.x + 0.5, position.y); vCd = aCd; vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0); vWc = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }`, `
+      uniform float uDraw, uFlat, uInk, uFade, uFadeH, uNear; varying vec2 vUv; varying vec4 vCd; varying vec3 vWc;
       void main(){ if (vCd.z < 1.0 - uDraw || vCd.w > 1.5) discard;
-        float wo = vCd.z > 0.1 ? clamp(vCd.w, 0.0, 1.0) : clamp((1.0 - uFadeH) * 1.6, 0.0, 1.0);
+        float wo = vCd.z > 0.1 ? max(clamp(vCd.w, 0.0, 1.0), (1.0 - smoothstep(6.0, 11.0, length(cameraPosition - vWc))) * uNear) : clamp((1.0 - uFadeH) * 1.6, 0.0, 1.0);
         float v = clamp(vUv.y, 0.0, 1.0), bend = sin(v * 2.6 + vCd.y) * 0.13 * v, hw = 0.5 * pow(1.0 - v, 0.7) * (0.75 + 0.25 * sin(v * 3.14159));
         float a = 1.0 - smoothstep(hw - 0.08, hw, abs(vUv.x - 0.5 - bend)); a *= kas(vec2(v * 0.6 + vCd.y, vUv.x * 0.7), 0.1 + 0.45 * v + (1.0 - uInk) * 0.2);
         float al = 1.0 - wo * 0.96; if (a < uCut || (uCut > 0.3 && al < 0.999 && al < ign(gl_FragCoord.xy + 5.0))) discard; a *= al;
@@ -1016,7 +1103,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     D.hc = []; const r2 = mulberry(23);
     for (let i = 0; i < NHC; i++) {
       if (i < 40) { const sx = i % 2 ? 1 : -1, k = Math.floor(i / 2), u = k / 19;
-        D.hc.push({ p: new V3(sx * (0.2 + u * 0.25 + r2() * 0.08), 0.62 - u * 0.95 + r2() * 0.1, 0.25 - u * 1.9), e: new THREE.Euler(-1.45 - u * 0.15 + (r2() - 0.5) * 0.3, sx * (0.35 + r2() * 0.55), sx * (0.25 + r2() * 0.3)), s: new V3(0.32 + r2() * 0.2, 1.5 + r2() * 1.6 - u * 0.4, 1), ph: r2() * TAU }); }
+        D.hc.push({ p: new V3(sx * (0.2 + u * 0.22 + r2() * 0.08), 0.62 - u * 1.1 + r2() * 0.1, 0.25 - u * 2.7), e: new THREE.Euler(-1.45 - u * 0.15 + (r2() - 0.5) * 0.3, sx * (0.35 + r2() * 0.55), sx * (0.25 + r2() * 0.3)), s: new V3(0.32 + r2() * 0.2, 1.7 + r2() * 1.8 - u * 0.3, 1), ph: r2() * TAU }); } // (r3) the mane runs further back over the neck
       else { const k = i - 40, sx = k % 2 ? 1 : -1;
         D.hc.push({ p: new V3(sx * (0.08 + (k >> 1) * 0.04), -0.38, 1.35 - (k >> 1) * 0.13), e: new THREE.Euler(PI + 0.45 + r2() * 0.35, 0, sx * (0.15 + r2() * 0.2)), s: new V3(0.2 + r2() * 0.08, 0.8 + r2() * 0.9, 1), ph: r2() * TAU }); }
     }
@@ -1027,16 +1114,18 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     const pfm = smat(S.U, `attribute vec4 aPf; varying vec2 vUv; varying vec4 vPf; varying float vNear;
       void main(){ vec4 c = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0); float sz = length(instanceMatrix[0].xyz);
         vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]), up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
-        vec3 wp = c.xyz + (right * position.x + up * position.y * 0.62) * sz; vUv = position.xy; vPf = aPf; vNear = smoothstep(3.0, 9.0, length(c.xyz - cameraPosition));
+        vec3 wp = c.xyz + (right * position.x + up * position.y * 0.62) * sz; vUv = position.xy; vPf = aPf; vNear = smoothstep(9.0, 13.0, length(c.xyz - cameraPosition));
         gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0); }`, `
       uniform float uDraw, uFade, uFlat; varying vec2 vUv; varying vec4 vPf; varying float vNear;
-      void main(){ if (vPf.y < 1.0 - uDraw + 0.05) discard;
-        float e = length(vUv) + (fbm(vUv * 1.6 + vPf.x) - 0.5) * 0.7, ang = atan(vUv.y, vUv.x);
-        float body = 1.0 - smoothstep(0.55, 0.8, e), rim = (smoothstep(0.5, 0.62, e) - smoothstep(0.66, 0.8, e)) * smoothstep(0.35, 0.6, vn(vec2(ang * 3.0, vPf.x)));
-        float curl = (1.0 - smoothstep(0.02, 0.05, abs(fract(e * 3.0 + ang * 0.48 + vPf.x) - 0.5) - 0.42)) * body * smoothstep(0.25, 0.5, e) * 0.5;
-        float a = max(body * 0.88, rim * 0.9) * vNear * clamp(uFade, 0.0, 1.0) * (1.0 - uFlat);
+      void main(){ if (vPf.y < 1.0 - uDraw + 0.05 || vNear < 0.004) discard;
+        // (r3) a soft two-tone wash, no linework: pale on top, a tone darker below, one wet edge along the lower side only
+        float e = length(vUv * vec2(1.0, 1.15)) + (fbm(vUv * 1.4 + vPf.x) - 0.5) * 0.6;
+        float body = 1.0 - smoothstep(0.42, 0.82, e), low = smoothstep(0.15, -0.55, vUv.y + (vn(vec2(vUv.x * 2.0, vPf.x)) - 0.5) * 0.3);
+        float wet = (smoothstep(0.55, 0.66, e) - smoothstep(0.68, 0.8, e)) * low;
+        float a = (body * 0.72 + wet * 0.2) * vNear * clamp(uFade, 0.0, 1.0) * (1.0 - uFlat);
         if (a < 0.01) discard;
-        vec3 c = mix(mix(PAPER, I4, uStorm * 0.6), I3, max(rim * 0.8, curl));
+        vec3 c = mix(mix(PAPER, I4, uStorm * 0.6), mix(I4, I3, 0.35 + uStorm * 0.3), low * 0.7);
+        c = mix(c, I3, wet * 0.6);
         gl_FragColor = vec4(outc(c), a); }`, D.U, { transparent: true, depthWrite: false });
     D.puffs = new THREE.InstancedMesh(pg, pfm, NPUFF); D.puffs.frustumCulled = false; D.puffs.renderOrder = 4; root.add(D.puffs);
     D.pose = { rear: 0, rake: 0, whip: 0, whipS: 1, slump: 0, sweep: 0, sweepA: 0, roar: 0, dive: 0 };
@@ -1119,7 +1208,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       return Math.max(0, d); };
     Object.assign(S, { ink: 1, forceDry: false, dry: false, lk: Object.assign({}, LOOK[0]), lkT: Object.assign({}, LOOK[0]), reveal: 1, draw: 1.2, eye: 1, descend: 0, introOn: false,
       seen: {}, hitAt: {}, leafPred: [], bleed: [], ensoN: 0, enso: null, carved: null, galeOn: 0, galeTell: 0, gwx: 0, gwz: 1, wind: new THREE.Vector2(0.25, 0.08), wash: -1, washK: 0, washDur: 2, splat: 0, frame: 0, seal: -1,
-      sealH: null, sealHitT: -1, grind: 0, slump: 0, rear: 0, rake: 0, whip: 0, roar: 0, sweep: 0, dive: 0, rip: -100, bolt: 0, boltA: 0.4, boltT: -10, boltX: 0.5, boltNext: 4, headW: new V3(0, 3, -6), sunRise: 0, birdT: 2, birdNext: 30, dead: false, flat: 0, wetG: 0, lvl: 0 });
+      sealH: null, sealHitT: -1, grind: 0, slump: 0, rear: 0, rake: 0, whip: 0, roar: 0, sweep: 0, dive: 0, rip: -100, bolt: 0, boltA: 0.4, boltT: -10, boltX: 0.5, boltNext: 4, headW: new V3(0, 3, -6), sunRise: 0, birdT: 2, birdNext: 3, dead: false, flat: 0, wetG: 0, lvl: 0 });
     return {
       edge: 'wall', radius: R, spawn: { x: 0, z: 13 }, bossStart: { x: 0, z: -6, face: 0 }, camDist: 16,
       contains: (x, z) => Math.hypot(x, z) <= R - 0.6,
@@ -1131,6 +1220,9 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
           if (hl > 1e-3) { const e = Math.atan2(oy, hl) - 0.105 * S.camUp, ch = Math.cos(e) * L / hl; x = f.x + ox * ch; z = f.z + oz * ch; y = f.y + Math.sin(e) * L; } }
         // the lens never sits in his head: slide it out to 5.5 m from the skull
         if (hw && S.D && !S.dead && !S.introOn) { const hx = x - hw.x, hy = y - hw.y, hz = z - hw.z, hd = Math.hypot(hx, hy, hz); if (hd < 5.5 && hd > 1e-3) { x = hw.x + hx * 5.5 / hd; y = hw.y + hy * 5.5 / hd; z = hw.z + hz * 5.5 / hd; } }
+        // (r3) a cinematic orbit stays inside the terrace and out of the cherry's canopy, so no grove or branch crosses the lens
+        if (Cam.cine) for (let it = 0; it < 2; it++) { const r = Math.hypot(x, z); if (r > R) { x *= R / r; z *= R / r; }
+          const tx = x - TREE_C[0], tz = z - TREE_C[1], td = Math.hypot(tx, tz); if (td < 11 && td > 1e-3) { x = TREE_C[0] + tx * 11 / td; z = TREE_C[1] + tz * 11 / td; } }
         const d = Math.hypot(x, z), m = R + 4.5; if (d > m) { x *= m / d; z *= m / d; } return { x, y: Math.max(y, 0.6), z }; },
     };
   }
@@ -1493,9 +1585,13 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       S.hemi.intensity = 1.25 - lk.storm * 0.35 + lk.sun * 0.1; S.sun.intensity = 1.3 - lk.storm * 0.6 + lk.sun * 0.35; S.sun.color.setHex(0xfff0dc).lerp(_c.setHex(0xffc890), lk.sun * 0.5);
       hdr(0xefe7d3, S.fog.color).lerp(hdr(0xb8b2a4, _c), lk.storm * 0.6);
       // birds
-      if (S.birdT < 1) { S.birdT += dt / 16; } else if (lk.storm < 0.1 && G.state === 'fight' && (S.birdNext -= dt) <= 0) { S.birdNext = 50 + vrand() * 30; S.birdT = 0; }
+      if (S.birdT < 1) { S.birdT += dt / 16; } else if (lk.storm < 0.1 && G.state === 'fight' && (S.birdNext -= dt) <= 0) { S.birdNext = 28 + vrand() * 14; S.birdT = 0; }
       S.birds.visible = S.birdT < 1; S.birdU.uBirdT.value = S.birdT; S.birdU.uBirdA.value = sat(S.birdT * 8) * sat((1 - S.birdT) * 8) * (1 - lk.storm);
-      S.tree.pet.visible = lk.petal > 0.01; S.tree.bl.visible = lk.bloom > 0.001;
+      // (r3) the cherry is never cut piecewise near the lens: within 6 m of any branch the whole tree (and its blossoms) fades out quickly
+      { const c = camera.position; let md = 1e9; for (const q of S.treePts) { const d = (q.x - c.x) ** 2 + (q.y - c.y) ** 2 + (q.z - c.z) ** 2; if (d < md) md = d; }
+        md = Math.sqrt(md); S.treeHide = md < 6 ? 1 : md > 7 ? 0 : S.treeHide; const ta = S.trU.uTreeA; ta.value = S.treeHide ? Math.max(0, ta.value - dt * 6) : Math.min(1, ta.value + dt * 6); }
+      S.tree.tree.visible = S.trU.uTreeA.value > 0.001;
+      S.tree.pet.visible = lk.petal > 0.01; S.tree.bl.visible = lk.bloom > 0.001 && S.tree.tree.visible;
       // the dragon
       if (!S.dead) D.t += dt * (1 + S.galeOn * 0.1);
       P.rear = damp(P.rear, Math.max(S.rear, S.grind > 0 ? 1 : 0), 6, dt); P.rake = S.rake ? Math.min(1, P.rake + dt * 4) : damp(P.rake, 0, 8, dt);
@@ -1504,7 +1600,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       if (!S.dead) poseDragon(S, b, dt);
       D.root.position.y = -P.dive * 15 + S.descend * 9; D.root.rotation.y = S.descend * 2.6;
       const inkV = b.enraged ? 1 : sat((S.ink - 0.15) / 0.8) * (S.dry ? 0.45 : 1);
-      D.U.uInk.value = damp(D.U.uInk.value, inkV, 2, dt); D.U.uGrind.value = S.grind; D.U.uDraw.value = S.draw; D.U.uFlat.value = S.flat;
+      D.U.uInk.value = damp(D.U.uInk.value, inkV, 2, dt); D.U.uGrind.value = S.grind; D.U.uDraw.value = S.draw; D.U.uFlat.value = S.flat; D.U.uNear.value = damp(D.U.uNear.value, !Cam.cine && !S.dead && !S.introOn ? 1 : 0, 4, dt);
       S.wetG = damp(S.wetG, S.lvl === 1 ? 1 : 0, 0.4, dt); D.U.uWetG.value = S.wetG;
       for (const pu of D.pupils) { pu.visible = S.eye > 0.01; pu.scale.set(0.5 * S.eye, S.eye, 0.7 * S.eye); }
       // which coils get out of the way: tested on the un-ducked pose so a coil that has sunk does not bob straight back up
@@ -1529,11 +1625,11 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         D.fd.needsUpdate = true;
         const ac = D.aCd.array; for (let i = 0; i < NSP; i++) ac[i * 4 + 3] = D.fdT[Math.min(NB - 3, 1 + Math.round(i / (NSP - 1) * (NB - 5)))]; for (let i = 0; i < NTT; i++) ac[(NSP + i) * 4 + 3] = D.fdT[NB - 1]; D.aCd.needsUpdate = true;
         D.fadeA = damp(D.fadeA, hit ? 0.45 : 1, 8, dt); D.U.uFade.value = D.fadeA > 0.98 ? 1.01 : D.fadeA; // the mist puffs
-        // the head only pales a little, and never while he is casting (he is the source of the stroke); the camera keeps clear of it,
+        // the head only pales to a grey I3 wash with its line kept (r3: also while casting, so it never hides the hero); the camera keeps clear of it,
         // and tilts up a little while the head is close over the hero
         D.head.getWorldPosition(_a); S.headW.copy(_a); S.camUp = damp(S.camUp || 0, live && Math.hypot(_a.x - p.pos.x, _a.z - p.pos.z) < 6 ? 1 : 0, 2, dt);
         _a.addScaledVector(_b.set(Math.sin(b.facing), 0, Math.cos(b.facing)), 1.2); const hk = clamp(((_a.x - c.x) * sx + (_a.y - c.y) * sy + (_a.z - c.z) * sz) / l2, 0, 1), hx = c.x + sx * hk - _a.x, hy = c.y + sy * hk - _a.y, hz = c.z + sz * hk - _a.z;
-        const hhit = !Cam.cine && !b.castState && hk > 0.05 && hk < 0.85 && hx * hx + hy * hy + hz * hz < 2.2;
+        const hhit = !Cam.cine && hk > 0.05 && hk < 0.85 && hx * hx + hy * hy + hz * hz < 2.2;
         D.fadeH = damp(D.fadeH, hhit ? 0.55 : 1, 6, dt); D.U.uFadeH.value = D.fadeH > 0.98 ? 1.01 : D.fadeH; }
       // the wet floor reflects the body, the head and the far coil
       if (lk.storm > 0.002) { const cf = Math.cos(b.facing), sf = Math.sin(b.facing), ry = D.root.position.y, R = S.gU.uRf.value, put = (v, q, h, w) => v.set(b.pos.x + q.x * cf + q.z * sf, b.pos.z - q.x * sf + q.z * cf, Math.max(0, h), w);
