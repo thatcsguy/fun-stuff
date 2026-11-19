@@ -67,7 +67,8 @@ const fs = require('fs'), path = require('path');
     await follow({ yaw: 1.3, d: 4.2, h: 1.5 });
     await press(4); await frames(12); await shot(P + 'riposte_guard');
     await frames(60);
-    await ev(() => { const p = window.__game.G.player; p.parryT = 0.5; p.hurt(50, { blockable: true, src: 'test' }); }); await frames(14); await shot(P + 'riposte_counter');
+    // god mode makes hurt() return early, so the parry is fired directly; its burst is cleared so the counter pose shows
+    await ev(() => { const p = window.__game.G.player; p.parryT = 0; p.cls.onParry(p, { blockable: true, src: 'test' }); }); await frames(14); await ev(() => window.__game.FX.clear()); await shot(P + 'riposte_counter');
     await frames(60);
     await follow({ yaw: 1.2, d: 4.2, h: 1.5 });
     await press(5); await frames(6); await shot(P + 'sunder_a'); await frames(7); await shot(P + 'sunder_b'); await frames(60);
