@@ -212,7 +212,7 @@ G.classes.push({
       } },
     { id: 'kindle', name: 'Kindle', icon: 'kindle', gcd: false, desc: 'Pour a flask on the blade instead of drinking it: 15 s of heavier blows and faster stamina.',
       usable: (p) => p.hasBuff('kindle') ? 'no' : p.sk[6].uses > 0 || 'spent', act: (p) => p.hasBuff('kindle'),
-      fire(p) { p.sk[6].uses--; p.addBuff('kindle', 15, 'kindle'); Sound.sfx('roar', 0.5, 1.6); Sound.sfx('steam', 0.6, 0.7); FX.pillar(p.pos.x, p.pos.z, { r: 1.1, h: 9, color: 0xff7a2a, dur: 0.7, y: p.pos.y }); FX.burst(p.pos.x, p.pos.y + 1, p.pos.z, { n: 50, color: 0xffb040, color2: 0xff4a10, speed: [2, 9], up: 3, life: [0.4, 1.1] }); FX.light(p.pos.x, p.pos.y + 1.5, p.pos.z, 0xff7a2a, 50, 0.5); } },
+      fire(p) { p.sk[6].uses--; p.addBuff('kindle', 15, 'kindle'); Sound.sfx('roar', 0.5, 1.6); Sound.sfx('steam', 0.6, 0.7); FX.pillar(p.pos.x, p.pos.z, { r: 1.1, h: 9, color: 0xff7a2a, dur: 0.7, y: p.pos.y, mult: 1.1 }); FX.burst(p.pos.x, p.pos.y + 1, p.pos.z, { n: 50, color: 0xffb040, color2: 0xff4a10, speed: [2, 9], up: 3, life: [0.4, 1.1] }); FX.light(p.pos.x, p.pos.y + 1.5, p.pos.z, 0xff7a2a, 50, 0.5); } },
     { id: 'roll', name: 'Roll', icon: 'roll', moves: true, gcd: false, desc: 'Tumble where you are moving. Hits pass through you mid-roll; dodging one makes your next Overhead instant, free and brutal.',
       usable: (p) => p.rooted > 0 ? 'no' : awReady(p), act: (p) => p.dodgeT > 0,
       fire(p) {
