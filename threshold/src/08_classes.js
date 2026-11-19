@@ -46,7 +46,7 @@ G.classes.push({
         const step = p.combo % 3; p.combo++; const dmg = [45, 55, 78][step];
         p.model.swing(step, 0.26); Sound.sfx('slash', 1, 0.9 + step * 0.12);
         const fx = Math.sin(p.facing), fz = Math.cos(p.facing);
-        FX.slash(p.pos.x + fx * 0.8, 1.25, p.pos.z + fz * 0.8, p.facing, { r: 2.7, color: 0xb070ff, tilt: [0.5, -0.35, 0][step], pitch: step === 2 ? 1.2 : 0, flip: step === 1 });
+        if (step !== 1) FX.slash(p.pos.x + fx * 0.8, 1.25, p.pos.z + fz * 0.8, p.facing, { r: 2.7, color: 0xb070ff, tilt: [0.5, -0.35, 0][step], pitch: step === 2 ? 1.2 : 0 }); // the rising backhand shows only the model's own trail
         if (t && t.alive) { t.damage(dmg, { src: 'player' }); hitPoint(p, t, _hp); FX.burst(_hp.x, _hp.y, _hp.z, { n: 8 + step * 5, color: 0xc9a0ff, speed: [2, 8], life: [0.2, 0.5], size: [0.12, 0.35] }); Sound.sfx('hit', 0.7); }
         p.gain((step === 2 ? 2 : 1) + (p.hasBuff('storm') ? 1 : 0));
       } },
@@ -56,7 +56,7 @@ G.classes.push({
         const m = p.res, dmg = 45 * m + (m >= 5 ? 50 : 0); p.res = 0; p.model.swing(5, 0.42); Sound.sfx(m >= 5 ? 'crit' : 'slash');
         const fx = Math.sin(p.facing), fz = Math.cos(p.facing);
         FX.slash(p.pos.x + fx, 1.3, p.pos.z + fz, p.facing, { r: 3.4, color: 0xff5a9c, tilt: 0.6, dur: 0.3 }); FX.slash(p.pos.x + fx, 1.3, p.pos.z + fz, p.facing, { r: 3.4, color: 0xb070ff, tilt: -0.6, flip: true, dur: 0.3 });
-        if (t && t.alive) { t.damage(dmg, { src: 'player', crit: m >= 5 }); hitPoint(p, t, _hp); FX.burst(_hp.x, _hp.y, _hp.z, { n: 10 + m * 7, color: 0xff7ab0, color2: 0xa060ff, speed: [3, 12], life: [0.3, 0.7] }); if (m >= 5) { FX.light(_hp.x, _hp.y, _hp.z, 0xff5a9c, 60, 0.3); FX.shake(0.25); } }
+        if (t && t.alive) { t.damage(dmg, { src: 'player', crit: m >= 5 }); hitPoint(p, t, _hp); FX.burst(_hp.x, _hp.y, _hp.z, { n: 10 + m * 7, color: 0xff7ab0, color2: 0xa060ff, speed: [3, 12], life: [0.3, 0.7] }); if (m >= 5) { FX.light(_hp.x + fx * 0.8, _hp.y, _hp.z + fz * 0.8, 0xff5a9c, 26, 0.3); FX.shake(0.25); } }
       } },
     { id: 'storm', name: 'Bladestorm', icon: 'storm', cd: 80, gcd: false, act: (p) => p.hasBuff('storm'), desc: '10 s of frenzy: faster attacks, extra Momentum.',
       fire(p) { p.addBuff('storm', 10, 'storm'); Sound.sfx('roar', 0.5, 2); FX.dome(p.pos.x, 1, p.pos.z, { r: 5, color: 0xb070ff }); FX.burst(p.pos.x, 1, p.pos.z, { n: 60, color: 0xb070ff, color2: 0xff5a9c, speed: [4, 12], life: [0.4, 1] }); } },
