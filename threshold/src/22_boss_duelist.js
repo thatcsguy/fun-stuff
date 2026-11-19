@@ -312,8 +312,8 @@
             vec3 col=mix(uA,uB,clamp(c.y+0.5,0.0,1.0)*(0.5+0.5*vS))*(0.8+0.2*fl)*(1.0-0.25*exp(-c.x*c.x*300.0)); gl_FragColor=vec4(col,uAlpha*(0.55+0.45*vS)*(1.0-smoothstep(0.6,1.0,d))); }` }));
       S.petals.frustumCulled = false; S.petals.renderOrder = 15; S.petals.onBeforeRender = () => { PU.uTime.value = G.now; PU.uScale.value = renderer.domElement.height * 0.5; }; S.PU = PU; g.add(S.petals); }
 
-    // ---------------------------------------------------------------- Issen
-    const M2 = buildHero({ id: 'duskblade', look: { armor: 0x17151f, cloth: 0x3a3450, glow: ROSE, hood: false } }); S.model = M2; M2.group.scale.setScalar(1.72); b.group.add(M2.group);
+    // ---------------------------------------------------------------- Issen (dresses the generic hero rig, so look.generic skips the Duskblade model)
+    const M2 = buildHero({ id: 'duskblade', look: { armor: 0x17151f, cloth: 0x3a3450, glow: ROSE, hood: false, generic: true } }); S.model = M2; M2.group.scale.setScalar(1.72); b.group.add(M2.group);
     const hips = M2.body.children[0], torso = hips.children[0], head = torso.children.find((o) => o.isGroup && Math.abs(o.position.y - 0.8) < 0.01);
     const shs = torso.children.filter((o) => o.isGroup && Math.abs(Math.abs(o.position.x) - 0.31) < 0.01); S.shs = shs;
     for (let i = 1; i < head.children.length; i++) head.children[i].visible = false;

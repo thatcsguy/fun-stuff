@@ -39,7 +39,7 @@ G.classes.push({
   id: 'duskblade', name: 'DUSKBLADE', role: 'Melee. Builds Momentum, lives on the counter.', color: '#b98cff', hp: 1000, gcd: 1.0, melee: true,
   gcdOf: (p) => p.hasBuff('storm') ? 0.6 : 1.0,
   resource: { name: 'Momentum', max: 5 },
-  look: { armor: 0x2c2640, cloth: 0x3d1c58, glow: 0xa868ff, hood: false },
+  look: { armor: 0x4a4068, cloth: 0x3d1c58, glow: 0xa868ff, hood: false, metal: 0xb9b2cc, leather: 0x2a1d26, inner: 0x1b1622, lining: 0x7a1f4e, plume: 0x8a2456 },
   skills: [
     { id: 'slash', name: 'Slash', icon: 'slash', range: MELEE, melee: true, desc: 'Three-hit combo. Each hit builds Momentum.',
       fire(p, t) {
@@ -53,7 +53,7 @@ G.classes.push({
     { id: 'sever', name: 'Sever', icon: 'sever', range: MELEE, melee: true, desc: 'Spend all Momentum in one cut. Far stronger at five.', rdy: (p) => p.res >= p.resMax,
       usable: (p) => p.res >= 1 || 'res',
       fire(p, t) {
-        const m = p.res, dmg = 45 * m + (m >= 5 ? 50 : 0); p.res = 0; p.model.swing(1, 0.34); Sound.sfx(m >= 5 ? 'crit' : 'slash');
+        const m = p.res, dmg = 45 * m + (m >= 5 ? 50 : 0); p.res = 0; p.model.swing(5, 0.42); Sound.sfx(m >= 5 ? 'crit' : 'slash');
         const fx = Math.sin(p.facing), fz = Math.cos(p.facing);
         FX.slash(p.pos.x + fx, 1.3, p.pos.z + fz, p.facing, { r: 3.4, color: 0xff5a9c, tilt: 0.6, dur: 0.3 }); FX.slash(p.pos.x + fx, 1.3, p.pos.z + fz, p.facing, { r: 3.4, color: 0xb070ff, tilt: -0.6, flip: true, dur: 0.3 });
         if (t && t.alive) { t.damage(dmg, { src: 'player', crit: m >= 5 }); hitPoint(p, t, _hp); FX.burst(_hp.x, _hp.y, _hp.z, { n: 10 + m * 7, color: 0xff7ab0, color2: 0xa060ff, speed: [3, 12], life: [0.3, 0.7] }); if (m >= 5) { FX.light(_hp.x, _hp.y, _hp.z, 0xff5a9c, 60, 0.3); FX.shake(0.25); } }
@@ -68,7 +68,7 @@ G.classes.push({
         else { dir = p.moving ? Math.atan2(p.intentX, p.intentZ) : p.facing; dist = 8; }
         { const A = G.arena; if (A && A.edge === 'fall') { while (dist > 0.5 && !A.contains(p.pos.x + Math.sin(dir) * dist, p.pos.z + Math.cos(dir) * dist)) dist -= 0.5; if (!A.contains(p.pos.x + Math.sin(dir) * dist, p.pos.z + Math.cos(dir) * dist)) dist = 0.01; } }
         const dur = clamp(dist / 46, 0.12, 0.42); p.facing = dir; p.casting = null;
-        p.dash = { vx: Math.sin(dir) * dist / dur, vz: Math.cos(dir) * dist / dur, t: dur, done: (q) => { if ((far || toT) && t.alive && t.distTo(q.pos.x, q.pos.z) < MELEE + 0.6) { t.damage(40, { src: 'player' }); q.gain(1); q.model.swing(2, 0.2); hitPoint(q, t, _hp); FX.impact(_hp.x, _hp.y, _hp.z, 0xb070ff, 0.8); Sound.sfx('hit'); } } };
+        p.dash = { vx: Math.sin(dir) * dist / dur, vz: Math.cos(dir) * dist / dur, t: dur, done: (q) => { if ((far || toT) && t.alive && t.distTo(q.pos.x, q.pos.z) < MELEE + 0.6) { t.damage(40, { src: 'player' }); q.gain(1); q.model.swing(6, 0.24); hitPoint(q, t, _hp); FX.impact(_hp.x, _hp.y, _hp.z, 0xb070ff, 0.8); Sound.sfx('hit'); } } };
         Sound.sfx('dash'); FX.burst(p.pos.x, 1, p.pos.z, { n: 24, color: 0xb070ff, dir: [-Math.sin(dir), 0.1, -Math.cos(dir)], spread: 0.5, speed: [2, 9], life: [0.25, 0.6] });
       } },
     { id: 'riposte', name: 'Riposte', icon: 'riposte', cd: 10, gcd: false, act: (p) => p.parryT > 0, desc: 'Parry for a moment. A blocked hit deals no damage, fills Momentum and strikes back hard.',
@@ -85,7 +85,7 @@ G.classes.push({
   onParry(p, o) {
     Sound.sfx('parry'); p.res = p.resMax; p.invuln = 0.35; FX.flash(0xffffff, 0.22, 5); FX.dome(p.pos.x, 1.2, p.pos.z, { r: 3.5, color: 0xffffff, dur: 0.3 }); FX.burst(p.pos.x, 1.2, p.pos.z, { n: 40, color: 0xffffff, color2: 0xb070ff, speed: [5, 16], life: [0.2, 0.6] });
     FX.num(p.aim(), 'PARRY', 'note'); const st = p.sk[4]; if (st.cd > 0) st.cd = Math.max(0.1, st.cd - 4);
-    const t = p.target; if (t && t.alive && t.distTo(p.pos.x, p.pos.z) < 9) { p.model.swing(1, 0.3); t.damage(240, { src: 'player', crit: true }); hitPoint(p, t, _hp); FX.lightning(p.aim(_h2), _hp, { color: 0xd0a0ff, width: 0.2 }); FX.impact(_hp.x, _hp.y, _hp.z, 0xffffff, 1.4); Sound.sfx('crit'); }
+    const t = p.target; if (t && t.alive && t.distTo(p.pos.x, p.pos.z) < 9) { p.model.swing(7, 0.32); t.damage(240, { src: 'player', crit: true }); hitPoint(p, t, _hp); FX.lightning(p.aim(_h2), _hp, { color: 0xd0a0ff, width: 0.2 }); FX.impact(_hp.x, _hp.y, _hp.z, 0xffffff, 1.4); Sound.sfx('crit'); }
     G.timeScale = 0.25; Co.start(function* () { let t0 = 0; while (t0 < 0.1) { t0 += G.rdt || 0.016; yield; } G.timeScale = 1; }, 'sys');
   },
   update(p, dt) { if (p.hasBuff('storm') && !G.headless && vrand() < dt * 30) FX.burst(p.pos.x, 0.2 + vrand() * 1.8, p.pos.z, { n: 1, color: 0xb070ff, speed: [0.5, 2], life: [0.3, 0.7], radius: 0.6 }); },

@@ -15,7 +15,10 @@ A PC-first 3D raid game: unrelated boss fights, one behind each door, four class
 | `05_world.js` | `Cam` (orbit camera + cinematic shots) and `W` (procedural textures, sky, water, lava, lights, motes) |
 | `06_combat.js` | `Hz` telegraphed hazards, `Bul` bullets, `Ent` and `Boss` |
 | `07_hero.js` | Hero model kit (`HeroKit`: rim-lit materials, parts merged per bone and material, lathe/tube helpers, cloth springs) and the per-class models in `HERO_MODELS` (Stormcaller so far) |
-| `07_player.js` | Generic procedural hero model (used by classes without their own), `Player` (movement, casting, GCD, buffs, dashes, damage) |
+| `07_hexslinger.js` | Hexslinger model: witch-crown cattleman hat, duster on hinged panels, bandolier of salve vials, a revolver whose six chambers show the loaded rounds; two-bone IK arms (fan, load, spin, salve twirl) |
+| `07_hero_warden.js` | The Ashwarden's model: ash-iron knight, greatsword held two-handed by IK (sword poses are a grip point and blade direction in chest space), cape and tabard springs, Ember Flasks on the belt. Its own file so class models can be built side by side; the name sorts after `07_hero.js` under any collation |
+| `07_model_duskblade.js` | The Duskblade's model on `HeroKit` (registers `HERO_MODELS.duskblade`): helm, kit, half-cape, blade with Momentum runes and a swing trail, keyframed swings (kinds 0-2 Slash, 3 Sunder, 5 Sever, 6 thrust, 7 parry counter) |
+| `07_player.js` | Generic procedural hero model (used by classes without their own, and by any `look` with `generic: true`, like Issen in door III), `Player` (movement, casting, GCD, buffs, dashes, damage) |
 | `08_classes.js` | The four classes and their autopilot rotations (see "Classes" below) |
 | `09_ui.js`, `10_game.js` | HUD/menus, fight lifecycle (including the hidden rehearsal at load), the hall-of-doors menu scene |
 | `11_warm.js` | Warm-up frame and light keeper that stop shader compiles mid-fight |
@@ -86,7 +89,10 @@ Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `pit`.
 - `hitch.js <boss>`: plays each phase in real frames and lists every shader compiled after the fight started (should be none).
 - `warmcheck.js [boss...]`: loads fights through the real loading path and prints rehearsal and warm-up times.
 - `shot.js <query> <out.png> [evalJS] [frames]`: screenshot.
+- `hexcap.js <outDir> [boss,boss] [groups]`: herocap.js for the Hexslinger: idle, walk, fire and recoil, Load, Spin, Salve twirl, Silver, the Last Word, airborne, plus gun close-ups and the same perf line. `groups` (play,idle,walk,fire,load,spin,salve,last,air) keeps a review loop short.
 - `herocap.js <outDir> [class] [boss,boss]`: player-model review. Enters each door normally (intro plays), then screenshots the hero with the play camera and with a follow camera (front, side, back, face) idle, walking, casting, on the spender, Blink, the barrier and Tempest; prints the hero's mesh and triangle counts and the frame time.
+- `duskcap.js <outDir> [boss,boss]`: the same review for the Duskblade (normal entry; idle, walk, the three Slash steps, Sever, Riposte and its counter, Sunder, Lunge, Bladestorm). `duskpose.js <outDir> [boss]` pins every Duskblade swing at four points of its timeline (plus guard, dash and full Momentum) and shoots each from the front and the sword side.
+- `awcap.js <outDir> [boss,boss] [groups]`: the same review for the Ashwarden (cuts, Overhead wind-up and slam, roll and hop, Kindle, Ember Flask, opening, Winded), with the one-shot moves in slow motion so screenshot latency cannot skip them. `AW_LAB=1` hides the arena and lights the knight evenly on grey.
 - `montage.js <out.png> <cols> <x,y,w,h | full> img...`: tiles (optionally cropped) screenshots into one contact sheet.
 - `diag.js <boss> <class> <expr> <seconds> [phase]`: autopilot run that prints `expr` (JS with `g, G, b, p, S` in scope) every half second, for tracing a mechanic.
 - `logicfuzz.js`: no browser; fuzzes the circuit generator of door `logic` (every circuit must be survivable).
