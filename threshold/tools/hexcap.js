@@ -30,6 +30,8 @@ const fs = require('fs'), path = require('path');
     await ev(([b]) => { const g = window.__game; g.G.god = true; g.Bot.update = () => { g.Input.bot = window.__mv || { moveX: 0, moveZ: 0 }; }; window.__mv = null; g.Game.start(b, { cls: 'hexslinger' }); }, [boss]);
     await page.waitForFunction('window.__game.G.state === "fight" && !window.__game.Cam.cine', null, { timeout: 120000, polling: 100 });
     await ev(() => { const g = window.__game; window.__mv = { moveX: 0, moveZ: 0 }; g.G.boss.immune = false; });
+    // calm (default; HX_LIVE=1 to skip): freeze the boss so its attacks do not wash over the review shots
+    if (!process.env.HX_LIVE) await ev(() => { const g = window.__game, b = g.G.boss; b.update = () => {}; for (const e of g.G.ents) if (e !== b && !e.isBoss) e.alive = false; });
     await frames(60);
     const P = boss + '_';
     await ev(() => { const g = window.__game, p = g.G.player; g.Cam.yaw = p.facing + 0.5; g.Cam.pitch = 0.36; });
@@ -45,6 +47,7 @@ const fs = require('fs'), path = require('path');
       await ev(() => { window.__mv = { moveX: 0, moveZ: 0 }; }); await frames(30);
       await press(0, 'LLLLLL'); await frames(4); await shot(P + 'play_fire'); await frames(50);
     }
+    await ev(() => { document.getElementById('hud').style.visibility = 'hidden'; }); // close-ups: no HUD over the legs
     if (want('idle')) {
       for (const [n, yaw, d, h] of [['front', 0.55, 5.2, 1.6], ['side', 1.57, 5.2, 1.4], ['back', 2.7, 5.2, 1.8]]) { await follow({ yaw, d, h }); await frames(8); await shot(P + 'idle_' + n); }
       await follow({ yaw: 0.35, d: 2.0, h: 1.75, ly: 1.6, fov: 30 }); await frames(8); await shot(P + 'idle_face');
@@ -85,6 +88,7 @@ const fs = require('fs'), path = require('path');
       await follow({ yaw: 1.0, d: 4.5, h: 1.6 });
       await ev(() => { const p = window.__game.G.player; p.jump(); }); await frames(14); await shot(P + 'air'); await frames(60);
     }
+    await ev(() => { document.getElementById('hud').style.visibility = ''; });
     await follow(null); await frames(40);
     const st = await ev(() => window.__game.state()); console.log('state', JSON.stringify(st));
   }
