@@ -19,14 +19,22 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
   const tone = (c, l, s = 1, hue) => { const o = new THREE.Color(c); o.getHSL(_hsl, SRGB); let h = _hsl.h;
     if (hue !== undefined) { const dh = ((hue - h + 1.5) % 1) - 0.5; if (Math.abs(dh) < 0.12) h += dh * 0.7; }
     return o.setHSL((h + 1) % 1, Math.min(_hsl.s, s), Math.max(_hsl.l, l), SRGB); };
-  const coatC = tone(C.cloth, 0.29, 0.48, 0.94), mantleC = tone(coatC, 0.41, 0.4), hatC = armorC.clone().multiplyScalar(0.72);
+  const coatC = tone(C.cloth, 0.29, 0.48, 0.94), mantleC = tone(coatC, 0.41, 0.4);
+  // hat felt: a mid plum (lightness >= 0.26, saturation >= 0.36, hue pulled toward plum) so the head reads on a dark floor; the brim
+  // top a fifth lighter than the crown
+  const hatC = (() => { const o = armorC.clone(); o.getHSL(_hsl, SRGB); let h = _hsl.h; const dh = ((0.835 - h + 1.5) % 1) - 0.5; if (Math.abs(dh) < 0.12) h += dh * 0.7;
+    return o.setHSL((h + 1) % 1, Math.max(_hsl.s, 0.36), Math.max(_hsl.l, 0.26), SRGB); })();
+  const brimC = hatC.clone(); brimC.getHSL(_hsl, SRGB); brimC.setHSL(_hsl.h, _hsl.s, _hsl.l * 1.2, SRGB);
   const liningC = new THREE.Color(or(C.lining, 0x2fa69a)), scarfC = tone(glowC.clone().lerp(clothC, 0.1), 0, 1, 0.925); // a hot rose pink
   const rimBase = new THREE.Color(0xa8c8ff).multiplyScalar(0.6), rimU = { value: rimBase.clone() };
   const coatM = K.mat({ color: coatC, roughness: 0.62, side: THREE.DoubleSide }, rimU, 1.25, liningC.getHex());
   const capeM = K.mat({ color: mantleC, roughness: 0.66, side: THREE.DoubleSide }, rimU, 1.5, coatC.clone().multiplyScalar(0.5).getHex());
   const hatM = K.mat({ color: hatC, roughness: 0.74, side: THREE.DoubleSide }, rimU, 1.6, hatC.clone().multiplyScalar(0.6).getHex());
+  const brimM = K.mat({ color: brimC, roughness: 0.72, side: THREE.DoubleSide }, rimU, 1.6, hatC.clone().multiplyScalar(0.7).getHex());
+  const boneM = K.mat({ color: 0xe8d8b8, roughness: 0.62 }, rimU, 0.75); // bone trims: boot cuffs, toe caps, sleeve cuffs, mantle edges
+  const bandM = K.mat({ color: liningC.clone().multiplyScalar(0.36), roughness: 0.8, side: THREE.DoubleSide }, rimU, 1.0); // dark teal bandana
   const vestM = K.mat({ color: armorC.clone().lerp(clothC, 0.15), roughness: 0.55, metalness: 0.15 }, rimU, 0.6);
-  const liningM = K.mat({ color: liningC, roughness: 0.66, side: THREE.DoubleSide }, rimU, 1.2);
+  const liningM = K.mat({ color: liningC, roughness: 0.66, side: THREE.DoubleSide, emissive: liningC, emissiveIntensity: 0.2 }, rimU, 1.2); // teal trims, faintly lit
   const scarfM = K.mat({ color: scarfC, roughness: 0.75, side: THREE.DoubleSide, emissive: scarfC, emissiveIntensity: 0.42 }, rimU, 0.6);
   const maskM = K.mat({ color: armorC.clone().multiplyScalar(0.6), roughness: 0.9 }, rimU, 0.5);
   const gloveM = K.mat({ color: 0xc2a580, roughness: 0.6 }, rimU, 0.7);
@@ -37,7 +45,7 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
   const pearlM = K.mat({ color: 0xe9dbe8, roughness: 0.3, metalness: 0.1, emissive: 0xffe8fb, emissiveIntensity: 0.05 }, rimU, 0.6);
   const hairM =K.mat({ color: 0x1c1519, roughness: 0.55 }, rimU, 0.7);
   const glowM = W.glow(C.glow, 2.2), sigM = W.glow(C.glow, 2.0), barrelM = W.glow(C.glow, 1.6), eyeM = W.glow(glowC.clone().lerp(new THREE.Color(1, 1, 1), 0.45), 3.6);
-  const glowBase = glowM.color.clone(), sigBase = sigM.color.clone(), barrelBase = barrelM.color.clone();
+  const glowBase = glowM.color.clone(), sigBase = sigM.color.clone(), barrelBase = barrelM.color.clone(), eyeBase = eyeM.color.clone();
   const grp = (parent, x = 0, y = 0, z = 0) => { const o = new THREE.Group(); o.position.set(x, y, z); parent.add(o); return o; };
   const warp = (geo, f) => { const pa = geo.attributes.position; for (let i = 0; i < pa.count; i++) { const r = f(pa.getX(i), pa.getY(i), pa.getZ(i)); pa.setXYZ(i, r[0], r[1], r[2]); } geo.computeVertexNormals(); return geo; };
   const hexG = (r, d) => new THREE.CylinderGeometry(r, r, d, 6).rotateX(PI / 2); // a flat hexagon facing +z
@@ -72,26 +80,34 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
 
   // ---- mantle: open front, three panels (left, back, right) hinged at the collar so they lag on turns and lift on recoil and in
   // the air; a scalloped hem longer at the back with a bone trim, the hex sigil and two scarf tails down the back ----
-  const MS = [1.24, 0.88], MP = [[0.33, 0.37], [0.325, 0.45], [0.305, 0.53], [0.27, 0.6], [0.2, 0.655], [0.12, 0.69], [0.098, 0.7]];
-  const mHem = (a) => -0.07 * Math.max(0, -Math.cos(a)) + 0.018 * Math.cos(a * 9) + 0.035 * Math.pow(Math.abs(Math.sin(a)), 4);
+  // ~15% shorter than it was (the shoulder line shows below it) and shallower front to back (no mushroom over the waist from the side)
+  const MS = [1.22, 0.82], my = (y) => 0.7 - (0.7 - y) * 0.85, mz = (z) => (z + 0.005) * MS[1] / 0.88 - 0.005;
+  const MP = [[0.33, 0.37], [0.325, 0.45], [0.305, 0.53], [0.27, 0.6], [0.2, 0.655], [0.12, 0.69], [0.098, 0.7]].map(([r, y]) => [r, my(y)]), MY0 = my(0.375);
+  const mHem = (a) => 0.85 * (-0.07 * Math.max(0, -Math.cos(a)) + 0.018 * Math.cos(a * 9) + 0.035 * Math.pow(Math.abs(Math.sin(a)), 4));
   const mantle = [], _m4 = new THREE.Matrix4(), _eM = new THREE.Euler(), _qM = new THREE.Quaternion(), _sM = new V3(1, 1, 1), _pM = new V3();
   const onPanel = (pv, geo) => geo.translate(-pv.position.x, -pv.position.y, -pv.position.z).rotateY(-pv.rotation.y); // torso space -> panel space
   const addOn = (pv, mat, geo, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => { geo.applyMatrix4(_m4.compose(_pM.set(x, y, z), _qM.setFromEuler(_eM.set(rx, ry, rz)), _sM)); P.add(pv, mat, onPanel(pv, geo)); };
   const mkMantle = (a0, a1, rs = 1) => {
     const ac = (a0 + a1) / 2, sx = MS[0] * rs, sz = MS[1] * rs, pv = grp(torso, Math.sin(ac) * 0.11 * sx, 0.69, Math.cos(ac) * 0.11 * sz - 0.005); pv.rotation.order = 'YXZ'; pv.rotation.y = ac;
     const cg = K.lathe(MP, Math.max(6, Math.round((a1 - a0) * 6.5)), a0, a1 - a0);
-    warp(cg, (x, y, z) => [x * sx, y < 0.375 ? y + mHem(Math.atan2(x, z)) : y, z * sz - 0.005]); P.add(pv, capeM, onPanel(pv, cg));
-    const edge = []; for (let k = 0; k <= 12; k++) { const a = a0 + (a1 - a0) * k / 12; edge.push([Math.sin(a) * 0.333 * sx, 0.372 + mHem(a), Math.cos(a) * 0.333 * sz - 0.005]); }
-    P.add(pv, gloveM, onPanel(pv, K.tube(edge, 0.0105, 22, 4)));
-    const m = { pv, phi: ac, spr: K.spring(60, 6.5), sprZ: K.spring(40, 5) }; mantle.push(m); return m;
+    warp(cg, (x, y, z) => [x * sx, y < MY0 ? y + mHem(Math.atan2(x, z)) : y, z * sz - 0.005]); P.add(pv, capeM, onPanel(pv, cg));
+    const edge = []; for (let k = 0; k <= 12; k++) { const a = a0 + (a1 - a0) * k / 12; edge.push([Math.sin(a) * 0.333 * sx, MP[0][1] + 0.002 + mHem(a), Math.cos(a) * 0.333 * sz - 0.005]); }
+    P.add(pv, boneM, onPanel(pv, K.tube(edge, 0.0105, 22, 4)));
+    // bone piping down both side edges, so the cut between panels reads when the mantle is still
+    for (const a of [a0 + 0.012, a1 - 0.012]) { const se = MP.slice(0, 5).map(([r, y], i) => [Math.sin(a) * (r + 0.004) * sx, (i ? y : y + mHem(a)) + 0.002, Math.cos(a) * (r + 0.004) * sz - 0.005]);
+      P.add(pv, boneM, onPanel(pv, K.tube(se, 0.0075, 10, 4))); }
+    const m = { pv, phi: ac, spr: K.spring(60, 6.5), sprZ: K.spring(40, 5), kS: K.spring(160, 9),
+      amp: Math.sin(ac) < -0.3 ? 1 : Math.cos(ac) < -0.5 ? 0.5 : 0.3 }; mantle.push(m); return m; // kS: the recoil flick (gun side most)
   };
-  mkMantle(0.58, 2.28); mkMantle(TAU - 2.28, TAU - 0.58); const mB = mkMantle(2.22, TAU - 2.22, 1.012);
+  // three panels with ~3 cm gaps between them over a dark leather seam
+  mkMantle(0.58, 2.2); mkMantle(TAU - 2.2, TAU - 0.58); const mB = mkMantle(2.31, TAU - 2.31, 1.012);
+  for (const a of [2.255, TAU - 2.255]) P.add(torso, leatherM, K.tube(MP.slice(0, 6).map(([r, y]) => [Math.sin(a) * (r - 0.012) * MS[0], y - 0.01, Math.cos(a) * (r - 0.012) * MS[1] - 0.005]), 0.016, 10, 4));
   { const tr = K.lathe([[0.1, 0.672], [0.104, 0.705]], 30, 0.58, TAU - 1.16); P.add(torso, liningM, tr, 0, 0, -0.005, 0, 0, 0, MS[0], 1, MS[1]); }
-  addOn(mB.pv, glowM, hexRing(0.04, 0.05), 0, 0.47, -0.299, 0.26, PI, 0); addOn(mB.pv, glowM, hexRing(0.012, 0.018), 0, 0.47, -0.3, 0.26, PI, 0);
+  addOn(mB.pv, glowM, hexRing(0.04, 0.05), 0, my(0.47), mz(-0.299), 0.3, PI, 0); addOn(mB.pv, glowM, hexRing(0.012, 0.018), 0, my(0.47), mz(-0.3), 0.3, PI, 0);
   // the scarf's back tails: two strips lying over the mantle from the collar, then a free end swinging below its hem
   const strip = (x, y0, z0, y1, z1, w) => { const dy = y1 - y0, dz = z1 - z0, len = Math.hypot(dy, dz); return new THREE.BoxGeometry(w, len + 0.012, 0.008).translate(0, -len / 2, 0).rotateX(Math.atan2(-dz, -dy)).translate(x, y0, z0); };
-  for (const s of [1, -1]) { addOn(mB.pv, scarfM, strip(s * 0.05, 0.7, -0.13, 0.6, -0.27, 0.05)); addOn(mB.pv, scarfM, strip(s * 0.056, 0.6, -0.27, 0.4, -0.32, 0.054)); }
-  const bTail = grp(mB.pv), bTailS = [K.spring(46, 5), K.spring(36, 5)]; bTail.position.set(0, 0.4, -0.32).sub(mB.pv.position).applyAxisAngle(new V3(0, 1, 0), -mB.phi);
+  for (const s of [1, -1]) { addOn(mB.pv, scarfM, strip(s * 0.05, 0.7, mz(-0.13), my(0.6), mz(-0.27), 0.05)); addOn(mB.pv, scarfM, strip(s * 0.056, my(0.6), mz(-0.27), my(0.4), mz(-0.32), 0.054)); }
+  const bTail = grp(mB.pv), bTailS = [K.spring(46, 5), K.spring(36, 5)]; bTail.position.set(0, my(0.4), mz(-0.32)).sub(mB.pv.position).applyAxisAngle(new V3(0, 1, 0), -mB.phi);
   { const w = 0.054, L = 0.24, sh = new THREE.Shape([new THREE.Vector2(-w / 2, 0.01), new THREE.Vector2(w / 2, 0.01), new THREE.Vector2(w / 2, -L), new THREE.Vector2(0, -L + 0.04), new THREE.Vector2(-w / 2, -L)]);
     for (const s of [1, -1]) P.add(bTail, scarfM, new THREE.ExtrudeGeometry(sh, { depth: 0.008, bevelEnabled: false }), s * 0.058, 0, -0.004, 0, 0, s * -0.05); }
 
@@ -100,7 +116,13 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
   P.add(head, hairM, new THREE.SphereGeometry(0.106, 14, 10), 0, 0.13, -0.016, 0, 0, 0, 1, 1, 1);
   // eye slits stand proud of the face so they stay lit from any angle
   for (const s of [1, -1]) P.add(head, eyeM, new THREE.BoxGeometry(0.038, 0.012, 0.02), s * 0.036, 0.132, 0.11, 0, s * 0.3, s * -0.16);
-  P.add(head, maskM, K.lathe([[0.104, -0.03], [0.112, 0.02], [0.113, 0.07], [0.106, 0.095]], 12, -1.45, 2.9), 0, 0, 0.008);
+  // bandana: a dark teal wedge from the bridge of the nose to a point below the chin, knotted at the back with two short tails
+  { const bg = K.lathe([[0.088, -0.05], [0.106, -0.012], [0.114, 0.035], [0.114, 0.08], [0.108, 0.108]], 16, -1.55, 3.1);
+    warp(bg, (x, y, z) => { const ca = Math.max(0, Math.cos(Math.atan2(x, z))), lo = sat((0.0 - y) / 0.05);
+      return [x * 0.97, y - 0.07 * Math.pow(ca, 3) * lo + (y > 0.1 ? 0.008 * ca * ca : 0), z + 0.012 * Math.pow(ca, 3) * lo]; });
+    P.add(head, bandM, bg, 0, 0, 0.006);
+    P.add(head, bandM, new THREE.SphereGeometry(0.024, 8, 6), 0, 0.075, -0.12, 0, 0, 0, 1.3, 0.9, 0.8);
+    for (const s of [1, -1]) P.add(head, bandM, new THREE.BoxGeometry(0.032, 0.1, 0.007).translate(0, -0.05, 0), s * 0.02, 0.07, -0.128, 0.35, 0, s * 0.32); }
   P.add(torso, scarfM, new THREE.TorusGeometry(0.083, 0.038, 8, 18), 0, 0.665, 0.004, PI / 2, 0, 0, 1, 0.92, 1);
   { const sh = new THREE.Shape([new THREE.Vector2(-0.09, 0), new THREE.Vector2(0.09, 0), new THREE.Vector2(0.01, -0.19)]);
     P.add(torso, scarfM, new THREE.ExtrudeGeometry(sh, { depth: 0.008, bevelEnabled: false }), 0, 0.66, 0.112, -0.32, 0, 0); }
@@ -109,9 +131,11 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
   { const bg = K.lathe([[0.12, 0.007], [0.24, 0.006], [0.36, 0.004], [0.372, 0.0], [0.36, -0.004], [0.24, -0.006], [0.12, -0.007]], 36);
     warp(bg, (x, y, z) => { const r = Math.hypot(x, z), a = Math.atan2(x, z), u = sat((r - 0.16) / 0.21), sa = Math.sin(a), ca = Math.cos(a);
       return [x, y + u * u * (0.105 * sa * sa - (ca > 0 ? 0.02 : 0.014) * ca * ca), z * 1.07]; });
-    P.add(hat, hatM, bg);
-    const edge = []; for (let k = 0; k <= 48; k++) { const a = k / 48 * TAU, sa = Math.sin(a), ca = Math.cos(a); edge.push([sa * 0.368, 0.105 * sa * sa - (ca > 0 ? 0.02 : 0.014) * ca * ca, ca * 0.368 * 1.07]); }
-    P.add(hat, liningM, K.tube(edge, 0.008, 72, 4)); // pale binding: the brim edge catches the rim at play distance
+    P.add(hat, brimM, bg);
+    const edge = []; for (let k = 0; k <= 48; k++) { const a = k / 48 * TAU, sa = Math.sin(a), ca = Math.cos(a); edge.push([sa * 0.364, 0.105 * sa * sa - (ca > 0 ? 0.02 : 0.014) * ca * ca, ca * 0.364 * 1.07]); }
+    P.add(hat, liningM, K.tube(edge, 0.016, 72, 5)); // a broad, faintly lit teal binding: the brim edge outlines the head at play distance
+    // a sweatband ridge under the crown's front: a lighter brow plane over the eyes
+    P.add(hat, hatM, new THREE.TorusGeometry(0.104, 0.01, 4, 12, 1.9).rotateZ(PI / 2 - 0.95).rotateX(PI / 2), 0, -0.036, 0.008, 0, 0, 0, 0.95, 1, 1.05);
     // a low cattleman crown: a centre crease front to back, two pinched dents at the front, the top dipping toward the brim's front
     const cg = K.lathe([[0.128, -0.01], [0.131, 0.05], [0.127, 0.1], [0.12, 0.142], [0.11, 0.176], [0.092, 0.196], [0.066, 0.204], [0.036, 0.207], [0.0, 0.208]], 24);
     warp(cg, (x, y, z) => { const u = sat((y - 0.07) / 0.13), a = Math.atan2(x, z), top = sat((y - 0.17) / 0.03);
@@ -142,17 +166,20 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
   const mkArm = (side) => {
     const sh = grp(torso, side * 0.262, 0.55, -0.01);
     P.add(sh, coatM, new THREE.SphereGeometry(0.066, 12, 8), side * 0.004, -0.012, 0, 0, 0, 0, 1, 0.95, 1);
-    P.add(sh, coatM, K.lathe([[0.064, -0.3], [0.07, -0.2], [0.076, -0.08], [0.08, 0.02]], 12));
+    P.add(sh, coatM, K.lathe([[0.053, -0.3], [0.062, -0.23], [0.075, -0.1], [0.08, 0.02]], 12)); // tapering into the elbow
     const el = grp(sh, 0, -UA, 0);
-    P.add(el, coatM, K.lathe([[0.056, -0.15], [0.06, -0.06], [0.064, 0.02]], 12));
-    P.add(el, gloveM, K.lathe([[0.046, -0.26], [0.052, -0.2], [0.074, -0.17], [0.08, -0.105], [0.066, -0.1]], 12));
-    P.add(el, gloveM, new THREE.TorusGeometry(0.075, 0.007, 4, 16), 0, -0.17, 0, PI / 2, 0, 0); // stitched cuff edge
-    const hand = grp(el, 0, -FA, 0);
+    P.add(el, coatM, new THREE.SphereGeometry(0.054, 10, 6), 0, 0.0, 0);
+    // sleeve: slim at the elbow, then a turned-back cuff flaring to ~1.4x the forearm with a bone edge
+    P.add(el, coatM, K.lathe([[0.05, -0.09], [0.052, -0.04], [0.056, 0.02]], 12));
+    P.add(el, coatM, K.lathe([[0.048, -0.075], [0.062, -0.11], [0.077, -0.15], [0.082, -0.172]], 12));
+    P.add(el, boneM, new THREE.TorusGeometry(0.081, 0.008, 4, 16), 0, -0.172, 0, PI / 2, 0, 0);
+    const wrist = K.lathe([[0.043, -0.27], [0.047, -0.21], [0.052, -0.14]], 10).translate(0, FA, 0); // glove wrist (on the hand bone)
+    const hand = grp(el, 0, -FA, 0); P.add(hand, gloveM, wrist);
     // a mitten: flat across the palm, tapering to the fingertips and curled a little toward the palm, with a separate thumb
     { const mg = K.lathe([[0.0, -0.124], [0.013, -0.12], [0.026, -0.108], [0.035, -0.086], [0.039, -0.056], [0.039, -0.028], [0.034, -0.006], [0.03, 0.006]], 10);
       warp(mg, (x, y, z) => [x * 0.74 - side * 1.6 * y * y, y, z * 1.06 + 0.006]); P.add(hand, gloveM, mg);
       P.add(hand, gloveM, new THREE.CapsuleGeometry(0.0155, 0.042, 3, 6), side * -0.021, -0.042, 0.04, -0.5, 0, side * 0.32); }
-    if (side > 0) { P.add(hand, sigM, hexRing(0.011, 0.019).rotateY(PI / 2), 0.031, -0.045, 0.008); P.add(el, sigM, new THREE.BoxGeometry(0.004, 0.05, 0.004), 0.08, -0.14, 0); }
+    if (side > 0) { P.add(hand, sigM, hexRing(0.011, 0.019).rotateY(PI / 2), 0.031, -0.045, 0.008); P.add(hand, sigM, new THREE.BoxGeometry(0.004, 0.04, 0.004), 0.074, FA - 0.135, 0, 0, 0, 0.35); }
     return { sh, el, hand, side };
   };
   const armL = mkArm(1), armR = mkArm(-1);
@@ -166,9 +193,10 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
     // tall boots, ~1.4x the old girth, with a turned-down bone cuff that reads against the dark floor
     const knee = grp(hip, 0, -0.45, 0);
     P.add(knee, leatherM, K.lathe([[0.084, -0.4], [0.078, -0.3], [0.086, -0.17], [0.096, -0.07], [0.1, -0.02]], 12));
-    P.add(knee, gloveM, K.lathe([[0.096, -0.075], [0.11, -0.045], [0.118, 0.0], [0.12, 0.03]], 12));
+    P.add(knee, boneM, K.lathe([[0.093, -0.18], [0.1, -0.15], [0.112, -0.08], [0.12, -0.01], [0.123, 0.03]], 12)); // a tall bone cuff
     const ankle = grp(knee, 0, -0.42, 0);
     P.add(ankle, leatherM, new THREE.SphereGeometry(0.07, 12, 8), 0, -0.03, 0.05, 0, 0, 0, 1.06, 0.66, 1.7);
+    P.add(ankle, boneM, new THREE.SphereGeometry(0.05, 10, 6, 0, TAU, 0, PI * 0.6), 0, -0.046, 0.128, 0, 0, 0, 1.2, 0.85, 1.15); // pale toe cap
     P.add(ankle, legM, new THREE.BoxGeometry(0.135, 0.018, 0.235), 0, -0.064, 0.05);
     P.add(ankle, legM, new THREE.BoxGeometry(0.1, 0.045, 0.06), 0, -0.05, -0.045);
     // spur: strap, shank and a big star rowel that glints
@@ -214,14 +242,14 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
   P.add(weapon, gunM, new THREE.BoxGeometry(0.03, 0.014, 0.112), 0, 0.112, 0.046); // top strap
   P.add(weapon, gunM, new THREE.BoxGeometry(0.03, 0.016, 0.1), 0, 0.01, 0.046); // bottom strap
   P.add(weapon, gunM, new THREE.BoxGeometry(0.04, 0.07, 0.022), 0, 0.068, 0.1); // front of the frame
-  P.add(weapon, gunM, new THREE.CylinderGeometry(0.021, 0.021, 0.35, 8), 0, BY, 0.27, PI / 2, 0, PI / 8);
-  P.add(weapon, gunM, new THREE.CylinderGeometry(0.01, 0.01, 0.2, 8), 0, BY - 0.03, 0.2, PI / 2, 0, 0);
-  P.add(weapon, gunM, new THREE.BoxGeometry(0.006, 0.02, 0.026), 0, BY + 0.028, 0.425);
-  P.add(weapon, metalM, new THREE.TorusGeometry(0.02, 0.0045, 5, 12), 0, BY, 0.444);
-  for (const z of [0.125, 0.3]) P.add(weapon, metalM, new THREE.TorusGeometry(0.0215, 0.004, 4, 12), 0, BY, z);
+  P.add(weapon, gunM, new THREE.CylinderGeometry(0.0273, 0.0273, 0.35, 8), 0, BY, 0.27, PI / 2, 0, PI / 8);
+  P.add(weapon, gunM, new THREE.CylinderGeometry(0.013, 0.013, 0.2, 8), 0, BY - 0.035, 0.2, PI / 2, 0, 0);
+  P.add(weapon, gunM, new THREE.BoxGeometry(0.006, 0.02, 0.026), 0, BY + 0.035, 0.425);
+  P.add(weapon, metalM, new THREE.TorusGeometry(0.026, 0.0055, 5, 12), 0, BY, 0.444);
+  for (const z of [0.125, 0.3]) P.add(weapon, metalM, new THREE.TorusGeometry(0.028, 0.0045, 4, 12), 0, BY, z);
   for (const s of [1, -1]) { P.add(weapon, metalM, new THREE.BoxGeometry(0.002, 0.006, 0.07), s * 0.0205, 0.068, 0.068); P.add(weapon, metalM, new THREE.BoxGeometry(0.002, 0.04, 0.006), s * 0.0205, 0.06, -0.012);
-    P.add(weapon, metalM, new THREE.BoxGeometry(0.002, 0.005, 0.2), s * 0.0212, BY - 0.004, 0.27); }
-  P.add(weapon, barrelM, new THREE.BoxGeometry(0.0055, 0.004, 0.27), 0, BY + 0.0215, 0.27);
+    P.add(weapon, metalM, new THREE.BoxGeometry(0.002, 0.005, 0.2), s * 0.0276, BY - 0.004, 0.27); }
+  P.add(weapon, barrelM, new THREE.BoxGeometry(0.0055, 0.004, 0.27), 0, BY + 0.0275, 0.27);
   P.add(weapon, metalM, new THREE.TorusGeometry(0.022, 0.0035, 4, 12, PI * 1.25), 0, 0.0, 0.03, 0, PI / 2, PI * 0.88);
   P.add(weapon, gunM, new THREE.BoxGeometry(0.006, 0.026, 0.008), 0, -0.004, 0.026, 0.3, 0, 0);
   P.add(weapon, gloveM, new THREE.CapsuleGeometry(0.0078, 0.032, 2, 6), 0, -0.004, 0.028, PI / 2 + 0.45, 0, 0); // trigger finger through the guard
@@ -265,9 +293,9 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
 
   const A = { run: 0, swing: 0, swingDur: 0.2, swingKind: 0, cast: 0, lean: 0, aim: 0, load: 0, spin: 0, tw: 0, air: 0, vx: 0, vz: 0, lx: null, lz: null,
     fireEv: false, pFront: 'L', pArmed: false, pLoad: 0, pAim: 0, loadHold: 0, push: 0, spinT: 0, twT: 0, kick: 0, kickV: 0, flash: 0, last: 0, lastH: 0,
-    fetch: 0, drum: 0, drumK: 26, hammer: 0, crane: 0, ember: 0, heal: 0, yawV: 0, lf: null, climb: 0.58, silver: 0, sway: 0, coil: 0, fl: 0, flK: 0.3, dk: 1 };
+    fetch: 0, drum: 0, drumK: 26, hammer: 0, crane: 0, ember: 0, heal: 0, yawV: 0, lf: null, climb: 0.58, silver: 0, sway: 0, coil: 0, fl: 0, flK: 0.3, flD: 0.16, dk: 1, shotT: 9, mDel: 0, mPow: 1 };
   // the shot's own muzzle light sits a forearm from the chest: the cloth darkens under it so the figure stays a silhouette
-  const dimMats = [coatM, capeM, vestM, gloveM, liningM, hatM, scarfM, leatherM, maskM].map((m) => [m, m.color.clone()]);
+  const dimMats = [coatM, capeM, vestM, gloveM, liningM, hatM, brimM, boneM, bandM, scarfM, leatherM, maskM].map((m) => [m, m.color.clone()]);
   const swayS = K.spring(110, 12); // the body's half-beat-late answer to the recoil: hips, hem, mantle and scarf follow it
   const TWD = 1.0, SPD = 0.6; // how long a salve twirl and a Spin hold their poses
   const flashCol = new THREE.Color(), emberCol = new THREE.Color(), _c = new THREE.Color();
@@ -300,8 +328,10 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
     if (!cyl && aimT > A.pAim + 0.2) A.fireEv = true;
     if (A.fireEv) { A.fireEv = false; const r = cyl ? A.pFront : 'L', last = !!(cyl && A.pArmed && !p.armed);
       if (r === 'V') { A.twT = TWD; A.heal = 1; } else { A.kick = 0; A.kickV = last ? 34 : 28; A.flash = 1; flashCol.copy(RC[r] || glowCol); A.last = last ? 1 : 0;
-        // muzzle climb per round: lead jumps ~30 degrees, silver stays level (sold by a cyan rim flash), the Last Word stays on the line
-        A.climb = last ? 0.08 : r === 'S' ? 0.16 : 0.58; if (r === 'S') A.silver = 1; A.fl = 1; A.flK = last ? 0.6 : 0.3; if (last) A.lastH = Math.max(A.lastH, 0.75);
+        // muzzle climb per round: lead jumps ~30 degrees (held under 20 for the first beat), silver and the Last Word stay level
+        A.climb = last ? 0.06 : r === 'S' ? 0.03 : 0.58; if (r === 'S') A.silver = 1; A.shotT = 0; A.mDel = 0.02; A.mPow = last ? 1.15 : r === 'S' ? 0.8 : 1;
+        // the figure darkens under its own flash (deepest and longest on the Last Word) so only the gun, eyes and scarf read bright
+        A.fl = 1; A.flK = last ? 0.82 : r === 'S' ? 0.5 : 0.3; A.flD = last ? 0.26 : r === 'S' ? 0.24 : 0.16; if (last) A.lastH = Math.max(A.lastH, 0.75);
         skirtS[0].v += last ? 2.6 : 1.6; for (const q of panels) if (Math.cos(q.phi) < 0.5) q.spr.v += last ? 2.2 : 1.4; // the skirt kicks back off the shot
         for (const m of mantle) m.spr.v += (last ? 4 : 2.5) * (Math.cos(m.phi) < 0 ? 1 : 0.6); }
       A.drum += PI / 3; A.drumK = 30; A.hammer = 1; A.ember = 1; emberCol.copy(RC[r] || glowCol); }
@@ -309,7 +339,9 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
     A.pLoad = loadT; A.pAim = aimT; A.pFront = cyl ? cyl[0] : 'L'; A.pArmed = !!p.armed;
     A.loadHold = Math.max(0, A.loadHold - dt); A.spinT = Math.max(0, A.spinT - dt); A.twT = Math.max(0, A.twT - dt);
     A.push = Math.max(0, A.push - dt / 0.3); A.flash = Math.max(0, A.flash - dt / 0.07); A.ember = Math.max(0, A.ember - dt / 0.7); A.heal = Math.max(0, A.heal - dt / 0.9); A.last = Math.max(0, A.last - dt / 1.0);
-    A.silver = Math.max(0, A.silver - dt / 0.35); A.fl = Math.max(0, A.fl - dt / 0.16);
+    A.silver = Math.max(0, A.silver - dt / 0.35); A.fl = Math.max(0, A.fl - dt / A.flD); A.shotT += dt;
+    // the mantle's recoil flick, a beat behind the gun: the gun-side panel throws up ~27 degrees and overshoots back
+    if (A.mDel > 0) { A.mDel -= dt; if (A.mDel <= 0) for (const m of mantle) m.kS.v += 9.6 * m.amp * A.mPow; }
     // recoil: a kicked, underdamped spring (peak ~1 at 0.08 s, a small overshoot, settled by ~0.35 s); the body sways after it
     A.kickV -= (A.kick * 260 + A.kickV * 14) * dt; A.kick = Math.max(-0.35, A.kick + A.kickV * dt); if (Math.abs(A.kick) < 0.002 && Math.abs(A.kickV) < 0.05) A.kick = A.kickV = 0;
     A.sway = swayS.step(A.kick, dt);
@@ -328,23 +360,29 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
     // the Last Word squares the chest up (so the off hand can brace) and lunges; the coil hunches into it
     const hb = AW * (0.3 - 0.06 * LH) * (1 - 0.6 * L), tb = AW * (0.32 - 0.24 * LH + 0.2 * L - k * 0.14);
     hips.position.set(-0.04 * Q, 0.95 + br * 0.005 + L * (Math.abs(c) * 0.11 - 0.05) - AW * I * (0.04 + 0.08 * LH + 0.035 * CQ) - 0.03 * SY, 0);
-    hips.rotation.set(0, s * 0.22 * L - 0.12 * Q + hb, -0.07 * Q + Math.sin(t * 0.5) * 0.01 * I);
-    body.rotation.set(0.04 + L * 0.34 + 0.03 * AW * I, 0, 0); body.position.set(0, 0, 0);
-    torso.rotation.set(0.03 + br * 0.01 + L * 0.1 + AW * I * (0.08 + 0.24 * LH + 0.08 * CQ) - k * 0.12 * AW * (1 - 0.4 * LH) + 0.03 * SY, -s * 0.38 * L - 0.2 * Q + tb, 0.12 * Q);
-    head.rotation.set(0.11 * Q - L * 0.16 - AW * (0.04 + k * 0.06), (Math.sin(t * 0.33) * 0.1 + 0.22) * Q + s * 0.14 * L - (hb + tb) * 0.92, -0.05 * Q);
+    // run: ~17 degrees of lean (not a hunch), hips swinging ~15 degrees with the stride and the shoulders countering ~10 against them
+    hips.rotation.set(0, s * 0.26 * L - 0.12 * Q + hb, -0.07 * Q + Math.sin(t * 0.5) * 0.01 * I);
+    body.rotation.set(0.04 + L * 0.18 + 0.03 * AW * I, 0, 0); body.position.set(0, 0, 0);
+    torso.rotation.set(0.03 + br * 0.01 + L * 0.06 + AW * I * (0.08 + 0.24 * LH + 0.08 * CQ) - k * 0.12 * AW * (1 - 0.4 * LH) + 0.03 * SY, -s * 0.44 * L - 0.2 * Q + tb, 0.12 * Q);
+    head.rotation.set(0.11 * Q - L * 0.08 - AW * (0.04 + k * 0.06), (Math.sin(t * 0.33) * 0.1 + 0.22) * Q + s * 0.16 * L - (hb + tb) * 0.92, -0.05 * Q);
     hat.rotation.x = 0.04 - k * 0.16 * AW;
-    let tl = lerp(-0.14, -s * 0.74, L), tr = lerp(0.04, s * 0.74, L), zl = 0.14 * I, zr = 0.07 * I;
+    // a long stride, reaching further forward than back so the far boot clears the hem
+    const st = (v) => v < 0 ? v * 1.0 : v * 0.6;
+    let tl = lerp(-0.14, st(-s), L), tr = lerp(0.04, st(s), L), zl = 0.14 * I, zr = 0.07 * I;
     const kc = Math.cos(ph - 0.45); let kl = lerp(0.3, 0.12 + Math.pow(Math.max(0, kc), 1.5) * 1.05, L), kr = lerp(0.03, 0.12 + Math.pow(Math.max(0, -kc), 1.5) * 1.05, L);
     // duel stance: feet ~1.3x shoulder width, front (gun-side) knee bent; the Last Word lunges (front knee deep, back leg straight)
     if (AW > 0.01) { const q = AW * I; tl = lerp(tl, 0.3, q); tr = lerp(tr, -0.24, q); zl = lerp(zl, 0.18, q); zr = lerp(zr, -0.15, q); kl = lerp(kl, 0.03, q); kr = lerp(kr, 0.34, q);
       const q2 = q * A.lastH; tl = lerp(tl, 0.48, q2); kl = lerp(kl, 0.0, q2); tr = lerp(tr, -0.58, q2); kr = lerp(kr, 0.8, q2); zl = lerp(zl, 0.12, q2); zr = lerp(zr, -0.1, q2);
       kl += 0.12 * q * CQ; kr += 0.14 * q * CQ; kr += 0.1 * SY; }
     // right arm and gun (gun pitch/yaw/roll in model space); left arm FK, both swinging against the legs
-    let rx = lerp(-0.06, -0.12 - s * 0.5, L), rz = lerp(-0.13, -0.12, L), re = lerp(-0.16, -0.45 - Math.max(0, s) * 0.5, L), gb = lerp(-1.35, -1.15 + Math.max(0, s) * 0.5, L), ga = lerp(-0.1, 0, L), gr = 0;
+    let rx = lerp(-0.06, -0.12 - s * 0.5, L), rz = lerp(-0.13, -0.12, L), re = lerp(-0.16, -0.62 - Math.max(0, s) * 0.4, L), gb = lerp(-1.35, -0.9 + Math.max(0, s) * 0.4, L), ga = lerp(-0.1, 0, L), gr = 0;
     let lx = lerp(-0.1, s * 0.66, L), lz = 0.12 + 0.03 * L, le = lerp(-0.5, -0.45 - Math.max(0, -s) * 0.55, L);
     let ry = 0, ly = 0; const reachR = (w, x, y, z, px, py, pz) => { if (w < 0.002) return; ik(armR, x, y, z, px, py, pz); rx = lerp(rx, _ik.rx, w); ry = lerp(ry, _ik.ry, w); rz = lerp(rz, _ik.rz, w); re = lerp(re, _ik.re, w); };
-    if (LW > 0.002) { const q = LW * I; torso.rotation.y += 0.2 * q; torso.rotation.x += 0.04 * q; head.rotation.x += 0.26 * q; head.rotation.y -= 0.32 * q; }
-    if (SW > 0.002) { const q = SW * I; torso.rotation.z += 0.08 * q; head.rotation.x += 0.06 * q; head.rotation.y -= 0.5 * q; }
+    // Load in two beats: hunch and look down at the bandolier while the off hand fetches a round, then turn to the open drum
+    if (LW > 0.002) { const q = LW * I, f = A.fetch; torso.rotation.y += (0.2 - 0.08 * f) * q; torso.rotation.x += (0.04 + 0.1 * f) * q; head.rotation.x += (0.24 + 0.34 * f) * q; head.rotation.y -= 0.36 * (1 - 0.85 * f) * q; }
+    // Spin: the torso twists ~15 degrees to the gun as the off hand fans across the hammer and the gun rolls at the wrist
+    const su = 1 - A.spinT / SPD;
+    if (SW > 0.002) { const q = SW * I; torso.rotation.y -= 0.26 * q * smooth(sat(su / 0.3)); torso.rotation.z += 0.05 * q; head.rotation.x += 0.2 * q; head.rotation.y -= 0.25 * q; }
     if (TWW > 0.002) { torso.rotation.y -= 0.1 * TWW; head.rotation.x += 0.12 * TWW; head.rotation.y -= 0.12 * TWW; }
     // aim: the hand goes to a point in model space (out along the line of fire), kicked up and back by the recoil; the Last Word
     // reaches past full extension
@@ -353,10 +391,13 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
     if (AW > 0.002) { const cf = A.climb / 0.58;
       armR.sh.rotation.set(rx, ry, rz); armR.el.rotation.x = re; g.updateMatrixWorld(true); g.worldToLocal(armR.hand.getWorldPosition(_hr));
       _v.set(lerp(-0.15, -0.06, LH), 1.43 + k * 0.08 * cf - 0.04 * LH - 0.03 * CQ, 0.64 - k * 0.11 + LH * 0.16 - 0.08 * CQ).lerp(_hr, 1 - AW); torso.worldToLocal(g.localToWorld(_v));
-      reachR(sat(AW * 4), _v.x, _v.y, _v.z, -0.4, -1, -0.2); gb = lerp(gb, 0.02 + k * A.climb, AW); ga = lerp(ga, -0.02, AW); gr = lerp(gr, 0, AW); }
+      // the climb is held under ~19 degrees for the first 0.07 s (the shot's direction reads first), then lead jumps to its full ~30
+      const cl = Math.min(A.climb, lerp(0.25, A.climb, sat((A.shotT - 0.07) / 0.05)));
+      reachR(sat(AW * 4), _v.x, _v.y, _v.z, -0.4, -1, -0.2); gb = lerp(gb, 0.02 + k * cl, AW); ga = lerp(ga, -0.02, AW); gr = lerp(gr, 0, AW); }
     // Load: the gun tipped up at the right shoulder, clear of the body; Spin: out at arm's length; Salve: a low twirl at the hip
     if (LW > 0.002) { reachR(LW, -0.35, 0.6, 0.24, -1, -0.5, -0.3); gb = lerp(gb, 0.95, LW); ga = lerp(ga, -0.42, LW); gr = lerp(gr, 0.25, LW); }
-    if (SW > 0.002) { reachR(SW, -0.7, 0.52, 0.24, 0, -1, -0.5); gb = lerp(gb, 0.55, SW); ga = lerp(ga, -0.2, SW); gr = lerp(gr, 0.2, SW); }
+    // Spin: the gun held out in front of the belt, tipped up, rolling ~30 degrees each way at the wrist while the off hand fans it
+    if (SW > 0.002) { reachR(SW, -0.12, 0.36, 0.4, -1, -0.6, -0.3); gb = lerp(gb, 0.3, SW); ga = lerp(ga, -0.3, SW); gr = lerp(gr, 0.52 * Math.cos(su * PI * 3.6), SW); }
     if (TWW > 0.002) { reachR(TWW, -0.33, 0.14, 0.2, -0.4, -1, -0.5); gb = lerp(gb, -0.05, TWW); ga = lerp(ga, -0.35, TWW); gr = lerp(gr, 0, TWW); }
     if (A.cast > 0.01) { reachR(A.cast, -0.05, 0.62, 0.36, -1, -0.5, 0); gb = lerp(gb, 1.2, A.cast); }
     // ---- airborne: tuck, arms out ----
@@ -384,11 +425,12 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
     const rest = (1 - LW) * (1 - SW) * (1 - TWW) * (1 - A.air) * (p.pose === 'fall' ? 0 : 1), hw = AW;
     // one reach whose target slides belt -> hip (blending targets, not joint angles, keeps the arm on a sane path)
     reachL(Math.max(I, AW) * rest, lerp(0.13, 0.22, hw), lerp(0.08, 0.1, hw), lerp(0.15, 0.02, hw), 1, lerp(-0.3, -0.1, hw), lerp(-0.8, -0.3, hw));
-    if (SW > 0.01) reachL(SW, 0.22, 0.1, 0.03, 1, -0.1, -0.3); // Spin: back on the hip, the gun hand does the showing off
+    // Spin: the off hand fans across the hammer, sweeping from one side of the gun to the other
+    if (SW > 0.01) { g.updateMatrixWorld(true); const q = gunPt(weapon, 0.11 * Math.cos((su - 0.05) * PI * 4.5), 0.2, -0.03); reachL(SW, q.x, q.y, q.z, 1, -0.6, 0.2); }
     // Last Word: the off hand braces the gun wrist from beneath
     if (LH * rest > 0.01) { g.updateMatrixWorld(true); const q = gunPt(armR.el, 0, -FA + 0.07, 0); reachL(LH * rest, q.x + 0.02, q.y - 0.05, q.z, 1, -1, 0.2); }
     if (LW + TWW > 0.01) { g.updateMatrixWorld(true);
-      if (LW > 0.01) { const q = gunPt(drum, 0, 0.028, -0.12 + (A.push > 0 ? Math.sin(A.push * PI) * 0.03 : 0)), v = vialAt[4], f = A.fetch;
+      if (LW > 0.01) { const q = gunPt(drum, 0, 0.028, -0.12 + (A.push > 0 ? Math.sin(A.push * PI) * 0.03 : 0)), v = vialAt[2], f = A.fetch;
         reachL(LW, lerp(q.x + 0.02, v[0] + 0.03, f), lerp(q.y, v[1] - 0.02, f), lerp(q.z, v[2] + 0.07, f), 1, -0.8, 0); }
       if (TWW > 0.01) { const q = gunPt(hat, 0.13, -0.012, 0.36); reachL(TWW, q.x, q.y, q.z, 1, -0.4, 0); } }
     armL.sh.rotation.set(lx, ly, lz); armL.el.rotation.x = le;
@@ -408,17 +450,19 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
     for (const m of mantle) { const fr = Math.cos(m.phi), sd = Math.sin(m.phi);
       const lift = 0.02 + A.air * 0.35 + A.sway * (fr < 0 ? 0.3 : 0.12) + A.last * 0.1 + L * (0.03 + Math.max(0, -fr) * 0.12) + Math.abs(A.yawV) * 0.012 + Math.max(0, -sd * A.yawV) * 0.025
         + Math.max(0, wind(m.phi)) * 0.4 + Math.sin(t * 6 + m.phi * 2) * 0.02 * L;
-      m.pv.rotation.x = -clamp(m.spr.step(clamp(lift, -0.02, fr < 0 ? 0.4 : 0.26), dt), -0.05, 0.5);
+      m.pv.rotation.x = -clamp(m.spr.step(clamp(lift, -0.02, fr < 0 ? 0.4 : 0.26), dt) + m.kS.step(0, dt), -0.06, 0.62);
       m.pv.rotation.z = m.sprZ.step(clamp(-A.yawV * 0.025, -0.14, 0.14) + Math.sin(ph) * 0.02 * L, dt); }
     const headTilt = tilt + torso.rotation.x + head.rotation.x;
     for (let k = 0; k < braid.length; k++) { const q = braid[k], tgt = (k === 0 ? 0.62 - headTilt : 0.05) + clamp(A.vz * 0.05, -0.1, 0.6) * (k ? 0.4 : 1) + A.air * 0.25 + Math.sin(t * 6 - k) * 0.04 * L;
       q.o.rotation.x = q.sx.step(tgt, dt); q.o.rotation.z = q.sz.step(-A.vx * 0.04 * (k ? 0.5 : 1) - (k === 0 ? head.rotation.z + hips.rotation.z : 0), dt); }
     const chestTilt = tilt + torso.rotation.x;
     // back tails: the free ends hang plumb below the mantle (whatever it and the chest are doing), trail a run and swing back after a shot
-    { const W = clamp(A.vz * 0.07, -0.2, 0.9) + A.air * 0.5 + A.sway * 0.45 + Math.sin(t * 7.3) * (0.06 * L + 0.015);
+    { const W = clamp(A.vz * 0.05, -0.2, 0.42) + A.air * 0.5 + A.sway * 0.45 + Math.sin(t * 7.3) * (0.06 * L + 0.015);
       bTail.rotation.x = -bTailS[0].step(Math.max(-0.35, W - chestTilt + mB.pv.rotation.x), dt); bTail.rotation.z = bTailS[1].step(A.vx * 0.05 + Math.sin(ph - 1.2) * 0.12 * L, dt); }
-    for (const ch of tails) for (let k = 0; k < ch.length; k++) { const q = ch[k], tgt = (k === 0 ? -0.34 - chestTilt - 0.3 * A.sway : 0.06) - clamp(A.vz * 0.06, -0.2, 0.9) * (k ? 0.5 : 1) - A.air * 0.4 + Math.sin(t * 8 - k * 1.3) * (0.08 * L + 0.02);
-      q.o.rotation.x = q.sx.step(tgt, dt); q.o.rotation.z = q.sz.step(q.rz - A.vx * 0.05 + Math.sin(t * 5.3 + k) * 0.05 * L + Math.sin(ph - 1.6 - k * 0.7) * 0.16 * L, dt); }
+    // front tails: hang plumb at rest; running, the wind lays them against the chest and streams them back round the left side
+    { const w = sat(A.vz / 4.5);
+      for (const ch of tails) for (let k = 0; k < ch.length; k++) { const q = ch[k], tgt = (k === 0 ? -0.34 - chestTilt * (1 - w) - 0.3 * A.sway : 0.06 + 0.18 * w) - A.air * 0.4 + Math.sin(t * 8 - k * 1.3) * (0.06 * L + 0.02);
+        q.o.rotation.x = q.sx.step(tgt, dt); q.o.rotation.z = q.sz.step(q.rz + w * (k ? 0.18 : 0.42) - A.vx * 0.05 + Math.sin(t * 5.3 + k) * 0.05 * L + Math.sin(ph - 1.6 - k * 0.7) * 0.1 * L, dt); } }
     charm.rotation.x = charmSpr[0].step(-(headTilt + hat.rotation.x) - A.vz * 0.04 + A.air * 0.3, dt); charm.rotation.z = charmSpr[1].step(-(head.rotation.z + hat.rotation.z) - A.vx * 0.04 + Math.sin(t * 7) * 0.08 * L, dt);
     // ---- chambers, vials, glows ----
     for (let k = 0; k < 6; k++) { const r = cyl ? cyl[k] : 'G';
@@ -432,16 +476,18 @@ HERO_MODELS.hexslinger = function buildHexslinger(cls) {
     const streak = cyl && p.armed ? (p.streak | 0) : 0, lastUp = cyl && p.armed && streak === 5;
     barrelM.color.copy(barrelBase).multiplyScalar(0.55 + streak / 5 * 1.3 + A.flash * 1.5 + (lastUp ? 0.4 * Math.sin(t * 9) : 0));
     lwM.opacity = damp(lwM.opacity, lastUp ? 0.85 : 0, 10, dt); lw.visible = lwM.opacity > 0.02 && !G.headless; lw.rotation.z = t * 2.2; lw.scale.setScalar(1 + Math.sin(t * 9) * 0.08);
-    glowM.color.copy(glowBase).multiplyScalar(0.88 + 0.12 * Math.sin(t * 2.1) + A.last * 0.35);
+    glowM.color.copy(glowBase).multiplyScalar((0.88 + 0.12 * Math.sin(t * 2.1)) * (1 - 0.5 * A.fl * A.flK));
+    eyeM.color.copy(eyeBase).multiplyScalar(1 + A.last * 0.6); gunM.emissiveIntensity = 0.14 + A.last * 0.5 + A.silver * 0.25;
     sigM.color.copy(sigBase).multiplyScalar(0.8 + LW * 1.1 + SW * 1.4 + A.push * 0.8 + TWW * 0.6);
     drumBlurM.opacity = A.drumK < 10 ? sat(Math.abs(A.drum) / 2.5) * 0.9 : 0; drumBlur.visible = drumBlurM.opacity > 0.02 && !G.headless;
     if (drumBlur.visible) drumBlurM.color.copy(glowCol).lerp(RC.L, 0.3).multiplyScalar(1.4);
     twBlurM.opacity = A.twT > 0 ? TWW * 0.4 * Math.pow(A.twT / TWD, 0.8) : 0; twBlur.visible = twBlurM.opacity > 0.02 && !G.headless;
     if (twBlur.visible) twBlurM.color.copy(RC.V);
-    flash.visible = A.flash > 0.02 && !G.headless; if (flash.visible) { flashM.color.copy(flashCol).multiplyScalar(1.6 + A.last * 1.5); flash.scale.set(1 + A.last, 1 + A.last, (0.5 + A.flash * 0.7) * (1 + A.last * 1.2)); flash.rotation.z = t * 37; }
-    // glow on the figure is capped on the big shots so the silhouette stays dark against its own flash; silver flashes a cyan rim
-    rimU.value.copy(rimBase).multiplyScalar(1 + A.flash * 0.35 * (1 - A.lastH) + A.heal * 0.4 - 0.3 * A.last);
-    if (A.silver > 0) rimU.value.add(_c.setRGB(0.5, 0.95, 1.0).multiplyScalar(A.silver * 0.85));
+    flash.visible = A.flash > 0.02 && !G.headless; if (flash.visible) { flashM.color.copy(flashCol).multiplyScalar(1.6 + A.last * 0.5); flash.scale.set(1 + A.last * 0.5, 1 + A.last * 0.5, (0.5 + A.flash * 0.7) * (1 + A.last * 1.2)); flash.rotation.z = t * 37; }
+    // glow on the figure is capped on the big shots (the Last Word's rim drops to ~40%) so the silhouette stays dark against its own
+    // flash; silver swaps the rim for a pure cyan one
+    rimU.value.copy(rimBase).multiplyScalar(1 + A.flash * 0.35 * (1 - A.lastH) + A.heal * 0.4 - 0.6 * A.last);
+    if (A.silver > 0) rimU.value.lerp(_c.setRGB(0.25, 0.8, 1.0), Math.min(1, A.silver * 1.3));
     const dk = 1 - A.fl * A.flK; if (dk !== A.dk) { A.dk = dk; for (const [m, c0] of dimMats) m.color.copy(c0).multiplyScalar(dk); }
     aura.intensity = 1.3 + A.flash * 1.4 * (1 - A.lastH) + (p.flashT > 0 ? 5 : 0) + A.heal * 1.5; fill.intensity = 2.6 * (1 - 0.5 * A.last);
   }
