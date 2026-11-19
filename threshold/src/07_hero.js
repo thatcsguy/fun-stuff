@@ -60,37 +60,50 @@ const HeroKit = {
 // forked staff that holds a floating crystal and a Tesla coil. Static charges orbit the shoulders (one per point of Static).
 HERO_MODELS.stormcaller = function buildStormcaller(cls) {
   const C = cls.look, K = HeroKit, P = K.parts(), g = new THREE.Group();
-  const glowC = new THREE.Color(C.glow), clothC = new THREE.Color(C.cloth);
-  const rimBase = glowC.clone().lerp(new THREE.Color(1, 1, 1), 0.35).multiplyScalar(0.22), rimU = { value: rimBase.clone() };
-  const coatM = K.mat({ color: C.cloth, roughness: 0.86, side: THREE.DoubleSide }, rimU, 0.75, C.lining !== undefined ? C.lining : clothC.clone().multiplyScalar(0.55).getHex());
-  const mantleM = K.mat({ color: C.mantle !== undefined ? C.mantle : clothC.clone().lerp(new THREE.Color(C.armor), 0.5).multiplyScalar(1.35), roughness: 0.8, side: THREE.DoubleSide }, rimU, 0.9);
-  const innerM = K.mat({ color: C.inner !== undefined ? C.inner : 0x8c97a8, roughness: 0.9, side: THREE.DoubleSide }, rimU, 0.45);
-  const legM = K.mat({ color: 0x14161d, roughness: 0.85 }, rimU, 0.5);
-  const leatherM = K.mat({ color: C.leather !== undefined ? C.leather : 0x2c211b, roughness: 0.62 }, rimU, 0.55);
-  const armorM = K.mat({ color: C.armor, roughness: 0.36, metalness: 0.7, envMapIntensity: 1.3 }, rimU, 1);
-  const metalM = K.mat({ color: C.metal !== undefined ? C.metal : 0xb07a48, roughness: 0.3, metalness: 0.85, envMapIntensity: 1.5, emissive: C.metal !== undefined ? C.metal : 0xb07a48, emissiveIntensity: 0.08 }, rimU, 0.9);
-  const woodM = K.mat({ color: 0x2a1e17, roughness: 0.7 }, rimU, 0.6);
+  const glowC = new THREE.Color(C.glow), clothC0 = new THREE.Color(C.cloth), clothC = clothC0.clone();
+  // play-distance value read: the coat is lifted and desaturated towards slate so it separates from dark, saturated floors
+  { const h = {}; clothC.getHSL(h); clothC.setHSL(h.h, h.s * 0.6, Math.min(0.62, h.l * 1.38 + 0.035)); }
+  const rimBase = glowC.clone().lerp(new THREE.Color(1, 1, 1), 0.5).multiplyScalar(0.4), rimU = { value: rimBase.clone() };
+  // HeroKit rim with a wider falloff (fr^2 instead of fr^3) for this model only
+  const mat = (o, k, lin) => { const m = K.mat(o, rimU, k, lin), ob = m.onBeforeCompile, key = m.customProgramCacheKey();
+    m.onBeforeCompile = (sh, r) => { ob(sh, r); sh.fragmentShader = sh.fragmentShader.replace('uRimK * fr * fr * fr', 'uRimK * fr * fr'); }; m.customProgramCacheKey = () => key + 'W'; return m; };
+  const coatM = mat({ color: clothC, roughness: 0.86, side: THREE.DoubleSide }, 0.8, C.lining !== undefined ? C.lining : clothC0.clone().multiplyScalar(0.55).getHex());
+  const capeM = mat({ color: clothC.clone().multiplyScalar(0.92), roughness: 0.84, side: THREE.DoubleSide }, 0.85, glowC.clone().lerp(clothC, 0.45).multiplyScalar(0.4).getHex());
+  const mantleM = mat({ color: (C.mantle !== undefined ? new THREE.Color(C.mantle) : clothC0.clone().lerp(new THREE.Color(C.armor), 0.5)).multiplyScalar(1.45), roughness: 0.8, side: THREE.DoubleSide }, 0.95);
+  const innerM = mat({ color: C.inner !== undefined ? C.inner : 0x8c97a8, roughness: 0.9, side: THREE.DoubleSide }, 0.45);
+  const legM = mat({ color: 0x2c323d, roughness: 0.85 }, 0.6);
+  const leatherM = mat({ color: C.leather !== undefined ? C.leather : 0x2c211b, roughness: 0.62 }, 0.6);
+  const armorM = mat({ color: C.armor, roughness: 0.36, metalness: 0.7, envMapIntensity: 1.3 }, 1);
+  const metalM = mat({ color: C.metal !== undefined ? C.metal : 0xb07a48, roughness: 0.3, metalness: 0.85, envMapIntensity: 1.5, emissive: C.metal !== undefined ? C.metal : 0xb07a48, emissiveIntensity: 0.2 }, 0.9);
+  const woodM = mat({ color: 0x2a1e17, roughness: 0.7 }, 0.6);
   const voidM = new THREE.MeshBasicMaterial({ color: 0x010204 });
-  const crystalM = W.glow(C.glow, 3.0), runeM = W.glow(C.glow, 2.0), glowM = runeM, eyeM = runeM;
-  const crystalBase = crystalM.color.clone(), runeBase = runeM.color.clone();
+  const crystalM = W.glow(C.glow, 3.0), runeM = W.glow(C.glow, 2.4), glowM = runeM, eyeM = runeM, palmM = W.glow(C.glow, 1.7);
+  const crystalBase = crystalM.color.clone(), runeBase = runeM.color.clone(), palmBase = palmM.color.clone();
   const grp = (parent, x = 0, y = 0, z = 0) => { const o = new THREE.Group(); o.position.set(x, y, z); parent.add(o); return o; };
 
   // ---- skeleton ----
-  const body = grp(g), hips = grp(body, 0, 0.95, 0), torso = grp(hips, 0, 0.02, 0), head = grp(torso, 0, 0.69, 0.0);
+  const body = grp(g), hips = grp(body, 0, 0.95, 0), torso = grp(hips, 0, 0.02, 0), head = grp(torso, 0, 0.69, 0.0); let hoodTip;
+  head.scale.setScalar(1.12); // a larger hood (head + peak about a quarter of the height) reads at play distance
   // ---- torso: coat body, inner robe V, harness, medallion, belt ----
-  P.add(torso, coatM, K.lathe([[0.168, -0.08], [0.172, 0.06], [0.19, 0.22], [0.208, 0.36], [0.2, 0.48], [0.155, 0.59], [0.085, 0.67], [0.07, 0.74]], 22), 0, 0, 0, 0, 0, 0, 1, 1, 0.8);
-  P.add(torso, innerM, K.lathe([[0.176, 0.1], [0.195, 0.24], [0.212, 0.36], [0.205, 0.48], [0.16, 0.6]], 6, -0.32, 0.64), 0, 0, 0, 0, 0, 0, 1, 1, 0.81); // robe showing in the coat's V
-  P.add(torso, runeM, new THREE.BoxGeometry(0.012, 0.3, 0.01), 0, 0.33, 0.176);
-  { const pts = []; for (let k = 0; k <= 16; k++) { const a = -0.9 + k / 16 * 4.3, y = 0.56 - k / 16 * 0.5; pts.push([Math.sin(a) * 0.218, y, Math.cos(a) * 0.178]); } P.add(torso, leatherM, K.tube(pts, 0.016, 40, 5)); }
-  P.add(torso, metalM, new THREE.CylinderGeometry(0.05, 0.05, 0.02, 16), -0.06, 0.38, 0.17, PI / 2, 0, 0);
-  P.add(torso, glowM, new THREE.OctahedronGeometry(0.026), -0.06, 0.38, 0.185, 0, 0, 0, 1, 1, 0.4);
-  P.add(hips, leatherM, new THREE.TorusGeometry(0.18, 0.032, 6, 28), 0, 0.0, 0, PI / 2, 0, 0, 1, 1, 0.82);
-  P.add(hips, metalM, new THREE.BoxGeometry(0.08, 0.07, 0.025), 0, 0.0, 0.155);
-  P.add(hips, glowM, new THREE.BoxGeometry(0.03, 0.03, 0.012), 0, 0.0, 0.17, 0, 0, PI / 4);
-  for (const s of [1, -1]) { P.add(hips, leatherM, new THREE.BoxGeometry(0.07, 0.09, 0.05), s * 0.165, -0.06, 0.04, 0, s * 0.5, 0); P.add(hips, metalM, new THREE.BoxGeometry(0.075, 0.02, 0.055), s * 0.165, -0.02, 0.04, 0, s * 0.5, 0); }
+  // waist pinched at the belt, chest broadening into wide shoulders (triangle over a bell)
+  P.add(torso, coatM, K.lathe([[0.148, -0.08], [0.146, 0.04], [0.17, 0.16], [0.205, 0.3], [0.222, 0.42], [0.21, 0.5], [0.16, 0.6], [0.085, 0.67], [0.07, 0.74]], 22), 0, 0, 0, 0, 0, 0, 1, 1, 0.8);
+  P.add(torso, innerM, K.lathe([[0.152, 0.04], [0.177, 0.16], [0.212, 0.3], [0.229, 0.42], [0.216, 0.5], [0.165, 0.6]], 6, -0.32, 0.64), 0, 0, 0, 0, 0, 0, 1, 1, 0.81); // robe showing in the coat's V
+  P.add(torso, runeM, new THREE.BoxGeometry(0.02, 0.34, 0.01), 0, 0.3, 0.178);
+  // back: glowing spine strip and a sigil on the mantle
+  { const TP = [[0.148, -0.08], [0.146, 0.04], [0.17, 0.16], [0.205, 0.3], [0.222, 0.42], [0.21, 0.5]], rAt = (y) => { for (let k = 1; k < TP.length; k++) if (y <= TP[k][1]) return lerp(TP[k - 1][0], TP[k][0], (y - TP[k - 1][1]) / (TP[k][1] - TP[k - 1][1])); return 0.21; };
+    const sp = []; for (let k = 0; k <= 8; k++) { const y = k / 8 * 0.42; sp.push([0, y, -(rAt(y) * 0.8 + 0.006)]); } P.add(torso, runeM, K.tube(sp, 0.011, 12, 4)); }
+  P.add(torso, runeM, new THREE.OctahedronGeometry(0.05), 0, 0.47, -0.322, 0.7, 0, 0, 0.75, 1.3, 0.3);
+  P.add(torso, metalM, new THREE.TorusGeometry(0.062, 0.009, 4, 18), 0, 0.47, -0.318, 0.7, 0, 0);
+  { const pts = []; for (let k = 0; k <= 16; k++) { const a = -0.9 + k / 16 * 4.3, y = 0.56 - k / 16 * 0.5; pts.push([Math.sin(a) * 0.226, y, Math.cos(a) * 0.184]); } P.add(torso, leatherM, K.tube(pts, 0.016, 40, 5)); }
+  P.add(torso, metalM, new THREE.CylinderGeometry(0.05, 0.05, 0.02, 16), -0.06, 0.38, 0.178, PI / 2, 0, 0);
+  P.add(torso, glowM, new THREE.OctahedronGeometry(0.026), -0.06, 0.38, 0.193, 0, 0, 0, 1, 1, 0.4);
+  P.add(hips, leatherM, new THREE.TorusGeometry(0.162, 0.034, 6, 28), 0, 0.0, 0, PI / 2, 0, 0, 1, 1, 0.82);
+  P.add(hips, metalM, new THREE.BoxGeometry(0.09, 0.075, 0.025), 0, 0.0, 0.14);
+  P.add(hips, glowM, new THREE.BoxGeometry(0.034, 0.034, 0.012), 0, 0.0, 0.155, 0, 0, PI / 4);
+  for (const s of [1, -1]) { P.add(hips, leatherM, new THREE.BoxGeometry(0.07, 0.09, 0.05), s * 0.15, -0.06, 0.04, 0, s * 0.5, 0); P.add(hips, metalM, new THREE.BoxGeometry(0.075, 0.02, 0.055), s * 0.15, -0.02, 0.04, 0, s * 0.5, 0); }
   // ---- mantle: pointed capelet, high collar with a copper rim ----
-  { const mg = K.lathe([[0.37, 0.36], [0.34, 0.43], [0.27, 0.52], [0.18, 0.61], [0.1, 0.68]], 24), pa = mg.attributes.position;
-    for (let i = 0; i < pa.count; i++) if (Math.abs(pa.getY(i) - 0.36) < 1e-4) { const a = Math.atan2(pa.getX(i), pa.getZ(i)), k = Math.round((a + PI) / TAU * 24); pa.setY(i, 0.36 + (k % 2 ? 0.05 : -0.04) - (Math.cos(a) < 0 ? 0.04 : 0)); }
+  { const mg = K.lathe([[0.43, 0.35], [0.4, 0.43], [0.3, 0.53], [0.19, 0.62], [0.1, 0.69]], 24), pa = mg.attributes.position;
+    for (let i = 0; i < pa.count; i++) if (Math.abs(pa.getY(i) - 0.35) < 1e-4) { const a = Math.atan2(pa.getX(i), pa.getZ(i)), k = Math.round((a + PI) / TAU * 24); pa.setY(i, 0.35 + (k % 2 ? 0.05 : -0.04) - (Math.cos(a) < 0 ? 0.04 : 0)); }
     P.add(torso, mantleM, mg, 0, 0, -0.01, 0, 0, 0, 1, 1, 0.84); }
 
   // ---- head: deep swept-back cowl, shadowed face, eyes, cloth mask ----
@@ -99,27 +112,33 @@ HERO_MODELS.stormcaller = function buildStormcaller(cls) {
   { const hg = K.lathe(HP, 22, HG, TAU - 2 * HG), pa = hg.attributes.position;
     for (let i = 0; i < pa.count; i++) pa.setXYZ(i, ...hoodXf(pa.getX(i), pa.getY(i), pa.getZ(i)));
     hg.computeVertexNormals(); P.add(head, coatM, hg);
-    const tip = new THREE.ConeGeometry(0.075, 0.26, 10, 1, true); tip.translate(0, 0.13, 0); const top = hoodXf(0, 0.33, -0.05); P.add(head, coatM, tip, 0, top[1] - 0.02, top[2] + 0.01, -2.0, 0, 0);
+    // tall peak swept up and back, on its own pivot so it can lag
+    const tip = new THREE.ConeGeometry(0.088, 0.34, 10, 2, true); tip.translate(0, 0.17, 0); { const pa = tip.attributes.position; for (let i = 0; i < pa.count; i++) { const y = pa.getY(i) / 0.34; pa.setZ(i, pa.getZ(i) - y * y * 0.07); } tip.computeVertexNormals(); }
+    const top = hoodXf(0, 0.3, -0.05); hoodTip = grp(head, 0, top[1] - 0.02, top[2] + 0.02); P.add(hoodTip, coatM, tip);
+    P.add(hoodTip, metalM, K.tube([[0, 0.0, -0.092], [0, 0.12, -0.07], [0, 0.24, -0.065], [0, 0.33, -0.072]], 0.008, 8, 4));
     const edge = []; for (let k = 0; k < HP.length * 2 - 1; k++) { const j = k < HP.length ? k : HP.length * 2 - 2 - k, s = k < HP.length ? 1 : -1, r = HP[j][0]; edge.push(hoodXf(r * Math.sin(HG) * s, HP[j][1], r * Math.cos(HG))); }
-    P.add(head, metalM, K.tube(edge, 0.009, 48, 5)); }
+    P.add(head, metalM, K.tube(edge, 0.014, 48, 5));
+    const seam = []; for (let j = 1; j < HP.length - 1; j++) seam.push(hoodXf(0, HP[j][1], -(HP[j][0] + 0.005))); P.add(head, metalM, K.tube(seam, 0.009, 20, 4)); }
   P.add(head, voidM, new THREE.SphereGeometry(0.13, 14, 10), 0, 0.11, 0.0, 0, 0, 0, 1, 1.05, 1);
   for (const s of [1, -1]) P.add(head, eyeM, new THREE.BoxGeometry(0.036, 0.011, 0.012), s * 0.045, 0.125, 0.128, 0, s * 0.35, s * -0.22);
 
   // ---- arms ----
   const mkArm = (side) => {
-    const sh = grp(torso, side * 0.245, 0.55, -0.01);
-    for (let k = 0; k < 3; k++) P.add(sh, k ? armorM : metalM, new THREE.SphereGeometry(0.11 - k * 0.006, 16, 6, 0, TAU, 0, PI * 0.42), side * (0.02 + k * 0.035), 0.05 - k * 0.05, 0, 0, 0, side * -(0.3 + k * 0.24), 1.12, 0.78, 1.12);
-    P.add(sh, runeM, new THREE.OctahedronGeometry(0.018), side * 0.13, 0.03, 0, 0, 0, side * -0.4, 0.5, 1.4, 1);
+    const sh = grp(torso, side * 0.265, 0.55, -0.01);
+    // broad pauldrons, tilted out past the mantle so the shoulders carry the silhouette
+    for (let k = 0; k < 3; k++) P.add(sh, k ? armorM : metalM, new THREE.SphereGeometry((0.11 - k * 0.006) * 1.3, 16, 6, 0, TAU, 0, PI * 0.42), side * (0.03 + k * 0.047), 0.065 - k * 0.065, 0, 0, 0, side * -(0.42 + k * 0.27), 1.12, 0.78, 1.12);
+    P.add(sh, runeM, new THREE.OctahedronGeometry(0.024), side * 0.175, 0.025, 0, 0, 0, side * -0.55, 0.5, 1.4, 1);
     P.add(sh, coatM, K.lathe([[0.068, -0.3], [0.075, -0.2], [0.082, -0.08], [0.076, 0.02]], 12));
     const el = grp(sh, 0, -0.29, 0);
     P.add(el, leatherM, K.lathe([[0.048, -0.25], [0.056, -0.16], [0.06, -0.06], [0.055, 0.0]], 12));
-    for (const y of [-0.07, -0.22]) P.add(el, metalM, new THREE.TorusGeometry(0.058, 0.008, 4, 16), 0, y, 0, PI / 2, 0, 0);
-    P.add(el, runeM, new THREE.BoxGeometry(0.01, 0.1, 0.01), side * 0.061, -0.145, 0);
-    P.add(el, coatM, K.lathe([[0.13, -0.19], [0.105, -0.12], [0.08, -0.04], [0.072, 0.02]], 14), 0, 0, -0.012, 0.12, 0, 0);
-    P.add(el, metalM, new THREE.TorusGeometry(0.13, 0.007, 4, 22), 0, -0.19, -0.012 + 0.023, PI / 2 + 0.12, 0, 0);
-    const hand = grp(el, 0, -0.275, 0);
-    P.add(hand, leatherM, new THREE.SphereGeometry(0.046, 10, 8), 0, -0.02, 0.005, 0, 0, 0, 0.85, 1.25, 1.1);
-    P.add(hand, leatherM, new THREE.CapsuleGeometry(0.016, 0.04, 3, 6), side * -0.035, -0.0, 0.03, 0.5, 0, side * 0.4);
+    // wide bell sleeve with one clean copper cuff
+    P.add(el, coatM, K.lathe([[0.165, -0.2], [0.125, -0.12], [0.086, -0.04], [0.074, 0.02]], 14), 0, 0, -0.012, 0.12, 0, 0);
+    P.add(el, metalM, new THREE.TorusGeometry(0.163, 0.014, 5, 24), 0, -0.199, -0.012 - 0.024, PI / 2 + 0.12, 0, 0); // sits on the tilted hem
+    // hands 1.3x, in light wrapped cloth with a lit palm (scaled in the geometry: the staff and the charge hang off the hand)
+    const hand = grp(el, 0, -0.29, 0), hs = 1.3;
+    P.add(hand, innerM, new THREE.SphereGeometry(0.046 * hs, 10, 8), 0, -0.02 * hs, 0.005, 0, 0, 0, 0.85, 1.25, 1.1);
+    P.add(hand, innerM, new THREE.CapsuleGeometry(0.016 * hs, 0.04 * hs, 3, 6), side * -0.035 * hs, 0, 0.03 * hs, 0.5, 0, side * 0.4);
+    P.add(hand, runeM, new THREE.SphereGeometry(0.026 * hs, 8, 6), side * -0.034 * hs, -0.025 * hs, 0.008, 0, 0, 0, 0.35, 1, 1);
     return { sh, el, hand };
   };
   const armL = mkArm(1), armR = mkArm(-1);
@@ -130,7 +149,8 @@ HERO_MODELS.stormcaller = function buildStormcaller(cls) {
     const knee = grp(hip, 0, -0.45, 0);
     P.add(knee, leatherM, K.lathe([[0.062, -0.4], [0.057, -0.3], [0.066, -0.17], [0.074, -0.05], [0.086, 0.03], [0.094, 0.07]], 12));
     P.add(knee, metalM, new THREE.SphereGeometry(0.06, 10, 6, 0, TAU, 0, PI * 0.5), 0, 0.0, 0.045, PI / 2 - 0.2, 0, 0, 1, 1.2, 0.8);
-    P.add(knee, metalM, new THREE.TorusGeometry(0.09, 0.007, 4, 16), 0, 0.06, 0, PI / 2, 0, 0);
+    P.add(knee, metalM, new THREE.TorusGeometry(0.094, 0.013, 4, 16), 0, 0.06, 0, PI / 2, 0, 0);
+    P.add(knee, metalM, new THREE.TorusGeometry(0.066, 0.012, 4, 16), 0, -0.33, 0, PI / 2, 0, 0);
     const ankle = grp(knee, 0, -0.42, 0);
     P.add(ankle, leatherM, new THREE.SphereGeometry(0.07, 12, 8), 0, -0.032, 0.045, 0, 0, 0, 0.78, 0.55, 1.55);
     P.add(ankle, leatherM, new THREE.BoxGeometry(0.1, 0.018, 0.2), 0, -0.062, 0.045);
@@ -139,32 +159,45 @@ HERO_MODELS.stormcaller = function buildStormcaller(cls) {
   const legL = mkLeg(1), legR = mkLeg(-1);
 
   // ---- coat skirt: five hinged panels, the back one a swallowtail; each has a copper hem ----
-  const R0 = 0.19, panels = [];
+  const R0 = 0.172, panels = [];
   const mkPanel = (phi, span, len, fork) => {
     const pv = grp(hips, Math.sin(phi) * R0, -0.03, Math.cos(phi) * R0); pv.rotation.y = phi;
-    const prof = (y) => R0 + 0.13 * Math.pow(-y / 0.8, 0.85);
+    const prof = (y) => R0 + 0.175 * Math.pow(-y / 0.8, 0.95); // bell flare: hem about twice the belt radius
     const shape = (geo, yOff) => { const pa = geo.attributes.position; for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i), a = Math.atan2(x, pa.getZ(i)) / (span / 2);
       const cut = fork ? (1 - Math.abs(a)) * 0.2 : -Math.abs(a) * 0.03; if (y < -len + 0.035 + 1e-4) pa.setY(i, y + cut);
       const fold = 1 + 0.06 * Math.sin(a * span * 9 + phi * 5) * sat(-y / len) ** 1.3; pa.setX(i, x * fold); pa.setZ(i, pa.getZ(i) * fold); } geo.computeVertexNormals(); };
     const pts = []; for (let k = 0; k <= 6; k++) { const y = -len + k / 6 * len; pts.push([prof(y), y]); }
     const cg = K.lathe(pts, 8, -span / 2, span); shape(cg); P.add(pv, coatM, cg, 0, 0, -R0);
-    const hy = -len, hg = K.lathe([[prof(hy) + 0.004, hy], [prof(hy + 0.035) + 0.004, hy + 0.035]], 8, -span / 2, span); shape(hg); P.add(pv, metalM, hg, 0, 0, -R0);
+    const hy = -len, hg = K.lathe([[prof(hy) + 0.004, hy], [prof(hy + 0.05) + 0.004, hy + 0.05]], 8, -span / 2, span); shape(hg); P.add(pv, metalM, hg, 0, 0, -R0);
+    if (fork) { const sp = []; for (let k = 0; k <= 6; k++) { const y = -0.02 - k / 6 * (len - 0.2); sp.push([0, y, prof(y) - R0 + 0.007]); } P.add(pv, runeM, K.tube(sp, 0.011, 12, 4)); } // the back spine strip continues down the tail
     panels.push({ pv, phi, spr: K.spring(70, 8) });
   };
   mkPanel(0.62, 0.95, 0.52, false); mkPanel(-0.62, 0.95, 0.52, false);
   mkPanel(1.72, 1.3, 0.66, false); mkPanel(-1.72, 1.3, 0.66, false);
   mkPanel(PI, 1.35, 0.82, true);
   // front stole between the legs, with three runes
-  const stole = grp(hips, 0, -0.01, 0.2); const stoleSpr = K.spring(60, 7);
-  { const sh = new THREE.Shape([new THREE.Vector2(-0.075, 0), new THREE.Vector2(0.075, 0), new THREE.Vector2(0.075, -0.5), new THREE.Vector2(0, -0.6), new THREE.Vector2(-0.075, -0.5)]);
+  const stole = grp(hips, 0, -0.01, 0.185); const stoleSpr = K.spring(60, 7);
+  { const w = 0.1, sh = new THREE.Shape([new THREE.Vector2(-w, 0), new THREE.Vector2(w, 0), new THREE.Vector2(w * 1.12, -0.52), new THREE.Vector2(0, -0.64), new THREE.Vector2(-w * 1.12, -0.52)]);
     P.add(stole, innerM, new THREE.ExtrudeGeometry(sh, { depth: 0.012, bevelEnabled: false }), 0, 0, -0.006);
-    for (let k = 0; k < 3; k++) P.add(stole, runeM, new THREE.OctahedronGeometry(0.025), 0, -0.13 - k * 0.14, 0.009, 0, 0, 0, 0.8, 1.3, 0.25);
-    P.add(stole, metalM, new THREE.BoxGeometry(0.16, 0.02, 0.02), 0, -0.005, 0.004); }
+    P.add(stole, runeM, new THREE.BoxGeometry(0.018, 0.44, 0.006), 0, -0.25, 0.008);
+    for (let k = 0; k < 3; k++) P.add(stole, runeM, new THREE.OctahedronGeometry(0.036), 0, -0.13 - k * 0.15, 0.009, 0, 0, 0, 0.8, 1.3, 0.25);
+    P.add(stole, metalM, new THREE.BoxGeometry(0.21, 0.026, 0.02), 0, -0.005, 0.004); }
   // sash tails off the back-right of the belt
   const sash = [];
   for (const [sx, w, n] of [[-0.09, 0.065, 3], [-0.15, 0.05, 3]]) { let par = grp(hips, sx, -0.01, -0.165); const chain = [];
     for (let k = 0; k < n; k++) { const seg = grp(par, 0, k ? -0.17 : 0, 0); P.add(seg, innerM, new THREE.BoxGeometry(w, 0.175, 0.008), 0, -0.085, 0); chain.push({ o: seg, spr: K.spring(55 - k * 10, 6), sprZ: K.spring(40, 6) }); par = seg; }
     sash.push(chain); }
+  // split back cape under the mantle: two flaps with a lit lining and glowing inner edges framing the spine strip, on springs
+  const cape = [];
+  for (const s of [1, -1]) {
+    const cp = grp(torso, 0, 0.45, -0.2), CPT = [[0.255, 0.02], [0.27, -0.15], [0.3, -0.36], [0.338, -0.6]], ph0 = s > 0 ? PI - 0.76 : PI + 0.07, edgeA = s > 0 ? PI - 0.07 : PI + 0.07;
+    const cg = K.lathe(CPT, 7, ph0, 0.69); { const pa = cg.attributes.position; for (let i = 0; i < pa.count; i++) if (pa.getY(i) < -0.59) { const a = Math.abs(Math.atan2(pa.getX(i), -pa.getZ(i))); pa.setY(i, pa.getY(i) + (a - 0.07) * 0.16); } cg.computeVertexNormals(); }
+    P.add(cp, capeM, cg, 0, 0, 0.2, 0, 0, 0, 1, 1, 0.8);
+    const ed = CPT.map(([r, y]) => [Math.sin(edgeA) * (r + 0.004), y, Math.cos(edgeA) * (r + 0.004) * 0.8 + 0.2]); P.add(cp, runeM, K.tube(ed, 0.009, 10, 4));
+    const hem = []; for (let k = 0; k <= 7; k++) { const a = ph0 + k / 7 * 0.69, r = 0.342, aa = Math.abs(Math.atan2(Math.sin(a), -Math.cos(a))); hem.push([Math.sin(a) * r, -0.6 + (aa - 0.07) * 0.16, Math.cos(a) * r * 0.8 + 0.2]); }
+    P.add(cp, metalM, K.tube(hem, 0.01, 14, 4));
+    cape.push({ o: cp, s, spr: K.spring(55, 6.5) });
+  }
 
   // ---- staff: knotted shaft, grip wrap, copper bands and coil, forked head holding a floating crystal ----
   const weapon = grp(armR.hand, 0, -0.03, 0.01), wtip = new THREE.Object3D();
@@ -196,7 +229,8 @@ HERO_MODELS.stormcaller = function buildStormcaller(cls) {
   P.finish();
   const aura = new THREE.PointLight(C.glow, 1.4, 7, 1.5); aura.position.set(0, 0.5, 0.9); g.add(aura);
 
-  const A = { run: 0, swing: 0, swingDur: 0.28, swingKind: 0, cast: 0, mend: 0, guard: 0, lean: 0, aim: 0, load: 0, blink: 0, air: 0, arcT: 0, vx: 0, vz: 0, lx: null, lz: null };
+  const A = { run: 0, swing: 0, swingDur: 0.28, swingKind: 0, cast: 0, mend: 0, guard: 0, lean: 0, aim: 0, load: 0, blink: 0, air: 0, arcT: 0, vx: 0, vz: 0, lx: null, lz: null, cp: 0, crk: 0, crkT: 2, hy: 0.95 };
+  const headSX = K.spring(85, 12), headSY = K.spring(85, 12), tipSpr = K.spring(60, 6.5); headSX.x = 0.13;
   const _v = new V3(), _w = new V3(), _a = new V3(), _b = new V3();
   // a jagged line from a to b (both in g's space) written into the arc buffer at slot i; off = hidden
   function arc(i, a, b, jag) {
@@ -214,7 +248,7 @@ HERO_MODELS.stormcaller = function buildStormcaller(cls) {
     // own velocity in model space (for cloth), and teleports (Blink)
     const wp = g.position, f = g.rotation.y;
     if (A.lx !== null && dt > 0) { const dx = wp.x - A.lx, dz = wp.z - A.lz;
-      if (dx * dx + dz * dz > 2.5) { A.blink = 1; for (const q of panels) q.spr.v -= 9; }
+      if (dx * dx + dz * dz > 2.5) { A.blink = 1; for (const q of panels) q.spr.v -= 9; for (const q of cape) q.spr.v += 7; }
       else { A.vx = damp(A.vx, (dx * Math.cos(f) - dz * Math.sin(f)) / dt, 12, dt); A.vz = damp(A.vz, (dx * Math.sin(f) + dz * Math.cos(f)) / dt, 12, dt); } }
     A.lx = wp.x; A.lz = wp.z;
     A.lean = damp(A.lean, moving ? Math.min(1, spd / 7) : 0, 9, dt);
@@ -223,33 +257,44 @@ HERO_MODELS.stormcaller = function buildStormcaller(cls) {
     A.cast = damp(A.cast, cast && !mend ? 1 : 0, 10, dt); A.mend = damp(A.mend, mend ? 1 : 0, 8, dt);
     const prog = cast && cast.time ? sat(cast.t / cast.time) : 0, CA = A.cast, MA = A.mend;
     A.air = damp(A.air, grounded ? 0 : 1, 12, dt); A.blink = Math.max(0, A.blink - dt / 0.32);
-    const storm = !!(p.hasBuff && p.hasBuff('tempest')), br = Math.sin(t * 1.7);
+    const storm = !!(p.hasBuff && p.hasBuff('tempest'));
 
-    // ---- base: idle stance blended into the run ----
-    hips.position.y = 0.95 + br * 0.006 + L * (Math.abs(c) * 0.065 - 0.035);
-    hips.rotation.set(0, s * 0.16 * L, Math.sin(t * 0.55) * 0.015 * (1 - L));
-    body.rotation.set(0.05 + L * 0.16, 0, 0); body.position.set(0, 0, 0);
-    torso.rotation.set(0.06 + br * 0.012 + L * 0.04, -s * 0.24 * L - 0.08 * (1 - L), 0);
-    head.rotation.set(0.1 - L * 0.16, Math.sin(t * 0.37) * 0.1 * (1 - L) + 0.08 * (1 - L) + s * 0.1 * L, 0);
-    let tl = lerp(-0.06, -s * 0.72, L), tr = lerp(0.1, s * 0.72, L), zl = 0.07 * (1 - L), zr = -0.07 * (1 - L);
-    const kc = Math.cos(ph - 0.45); let kl = lerp(0.07, 0.12 + Math.pow(Math.max(0, kc), 1.5) * 1.0, L), kr = lerp(0.12, 0.12 + Math.pow(Math.max(0, -kc), 1.5) * 1.0, L);
-    let lx = lerp(-0.12, s * 0.6, L), lz = 0.14 + 0.02 * L, le = lerp(-0.5, -0.75, L);
-    let rx = lerp(-0.42, -0.35 - s * 0.25, L), rz = lerp(-0.3, -0.16, L), re = lerp(-0.62, -0.9, L), staffP = lerp(0.04, 0.55, L), staffR = 0;
-    // ---- Bolt cast: plant, turn the staff shoulder in, raise the staff, reach with the off hand ----
+    // ---- base: idle stance (weight on the free-hand leg, hips cocked off the staff, staff leaning out) blended into the run ----
+    const I = 1 - L, br2 = Math.sin(t * 1.57); // breathing at 0.25 Hz
+    hips.position.set(0.035 * I, 0.95 - 0.008 * I + br2 * 0.006 + L * (Math.abs(c) * 0.07 - 0.035), 0);
+    hips.rotation.set(0, s * 0.17 * L, (0.085 + Math.sin(t * 0.55) * 0.012) * I);
+    body.rotation.set(0.05 + L * 0.19, 0, 0); body.position.set(0, 0, 0);
+    torso.rotation.set(0.06 + br2 * 0.014 + L * 0.06, -s * 0.34 * L - 0.08 * I, -0.11 * I);
+    head.rotation.set(0.13 - L * 0.18, Math.sin(t * 0.37) * 0.1 * I + 0.08 * I + s * 0.12 * L, 0.04 * I);
+    let tl = lerp(-0.06, -s * 0.72, L), tr = lerp(0.1, s * 0.72, L), zl = -0.02 * I, zr = -0.25 * I;
+    const kc = Math.cos(ph - 0.45); let kl = lerp(0.04, 0.12 + Math.pow(Math.max(0, kc), 1.5) * 1.0, L), kr = lerp(0.16, 0.12 + Math.pow(Math.max(0, -kc), 1.5) * 1.0, L);
+    let lx = lerp(-0.22, s * 0.6, L), lz = 0.2 - 0.04 * L, le = lerp(-0.78, -0.75, L);
+    let rx = lerp(-0.3, -0.35 - s * 0.25, L), rz = lerp(-0.32, -0.16, L), re = lerp(-0.55, -0.9, L), staffP = lerp(0.14, 0.55, L), staffR = 0.28 * I;
+    armL.sh.position.y = armR.sh.position.y = 0.55 + br2 * 0.007;
+    // ---- Bolt cast: wind up (torso coiled, staff raised and swept back, off hand drawn to the hip cupping the charge), then snap
+    // to full extension (off hand thrust out, staff levelled) for the last stretch of the cast ----
     if (CA > 0.01) {
-      const tr2 = Math.sin(t * 31) * 0.02 * prog;
-      tl = lerp(tl, -0.3, CA); tr = lerp(tr, 0.3, CA); zl = lerp(zl, 0.16, CA); zr = lerp(zr, -0.12, CA); kl = lerp(kl, 0.3, CA); kr = lerp(kr, 0.2, CA);
-      hips.position.y -= 0.045 * CA; hips.rotation.y += 0.12 * CA; torso.rotation.y += 0.1 * CA; torso.rotation.x -= 0.1 * prog * CA; head.rotation.y -= 0.2 * CA; head.rotation.x -= 0.06 * CA;
-      rx = lerp(rx, -1.2 - prog * 0.25, CA); rz = lerp(rz, -0.14, CA); re = lerp(re, -0.45, CA); staffP = lerp(staffP, 0.3 + prog * 0.25, CA);
-      lx = lerp(lx, -1.3 + tr2, CA); lz = lerp(lz, 0.32, CA); le = lerp(le, -0.4 + tr2, CA);
+      if (cast && !mend) A.cp = prog; const cp = A.cp, ex = smooth(sat((cp - 0.72) / 0.07)), tr2 = Math.sin(t * 31) * 0.02 * cp * ex, coil = 0.44 * (1 - ex) - 0.14 * ex;
+      tl = lerp(tl, -0.3, CA); tr = lerp(tr, 0.3, CA); zl = lerp(zl, 0.16, CA); zr = lerp(zr, -0.14, CA); kl = lerp(kl, 0.3, CA); kr = lerp(kr, 0.2, CA); staffR = lerp(staffR, 0, CA);
+      hips.position.y -= 0.045 * CA; hips.position.x *= 1 - CA; hips.rotation.z *= 1 - CA; torso.rotation.z *= 1 - CA;
+      hips.rotation.y += 0.12 * CA; torso.rotation.y += coil * CA; torso.rotation.x += (0.1 * ex - 0.04) * CA; head.rotation.y -= (0.14 + coil) * CA; head.rotation.x -= 0.06 * CA;
+      rx = lerp(rx, lerp(-2.05, -1.3, ex), CA); rz = lerp(rz, lerp(-0.22, -0.14, ex), CA); re = lerp(re, lerp(-0.4, -0.4, ex), CA); staffP = lerp(staffP, lerp(-0.32, 0.6, ex), CA);
+      lx = lerp(lx, lerp(0.38, -1.45 + tr2, ex), CA); lz = lerp(lz, lerp(0.3, 0.22, ex), CA); le = lerp(le, lerp(-1.35, -0.08 + tr2, ex), CA);
     }
     // ---- Mend: staff raised overhead, off hand on the heart ----
     if (MA > 0.01) { rx = lerp(rx, -2.55, MA); rz = lerp(rz, -0.15, MA); re = lerp(re, -0.15, MA); staffP = lerp(staffP, 0, MA); lx = lerp(lx, -0.95, MA); lz = lerp(lz, -0.45, MA); le = lerp(le, -1.9, MA); head.rotation.x -= 0.25 * MA; torso.rotation.x -= 0.08 * MA; }
     // ---- one-shot moves ----
     if (A.swing > 0) {
       A.swing -= dt; const k = 1 - Math.max(0, A.swing) / A.swingDur, e = smooth(k < 0.3 ? k / 0.3 : 1), fz = Math.sin(Math.min(1, k * 1.1) * PI);
-      if (A.swingKind === 3) { rx = lerp(rx, -1.6, fz); re = lerp(re, -0.05, fz); staffP = lerp(staffP, 1.35, fz); lx = lerp(lx, 0.35, fz); le = lerp(le, -0.6, fz); body.rotation.x += 0.08 * fz; torso.rotation.y += 0.15 * fz; }
-      else if (A.swingKind === 0) { rx = lerp(rx, lerp(-2.7, -0.95, e), fz); re = lerp(re, -0.2, fz); staffP = lerp(staffP, lerp(-0.5, 1.45, e), fz); torso.rotation.y += lerp(0.5, -0.45, e) * fz; lx = lerp(lx, 0.6, fz); lz = lerp(lz, 0.5, fz); body.rotation.x += 0.1 * e * fz; }
+      // Bolt release: staff snaps forward, then kicks back with the body recoiling (the coat overshoots from the impulse in swing())
+      if (A.swingKind === 3) { const h = k < 0.12 ? smooth(k / 0.12) : 1 - smooth(sat((k - 0.55) / 0.45)), r = smooth(sat((k - 0.16) / 0.3));
+        rx = lerp(rx, lerp(-1.6, -1.05, r), h); re = lerp(re, lerp(-0.05, -0.55, r), h); staffP = lerp(staffP, lerp(1.35, -0.3, r), h); lx = lerp(lx, -1.2, h); le = lerp(le, -0.2, h);
+        body.rotation.x += lerp(0.08, -0.11, r) * h; torso.rotation.y += lerp(0.15, -0.05, r) * h; head.rotation.x -= 0.08 * r * h; }
+      // Discharge: an X silhouette held through the flash - staff straight overhead, off arm flung wide, chest arched, wide stance
+      else if (A.swingKind === 0) { const h = k < 0.16 ? smooth(k / 0.16) : 1 - smooth(sat((k - 0.72) / 0.28));
+        rx = lerp(rx, -2.8, h); rz = lerp(rz, -0.3, h); re = lerp(re, -0.08, h); staffP = lerp(staffP, -0.06, h); staffR = lerp(staffR, 0.15, h);
+        lx = lerp(lx, -0.2, h); lz = lerp(lz, 1.85, h); le = lerp(le, -0.1, h); zl = lerp(zl, 0.22, h); zr = lerp(zr, -0.22, h); kl = lerp(kl, 0.12, h); kr = lerp(kr, 0.12, h); tl = lerp(tl, 0, h); tr = lerp(tr, 0, h);
+        torso.rotation.x -= 0.16 * h; head.rotation.x -= 0.22 * h; body.rotation.x -= 0.05 * h; hips.position.y -= 0.03 * h; }
       else if (A.swingKind === 4) { rx -= fz * 0.45; re -= fz * 0.25; body.rotation.x -= fz * 0.05; }
       else { rx = lerp(rx, -1.7, fz); lx = lerp(lx, -1.7, fz); re = lerp(re, -0.1, fz); le = lerp(le, -0.1, fz); staffP = lerp(staffP, 1.2, fz); }
     }
@@ -259,6 +304,7 @@ HERO_MODELS.stormcaller = function buildStormcaller(cls) {
       tl = 0.25 + Math.sin(t * 5) * 0.05; tr = 0.25 - Math.sin(t * 5) * 0.05; kl = kr = 0.7; if (A.swing <= 0 && CA < 0.05) { lx = rx = -2.3; lz = 0.75; rz = -0.75; le = re = -0.5; staffP = 1.3; } }
     if (p.flashT > 0) { const q = p.flashT / 0.15; torso.rotation.x -= 0.14 * q; head.rotation.x -= 0.1 * q; }
     // ---- apply ----
+    head.rotation.x = headSX.step(head.rotation.x, dt); head.rotation.y = headSY.step(head.rotation.y, dt); // the head trails the body by ~0.1 s
     legL.hip.rotation.set(tl, 0, zl); legR.hip.rotation.set(tr, 0, zr); legL.knee.rotation.x = kl; legR.knee.rotation.x = kr;
     const tilt = body.rotation.x + hips.rotation.x;
     legL.ankle.rotation.x = clamp(-(tl + kl + tilt) * 0.85 + (L > 0.2 ? Math.max(0, -s) * 0.35 * L : 0), -0.9, 0.9); legR.ankle.rotation.x = clamp(-(tr + kr + tilt) * 0.85 + (L > 0.2 ? Math.max(0, s) * 0.35 * L : 0), -0.9, 0.9);
@@ -271,28 +317,39 @@ HERO_MODELS.stormcaller = function buildStormcaller(cls) {
     for (const q of panels) {
       const fr = Math.cos(q.phi), sd = Math.sin(q.phi);
       const legX = sd > 0 ? tl : tr, push = fr > 0.3 ? Math.max(0, -legX) * 1.0 + 0.04 : fr < -0.3 ? Math.max(0, Math.max(tl, tr)) * 0.8 + 0.03 : Math.max(0, Math.abs(legX)) * 0.35 + 0.05 * Math.abs(sd > 0 ? zl : zr) * 4;
-      const tgt = clamp(push + wind(q.phi) + flut(q.phi, 8.5) + A.air * 0.45 + CA * prog * 0.18, -0.05, 1.25);
+      const tgt = clamp(push + wind(q.phi) + flut(q.phi, 8.5) + A.air * 0.45 + CA * prog * 0.18 + (0.02 + 0.02 * Math.sin(t * 1.3 + q.phi * 2)) * (1 - L), -0.05, 1.25);
       q.pv.rotation.x = -clamp(q.spr.step(tgt, dt), -0.05, 1.3);
     }
+    // back cape: trails the motion, kept near vertical against the body's lean, lifts off the stride
+    const lean = tilt + torso.rotation.x;
+    for (const q of cape) { const tgt = clamp(A.vz * 0.03, -0.05, 0.3) + Math.max(0, Math.max(tl, tr)) * 0.15 + flut(q.s, 7.5) * 1.2 + A.air * 0.5 + CA * prog * 0.12 + 0.03 * Math.sin(t * 1.1 + q.s) * (1 - L) - lean * 0.8;
+      q.o.rotation.x = clamp(q.spr.step(tgt, dt), -0.04, 1.2); q.o.rotation.z = clamp(-A.vx * 0.03, -0.25, 0.25) + q.s * 0.03 * clamp(A.vz * 0.1, 0, 1); }
+    // hood peak swept back, lagging the head and the bob
+    const hv = (hips.position.y - A.hy) / Math.max(dt, 1e-3); A.hy = hips.position.y;
+    hoodTip.rotation.x = -0.5 - tipSpr.step(clamp(A.vz * 0.045, -0.1, 0.4) + clamp(hv * 0.12, -0.2, 0.2) + A.air * 0.25, dt);
     stole.rotation.x = -clamp(stoleSpr.step(Math.max(0, -Math.min(tl, tr)) * 1.05 + wind(0) * 0.6 + flut(0, 9) + A.air * 0.3, dt), -0.05, 1.3);
     for (const ch of sash) for (let k = 0; k < ch.length; k++) { const q = ch[k], tgt = clamp(A.vz * 0.085 - 0.05, -0.15, 1.25) * (k ? 0.35 : 1) + Math.sin(t * 7 - k * 1.3) * (0.06 * L + 0.02) + A.air * 0.3;
       q.o.rotation.x = q.spr.step(tgt + (k === 0 ? -tilt : 0), dt); q.o.rotation.z = q.sprZ.step(-A.vx * 0.05 * (k ? 0.4 : 1), dt); }
     // ---- glow, arcs, charges ----
     const pump = 1 + CA * (0.5 + prog * 0.9) + MA * 0.6 + (storm ? 0.45 : 0) + A.blink * 1.5 + (A.swing > 0 ? 0.6 : 0);
     crystalM.color.copy(crystalBase).multiplyScalar(pump); runeM.color.copy(runeBase).multiplyScalar(0.85 + 0.15 * Math.sin(t * 2.3) + (pump - 1) * 0.6);
-    rimU.value.copy(rimBase).multiplyScalar(1 + CA * prog * 0.8 + A.blink * 2 + (storm ? 0.3 : 0));
+    rimU.value.copy(rimBase).multiplyScalar(1 + CA * prog * 0.45 + A.blink * 1.5 + (storm ? 0.25 : 0));
     crystal.rotation.y += dt * (1.4 + CA * 7 + (storm ? 3 : 0)); crystal.position.y = 1.24 + Math.sin(t * 2.1) * 0.012; halo.rotation.set(t * 1.3, t * 0.9, 0); halo.scale.setScalar(1 + CA * prog * 0.35);
-    palm.visible = CA > 0.03 || MA > 0.03; palm.scale.setScalar(Math.max(0.01, CA * (0.35 + prog * 0.75) + MA * 0.7) * (1 + Math.sin(t * 40) * 0.08));
+    // the cast charge stays small and moderately bright so the hand and hood still read through the bloom
+    palm.visible = CA > 0.03 || MA > 0.03; palm.scale.setScalar(Math.min(0.8, Math.max(0.01, CA * (0.3 + A.cp * 0.5) + MA * 0.6)) * (1 + Math.sin(t * 40) * 0.08));
+    palmM.color.copy(palmBase).multiplyScalar(1 + CA * A.cp * 0.4);
+    // idle: now and then a crackle jumps from the staff crystal to the free hand
+    A.crk -= dt; if ((A.crkT -= dt) <= 0) { A.crkT = 1.6 + Math.random() * 2.4; if (CA < 0.3 && A.swing <= 0) A.crk = 0.14 + Math.random() * 0.08; }
     if (!G.headless && (A.arcT -= dt) <= 0) {
       A.arcT = 0.05 + Math.random() * 0.04;
       local(weapon, 0.05, 1.45, 0, _a); local(weapon, 0, 1.3, 0, _b); arc(0, _a, _b, 0.03);
       local(weapon, -0.05, 1.45, 0, _a); local(weapon, 0, 1.18, 0, _b); arc(1, _a, _b, 0.03);
-      if (CA > 0.3) { local(armL.hand, 0, -0.06, 0.05, _a); local(weapon, 0, 1.24, 0, _b); arc(2, _a, _b, 0.12 + 0.1 * prog); } else off(2);
+      if (CA > 0.3 || A.crk > 0) { local(armL.hand, CA > 0.3 ? 0 : -0.04, -0.06, CA > 0.3 ? 0.05 : 0.01, _a); local(weapon, 0, 1.24, 0, _b); arc(2, _a, _b, CA > 0.3 ? 0.12 + 0.1 * prog : 0.16); } else off(2);
       if (CA > 0.5 && prog > 0.5) { local(weapon, 0, 1.24, 0, _a); _b.set((Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5, (Math.random() - 0.5) * 0.5).add(_a); arc(3, _a, _b, 0.1); } else off(3);
       if (storm) { _a.set((Math.random() - 0.5) * 0.5, 0.4 + Math.random() * 1.2, (Math.random() - 0.5) * 0.4); _b.set(_a.x + (Math.random() - 0.5) * 0.9, _a.y + (Math.random() - 0.5) * 0.7, _a.z + (Math.random() - 0.5) * 0.5); arc(4, _a, _b, 0.15); local(weapon, 0, 1.24, 0, _a); _b.set((Math.random() - 0.5) * 0.8, (Math.random() - 0.2) * 0.7, (Math.random() - 0.5) * 0.8).add(_a); arc(5, _a, _b, 0.12); } else { off(4); off(5); }
       arcGeo.attributes.position.needsUpdate = true;
     }
-    arcMat.opacity = Math.min(1, 0.35 + CA * 0.5 + (storm ? 0.3 : 0) + A.blink);
+    arcMat.opacity = Math.min(1, 0.35 + CA * 0.5 + (storm ? 0.3 : 0) + A.blink + (A.crk > 0 ? 0.4 : 0));
     const res = p.res | 0;
     for (let i = 0; i < 4; i++) { const o = orbs[i]; o.visible = i < res && !G.headless; if (!o.visible) continue; const a = t * 2.4 + i * TAU / 4;
       o.position.set(Math.cos(a) * 0.55, 1.32 + Math.sin(t * 3 + i * 1.7) * 0.07, Math.sin(a) * 0.55); o.scale.setScalar(res >= 4 ? 1.25 + Math.sin(t * 12 + i) * 0.15 : 1); }
@@ -301,5 +358,8 @@ HERO_MODELS.stormcaller = function buildStormcaller(cls) {
     const bk = A.blink * A.blink; body.scale.set(1 - 0.4 * bk, 1 + 0.35 * bk, 1 - 0.4 * bk);
     aura.intensity = 1.4 + CA * (1.5 + prog * 3) + MA * 2 + (storm ? 1 : 0) + (p.flashT > 0 ? 6 : 0) + A.blink * 6;
   }
-  return { group: g, update, anim: A, wtip, body, swing(kind = 0, dur = 0.28) { A.swing = A.swingDur = dur; A.swingKind = kind; } };
+  return { group: g, update, anim: A, wtip, body, swing(kind = 0, dur = 0.28) {
+    if (kind === 3) { dur = Math.max(dur, 0.42); for (const q of panels) q.spr.v += 3.5; for (const q of cape) q.spr.v += 4.5; stoleSpr.v += 3; } // recoil + overshoot
+    else if (kind === 0) dur = Math.max(dur, 0.5); // hold the Discharge silhouette through the flash
+    A.swing = A.swingDur = dur; A.swingKind = kind; } };
 };
