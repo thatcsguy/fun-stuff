@@ -51,9 +51,9 @@ const fs = require('fs'), path = require('path');
     await clear(); await frames(20);
     for (const [n, yaw, d, h] of [['front', 0.55, 5.2, 1.6], ['side', 1.57, 5.2, 1.4], ['back', 2.7, 5.2, 1.8]]) { await follow({ yaw, d, h }); await frames(8); await shot(P + 'idle_' + n); }
     await follow({ yaw: 0.35, d: 2.0, h: 1.75, ly: 1.6, fov: 30 }); await frames(8); await shot(P + 'idle_face');
-    // walk a lap around the boss so the run never meets a wall
+    // walk a lap around the boss so the run never meets a wall (the boss is on the hero's left, so the cameras stay on the right)
     await ev(() => { window.__walkLoop = true; const g = window.__game; const f = () => { if (!window.__walkLoop) return; const p = g.G.player, b = g.G.boss; const a = Math.atan2(p.pos.x - b.pos.x, p.pos.z - b.pos.z) + Math.PI / 2; window.__mv = { moveX: Math.sin(a), moveZ: Math.cos(a) }; requestAnimationFrame(f); }; f(); });
-    for (const [n, yaw] of [['side', 1.57], ['front', 0.6], ['back', 2.6]]) { await follow({ yaw, d: 4.2, h: 1.4 }); await frames(23); await shot(P + 'walk_' + n); await frames(11); await shot(P + 'walk_' + n + '2'); }
+    for (const [n, yaw] of [['side', -1.57], ['front', -0.6], ['back', -2.6]]) { await follow({ yaw, d: 4.2, h: 1.4 }); await frames(23); await shot(P + 'walk_' + n); await frames(11); await shot(P + 'walk_' + n + '2'); }
     await ev(() => { window.__walkLoop = false; window.__mv = { moveX: 0, moveZ: 0 }; }); await frames(40);
     await ev(() => { const g = window.__game, p = g.G.player, b = g.G.boss; const d = Math.hypot(b.pos.x - p.pos.x, b.pos.z - p.pos.z), k = Math.max(0, d - b.radius - 2.2) / d; p.pos.x += (b.pos.x - p.pos.x) * k; p.pos.z += (b.pos.z - p.pos.z) * k; p.facing = Math.atan2(b.pos.x - p.pos.x, b.pos.z - p.pos.z); p.combo = 0; });
     await frames(20);
