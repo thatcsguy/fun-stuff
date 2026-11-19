@@ -20,14 +20,16 @@ const fs = require('fs'), path = require('path');
         requestAnimationFrame(f); }; requestAnimationFrame(f); }
     if (!v) { C.cine = null; C.cineW = 0; }
   }, v);
-  const shot = async (name) => { const f = path.join(out, name + '.png'); await page.screenshot({ path: f }); console.log(f); };
+  // the game is held still while the screenshot is taken, so a shot shows the moment it was asked for (a/b pairs are really ~0.1 s apart)
+  const shot = async (name) => { const f = path.join(out, name + '.png'); await page.evaluate(() => { window.__game.G.timeScale = 0; }); await page.screenshot({ path: f }); await page.evaluate(() => { window.__game.G.timeScale = 1; }); console.log(f); };
   const ev = (fn, arg) => page.evaluate(fn, arg);
   // press a skill with its gate cleared; the target stays the boss
   const press = (i, res) => ev(([i, res]) => { const p = window.__game.G.player; p.gcd = 0; p.casting = null; const st = p.sk[i]; st.cd = 0; st.charges = Math.max(1, st.charges); if (res !== undefined) p.res = res; p.press(i); }, [i, res]);
   for (const boss of bosses.split(',')) {
     await ev(([b, c]) => { const g = window.__game; g.G.god = true; g.Bot.update = () => { g.Input.bot = window.__mv || { moveX: 0, moveZ: 0 }; }; window.__mv = null; g.Game.start(b, { cls: c }); }, [boss, cls]);
     await page.waitForFunction('window.__game.G.state === "fight" && !window.__game.Cam.cine', null, { timeout: 120000, polling: 100 });
-    await ev(() => { const g = window.__game; window.__mv = { moveX: 0, moveZ: 0 }; g.G.boss.immune = false; });
+    // the boss stands still (no attacks, so no telegraph washes out a shot); it still takes damage
+    await ev(() => { const g = window.__game; window.__mv = { moveX: 0, moveZ: 0 }; g.G.boss.immune = false; }); await ev(() => { const g = window.__game, b = g.G.boss, i = Math.max(0, b.phase | 0); b.def = Object.create(b.def); b.def.phases = b.def.phases.map((q, k) => k === i ? Object.assign({}, q, { enter: null, run: function* () { while (true) yield 1; } }) : q); b.goPhase(i); b.update = () => {}; g.Hz.clear(); g.Bul.clear(); });
     await frames(60);
     const P = boss + '_';
     await ev(() => { const g = window.__game, p = g.G.player; g.Cam.yaw = p.facing + 0.5; g.Cam.pitch = 0.36; });
@@ -48,7 +50,8 @@ const fs = require('fs'), path = require('path');
     // ---- close-ups: stand clear of the boss and the walls, facing away from the boss ----
     const clear = () => ev(() => { const g = window.__game, p = g.G.player, b = g.G.boss; let dx = p.pos.x - b.pos.x, dz = p.pos.z - b.pos.z; const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
       const r = b.radius + 5; p.pos.x = b.pos.x + dx * r; p.pos.z = b.pos.z + dz * r; p.facing = Math.atan2(dx, dz); });
-    await clear(); await frames(20);
+    // idle close-ups: turned so the boss is on the hero's right, the cameras (all on the left) never look into it
+    await clear(); await ev(() => { const p = window.__game.G.player; p.facing -= Math.PI / 2; }); await frames(20);
     for (const [n, yaw, d, h] of [['front', 0.55, 5.2, 1.6], ['side', 1.57, 5.2, 1.4], ['back', 2.7, 5.2, 1.8]]) { await follow({ yaw, d, h }); await frames(8); await shot(P + 'idle_' + n); }
     await follow({ yaw: 0.35, d: 2.0, h: 1.75, ly: 1.6, fov: 30 }); await frames(8); await shot(P + 'idle_face');
     // walk a lap around the boss so the run never meets a wall (the boss is on the hero's left, so the cameras stay on the right)
@@ -64,7 +67,7 @@ const fs = require('fs'), path = require('path');
     await follow({ yaw: 1.3, d: 4.2, h: 1.5 });
     await press(4); await frames(12); await shot(P + 'riposte_guard');
     await frames(60);
-    await ev(() => { const p = window.__game.G.player; p.parryT = 0.5; p.hurt(50, { blockable: true, src: 'test' }); }); await frames(8); await shot(P + 'riposte_counter');
+    await ev(() => { const p = window.__game.G.player; p.parryT = 0.5; p.hurt(50, { blockable: true, src: 'test' }); }); await frames(14); await shot(P + 'riposte_counter');
     await frames(60);
     await follow({ yaw: 1.2, d: 4.2, h: 1.5 });
     await press(5); await frames(6); await shot(P + 'sunder_a'); await frames(7); await shot(P + 'sunder_b'); await frames(60);

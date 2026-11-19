@@ -12,7 +12,7 @@ const fs = require('fs'), path = require('path');
   const ev = (fn, arg) => page.evaluate(fn, arg);
   const frames = (n) => page.evaluate((n) => new Promise((res) => { const t0 = performance.now(); let k = 0; const f = () => { if (++k >= 2 && performance.now() - t0 >= n / 60 * 1000) res(); else requestAnimationFrame(f); }; requestAnimationFrame(f); }), n);
   await ev((b) => { const g = window.__game; g.G.god = true; g.Bot.update = () => { g.Input.bot = { moveX: 0, moveZ: 0 }; }; g.Game.start(b, { cls: 'duskblade', skipIntro: true }); }, boss);
-  await page.waitForFunction('window.__game.G.state === "fight"', null, { timeout: 120000, polling: 100 });
+  await page.waitForFunction('window.__game.G.state === "fight"', null, { timeout: 120000, polling: 100 }); await ev(() => { const g = window.__game, b = g.G.boss, i = Math.max(0, b.phase | 0); b.def = Object.create(b.def); b.def.phases = b.def.phases.map((q, k) => k === i ? Object.assign({}, q, { enter: null, run: function* () { while (true) yield 1; } }) : q); b.goPhase(i); b.update = () => {}; g.Hz.clear(); g.Bul.clear(); });
   await frames(30);
   // stand clear of the boss, facing away from it, and pin the model's anim from outside
   await ev(() => { const g = window.__game, p = g.G.player, b = g.G.boss, M = p.model; let dx = p.pos.x - b.pos.x, dz = p.pos.z - b.pos.z; const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
