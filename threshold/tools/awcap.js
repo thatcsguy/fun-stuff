@@ -36,6 +36,12 @@ const fs = require('fs'), path = require('path');
     await ev(([b]) => { const g = window.__game; g.G.god = true; g.Bot.update = () => { g.Input.bot = window.__mv || { moveX: 0, moveZ: 0 }; }; window.__mv = null; g.Game.start(b, { cls: 'ashwarden' }); }, [boss]);
     await page.waitForFunction('window.__game.G.state === "fight" && !window.__game.Cam.cine', null, { timeout: 120000, polling: 100 });
     await ev(() => { const g = window.__game; window.__mv = { moveX: 0, moveZ: 0 }; g.G.boss.immune = false; });
+    // AW_CALM=1: the boss stands idle (its phases run an empty loop) and live hazards/bullets are cleared, so beams and telegraphs
+    // do not wash out the close-ups
+    if (process.env.AW_CALM) await ev(() => { const g = window.__game, b = g.G.boss;
+      b.def = Object.assign({}, b.def, { phases: b.def.phases.map((ph) => Object.assign({}, ph, { enter: null, run: function* () { for (;;) yield 1; } })) });
+      b.goPhase(Math.max(0, b.phase)); g.Hz.clear(); g.Bul.clear();
+      const hide = () => { b.group.visible = false; requestAnimationFrame(hide); }; hide(); });
     // AW_LAB=1: hide the arena and light the knight evenly on grey, to judge the model itself
     if (process.env.AW_LAB) await ev(async () => { const T = await import('three'), g = window.__game, p = g.G.player;
       for (const o of g.scene.children) if (o !== p.group) o.visible = false;
