@@ -40,7 +40,8 @@ const fs = require('fs'), path = require('path');
     // do not wash out the close-ups
     if (process.env.AW_CALM) await ev(() => { const g = window.__game, b = g.G.boss;
       b.def = Object.assign({}, b.def, { phases: b.def.phases.map((ph) => Object.assign({}, ph, { enter: null, run: function* () { for (;;) yield 1; } })) });
-      b.goPhase(Math.max(0, b.phase)); g.Hz.clear(); g.Bul.clear(); });
+      b.goPhase(Math.max(0, b.phase)); g.Hz.clear(); g.Bul.clear();
+      const hide = () => { b.group.visible = false; requestAnimationFrame(hide); }; hide(); });
     // AW_LAB=1: hide the arena and light the knight evenly on grey, to judge the model itself
     if (process.env.AW_LAB) await ev(async () => { const T = await import('three'), g = window.__game, p = g.G.player;
       for (const o of g.scene.children) if (o !== p.group) o.visible = false;
