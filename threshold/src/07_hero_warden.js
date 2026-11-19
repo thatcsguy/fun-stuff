@@ -12,16 +12,20 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
   const glowC = new THREE.Color(C.glow), clothC = new THREE.Color(C.cloth), armC = new THREE.Color(C.armor), ashC = new THREE.Color(0xa49e96);
   // a cool, strong rim: the knight is mostly seen from behind on dark floors, so the silhouette carries its own edge light
   const rimBase = new THREE.Color(0xa8bce0).lerp(glowC, 0.22).multiplyScalar(0.4), rimU = { value: rimBase.clone() };
-  const plateC = armC.clone().lerp(ashC, 0.4);
-  const plateM = K.mat({ color: plateC.getHex(), roughness: 0.42, metalness: 0.42, envMapIntensity: 1.3 }, rimU, 1);
-  const darkM = K.mat({ color: armC.clone().lerp(ashC, 0.18).multiplyScalar(0.72).getHex(), roughness: 0.52, metalness: 0.5, envMapIntensity: 0.9 }, rimU, 0.6);
+  // (a cool blue-grey cast and real specular, so warm arena light reads as light on steel instead of turning the knight brown)
+  const coolC = new THREE.Color(0x8c99ad), plateC = armC.clone().lerp(ashC, 0.4).lerp(coolC, 0.42).multiplyScalar(1.08);
+  const plateM = K.mat({ color: plateC.getHex(), emissive: 0x161c28, roughness: 0.45, metalness: 0.6, envMapIntensity: 1.5 }, rimU, 1);
+  const darkM = K.mat({ color: armC.clone().lerp(ashC, 0.18).lerp(coolC, 0.25).multiplyScalar(0.74).getHex(), roughness: 0.5, metalness: 0.58, envMapIntensity: 1.0 }, rimU, 0.6);
   const trimM = K.mat({ color: C.metal !== undefined ? C.metal : 0x9c7850, roughness: 0.32, metalness: 0.8, envMapIntensity: 1.5 }, rimU, 0.9);
   const clothM = K.mat({ color: C.cloth, roughness: 0.9, side: THREE.DoubleSide }, rimU, 0.7, C.lining !== undefined ? C.lining : clothC.clone().multiplyScalar(0.45).getHex());
   const capeM = K.mat({ color: clothC.clone().multiplyScalar(0.95).getHex(), roughness: 0.92, side: THREE.DoubleSide }, rimU, 0.8, clothC.clone().multiplyScalar(0.35).getHex());
-  const plumeM = K.mat({ color: clothC.clone().lerp(glowC, 0.3).multiplyScalar(1.5).getHex(), emissive: clothC.clone().lerp(glowC, 0.55).getHex(), emissiveIntensity: 0.35, roughness: 0.85, side: THREE.DoubleSide }, rimU, 0.8);
+  // the plume darkens to a deep red at the root and burns ember-bright on its last third
+  const PL = 6, plumeMs = []; for (let k = 0; k < PL; k++) { const u = k / (PL - 1), hot = smooth((u - 0.35) / 0.6);
+    const col = clothC.clone().lerp(new THREE.Color(0x3a0a05), 0.35 * (1 - u)).multiplyScalar(1.25).lerp(clothC.clone().lerp(glowC, 0.5).multiplyScalar(1.5), hot);
+    plumeMs.push(K.mat({ color: col.getHex(), emissive: glowC.getHex(), emissiveIntensity: 0.08 + 0.85 * hot * hot, roughness: 0.85 }, rimU, 0.9)); }
   const ashM = K.mat({ color: C.mantle !== undefined ? C.mantle : armC.clone().lerp(new THREE.Color(0x8a847c), 0.55).getHex(), roughness: 1, side: THREE.DoubleSide }, rimU, 0.8);
   const leatherM = K.mat({ color: C.leather !== undefined ? C.leather : 0x3a2a1e, roughness: 0.66 }, rimU, 0.5);
-  const glassM = K.mat({ color: glowC.clone().multiplyScalar(0.14).getHex(), roughness: 0.12, metalness: 0.4, envMapIntensity: 1.6 }, rimU, 0.9);
+  const glassM = K.mat({ color: glowC.clone().lerp(new THREE.Color(0x9aa0a8), 0.35).multiplyScalar(0.42).getHex(), emissive: glowC.getHex(), emissiveIntensity: 0.07, roughness: 0.1, metalness: 0.3, envMapIntensity: 1.8 }, rimU, 1.4);
   const voidM = new THREE.MeshBasicMaterial({ color: 0x020101 });
   const seamM = W.glow(C.glow, 1.5), eyeM = W.glow(C.glow, 3.2), singeM = W.glow(C.glow, 0.9), fullerM = W.glow(C.glow, 1.6);
   const liqM = W.glow(glowC.clone().lerp(new THREE.Color(0xffb060), 0.3), 1.5), handLiqM = liqM.clone();
@@ -37,8 +41,9 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
     sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying float vBy; varying float vBe;\nvoid main() {\nvBy = position.y; vBe = abs(position.x) / (abs(position.x) + abs(position.z) * 5.0 + 1e-5);');
     sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform vec3 uRim; uniform float uHeat; uniform vec3 uHot; uniform float uWhite; varying float vBy; varying float vBe;\nvoid main() {')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n{ vec3 vv = vViewPosition / max(length(vViewPosition), 1e-4); float fr = 1.0 - clamp(abs(dot(normal, vv)), 0.0, 1.0);'
-        + ' float h = uHeat * (0.5 + 0.5 * (1.0 - smoothstep(0.3, 1.64, vBy))), edge = smoothstep(0.78, 0.96, vBe);'
-        + ' totalEmissiveRadiance += vec3(0.035, 0.037, 0.042) + vec3(0.5, 0.56, 0.66) * edge * 0.6 + uRim * fr * fr * fr + uHot * h * (0.06 + 0.55 * fr * fr + 0.8 * edge) + vec3(1.0, 0.86, 0.66) * uWhite * (0.25 + 1.2 * fr * fr); }');
+        + ' float h = uHeat * (0.5 + 0.5 * (1.0 - smoothstep(0.3, 1.64, vBy))), edge = smoothstep(0.76, 0.95, vBe), rdg = 1.0 - smoothstep(0.04, 0.17, vBe), bev = max(edge, rdg * 0.7);'
+        // (seen edge-on the faces turn grazing: they light up pale, so the blade never thins to a dark hairline)
+        + ' totalEmissiveRadiance += vec3(0.035, 0.037, 0.042) + vec3(0.5, 0.56, 0.66) * bev * 0.62 + vec3(0.5, 0.55, 0.64) * fr * fr * 0.75 + uRim * fr * fr * fr + uHot * h * (0.06 + 0.55 * fr * fr + 0.8 * bev) + vec3(1.0, 0.86, 0.66) * uWhite * (0.25 + 1.2 * fr * fr); }');
   };
   bladeM.customProgramCacheKey = () => 'awBlade';
   const grp = (parent, x = 0, y = 0, z = 0) => { const o = new THREE.Group(); o.position.set(x, y, z); parent.add(o); return o; };
@@ -97,22 +102,38 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
   { const sh = new THREE.Shape([[0.14, 0.215], [0.08, 0.31], [-0.02, 0.345], [-0.12, 0.325], [-0.19, 0.205], [-0.13, 0.215], [-0.03, 0.27], [0.08, 0.26]].map(([u, v]) => new THREE.Vector2(u, v)));
     const cg = new THREE.ExtrudeGeometry(sh, { depth: 0.016, bevelEnabled: false }); cg.rotateY(-PI / 2); cg.translate(0.008, 0, 0); P.add(head, plateM, cg);
     P.add(head, trimM, K.tube([[0, 0.235, 0.135], [0, 0.31, 0.08], [0, 0.345, -0.02], [0, 0.325, -0.12], [0, 0.205, -0.19]], 0.0095, 20, 5)); }
-  const plume = []; { let par = grp(head, 0, 0.27, -0.17); for (let k = 0; k < 3; k++) { const seg = grp(par, 0, k ? -0.2 : 0, 0);
-    for (let j = 0; j < 9; j++) { // a round horsetail: a core cone and a ring of eight, splaying a little more each segment
-      const a = j * TAU / 8, rr = j === 8 ? 0 : 0.028 - k * 0.005, ox = Math.sin(a) * rr, oz = Math.cos(a) * rr, sp = 0.04 + 0.025 * k, cg = new THREE.ConeGeometry(0.042 - k * 0.009, 0.28, 5); cg.translate(0, -0.12, 0);
-      P.add(seg, plumeM, cg, ox, 0, oz, -oz / 0.028 * sp, 0, ox / 0.028 * sp); }
-    plume.push({ o: seg, spr: K.spring(50 - k * 12, 6), sprZ: K.spring(40 - k * 6, 5.5) }); par = seg; } }
+  // one tapered horsetail of six overlapping segments, rooted on the crest and hanging down the back to the shoulder blades;
+  // each segment replays the root's motion a beat later (PLAG s per segment), so turns and nods travel down the tail
+  const PSEG = 0.105, PLAG = 0.065, PBASE = [0.8, -0.2, -0.15, -0.13, -0.1, -0.08], plume = [], plH = { t: [], x: [], z: [] };
+  { let par = grp(head, 0, 0.285, -0.12);
+    for (let k = 0; k < PL; k++) { const seg = grp(par, 0, k ? -PSEG : 0, 0), r0 = lerp(0.064, 0.022, k / PL), r1 = lerp(0.064, 0.022, (k + 1) / PL);
+      P.add(seg, plumeMs[k], K.lathe([[0.001, 0.012], [r0 * 0.96, 0.002], [r0 * 1.02, -0.03], [(r0 + r1) * 0.53, -0.075], [r1 * 1.02, -0.12], [r1 * 0.7, -0.142], [0.001, -0.15]], 8), 0, 0, 0, 0, 0, 0, 1.3 - k * 0.04, 1, 0.82);
+      if (k === PL - 1) for (let j = 0; j < 5; j++) { const cg = new THREE.ConeGeometry(0.009, 0.13, 4); cg.rotateX(PI); cg.translate(0, -0.11, 0); // a frayed tuft at the tip
+        P.add(seg, plumeMs[k], cg, (j - 2) * 0.006, -0.02, ((j * 7) % 3 - 1) * 0.005, ((j * 3) % 5 - 2) * 0.06, 0, (j - 2) * 0.12); }
+      plume.push({ o: seg }); par = seg; } }
+  const plSprX = K.spring(55, 7), plSprZ = K.spring(45, 6);
+  const plAt = (back, arr) => { const T = plH.t, n = T.length; if (!n) return 0; const tt = T[n - 1] - back; if (tt <= T[0]) return arr[0];
+    let i = n - 1; while (i > 0 && T[i - 1] > tt) i--; const a = T[i - 1], b = T[i]; return lerp(arr[i - 1], arr[i], b > a ? (tt - a) / (b - a) : 1); };
 
   // ---- arms: mail sleeve, rerebrace, couter with a fan, vambrace, flared gauntlet ----
   const L1 = 0.31, L2 = 0.29, SHY = 0.55 * TS, PDY = 0.56 * TS;
+  // a pointed joint plate (poleyn / couter): a faceted dome with a diamond outline, its point along +z, plus a diamond trim rim
+  const cup = (bone, r, h, x, y, z, rx, sx, sy) => {
+    const cg = K.lathe([[0.001, h], [r * 0.42, h * 0.8], [r * 0.78, h * 0.42], [r, 0], [r * 1.03, -h * 0.18]], 4); cg.rotateX(PI / 2); P.add(bone, plateM, cg, x, y, z, rx, 0, 0, sx, sy, 1);
+    const rg = new THREE.TorusGeometry(r * 1.02, 0.0075, 4, 4); P.add(bone, trimM, rg, x, y, z, rx, 0, 0, sx, sy, 1); };
+  // a shell-shaped side fan on the outside of a joint: a half disc (open toward `dz`) with a trim rim and two ribs
+  const fan = (bone, side, r, x, y, z, dz) => { const t0 = dz < 0 ? PI / 2 : -PI / 2;
+    const fg = new THREE.CylinderGeometry(r, r, 0.012, 10, 1, false, t0, PI); fg.rotateZ(PI / 2); P.add(bone, plateM, fg, x, y, z, 0, 0, side * 0.12);
+    const tg = new THREE.TorusGeometry(r, 0.006, 3, 10, PI); tg.rotateY(PI / 2); tg.rotateX(dz < 0 ? -PI / 2 : PI / 2); P.add(bone, trimM, tg, x + side * 0.007, y, z, 0, 0, side * 0.12);
+    for (const a of [-0.6, 0.6]) P.add(bone, trimM, new THREE.BoxGeometry(0.006, 0.005, r * 0.9), x + side * 0.008, y + Math.sin(a) * r * 0.45, z + Math.sign(dz) * Math.cos(a) * r * 0.45, -a * Math.sign(dz), 0, side * 0.12); };
   const mkArm = (side) => {
     const sh = grp(torso, side * 0.29, SHY, -0.01);
     P.add(sh, darkM, K.lathe([[0.072, -0.3], [0.082, -0.2], [0.088, -0.08], [0.084, 0.02]], 12));
     P.add(sh, plateM, K.lathe([[0.088, -0.27], [0.097, -0.18], [0.101, -0.09]], 12, side * PI / 2 - 1.35, 2.7));
     const el = grp(sh, 0, -L1, 0);
-    P.add(el, plateM, new THREE.SphereGeometry(0.076, 12, 6, 0, TAU, 0, PI * 0.5), 0, 0, -0.018, -PI / 2, 0, 0, 1, 1, 0.9);
-    P.add(el, trimM, new THREE.CylinderGeometry(0.067, 0.067, 0.012, 14), side * 0.072, 0.0, -0.01, 0, 0, PI / 2, 1, 1, 0.8);
-    P.add(el, plateM, K.lathe([[0.058, -0.25], [0.066, -0.17], [0.074, -0.07], [0.072, -0.01]], 12));
+    cup(el, 0.074, 0.075, 0, 0.005, -0.03, PI, 0.85, 1.3); fan(el, side, 0.068, side * 0.068, 0, -0.005, 1); // couter, pointing back
+    P.add(el, plateM, K.lathe([[0.06, -0.25], [0.068, -0.17], [0.077, -0.07], [0.082, -0.03]], 12));
+    P.add(el, trimM, new THREE.TorusGeometry(0.081, 0.006, 4, 16), 0, -0.035, 0, PI / 2, 0, 0);
     for (const y of [-0.08, -0.19]) P.add(el, leatherM, new THREE.TorusGeometry(0.07, 0.009, 4, 16), 0, y, 0, PI / 2, 0, 0);
     const hand = grp(el, 0, -L2, 0);
     P.add(hand, plateM, K.lathe([[0.058, -0.005], [0.072, 0.045], [0.096, 0.1]], 12));
@@ -138,11 +159,15 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
     P.add(hip, trimM, K.lathe([[0.108, -0.435], [0.11, -0.42]], 12, -1.3, 2.6));
     P.add(hip, trimM, K.lathe([[0.152, -0.15], [0.155, -0.135]], 12, -1.3, 2.6));
     const knee = grp(hip, 0, -LT, 0);
-    P.add(knee, plateM, new THREE.SphereGeometry(0.088, 12, 6, 0, TAU, 0, PI * 0.5), 0, 0.0, 0.055, PI / 2 - 0.15, 0, 0, 1, 1.15, 0.85);
-    P.add(knee, trimM, new THREE.CylinderGeometry(0.064, 0.064, 0.012, 12), side * 0.08, 0, 0.02, 0, 0, PI / 2, 1, 1, 0.8);
-    P.add(knee, plateM, K.lathe([[0.092, -0.43], [0.074, -0.36], [0.086, -0.22], [0.098, -0.09], [0.088, 0.02]], 12));
-    P.add(knee, trimM, K.lathe([[0.094, -0.435], [0.09, -0.418]], 12));
-    P.add(knee, seamM, new THREE.BoxGeometry(0.007, 0.24, 0.007), 0, -0.2, 0.093, -0.035, 0, 0);
+    cup(knee, 0.09, 0.085, 0, 0.0, 0.05, -0.12, 0.82, 1.38); fan(knee, side, 0.08, side * 0.086, -0.005, 0.0, -1); // poleyn and its side fan
+    { // greave: flared rimmed top, swelling calf behind, a raised shin ridge in front, flared over the instep
+      const gg = K.lathe([[0.1, -0.43], [0.076, -0.37], [0.082, -0.3], [0.094, -0.19], [0.096, -0.1], [0.09, -0.04], [0.1, -0.005], [0.108, 0.01]], 14), pa = gg.attributes.position;
+      for (let i = 0; i < pa.count; i++) { const x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i), a = Math.atan2(x, z);
+        pa.setZ(i, z < 0 ? z * (1 + 0.3 * Math.exp(-((y + 0.17) ** 2) / 0.008)) : z + 0.014 * Math.exp(-a * a / 0.06) * smooth((y + 0.4) / 0.1)); }
+      gg.computeVertexNormals(); P.add(knee, plateM, gg); }
+    P.add(knee, trimM, K.lathe([[0.102, -0.435], [0.098, -0.418]], 14));
+    P.add(knee, trimM, new THREE.TorusGeometry(0.106, 0.008, 4, 18), 0, 0.006, 0, PI / 2, 0, 0);
+    P.add(knee, seamM, new THREE.BoxGeometry(0.007, 0.24, 0.007), 0, -0.2, 0.108, -0.04, 0, 0);
     const ankle = grp(knee, 0, -LS, 0);
     P.add(ankle, plateM, new THREE.SphereGeometry(0.072, 12, 8), 0, -0.02, 0.075, 0, 0, 0, 1.05, 0.62, 2.2);
     for (let k = 0; k < 3; k++) P.add(ankle, trimM, new THREE.TorusGeometry(0.075 - k * 0.007, 0.005, 3, 14, PI), 0, -0.02, 0.1 + k * 0.045, 0, 0, 0, 1, 0.75, 1);
@@ -153,11 +178,11 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
 
   // ---- big flared tassets (hinged plates over the thighs) and the frayed front tabard with an ember sigil ----
   const R0 = 0.21, tassets = [];
-  for (const phi of [0.85, -0.85]) {
+  for (const phi of [1.0, -1.0]) { // three lames each, 1.5x the old plates, reaching to mid-thigh, every lower edge trimmed
     const pv = grp(hips, Math.sin(phi) * R0, -0.07, Math.cos(phi) * R0 * 0.84); pv.rotation.y = phi;
-    for (let k = 0; k < 3; k++) { const r = R0 + 0.025 + k * 0.02, y = -k * 0.1;
-      P.add(pv, plateM, K.lathe([[r, y], [r + 0.036, y - 0.13]], 8, -0.5, 1.0), 0, 0, -R0);
-      P.add(pv, trimM, K.lathe([[r + 0.037, y - 0.12], [r + 0.039, y - 0.132]], 8, -0.5, 1.0), 0, 0, -R0); }
+    for (let k = 0; k < 3; k++) { const r = R0 + 0.03 + k * 0.03, y = -k * 0.115;
+      P.add(pv, plateM, K.lathe([[r, y], [r + 0.022, y - 0.08], [r + 0.045, y - 0.155]], 10, -0.72, 1.44), 0, 0, -R0);
+      P.add(pv, trimM, K.lathe([[r + 0.046, y - 0.143], [r + 0.049, y - 0.158]], 10, -0.72, 1.44), 0, 0, -R0); }
     tassets.push({ pv, phi, spr: K.spring(80, 9) });
   }
   const tabard = grp(hips, 0, -0.05, 0.225), tabSpr = K.spring(55, 6.5);
@@ -172,14 +197,15 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
     P.add(tabard, trimM, new THREE.BoxGeometry(0.2, 0.02, 0.02), 0, -0.004, 0.004); }
   // ---- the Ember Flasks: two fist-sized bottles on the left hip, two doses each; the glowing level is what is left ----
   const flaskGeo = (pp, sc) => { const add = (m, geo, ...a) => { geo.scale(sc, sc, sc); P.add(pp, m, geo, ...a.map((v, i) => i < 3 ? v * sc : v)); };
-    add(glassM, K.lathe([[0.001, -0.125], [0.027, -0.12], [0.037, -0.095], [0.039, -0.06], [0.031, -0.038], [0.013, -0.024], [0.012, -0.012]], 10));
-    add(trimM, new THREE.TorusGeometry(0.04, 0.005, 3, 14), 0, -0.04, 0, PI / 2, 0, 0); add(trimM, K.lathe([[0.03, -0.128], [0.03, -0.116]], 10));
-    add(trimM, K.lathe([[0.015, -0.026], [0.016, 0.0], [0.009, 0.01]], 8)); add(trimM, K.lathe([[0.011, 0.005], [0.013, 0.024], [0.001, 0.028]], 6)); // collar, cork
-    const lq = grp(pp, 0, -0.125 * sc, 0); // the liquid, scaled in y by the level
-    P.add(lq, pp === handFlask ? handLiqM : liqM, K.lathe([[0.001, 0], [0.0285, 0.004], [0.0388, 0.03], [0.0407, 0.065], [0.0326, 0.087]].map(([r, y]) => [r * sc, y * sc]), 10)); return lq; };
+    // a round-bellied bottle: bulb, sloped shoulder, a long neck with a collar and a cork
+    add(glassM, K.lathe([[0.001, -0.115], [0.03, -0.112], [0.047, -0.095], [0.052, -0.07], [0.047, -0.046], [0.031, -0.033], [0.015, -0.027], [0.012, -0.012]], 12));
+    add(trimM, new THREE.TorusGeometry(0.053, 0.0045, 3, 16), 0, -0.07, 0, PI / 2, 0, 0); add(trimM, K.lathe([[0.03, -0.118], [0.03, -0.108]], 10));
+    add(trimM, K.lathe([[0.015, -0.022], [0.016, 0.0], [0.01, 0.008]], 8)); add(trimM, K.lathe([[0.011, 0.004], [0.0135, 0.026], [0.001, 0.03]], 6)); // collar, cork
+    const lq = grp(pp, 0, -0.112 * sc, 0); // the liquid, scaled in y by the level
+    P.add(lq, pp === handFlask ? handLiqM : liqM, K.lathe([[0.001, 0], [0.029, 0.002], [0.0445, 0.016], [0.0495, 0.042], [0.0445, 0.066], [0.029, 0.078]].map(([r, y]) => [r * sc, y * sc]), 10)); return lq; };
   const flasks = []; let handFlask = null;
-  for (const a of [1.22, 1.78]) { const pv = grp(hips, Math.sin(a) * 0.235, -0.03, Math.cos(a) * 0.235 * 0.84); pv.rotation.y = a; const lq = flaskGeo(pv, 1.25); flasks.push({ pv, lq, spr: K.spring(45, 4.5), sprZ: K.spring(40, 4.5) }); }
-  handFlask = grp(armL.hand, 0, -0.1, 0.11); const handLq = flaskGeo(handFlask, 1.15); handFlask.rotation.set(0, 0, PI); handFlask.visible = false;
+  for (const a of [1.22, 1.78]) { const pv = grp(hips, Math.sin(a) * 0.235, -0.03, Math.cos(a) * 0.235 * 0.84); pv.rotation.y = a; const lq = flaskGeo(pv, 1.15); flasks.push({ pv, lq, spr: K.spring(45, 4.5), sprZ: K.spring(40, 4.5) }); }
+  const HFS = 1.6; handFlask = grp(armL.hand, 0, -0.1, 0.11); const handLq = flaskGeo(handFlask, HFS); handFlask.visible = false; // oriented each frame
 
   // ---- broad singed cape (shoulder to shoulder, four hinged rows) with a burning hem ----
   const cape = []; { let par = grp(torso, 0, 0.56 * TS, -0.19); const LEN = [0.3, 0.28, 0.27, 0.27], WID = [0.58, 0.72, 0.84, 0.94, 1.02], NS = LEN.length, CZ = 0.15;
@@ -199,7 +225,7 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
       cape.push({ o: seg, spr: K.spring(60 - k * 10, 7), sprZ: K.spring(45, 6), sprY: K.spring(38, 5.5) }); par = seg; } }
 
   // ---- greatsword: chunky pommel, thick wrapped grip, wide swept guard with ember stones, ricasso with lugs, broad diamond blade ----
-  const BL = [[0.045, 0.31], [0.1, 0.35], [0.102, 0.48], [0.095, 0.85], [0.083, 1.2], [0.066, 1.44], [0.0, 1.64]], BT = 0.2, bw = (y) => prof(BL, y);
+  const BL = [[0.045, 0.31], [0.1, 0.35], [0.102, 0.48], [0.095, 0.85], [0.083, 1.2], [0.066, 1.44], [0.0, 1.64]], BT = 0.32, bw = (y) => prof(BL, y);
   const weapon = grp(armR.hand), wtip = new THREE.Object3D();
   P.add(weapon, trimM, K.lathe([[0.001, -0.37], [0.044, -0.36], [0.064, -0.318], [0.058, -0.275], [0.03, -0.25]], 8));
   P.add(weapon, seamM, new THREE.OctahedronGeometry(0.022), 0, -0.374, 0);
@@ -233,7 +259,15 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
   const fg = new THREE.PlaneGeometry(0.62, 1.62); fg.translate(0, 0.3 + 0.81, 0);
   const flames = [0, PI / 2].map((ry, i) => { const m = new THREE.Mesh(fg, flameMat); m.rotation.y = ry; if (i) m.scale.x = 0.55; m.visible = false; m.renderOrder = 2; weapon.add(m); return m; });
   P.finish();
-  const aura = new THREE.PointLight(C.glow, 1.3, 7, 1.5); aura.position.set(0, 1.0, 0.6); g.add(aura);
+  // (kept low and ahead: it pools ember light on the floor without washing the whole front of the armour orange)
+  const aura = new THREE.PointLight(C.glow, 0.85, 7, 1.5); aura.position.set(0, 0.35, 1.0); g.add(aura);
+  // ember trail: a short ribbon swept by the outer half of the blade during the cuts and the slam (model space, additive, fading)
+  const TRN = 16, TRLIFE = 0.13, trS = [], trPool = Array.from({ length: TRN }, () => ({ a: new V3(), b: new V3(), age: 0 })),trPos = new Float32Array(TRN * 6), trCol = new Float32Array(TRN * 6), trIdx = [];
+  for (let i = 0; i < TRN - 1; i++) { const a = i * 2; trIdx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3); }
+  const trGeo = new THREE.BufferGeometry(); trGeo.setAttribute('position', new THREE.BufferAttribute(trPos, 3)); trGeo.setAttribute('color', new THREE.BufferAttribute(trCol, 3)); trGeo.setIndex(trIdx);
+  const trail = new THREE.Mesh(trGeo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+  trail.frustumCulled = false; trail.renderOrder = 2; trail.visible = false; g.add(trail);
+  const trC = glowC.clone().lerp(new THREE.Color(1, 0.8, 0.5), 0.25), _gi = new THREE.Matrix4(), _w1 = new V3(), _w2 = new V3();
 
   // ---- sword poses: grip point, blade direction and an edge hint, all in chest (torso) space ----
   // (authored for the unshortened torso; the shoulders sit 0.066 lower now, so every grip follows them down)
@@ -246,20 +280,25 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
   // past `end` it blends back. yaw: chest twist [wind-up, follow-through]; the hips lead it and the head counters it
   const SW = {
     0: { end: 0.62, yaw: [-0.72, 0.78], keys: [[0.2, pose(-0.28, 0.62, 0.06, -0.42, 0.72, -0.56)], [0.38, pose(-0.02, 0.33, 0.46, 0.3, 0.0, 1)], [0.5, pose(0.16, 0.08, 0.26, 0.86, -0.48, 0.18)], [0.62, pose(0.08, 0.14, 0.32, 0.74, -0.48, 0.46)]] },
-    // cut b is a flat sweep at waist height, left to right, so it never looks like cut a's raised wind-up
-    1: { end: 0.62, yaw: [0.7, -0.8], keys: [[0.17, pose(0.14, 0.14, 0.24, 0.86, -0.08, -0.5)], [0.38, pose(-0.02, 0.24, 0.5, -0.06, 0.02, 1)], [0.5, pose(-0.4, 0.28, 0.16, -0.9, 0.06, -0.42)], [0.62, pose(-0.32, 0.3, 0.26, -0.94, 0.12, -0.08)]] },
+    // cut b is a flat sweep at waist height, left to right, so it never looks like cut a's raised wind-up. The chest twists past
+    // the hips, so the follow-through keys point right of chest-forward: the blade ends level, square to the facing, and holds there
+    1: { end: 0.74, t3: 0.6, yaw: [0.7, -0.95], keys: [[0.17, pose(0.26, 0.16, 0.2, 0.78, -0.06, -0.62)], [0.38, pose(0.02, 0.2, 0.52, 0.22, -0.04, 0.97)], [0.5, pose(-0.2, 0.19, 0.4, -0.56, -0.05, 0.83)],
+      [0.6, pose(-0.23, 0.19, 0.38, -0.6, -0.04, 0.8)], [0.74, pose(-0.16, 0.22, 0.4, -0.42, 0.04, 0.9)]] },
     2: { end: 1, yaw: [0, 0], keys: [[0.55, pose(-0.04, 0.95, 0.12, 0, 0.42, -0.9)], [1, pose(-0.04, 0.97, 0.1, 0, 0.38, -0.92)]] },
-    3: { end: 0.6, yaw: [0, 0], keys: [[0.1, pose(-0.04, 0.97, 0.13, 0, 0.62, -0.78)], [0.2, pose(-0.04, 0.85, 0.24, 0, 0.95, 0.3)], [0.3, pose(-0.04, 0.16, 0.34, 0, -0.42, 1)], [0.6, pose(-0.04, 0.15, 0.34, 0, -0.45, 1)]] },
+    // the slam hangs at the top (blade back past vertical, a small hop) and then whips down in the last few hundredths
+    3: { end: 0.6, yaw: [0, 0], keys: [[0.1, pose(-0.04, 0.88, 0.02, 0, 0.5, -0.87)], [0.21, pose(-0.04, 0.88, 0.1, 0, 0.8, -0.6)], [0.3, pose(-0.04, 0.16, 0.34, 0, -0.42, 1)], [0.6, pose(-0.04, 0.15, 0.34, 0, -0.45, 1)]] },
   };
+  // the back-hop: the blade trails low and forward in the right hand, the left arm out for balance
+  const TRAIL = pose(-0.17, 0.06, 0.3, -0.22, -0.5, 0.84, 0.96, -0.2, 0.1);
   const HOLD = SW[2].keys[1][1];
-  const yawAt = (sw, k) => { const t1 = sw.keys[0][0], t3 = sw.keys[Math.min(2, sw.keys.length - 1)][0];
+  const yawAt = (sw, k) => { const t1 = sw.keys[0][0], t2 = sw.keys[Math.min(2, sw.keys.length - 1)][0], t3 = sw.t3 || t2; // (t2..t3: the held overshoot)
     if (k < t1) return lerp(0, sw.yaw[0], smooth(k / t1));
-    const y = lerp(sw.yaw[0], sw.yaw[1], smooth((k - t1) / Math.max(1e-3, t3 - t1)));
+    const y = lerp(sw.yaw[0], sw.yaw[1], smooth((k - t1) / Math.max(1e-3, t2 - t1)));
     return k > t3 ? y * (1 - 0.2 * smooth((k - t3) / 0.14)) : y; }; // overshoot, then settle back
   const A = { run: 0, swing: 0, swingDur: 0.3, swingKind: 0, ps: 0, lean: 0, air: 0, leap: 0, vx: 0, vz: 0, lx: null, lz: null, lf: null, yr: 0, fight: 0, gw: 0, hold: 0, pr: 0, rollKind: 1,
-    pour: 0, kin: false, wind: 0, open: 0, heat: 0, drink: 0, P: REST.P.clone(), D: REST.D.clone(), E: REST.E.clone(), S0: pose(0, 0, 0, 0, 1, 0), tip: new V3(), tipOk: false };
+    pour: 0, kin: false, wind: 0, open: 0, heat: 0, drink: 0, flare: 0, slamHit: false, crouch: 0, trT: 0, P: REST.P.clone(), D: REST.D.clone(), E: REST.E.clone(), S0: pose(0, 0, 0, 0, 1, 0), tip: new V3(), tipOk: false };
   const _P = new V3(), _D = new V3(), _E = new V3(), _g = new V3(), _t = new V3(), _u = new V3(), _hr = new V3(), _lt = new V3(), _pole = new V3();
-  const _a1 = new V3(), _b1 = new V3(), _c1 = new V3(), _a2 = new V3(), _b2 = new V3(), _c2 = new V3(), _d = new V3(), _hl = new V3();
+  const _a1 = new V3(), _b1 = new V3(), _c1 = new V3(), _a2 = new V3(), _b2 = new V3(), _c2 = new V3(), _d = new V3(), _hl = new V3(), _fd = new V3(0, 1, 0), _Y = new V3(0, 1, 0);
   const _m1 = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _qi = new THREE.Quaternion();
   // Catmull-Rom through the keys of a swing (the first key is where the sword was when the swing began)
   const cr = (p0, p1, p2, p3, u, out) => { const u2 = u * u, u3 = u2 * u;
@@ -297,22 +336,24 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
     const rollT = p.rollT || 0, rolling = rollT > 0;
     if (rollT > A.pr + 0.02) A.rollKind = p.dash && p.dash.vx * Math.sin(f) + p.dash.vz * Math.cos(f) < 0 ? 2 : 1; A.pr = rollT; // rolling backwards = the hop back
     if (hot && !A.kin) A.pour = 0.75; A.kin = hot;
-    if (A.swing > A.ps + 0.02) { A.S0.P.copy(A.P); A.S0.D.copy(A.D); A.fight = 1.8; A.hold = 0; } // a new swing (door VII sets swing directly)
+    if (A.swing > A.ps + 0.02) { A.S0.P.copy(A.P); A.S0.D.copy(A.D); A.fight = 1.8; A.hold = 0; A.slamHit = false; } // a new swing (door VII sets swing directly)
     A.lean = damp(A.lean, moving ? Math.min(1, spd / 7) : 0, 8, dt); A.air = damp(A.air, grounded && !(p.dash && !rolling) ? 0 : 1, 12, dt);
     A.leap = damp(A.leap, p.dash && !rolling ? 1 : 0, 14, dt); A.wind = damp(A.wind, winded ? 1 : 0, 4, dt); A.open = damp(A.open, opening ? 1 : 0, 10, dt);
     A.heat = damp(A.heat, hot ? 1 : 0, 3, dt); A.drink = damp(A.drink, drinking ? 1 : 0, 10, dt);
     if (A.fight > 0) A.fight -= dt; if (cast && !drinking) A.fight = Math.max(A.fight, 1);
     A.gw = damp(A.gw, A.fight > 0 ? 1 : 0, A.fight > 0 ? 9 : 3, dt);
-    A.run += dt * spd * 1.5; const ph = A.run, s = Math.sin(ph), c = Math.cos(ph), L = A.lean, I = 1 - L;
+    A.run += dt * spd * 1.5; const ph = A.run, s = Math.sin(ph), c = Math.cos(ph), sp = Math.sin(ph - 0.6), L = A.lean, I = 1 - L;
     const br = Math.sin(t * 1.6), puff = Math.sin(t * 6.5) * (A.wind * 0.9 + sat((0.35 - sf) / 0.35) * 0.4), WD = A.wind, cp = I * (1 - A.gw) * (1 - WD); // cp: idle contrapposto
 
     // ---- base: heavy stance (weight on the back leg) blended into the walk (pelvis sway and bob, shoulders counter-rotating) ----
     hips.position.set(-0.03 * cp + s * 0.035 * L, 0.98 + L * (Math.abs(c) * 0.07 - 0.04), 0);
-    hips.rotation.set(0, s * 0.18 * L - 0.12 * I, Math.sin(t * 0.5) * 0.012 * I - 0.045 * cp - s * 0.06 * L);
+    // (the walk rolls the shoulders over the planted leg and nods the helm twice a stride, so it reads from the front too)
+    hips.rotation.set(0, s * 0.18 * L - 0.12 * I, Math.sin(t * 0.5) * 0.012 * I - 0.045 * cp - s * 0.08 * L);
     body.rotation.set(0.03 + L * 0.07 + WD * 0.12, 0, 0); body.position.set(0, 0, 0); body.scale.set(1, 1, 1);
-    torso.rotation.set(0.04 + br * 0.012 + L * 0.08 + WD * 0.42 + puff * 0.06, -s * 0.34 * L + 0.12 * I, 0.05 * cp + s * 0.05 * L);
-    head.rotation.set(0.08 - L * 0.12 - WD * 0.08, Math.sin(t * 0.33) * 0.08 * I - 0.1 * I + s * 0.15 * L, -0.04 * cp);
-    let tl = lerp(-0.16, -s * 0.7, L), tr = lerp(0.14, s * 0.7, L), zl = 0.13 * I, zr = -0.13 * I;
+    torso.rotation.set(0.04 + br * 0.012 + L * 0.08 + WD * 0.42 + puff * 0.06, -s * 0.34 * L + 0.12 * I, 0.05 * cp + sp * 0.11 * L);
+    head.rotation.set(0.08 - L * 0.12 - WD * 0.08 + Math.cos(ph * 2 - 0.6) * 0.05 * L, Math.sin(t * 0.33) * 0.08 * I - 0.1 * I + s * 0.15 * L, -0.04 * cp - sp * 0.06 * L);
+    let tl = lerp(-0.16, -s * 0.7, L), tr = lerp(0.14, s * 0.7, L), zl = 0.17 * I, zr = -0.17 * I;
+    let slamAir = 0, hopF = 0, hopLand = 0, rollTuck = 0; // (for the grounding and the cloth below)
     const kc = Math.cos(ph - 0.45); let kl = lerp(0.24, 0.2 + Math.pow(Math.max(0, kc), 1.5) * 1.1, L), kr = lerp(0.1, 0.2 + Math.pow(Math.max(0, -kc), 1.5) * 1.1, L);
     kl += WD * 0.5; kr += WD * 0.45; tl -= WD * 0.25; tr -= WD * 0.1;
     let lx = lerp(-0.12, s * 0.7, L), lz = 0.16 + 0.04 * L, le = lerp(-0.4, -0.8, L) - WD * 0.3;
@@ -334,53 +375,75 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
         // (coiled upright on the wind-up, the lean arrives with the strike; cut a steps in with the left foot, cut b with the right)
         const e = w * smooth((k - 0.12) / 0.26) * (1 - smooth((k - 0.62) / 0.3)), st = w * smooth(k / 0.3);
         if (kind === 0) { tl -= 0.42 * st; kl += 0.3 * st + 0.2 * e; tr += 0.3 * st; kr = lerp(kr, 0.04, st); }
-        else { tr -= 0.56 * st; kr += 0.3 * st + 0.2 * e; tl += 0.46 * st; kl = lerp(kl, 0.04, st); }
+        // cut b: a long low step with the right foot (front knee ~55 degrees, the pelvis ~11% lower), the back leg driven straight
+        else { tr -= 0.84 * st; kr += 0.6 * st + 0.27 * e; tl += 0.72 * st; kl = lerp(kl, 0.08, st); }
         zl *= 1 - 0.5 * st; zr *= 1 - 0.5 * st;
-        torso.rotation.x += 0.32 * e; body.rotation.x += 0.05 * e; head.rotation.x -= 0.25 * e; torso.rotation.z += (kind ? 0.08 : -0.08) * e; }
-      else if (kind === 2) { const e = w * smooth(sw ? k / 0.6 : 1); kl += 0.42 * e; kr += 0.36 * e; tl -= 0.25 * e; tr += 0.15 * e; torso.rotation.x -= 0.16 * e; head.rotation.x -= 0.12 * e; body.rotation.x -= 0.04 * e; }
-      else { // the slam: a deep lunge, front knee well bent, back knee low
-        const imp = smooth((k - 0.2) / 0.1) * w; torso.rotation.x += 0.5 * imp; body.rotation.x += 0.1 * imp; head.rotation.x -= 0.25 * imp;
+        torso.rotation.x += (kind ? 0.38 : 0.32) * e; body.rotation.x += 0.05 * e; head.rotation.x -= 0.27 * e; torso.rotation.z += (kind ? 0.1 : -0.08) * e; }
+      else if (kind === 2) { const e = w * smooth(sw ? k / 0.6 : 1); kl += 0.42 * e; kr += 0.36 * e; tl -= 0.25 * e; tr += 0.15 * e; torso.rotation.x -= 0.16 * e; head.rotation.x -= 0.12 * e; body.rotation.x -= 0.04 * e;
+        if (!sw) { torso.rotation.x -= 0.28 * A.leap * w; head.rotation.x += 0.18 * A.leap * w; } } // the leap: arched back under the raised blade
+      else { // the slam: a short hop (back arched 20 degrees, knees tucked, blade hanging behind), then a deep lunge
+        const pre = w * smooth(k / 0.07) * (1 - smooth((k - 0.2) / 0.08)), imp = smooth((k - 0.2) / 0.1) * w;
+        torso.rotation.x += 0.5 * imp - 0.36 * pre; body.rotation.x += 0.1 * imp - 0.03 * pre; head.rotation.x += 0.24 * pre - 0.25 * imp;
+        tl = lerp(tl, -0.8, pre); kl = lerp(kl, 1.45, pre); tr = lerp(tr, -0.55, pre); kr = lerp(kr, 1.3, pre); slamAir = pre;
         tl = lerp(tl, -0.85, imp); kl = lerp(kl, 1.75, imp); tr = lerp(tr, 0.4, imp); kr = lerp(kr, 0.85, imp);
-        torso.rotation.x -= 0.18 * w * smooth(k / 0.15) * (1 - imp); }
+        if (imp > 0.5 && !A.slamHit) { A.slamHit = true; A.flare = 1; for (let i = 0; i < cape.length; i++) cape[i].spr.v += i ? 2 : 3.5; } } // the cape flares up
     }
     hips.rotation.y += yH * 0.45; torso.rotation.y += yaw - yH * 0.45; head.rotation.y -= yaw * 0.8;
     // ---- Kindle: hold the blade upright and pour a flask along it ----
     let lW = 0; // left-hand IK weight toward _lt (overrides the grip)
     if (A.pour > 0) { A.pour -= dt; const k = 1 - A.pour / 0.75, w = smooth(k / 0.15) * (1 - smooth((k - 0.8) / 0.2)); blend(POUR, w); tw *= 1 - w;
-      _lt.copy(POUR.P).addScaledVector(POUR.D, lerp(0.42, 1.3, smooth((k - 0.15) / 0.6))).add(_hr.set(0.02, 0, 0.08)); lW = w; head.rotation.x += 0.1 * w; }
-    // ---- Ember Flask: from the belt to the visor and back ----
+      _lt.copy(POUR.P).addScaledVector(POUR.D, lerp(0.42, 1.3, smooth((k - 0.15) / 0.6))).add(_hr.set(0.02, 0, 0.08)); lW = w; head.rotation.x += 0.1 * w;
+      _fd.set(-0.08, -0.9, -0.42).normalize(); }
+    // ---- Ember Flask: from the belt to the visor and back; the bottle tips neck-down into the visor ----
     if (A.drink > 0.01) { const up = smooth(prog / 0.25) * (1 - smooth((prog - 0.85) / 0.15)) * A.drink;
-      _lt.set(0.18, -0.08, 0.17).lerp(_hr.set(0.05, 0.72, 0.34), up); lW = Math.max(lW, A.drink); tw *= 1 - A.drink; head.rotation.x -= 0.4 * up; torso.rotation.x -= 0.08 * up; }
+      head.rotation.x -= 0.4 * up; torso.rotation.x -= 0.08 * up;
+      _fd.set(-0.2, -0.45, -0.87).normalize(); _w1.set(0, 0.095, 0.2).applyEuler(head.rotation).add(head.position).addScaledVector(_fd, -0.125);
+      _lt.set(0.18, -0.08, 0.17).lerp(_w1, up); _fd.lerp(_hr.set(0.05, 1, 0.15), 1 - up).normalize(); lW = Math.max(lW, A.drink); tw *= 1 - A.drink; }
     // ---- roll: a tucked forward roll, or a hop back when no direction is held ----
     if (rolling) { const k = 1 - rollT / 0.42;
-      if (A.rollKind === 1) { const tuck = Math.sin(sat(k / 0.92) * PI); hips.rotation.x = smooth(sat((k - 0.06) / 0.8)) * TAU; hips.position.y = 0.98 - 0.52 * tuck;
+      if (A.rollKind === 1) { const tuck = Math.sin(sat(k / 0.92) * PI); hips.rotation.x = smooth(sat((k - 0.06) / 0.8)) * TAU; hips.position.y = 0.98 - 0.52 * tuck; rollTuck = tuck;
         torso.rotation.x += 0.9 * tuck; head.rotation.x += 0.4 * tuck; tl = lerp(tl, -1.75, tuck); tr = lerp(tr, -1.5, tuck); kl = lerp(kl, 2.15, tuck); kr = lerp(kr, 2.0, tuck); blend(TUCK, tuck); tw = lerp(tw, 1, tuck); }
-      else { const hop = Math.sin(k * PI), land = smooth((k - 0.7) / 0.3); body.rotation.x -= 0.28 * hop; hips.position.y += 0.1 * hop - 0.1 * land * (1 - smooth((k - 0.9) / 0.1)); tl = lerp(tl, -0.5, hop); tr = lerp(tr, -0.1, hop); kl += 0.8 * hop; kr += 0.6 * hop; blend(GUARD, hop); tw = lerp(tw, 1, hop); }
+      else { // the hop back: knees tucked in flight, chest over them, the blade trailing low in one hand, a crouch on landing
+        const hop = Math.sin(k * PI); hopF = smooth(k / 0.16) * (1 - smooth((k - 0.62) / 0.18)); hopLand = smooth((k - 0.68) / 0.14);
+        hips.position.y += 0.15 * hop; body.rotation.x += 0.16 * hopF; torso.rotation.x += 0.2 * hopF; head.rotation.x -= 0.18 * hopF;
+        tl = lerp(tl, -0.95, hopF); tr = lerp(tr, -0.7, hopF); kl = lerp(kl, 1.6, hopF); kr = lerp(kr, 1.45, hopF);
+        A.crouch = Math.max(A.crouch, hopLand); blend(TRAIL, smooth(k / 0.2) * (1 - smooth((k - 0.72) / 0.28))); tw = lerp(tw, 0, hopF); lx = lerp(lx, -0.7, hopF); lz = lerp(lz, 0.6, hopF); le = lerp(le, -0.5, hopF); }
     }
-    // ---- airborne / the Overhead leap ----
-    if (A.air > 0.01 && !rolling) { const q = A.air; tl = lerp(tl, -0.85, q); tr = lerp(tr, 0.25, q); kl = lerp(kl, 1.2, q); kr = lerp(kr, 0.7, q); lz = lerp(lz, 0.45, q); body.rotation.x -= 0.08 * A.leap; }
+    if (!(rolling && A.rollKind === 2)) A.crouch = damp(A.crouch, 0, 6, dt);
+    if (A.crouch > 0.01) { const q = A.crouch; kl += 0.8 * q; kr += 0.7 * q; tl -= 0.42 * q; tr -= 0.3 * q; torso.rotation.x += 0.22 * q; head.rotation.x -= 0.15 * q; }
+    // ---- airborne / the Overhead leap (knees tucked) ----
+    if (A.air > 0.01 && !rolling) { const q = A.air, lp = A.leap; tl = lerp(tl, -0.85, q); tr = lerp(tr, lerp(0.25, -0.6, lp), q); kl = lerp(kl, lerp(1.2, 1.4, lp), q); kr = lerp(kr, lerp(0.7, 1.25, lp), q); lz = lerp(lz, 0.45, q); body.rotation.x -= 0.08 * lp; }
+    hips.position.y += 0.2 * slamAir;
     const fall = p.pose === 'fall';
     if (fall) { body.rotation.x = 1.28 + Math.sin(t * 2.3) * 0.05 + L * 0.12; body.position.set(0, 0.75, -0.95); body.rotation.z = Math.sin(t * 1.7) * 0.05;
       tl = 0.25 + Math.sin(t * 5) * 0.05; tr = 0.25 - Math.sin(t * 5) * 0.05; kl = kr = 0.7; if (A.swing <= 0) { lx = -2.3; lz = 0.75; le = -0.5; tw = 0; } }
     if (p.flashT > 0) { const q = p.flashT / 0.15; torso.rotation.x -= 0.16 * q; head.rotation.x -= 0.12 * q; }
     // ---- ground the pelvis on the longer leg (on foot; the walk keeps part of its own bob) ----
-    const gnd = (rolling || fall ? 0 : 1) * (1 - A.air) * (1 - 0.65 * L);
+    const gnd = (fall ? 0 : rolling ? (A.rollKind === 2 ? hopLand : 0) : 1) * (1 - A.air) * (1 - 0.65 * L) * (1 - slamAir);
     if (gnd > 0.001) { const hz = Math.sin(hips.rotation.z) * HX, need = Math.max(reach(tl, kl, zl) - hz, reach(tr, kr, zr) + hz);
       hips.position.y = lerp(hips.position.y, need - SINK + br * 0.005 + puff * 0.012, gnd); }
     // ---- apply: legs, then both arms by IK onto the grip ----
-    legL.hip.rotation.set(tl, 0, zl); legR.hip.rotation.set(tr, 0, zr); legL.knee.rotation.x = kl; legR.knee.rotation.x = kr;
+    const toe = rolling || fall ? 0 : I * (1 - A.air); // toes turned out ~15 degrees in the stance (hip twist plus ankle)
+    legL.hip.rotation.set(tl, 0.1 * toe, zl); legR.hip.rotation.set(tr, -0.1 * toe, zr); legL.knee.rotation.x = kl; legR.knee.rotation.x = kr;
+    legL.ankle.rotation.y = 0.16 * toe; legR.ankle.rotation.y = -0.16 * toe;
     const tilt = body.rotation.x + (rolling ? 0 : hips.rotation.x);
     legL.ankle.rotation.x = clamp(-(tl + kl + tilt) * 0.85 + (L > 0.2 ? Math.max(0, -s) * 0.35 * L : 0), -0.9, 0.9); legR.ankle.rotation.x = clamp(-(tr + kr + tilt) * 0.85 + (L > 0.2 ? Math.max(0, s) * 0.35 * L : 0), -0.9, 0.9);
     legL.ankle.rotation.z = -zl * 0.9; legR.ankle.rotation.z = -zr * 0.9; // soles flat despite the splay
     // shoulders breathe, and heave when Winded
-    const sy = br * 0.004 + puff * 0.016; for (const a of [armL, armR]) { a.sh.position.y = SHY + sy; a.pd.position.y = PDY + sy * 1.3; }
+    const sy = br * 0.004 + puff * 0.016; for (const a of [armL, armR]) { const w = a.side * sp * 0.022 * L; a.sh.position.y = SHY + sy + w; a.pd.position.y = PDY + sy * 1.3 + w * 1.2; }
     armR.sh.rotation.set(-0.4, 0, -0.2); armR.el.rotation.x = -0.8;
     ik(armR, _P, _pole.set(-0.75, -0.55, -0.15), 1, _hr);
     // edge: leads along the tip's motion during a cut, otherwise follows the pose (either edge, it is double-edged)
     _t.copy(_P).addScaledVector(_D, 1.2);
     if (A.tipOk && dt > 0 && A.swing > 0) { _u.subVectors(_t, A.tip); if (_u.lengthSq() > (dt * 2.5) ** 2) _E.copy(_u); }
     A.tip.copy(_t); A.tipOk = true;
-    _E.addScaledVector(_D, -_E.dot(_D)); if (_E.lengthSq() < 1e-6) _E.set(1, 0, 0).addScaledVector(_D, -_D.x); _E.normalize(); if (_E.dot(A.E) < 0) _E.negate();
+    _E.addScaledVector(_D, -_E.dot(_D)); if (_E.lengthSq() < 1e-6) _E.set(1, 0, 0).addScaledVector(_D, -_D.x); _E.normalize();
+    // roll the blade about its own axis so a flat faces the camera (most of the way through a swing, partly at rest): seen
+    // edge-on from the play camera the broad blade collapses to a hairline. (torso.matrixWorld is last frame's: close enough)
+    _w1.setFromMatrixPosition(camera.matrixWorld); torso.worldToLocal(_w1).sub(_P).normalize(); _w2.crossVectors(_D, _w1);
+    const cw = (A.swing > 0 ? 0.9 : 0.6) * sat(_w2.length() * 2.2 - 0.15);
+    if (cw > 0.01) { _w2.normalize(); if (_w2.dot(_E) < 0) _w2.negate(); _E.lerp(_w2, cw).addScaledVector(_D, -_E.dot(_D)); if (_E.lengthSq() < 1e-6) _E.copy(_w2); _E.normalize(); }
+    if (_E.dot(A.E) < 0) _E.negate();
     A.E.lerp(_E, 1 - Math.exp(-22 * dt)).addScaledVector(_D, -A.E.dot(_D)); if (A.E.lengthSq() < 1e-6) A.E.copy(_E); A.E.normalize();
     A.P.copy(_P); A.D.copy(_D);
     _c1.crossVectors(A.E, _D); _m1.makeBasis(A.E, _D, _c1); _q.setFromRotationMatrix(_m1); // the blade's orientation in torso space
@@ -392,10 +455,17 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
     for (const a of [armL, armR]) a.pd.quaternion.set(0, 0, 0, 1).slerp(a.sh.quaternion, 0.38);
     // ---- cloth: cape (lags on turns), tabard, tassets, flasks, plume ----
     const chestTilt = rolling ? 0 : tilt + torso.rotation.x;
+    // cape: in motion each row bends ~9 degrees further than the one above (a curve, not a board), billows sideways with the
+    // stride, wraps round the back in the roll, and flares up on the slam and settles
+    A.flare = Math.max(0, A.flare - dt / 0.32); const fl0 = A.flare * A.flare * (3 - 2 * A.flare);
+    const mot = sat(Math.max(L, A.air, Math.max(0, A.vz) / 5)), bk = Math.max(sat(-A.vz / 4), hopF); // bk: moving backwards (the hop): the cape is pressed in and curls under
     for (let k = 0; k < cape.length; k++) { const q = cape[k];
-      const tgt = k === 0 ? clamp(0.04 + Math.max(0, Math.max(tl, tr)) * 0.2 + Math.max(0, A.vz) * 0.022 + A.air * 0.35 + Math.sin(t * 6.5) * 0.04 * L - chestTilt * 0.9, -chestTilt - 0.05, 1.2)
-        : 0.08 * sat(A.vz / 6) + 0.025 * k - Math.max(0, cape[0].o.rotation.x - 0.15) * (0.24 + 0.08 * k) + Math.sin(t * 7 - k * 1.1) * (0.08 * L + 0.022) + A.air * 0.07 + Math.max(0, -A.vz) * 0.025;
-      q.o.rotation.x = q.spr.step(tgt, dt); q.o.rotation.z = q.sprZ.step(-A.vx * 0.04 * (k ? 0.5 : 1) - A.yr * 0.035 * (k ? 1 : 0.4), dt); q.o.rotation.y = q.sprY.step(-A.yr * 0.05 * (k ? 1 : 0.3), dt); }
+      const tgt = k === 0 ? clamp(0.04 + Math.max(0, Math.max(tl, tr)) * 0.2 + Math.max(0, A.vz) * 0.022 + A.air * 0.35 + fl0 * 0.45 + Math.sin(t * 6.5) * 0.04 * L - chestTilt * 0.9 - 0.12 * bk, -chestTilt - 0.05, 1.5)
+        : 0.025 + 0.135 * mot * (1 - bk) - 0.16 * bk - fl0 * 0.2 - Math.max(0, cape[0].o.rotation.x - 0.25) * (0.18 + 0.05 * k) + Math.sin(t * 7 - k * 1.1) * (0.06 * L + 0.02);
+      let rx = q.spr.step(tgt, dt), rz = q.sprZ.step(-A.vx * 0.04 * (k ? 0.5 : 1) - A.yr * 0.035 * (k ? 1 : 0.4) + Math.sin(ph - k * 0.8) * 0.075 * L * (0.4 + 0.3 * k), dt);
+      if (hopF > 0.01) rx = lerp(rx, tgt, hopF * 0.8); // (the hop is too quick for the spring: the cape would trail the lean as a board)
+      const wr = Math.min(1, rollTuck * 1.8); if (wr > 0.01) { rx = lerp(rx, k ? -0.42 : -0.12, wr * 0.85); rz *= 1 - wr; }
+      q.o.rotation.x = rx; q.o.rotation.z = rz; q.o.rotation.y = q.sprY.step(-A.yr * 0.05 * (k ? 1 : 0.3) + Math.sin(ph - k * 0.8 - 0.6) * 0.05 * L, dt); }
     tabard.rotation.x = -clamp(tabSpr.step(Math.max(0, -Math.min(tl, tr)) * 1.05 + tilt + A.vz * -0.03 + A.air * 0.3 + Math.sin(t * 8) * 0.03 * L, dt), -0.1, 1.4);
     for (const q of tassets) { const lg = q.phi > 0 ? tl : tr; q.pv.rotation.x = -clamp(q.spr.step(Math.max(0, -lg) * 0.85 + 0.03 + tilt * 0.4, dt), -0.05, 1.2); }
     const uses = p.sk && p.sk[6] ? p.sk[6].uses : 4, left = clamp((uses === Infinity ? 4 : uses) - (drinking ? 1 : 0), 0, 4);
@@ -405,8 +475,33 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
       q.pv.rotation.x = q.spr.step(-tilt + A.vz * 0.035 + bob, dt); q.pv.rotation.z = q.sprZ.step(-A.vx * 0.04 + Math.sin(ph + i) * 0.08 * L, dt); }
     handFlask.visible = A.drink > 0.05 || (A.pour > 0 && A.pour > 0.12);
     handLq.scale.y = drinking ? Math.max(0.05, 1 - prog) : A.pour > 0 ? Math.max(0.05, sat(A.pour / 0.75 * 1.4)) : 1;
-    for (let k = 0; k < plume.length; k++) { const q = plume[k], tgt = k === 0 ? 0.4 + Math.max(0, A.vz) * 0.06 + A.air * 0.3 - (chestTilt + head.rotation.x) * 0.9 : 0.1 + Math.sin(t * 8 - k) * 0.06 * L + Math.sin(t * 1.3 + k) * 0.03;
-      q.o.rotation.x = q.spr.step(tgt, dt); q.o.rotation.z = q.sprZ.step(-A.vx * 0.05 - A.yr * 0.04 * (k + 1) - head.rotation.y * 0.3 * (k ? 0 : 1), dt); }
+    if (handFlask.visible) { // the bottle in the left fist, neck along _fd (torso space), gripped at its shoulder
+      _q2.copy(armL.sh.quaternion).multiply(armL.el.quaternion); _qi.copy(_q2).invert(); _t.copy(_fd).applyQuaternion(_qi);
+      _q.setFromUnitVectors(_Y, _fd); handFlask.quaternion.copy(_qi).multiply(_q); handFlask.position.set(0, -0.045, 0.012).addScaledVector(_t, 0.04 * HFS); }
+    // plume: the root springs toward hanging down the back; segment k replays the root's motion k*PLAG s later
+    { const pX = Math.max(0, A.vz) * 0.028 + A.air * 0.25 + hopF * 0.2 - (chestTilt + head.rotation.x) * 0.9 - 0.3 * rollTuck, pZ = -A.vx * 0.05 - A.yr * 0.06 - head.rotation.y * 0.3;
+      const X0 = plSprX.step(pX, dt), Z0 = plSprZ.step(pZ, dt), T = plH.t, n = T.length;
+      if (n && t < T[n - 1] - 1) { T.length = 0; plH.x.length = 0; plH.z.length = 0; }
+      if (T.length && t <= T[T.length - 1]) { plH.x[T.length - 1] = X0; plH.z[T.length - 1] = Z0; } else { T.push(t); plH.x.push(X0); plH.z.push(Z0); }
+      while (T.length > 400 || (T.length > 2 && T[1] < t - (PL * PLAG + 0.05))) { T.shift(); plH.x.shift(); plH.z.shift(); }
+      let px = 0, pz = 0;
+      for (let k = 0; k < PL; k++) { const xk = plAt(k * PLAG, plH.x), zk = plAt(k * PLAG, plH.z), o = plume[k].o;
+        o.rotation.x = PBASE[k] + xk - px + (k ? Math.sin(t * 7.5 - k * 0.9) * 0.05 * L + Math.sin(t * 1.3 + k) * 0.018 : 0);
+        o.rotation.z = zk - pz + (k ? Math.sin(t * 6 - k * 0.9) * 0.05 * L + Math.sin(t * 1.1 + k * 0.7) * 0.02 : 0); px = xk; pz = zk; } }
+    // ember trail behind the outer blade during the strike part of each cut and the slam
+    if (!G.headless) { const ks = A.swing > 0 ? 1 - A.swing / A.swingDur : -1, kd = A.swingKind;
+      const on = ks >= 0 && (kd === 3 ? ks > 0.21 && ks < 0.42 : kd <= 1 && ks > 0.24 && ks < 0.64);
+      for (const s of trS) s.age += dt; while (trS.length && trS[trS.length - 1].age > TRLIFE) trPool.push(trS.pop());
+      if (on || trS.length) {
+        weapon.updateWorldMatrix(true, false); _gi.copy(g.matrixWorld).invert();
+        _w1.set(0, 0.8, 0).applyMatrix4(weapon.matrixWorld).applyMatrix4(_gi); _w2.set(0, 1.66, 0).applyMatrix4(weapon.matrixWorld).applyMatrix4(_gi);
+        A.trT += dt; if (on && (A.trT >= 0.008 || !trS.length)) { A.trT = 0; const s = trS.length >= TRN - 1 ? trS.pop() : trPool.pop(); s.a.copy(_w1); s.b.copy(_w2); s.age = 0; trS.unshift(s); }
+        const n = Math.min(TRN, trS.length + (on ? 1 : 0)), br2 = 1 + A.heat * 0.6 + A.open * 0.8;
+        for (let i = 0; i < TRN; i++) { const j = Math.min(i, n - 1), s = on ? (j === 0 ? null : trS[j - 1]) : trS[j], a = s ? s.a : _w1, b = s ? s.b : _w2;
+          const f = i < n ? Math.pow(1 - (s ? s.age : 0) / TRLIFE, 1.6) * br2 : 0;
+          trPos.set([a.x, a.y, a.z, b.x, b.y, b.z], i * 6); trCol.set([trC.r * f * 0.25, trC.g * f * 0.25, trC.b * f * 0.25, trC.r * f * 1.7, trC.g * f * 1.7, trC.b * f * 1.7], i * 6); }
+        trGeo.attributes.position.needsUpdate = true; trGeo.attributes.color.needsUpdate = true; trGeo.setDrawRange(0, Math.max(0, n - 1) * 6); trail.visible = n >= 2;
+      } else trail.visible = false; }
     // ---- glow: seams breathe with stamina, the blade heats with Kindle and goes white-hot on an opening ----
     const swingGlow = A.swing > 0 && A.swingKind >= 2 ? 0.5 : 0, O = A.open;
     seamM.color.copy(seamBase).lerp(whiteHot, 0.6 * O).multiplyScalar((0.25 + 0.75 * sf) * (1 + 0.15 * br) * (1 + 0.6 * A.heat + 0.6 * O) * (1 - 0.55 * WD));
@@ -422,7 +517,7 @@ HERO_MODELS.ashwarden = function buildAshwarden(cls) {
     const ign = A.pour > 0 ? smooth((1 - A.pour / 0.75 - 0.2) / 0.5) : 1, fl = Math.max(A.heat * ign, O * 0.75);
     flameMat.uniforms.uC.value.copy(glowC).lerp(haloC, O * (1 - A.heat * 0.5));
     flameMat.uniforms.uI.value = fl * (1.1 + 0.15 * Math.sin(t * 17)); flameMat.uniforms.uT.value = t; for (const m of flames) m.visible = fl > 0.02 && !G.headless;
-    aura.intensity = 1.3 + A.heat * 1.6 + O * 3.5 + (p.flashT > 0 ? 6 : 0) + swingGlow * 2;
+    aura.intensity = 0.85 + A.heat * 1.6 + O * 3.5 + (p.flashT > 0 ? 6 : 0) + swingGlow * 2;
     A.ps = A.swing;
   }
   return { group: g, update, anim: A, wtip, body, swing(kind = 0, dur = 0.3) { A.swing = A.swingDur = dur; A.swingKind = kind; } };
