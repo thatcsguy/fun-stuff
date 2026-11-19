@@ -73,7 +73,7 @@ HUD hooks on a skill: `rdy(p)` (glow), `act(p)` (lit while active), `interrupt: 
 
 `?boss=cathedral|leviathan|duelist|engine|titan|gorgon|theatre|wheel|express|winter|origami|lamp|chess|festival|fall`, `&class=duskblade|stormcaller|ashwarden|hexslinger`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`, `&strictmath` (testing only: out-of-domain shader math returns NaN and NaN pixels show bright magenta).
 
-Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `pit`.
+Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `sumi`.
 
 ## Test hooks
 
