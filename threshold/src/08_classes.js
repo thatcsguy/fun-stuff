@@ -106,7 +106,7 @@ G.classes.push({
   id: 'stormcaller', name: 'STORMCALLER', role: 'Ranged caster. Plants its feet to cast, spends Static on the move.', color: '#6fd8ff', hp: 1000, gcd: 1.5,
   gcdOf: (p, s) => (p.hasBuff('tempest') ? 0.75 : 1.5) * (s.id === 'discharge' ? 0.8 : 1),
   resource: { name: 'Static', max: 4 },
-  look: { armor: 0x1c3344, cloth: 0x12344a, glow: 0x50d0ff, hood: true },
+  look: { armor: 0x2a3a4c, cloth: 0x12344a, glow: 0x50d0ff, hood: true, inner: 0xd8d0bc, metal: 0xc0844a, leather: 0x4a3222, lining: 0x0b3c6e, mantle: 0x262a33 },
   skills: [
     { id: 'bolt', name: 'Bolt', icon: 'bolt', range: 34, rdy: (p) => p.hasBuff('surge'), desc: 'Cast time. Heavy lightning that builds Static. You must stand still.',
       cast: (p) => p.hasBuff('surge') ? 0 : p.hasBuff('tempest') ? 0.7 : 1.5, moveCast: (p) => p.hasBuff('tempest'),
