@@ -25,10 +25,12 @@ const fs = require('fs'), path = require('path');
   }, v);
   const shot = async (name) => { const f = path.join(out, name + '.png'); await page.screenshot({ path: f }); console.log(f); };
   const ev = (fn, arg) => page.evaluate(fn, arg);
+  // home(turn): put the hero back on the arena spawn point (walking drifts it into walls / the boss) and face spawnFacing + turn
+  const home = (turn) => ev((turn) => { const p = window.__game.G.player, h = window.__home; p.pos.set(h.x, h.y, h.z); p.facing = h.f + turn; if (p.vel) p.vel.set(0, 0, 0); }, turn);
   for (const boss of bosses.split(',')) {
     await ev(([b, c]) => { const g = window.__game; g.G.god = true; g.Bot.update = () => { g.Input.bot = window.__mv || { moveX: 0, moveZ: 0 }; }; window.__mv = null; g.Game.start(b, { cls: c }); }, [boss, cls]);
     await page.waitForFunction('window.__game.G.state === "fight" && !window.__game.Cam.cine', null, { timeout: 120000, polling: 100 });
-    await ev(() => { const g = window.__game; window.__mv = { moveX: 0, moveZ: 0 }; g.G.boss.immune = false; });
+    await ev(() => { const g = window.__game; window.__mv = { moveX: 0, moveZ: 0 }; g.G.boss.immune = false; const p = g.G.player; window.__home = { x: p.pos.x, y: p.pos.y, z: p.pos.z, f: p.facing }; });
     await frames(60);
     const P = boss + '_';
     // ---- normal camera ----
@@ -53,6 +55,7 @@ const fs = require('fs'), path = require('path');
     for (const [n, yaw] of [['side', 1.57], ['front', 0.6]]) { await follow({ yaw, d: 4.2, h: 1.4 }); await frames(23); await shot(P + 'walk_' + n); await frames(11); await shot(P + 'walk_' + n + '2'); }
     await ev(() => { window.__mv = { moveX: 0, moveZ: 0 }; }); await frames(30);
     // bolt cast: mid-cast and the release
+    await home(0); await frames(10);
     await follow({ yaw: 0.6, d: 3.8, h: 1.5 });
     await ev(() => { const p = window.__game.G.player; p.gcd = 0; p.press(0); }); await frames(45); await shot(P + 'cast_mid');
     await frames(38); await shot(P + 'cast_release');
@@ -60,16 +63,20 @@ const fs = require('fs'), path = require('path');
     await ev(() => { const p = window.__game.G.player; p.gcd = 0; p.press(0); }); await frames(60); await shot(P + 'cast_side');
     await frames(60);
     // discharge (spender, instant)
+    await home(0); await frames(10);
     await follow({ yaw: 0.8, d: 4, h: 1.5 });
-    await ev(() => { const p = window.__game.G.player; p.gcd = 0; p.res = 4; p.press(1); }); await frames(5); await shot(P + 'discharge');
+    await ev(() => { const p = window.__game.G.player; p.gcd = 0; p.res = 4; p.press(1); }); await frames(14); await shot(P + 'discharge');
     await frames(60);
-    // blink while moving, then aegis
+    // blink while moving (sideways across the arena), then aegis
+    await home(-Math.PI / 2); await ev(() => { window.__game.G.player.pos.x -= 9; }); await frames(10); // blink (11 m) ends near the spawn, not in a wall
     await ev(() => { const g = window.__game, p = g.G.player; window.__mv = { moveX: Math.sin(p.facing), moveZ: Math.cos(p.facing) }; }); await frames(12);
     await follow({ yaw: 0.9, d: 5, h: 1.6 });
     await ev(() => window.__game.G.player.press(3)); await frames(2); await shot(P + 'blink_a'); await frames(6); await shot(P + 'blink_b');
     await ev(() => { window.__mv = { moveX: 0, moveZ: 0 }; }); await frames(40);
+    await home(0); await frames(10);
     await follow({ yaw: 0.6, d: 4, h: 1.5 });
     await ev(() => window.__game.G.player.press(4)); await frames(30); await shot(P + 'aegis');
+    await follow({ yaw: 0.6, d: 5.2, h: 1.9, ly: 1.5 });
     await ev(() => { const p = window.__game.G.player; p.sk[2].cd = 0; p.sk[2].charges = 1; p.press(2); }); await frames(40); await shot(P + 'tempest');
     await follow(null); await frames(40);
     const st = await ev(() => window.__game.state()); console.log('state', JSON.stringify(st));
