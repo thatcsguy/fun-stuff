@@ -88,7 +88,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       o += c; q.dispose();
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(N, 3));
-    g.setAttribute('aS', new THREE.BufferAttribute(S, 1)); g.setAttribute('aK', new THREE.BufferAttribute(K, 1)); g.setAttribute('aSc', new THREE.BufferAttribute(SC, 2)); g.setAttribute('aBelly', new THREE.BufferAttribute(BE, 1));
+    g.setAttribute('aS', new THREE.BufferAttribute(S, 1)); g.setAttribute('aK', new THREE.BufferAttribute(K, 1)); g.setAttribute('aSc', new THREE.BufferAttribute(SC, 2)); g.setAttribute('aBelly', new THREE.BufferAttribute(BE, 1)); g.setAttribute('aFd', new THREE.BufferAttribute(new Float32Array(n), 1));
     g.computeBoundingSphere(); return g;
   }
   const iattr = (n, k) => new THREE.InstancedBufferAttribute(new Float32Array(n * k), k);
@@ -116,10 +116,10 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
           vec2 qw = q + vec2(fbm(q * 1.7 + 2.0), fbm(q * 1.7 + 6.0)) * 0.9;
           float c = fbm(qw * 1.7 + 4.0) + smoothstep(0.02, 0.26, h) * 0.3 - 0.08 + (vn(cs * 34.0 + h * 20.0) - 0.5) * 0.06;
           float low = smoothstep(-0.03, 0.08, h), desc = smoothstep(0.0, 0.6, uStorm);
-          float cov = smoothstep(0.42, 0.6, c) * low * desc;
-          float wet = (smoothstep(0.42, 0.45, c) - smoothstep(0.45, 0.53, c)) * low * desc;
-          float core = smoothstep(0.62, 0.9, c);
-          col = mix(col, mix(I2, I0, core * (0.6 + 0.4 * n2)), cov * 0.95);
+          float cov = smoothstep(0.38, 0.56, c) * low * desc;
+          float wet = (smoothstep(0.38, 0.41, c) - smoothstep(0.41, 0.49, c)) * low * desc;
+          float core = smoothstep(0.48, 0.68, c);
+          col = mix(col, mix(mix(I2, I1, core), I0, smoothstep(0.7, 0.86, c) * (0.5 + 0.5 * n2)), cov * 0.97);
           col = mix(col, I1, wet * 0.7);
           float X = az * 160.0 + h * 60.0 * (0.4 + uGale), hc = hh(vec2(floor(X), 7.0));
           float seg = fract(h * (3.0 + hc * 3.0) + uTime * (1.5 + hc));
@@ -132,7 +132,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         if (uSun > 0.002) {
           float cd = clamp(dot(d, uSunD), -1.0, 1.0), ang = acos(cd);
           col = mix(col, GLD, uSun * (exp(-ang * 2.2) * 0.75 + (1.0 - smoothstep(-0.05, 0.5, h)) * 0.2));
-          float edge = 0.072 + (vn(d.xy * 90.0 + d.z * 40.0) - 0.5) * 0.006;
+          float edge = 0.039 + (vn(d.xy * 160.0 + d.z * 70.0) - 0.5) * 0.004;
           disc = (1.0 - smoothstep(edge - 0.003, edge + 0.004, ang)) * uSun;
           col = mix(col, VER, disc);
         }
@@ -155,13 +155,13 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         // pale washes: a few large domain-warped pools, a hard darker wet edge where the pigment dried, granulation inside
         vec2 wq = p * 0.045 + 11.0; wq += vec2(fbm(wq * 1.3 + 3.1), fbm(wq * 1.3 + 7.7)) * 1.5;
         float w = fbm(wq) + (n3 - 0.5) * 0.025;
-        float gran = vn(p * 13.0) * 0.55 + vn(p * 37.0 + 5.0) * 0.45;
-        float wash = smoothstep(0.65, 0.656, w), wedge = wash * (1.0 - smoothstep(0.656, 0.69, w));
-        ink = max(ink, (wash * (0.062 + 0.045 * gran) + wedge * 0.17) * inner * rvW);
+        float gran = vn(p * 0.55 + 2.0) * 0.6 + vn(p * 1.3 + 5.0) * 0.4;
+        float wash = smoothstep(0.7, 0.705, w), wedge = wash * (1.0 - smoothstep(0.705, 0.735, w));
+        ink = max(ink, (wash * 0.075 * (0.92 + 0.15 * (gran - 0.5)) + wedge * 0.15) * inner * rvW);
         // concentric dry-brush arcs: the terrace swept with a dry brush
         float st = vn(vec2(r * 3.2, az * r * 0.06 + 40.0)) * 0.7 + vn(vec2(r * 9.0, az * r * 0.2)) * 0.3;
         float arcs = smoothstep(0.66, 0.74, st) * smoothstep(0.42, 0.62, n1) * smoothstep(2.5, 5.0, r);
-        ink = max(ink, arcs * 0.2 * inner * rvW);
+        ink = max(ink, arcs * 0.13 * inner * rvW);
         // moss dots crowding the rim, in irregular clusters of three to seven of different sizes
         vec2 cg = p / 2.3, ci = floor(cg), cf = fract(cg);
         float dens = smoothstep(${(R - 5).toFixed(1)}, ${(R - 0.8).toFixed(1)}, r) * (1.0 - smoothstep(${(R + 1.5).toFixed(1)}, ${(R + 4).toFixed(1)}, r)) * smoothstep(0.3, 0.6, n2);
@@ -190,17 +190,15 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         ink = max(ink, (1.0 - smoothstep(0.8, 3.4, length(p - uBP.xz) + (n3 - 0.5) * 0.8)) * 0.32 * uBP.y);
         // storm: wet streaks and rain rings
         if (uStorm > 0.002) {
-          float sw = vn(vec2(p.x * 0.05 + p.y * 0.02, p.y * 1.1 - p.x * 0.3) + 4.0) * 0.7 + vn(p * 0.3) * 0.3;
-          ink = max(ink, smoothstep(0.66, 0.8, sw) * 0.2 * uStorm * inner);
-          vec2 rg = p / 1.6, ri = floor(rg), rf = fract(rg) - 0.5; float ph = fract(uTime * 1.1 + hh(ri) * 7.0);
-          float rl = abs(length(rf - (vec2(hh(ri + 2.0), hh(ri + 4.0)) - 0.5) * 0.4) - ph * 0.42);
-          ink = max(ink, (1.0 - smoothstep(0.0, 0.025, rl)) * (1.0 - ph) * 0.42 * uStorm * step(hh(ri + 6.0), 0.4));
+          vec2 pr = mat2(0.8, -0.6, 0.6, 0.8) * p, rg = pr / 1.6, ri = floor(rg), rf = fract(rg) - 0.5; float ph = fract(uTime * 1.1 + hh(ri) * 7.0);
+          float rl = abs(length(rf - (vec2(hh(ri + 2.0), hh(ri + 4.0)) - 0.5) * 0.4) - ph * 0.42), near = 1.0 - smoothstep(7.0, 11.0, length(p - cameraPosition.xz));
+          ink = max(ink, (1.0 - smoothstep(0.0, 0.03, rl)) * (1.0 - ph) * 0.5 * uStorm * step(hh(ri + 6.0), 0.3) * near);
           // the wet floor mirrors the dragon: dark smears running from him toward the eye, broken by ripples
           for (int i = 0; i < 3; i++) { vec4 q = uRf[i]; vec2 dv = cameraPosition.xz - q.xy; float dl = max(length(dv), 1e-3); vec2 dn = dv / dl;
             float al = dot(p - q.xy, dn), sd = abs(dot(p - q.xy, vec2(-dn.y, dn.x))), L = q.z * dl / max(cameraPosition.y + q.z, 1.0);
-            float sm = smoothstep(-0.5, 0.6, al) * (1.0 - smoothstep(L * 0.45, L * 1.05, al)) * (1.0 - smoothstep(q.w * 0.35, q.w * (0.75 + 0.25 * n3), sd + al * 0.08));
-            float rp = smoothstep(0.3, 0.55, vn(vec2(sd * 1.1 + q.x, al * 3.5 - uTime * 0.7))) * (0.6 + 0.4 * n3);
-            ink = max(ink, sm * rp * 0.62 * uStorm * inner); }
+            float sm = smoothstep(-0.8, 0.8, al) * (1.0 - smoothstep(L * 0.3, L * 1.1, al)) * (1.0 - smoothstep(q.w * 0.2, q.w * 0.8, sd + (fbm(vec2(al * 0.35, q.x) + uTime * 0.05) - 0.5) * q.w * 0.6));
+            float rp = 0.55 + 0.45 * fbm(vec2(sd * 0.9 + q.x, al * 0.22 - uTime * 0.12));
+            ink = max(ink, sm * rp * 0.35 * uStorm * inner); }
           // bamboo reflected at the foot of the groves
           float gb = smoothstep(0.25, 0.4, abs(sin(atan(p.x, p.y)))) * smoothstep(${(R - 4).toFixed(1)}, ${(R - 0.5).toFixed(1)}, r);
           ink = max(ink, gb * smoothstep(0.82, 0.92, vn(vec2(atan(p.x, p.y) * 70.0, 1.0))) * smoothstep(0.3, 0.6, vn(vec2(az * 30.0, r * 3.0 - uTime))) * 0.45 * uStorm * inner);
@@ -211,7 +209,8 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         // the dragon diving into the paper: rings spreading from where he went in
         if (uRip.w > 0.002) { float d = length(p - uRip.xy), ph = d - (uTime - uRip.z) * 6.0;
           ink = max(ink, smoothstep(0.86, 0.98, cos(ph * 2.0)) * step(ph, 0.0) * exp(ph * 0.12) * uRip.w * (1.0 - smoothstep(12.0, 24.0, d)) * 0.7); }
-        vec3 c = mix(base, tone(1.0 - ink, n3), smoothstep(0.02, 0.07, ink));
+        vec3 cw = mix(base, mix(I3, I2, 0.35), clamp(ink * 2.4, 0.0, 1.0));
+        vec3 c = min(mix(cw, tone(1.0 - ink, n3), smoothstep(0.3, 0.42, ink)), base);
         // fallen petals
         if (uPetal > 0.002) { vec2 pg = p / 0.8, pi = floor(pg), pf = fract(pg) - 0.5 - (vec2(hh(pi + 1.1), hh(pi + 2.2)) - 0.5) * 0.5;
           float pet = (1.0 - smoothstep(0.06, 0.1, length(pf * vec2(1.0, 1.7)))) * step(hh(pi + 8.8), uPetal * 0.28); c = mix(c, mix(PK, PK2, hh(pi + 4.4) * 0.6), pet * 0.9); }
@@ -224,15 +223,21 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
   function buildMountains(S, g) {
     // radius, peak height, ink strength, seed, base fade
     const L = [[58, 44, 1.3, 3.1], [84, 33, 0.92, 11.7], [112, 19, 0.62, 23.3], [150, 13, 0.5, 37.9], [210, 11, 0.38, 51.1]];
+    // crest elevation range (deg) per layer, seen from the fight eye (about 7 m up, 12 m behind the terrace centre)
+    const EL = [[-6.5, -1.4], [-4.8, -0.5], [-3.2, 0.5], [-2.2, 1.3], [-1.6, 2.0]];
     const mat0 = smat(S.U, VW, `
-      varying vec3 vW; uniform vec4 uL; uniform vec2 uRW; uniform float uFall;
+      varying vec3 vW; uniform vec4 uL, uL2; uniform vec2 uRW; uniform float uFall;
       float ridge(vec2 cs){ float s = 0.0, a = 0.5, f = 1.0; for (int i = 0; i < 4; i++){ float n = vn(cs * (2.4 * f) + uL.w + float(i) * 7.3); s += a * (1.0 - abs(n * 2.0 - 1.0)); f *= 2.3; a *= 0.5; } return s / 0.9375; }
       void main(){
         float r = length(vW.xz); vec2 cs = vW.xz / max(r, 1e-3); float az = atan(vW.x, -vW.z);
         float rg = clamp(ridge(cs), 0.0, 1.0);
         float mass = 0.35 + 0.65 * vn(cs * 1.3 + uL.w + 50.0);
-        float valley = mix(uL.x < 60.0 ? 0.22 : 0.8, 1.0, smoothstep(0.08, 0.5, abs(az)));
-        float H = min(uL.y * pow(rg, 1.5) * mass * valley * 1.8, uL.y * 1.1) - 2.0;
+        float e = mix(uL2.x, uL2.y, min(pow(rg, 2.0) * mass * 1.35, 1.15));
+        // near ridges dip in the middle (the valley the sun rises in); the two far ridges flank a notch at the centre
+        e = mix(uL2.x - 0.5, e, mix(1.0, smoothstep(0.08, 0.42, abs(az)), uL2.z));
+        float nt = exp(-pow(az / 0.075, 2.0)), fl = exp(-pow((abs(az) - 0.17) / 0.06, 2.0));
+        e = mix(e, uL2.y + 0.4, fl * uL2.w); e = mix(e, uL2.x - 0.6, nt * uL2.w);
+        float H = 7.0 + tan(e * 0.017453) * (r + 12.0);
         float y = vW.y, dy = H - y, aa = max(fwidth(y), 1e-3) * 1.2;
         float sil = smoothstep(-aa, aa, dy);
         if (sil < 0.004) discard;
@@ -258,7 +263,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     S.mtn = L.map(([r, h, k, seed], i) => {
       const mt = mat0.clone(); // clone() copies uniforms: re-link the shared block
       for (const key in S.U) mt.uniforms[key] = S.U[key];
-      mt.uniforms.uL = { value: new THREE.Vector4(r, h, k, seed) }; mt.uniforms.uRW = { value: new THREE.Vector2(0.02 + (4 - i) * 0.07, 0.3 + (4 - i) * 0.07) }; mt.uniforms.uFall = { value: i === 0 ? 1 : 0 };
+      mt.uniforms.uL = { value: new THREE.Vector4(r, 9 + Math.tan(EL[i][1] * PI / 180) * (r + 12), k, seed) }; mt.uniforms.uL2 = { value: new THREE.Vector4(EL[i][0], EL[i][1], i < 3 ? 1 : 0, i >= 3 ? 1 : 0) }; mt.uniforms.uRW = { value: new THREE.Vector2(0.02 + (4 - i) * 0.07, 0.3 + (4 - i) * 0.07) }; mt.uniforms.uFall = { value: i === 0 ? 1 : 0 };
       const geo = new THREE.CylinderGeometry(r, r, h * 2 + 30, 160, 1, true); geo.translate(0, h - 3, 0);
       const m = new THREE.Mesh(geo, mt); m.renderOrder = -90 + (4 - i) * 2; m.frustumCulled = false; g.add(m); return m;
     });
@@ -266,7 +271,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
   }
 
   function buildMist(S, g, low) {
-    const bands = low ? [[34, 0, 7, 0.75], [95, 2, 18, 0.6]] : [[31, -1, 6.5, 0.7], [50, 0, 10, 0.75], [72, 1, 15, 0.6], [100, 3, 20, 0.55], [135, 4, 26, 0.5]];
+    const bands = low ? [[34, -1, 4.5, 0.7], [95, 0, 6, 0.5]] : [[31, -1, 4, 0.7], [50, -1, 5, 0.7], [72, 0, 5.5, 0.6], [100, 0, 6.5, 0.5], [135, 0, 7.5, 0.45]];
     const mat0 = smat(S.U, VW, `
       varying vec3 vW; uniform vec4 uM;
       void main(){
@@ -286,8 +291,8 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
 
   // the middle ground between the terrace and the far ridges: axe-cut rock stacks, gnarled pines, a strip of still water, low mist
   // [angle from -z, radius, width, height, kind 0 rock / 1 pine / 2 mist, base y, ink strength]
-  const MID = [[-1.05, 36, 7, 12, 0, -2, 0.95], [-0.62, 45, 8, 17, 0, -2, 0.8], [-0.3, 31, 4.6, 7.5, 0, -2, 1.0], [0.4, 33, 5.2, 9.5, 0, -2, 1.0], [0.72, 47, 8, 16, 0, -2, 0.78], [1.12, 37, 6.5, 12.5, 0, -2, 0.92], [1.55, 43, 5.5, 9, 0, -2, 0.85],
-    [-0.98, 35.5, 8, 9.5, 1, 6.5, 1.0], [-0.42, 39, 7.5, 10, 1, -1.5, 0.9], [0.52, 32.5, 7, 9, 1, -1.5, 1.0], [1.08, 36.5, 7.5, 9, 1, 9.5, 0.95],
+  const MID = [[-1.05, 36, 7, 10, 0, -2, 0.95], [-0.62, 45, 8, 11.5, 0, -2, 0.8], [-0.3, 31, 4.6, 7, 0, -2, 1.0], [0.4, 33, 5.2, 8.5, 0, -2, 1.0], [0.72, 47, 8, 11.5, 0, -2, 0.78], [1.12, 37, 6.5, 10, 0, -2, 0.92], [1.55, 43, 5.5, 8.5, 0, -2, 0.85],
+    [-0.98, 35.5, 7, 7.5, 1, 4.6, 1.0], [-0.42, 39, 7, 8, 1, -1.5, 0.9], [0.52, 32.5, 6.5, 7.5, 1, -1.5, 1.0], [1.08, 36.5, 7, 7.5, 1, 5.6, 0.95],
     [-0.85, 33, 22, 5, 2, -1, 0.75], [-0.15, 38, 26, 4.5, 2, -0.5, 0.7], [0.55, 35, 22, 5, 2, -1, 0.75], [1.3, 40, 24, 5, 2, -0.5, 0.7], [-1.45, 41, 20, 5, 2, 0, 0.7]];
   function buildMid(S, g) {
     const n = MID.length, qg = new THREE.PlaneGeometry(1, 1); qg.translate(0, 0.5, 0); const aM = iattr(n, 4), aN = iattr(n, 4);
@@ -347,18 +352,21 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     const m = new THREE.InstancedMesh(qg, mm, n); m.frustumCulled = false; m.renderOrder = -80; g.add(m); S.mid = m;
     // still water below the terrace, catching dark reflections of the rocks
     const wg = new THREE.RingGeometry(26.5, 52, 120, 1, PI * 0.5 - 1.75, 3.5); wg.rotateX(-PI / 2);
-    S.wU = { uRk: { value: MID.filter((q) => q[4] < 1).map(([t, r, w, h]) => new THREE.Vector4(Math.sin(t) * r, -Math.cos(t) * r, h, w)) } };
+    S.wU = { uRk: { value: MID.filter((q) => q[4] < 1).map(([t, r, w, h]) => new THREE.Vector4(Math.sin(t) * r, -Math.cos(t) * r, h, w)) }, uSunD: S.skyU.uSunD };
     const wm = smat(S.U, VW, `
-      varying vec3 vW; uniform vec4 uRk[7];
+      varying vec3 vW; uniform vec4 uRk[7]; uniform vec3 uSunD;
       void main(){
         vec2 p = vW.xz; float r = length(p), az = atan(p.x, -p.y);
         float rv = clamp((uReveal - 0.3) / 0.4, 0.0, 1.0); if (rv < 0.001) discard;
-        float ink = (1.0 - smoothstep(0.0, 0.05, abs(fract(r * 0.9 + vn(vec2(az * 14.0, r * 0.2)) * 0.8) - 0.5) - 0.42)) * step(0.55, vn(vec2(az * r * 0.4, r * 0.9))) * 0.35;
+        float ink = smoothstep(0.56, 0.8, fbm(vec2(az * r * 0.1, r * 0.75) + vec2(uTime * 0.02, 0.0))) * 0.22;
         for (int i = 0; i < 7; i++) { vec4 q = uRk[i]; vec2 dv = cameraPosition.xz - q.xy; float dl = max(length(dv), 1e-3); vec2 dn = dv / dl;
           float al = dot(p - q.xy, dn), sd = abs(dot(p - q.xy, vec2(-dn.y, dn.x)));
           float sm = smoothstep(-1.0, 0.5, al) * (1.0 - smoothstep(q.z * 0.25, q.z * 0.55, al)) * (1.0 - smoothstep(q.w * 0.2, q.w * 0.42, sd));
           ink = max(ink, sm * smoothstep(0.3, 0.6, vn(vec2(sd * 1.5 + q.x, al * 2.5 - uTime * 0.3))) * 0.5); }
-        vec3 c = mix(mix(PAPER, I4, 0.35 + uStorm * 0.4), tone(1.0 - ink, 0.5), smoothstep(0.02, 0.1, ink));
+        vec3 c = min(mix(mix(PAPER, I4, 0.35 + uStorm * 0.4), tone(1.0 - ink, 0.5), smoothstep(0.02, 0.1, ink)), mix(PAPER, I4, 0.35 + uStorm * 0.4));
+        if (uSun > 0.002) { vec2 sd2 = normalize(uSunD.xz + vec2(1e-5)), rel = p - cameraPosition.xz; float al = dot(rel, sd2), sd = abs(rel.x * sd2.y - rel.y * sd2.x);
+          float st = (1.0 - smoothstep(0.3, 1.2 + al * 0.025, sd + (vn(vec2(al * 0.7, 3.0)) - 0.5) * 0.8)) * smoothstep(0.32, 0.6, vn(vec2(sd * 0.9, al * 1.1 + uTime * 0.25)));
+          c = mix(c, mix(VER, GLD, 0.15), st * uSun * 0.85); }
         float a = smoothstep(26.5, 29.0, r) * (1.0 - smoothstep(42.0, 52.0, r));
         gl_FragColor = vec4(outc(c), a * rv);
       }`, S.wU, { transparent: true, depthWrite: false });
@@ -638,14 +646,24 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     g.add(m);
     // the bullets themselves: a wet ink globe with a vermilion rim (petals: a pink globe), wrapped around the stock core, which is drawn
     // in ink colour so its additive tail and floor disc vanish. Under each, an ink blot that spreads on the paper as it flies.
-    const gm = smat(S.U, `varying vec3 vN, vW; varying float vK; void main(){ vK = instanceColor.r; vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0); vW = wp.xyz; vN = mat3(modelMatrix * instanceMatrix) * normal; gl_Position = projectionMatrix * viewMatrix * wp; }`, `
-      varying vec3 vN, vW; varying float vK;
-      void main(){ vec3 n = vN / max(length(vN), 1e-4), v = cameraPosition - vW; v /= max(length(v), 1e-4);
-        float fr = 1.0 - clamp(abs(dot(n, v)), 0.0, 1.0), sp = smoothstep(0.82, 0.95, dot(reflect(-v, n), normalize(vec3(-0.4, 0.8, 0.45))));
-        vec3 c = vK < 0.5 ? mix(I0, I1, (1.0 - fr) * 0.3) : mix(mix(PAPER, PK, 0.7), PK2, fr);
-        c = mix(c, VER, smoothstep(0.45, 0.8, fr)); c = mix(c, vK < 0.5 ? I3 : PAPER, sp * 0.8);
-        gl_FragColor = vec4(outc(c), 1.0); }`);
-    const glb = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), gm, n); glb.frustumCulled = false;
+    // (r2) no longer a glossy globe: a flat ink blot (petals: pink) with a ragged edge and a short dry-brush trail, turned to the eye about
+    // its line of flight, with vermilion only as a thin broken crescent on the leading side
+    const gm = smat(S.U, `varying vec2 vL; varying float vK, vSd;
+      void main(){ vK = instanceColor.r; vSd = instanceColor.g * 37.0; vec3 c = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+        float s = length((instanceMatrix * vec4(1.0, 0.0, 0.0, 0.0)).xyz); vec3 f = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz; f /= max(length(f), 1e-4);
+        vec3 v = cameraPosition - c; v /= max(length(v), 1e-4); vec3 rt = cross(v, f); float rl = length(rt); rt = rl > 1e-3 ? rt / rl : vec3(1.0, 0.0, 0.0);
+        vec3 fw = cross(rt, v); vL = vec2(position.x, position.y * 1.7 - 0.7);
+        gl_Position = projectionMatrix * viewMatrix * vec4(c + v * s * 1.1 + rt * vL.x * s + fw * vL.y * s, 1.0); }`, `
+      varying vec2 vL; varying float vK, vSd;
+      void main(){ vec2 q = vL; float d = length(q) + (fbm(q * 1.7 + vSd) - 0.5) * 0.5, ang = atan(q.x, q.y);
+        float blob = 1.0 - smoothstep(0.74, 0.84, d);
+        float tw = 0.72 * (1.0 + q.y / 2.4), tr = (1.0 - smoothstep(tw - 0.12, tw, abs(q.x + sin(q.y * 1.7 + vSd) * 0.08))) * step(q.y, 0.0) * kas(vec2(q.y * 0.35 + vSd, q.x * 0.45), 0.2 + 0.55 * (-q.y / 2.4));
+        float a = max(blob, tr * 0.9);
+        float cres = (smoothstep(0.5, 0.62, d) - smoothstep(0.72, 0.84, d)) * smoothstep(0.15, 0.6, q.y / max(length(q), 0.05)) * step(0.42, vn(vec2(ang * 3.0 + vSd, 1.0)));
+        vec3 c = vK < 0.5 ? mix(I0, I1, (1.0 - blob) * 0.6) : mix(mix(PAPER, PK, 0.75), PK2, smoothstep(0.2, 0.8, d) * 0.7 + (1.0 - blob) * 0.3);
+        c = mix(c, VER, cres * 0.95);
+        if (a < uCut) discard; gl_FragColor = vec4(outc(c), a); }`, {}, { side: THREE.DoubleSide, alphaToCoverage: A2C() });
+    const glb = new THREE.InstancedMesh(new THREE.PlaneGeometry(2, 2), gm, n); glb.frustumCulled = false; glb.renderOrder = 12;
     const sg = new THREE.PlaneGeometry(1, 1); sg.rotateX(-PI / 2);
     const sm = smat(S.U, `varying vec2 vL; varying float vK, vS; void main(){ vL = position.xz * 2.0; vK = instanceColor.r; vS = instanceColor.g; gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0); }`, `
       varying vec2 vL; varying float vK, vS;
@@ -682,11 +700,15 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         float ff = f + (vn(wq * 1.2 + seed) - 0.5) * 0.1, filled = mode > 0.5 ? 1.0 : 1.0 - smoothstep(prog - 0.05, prog, ff);
         float front = mode > 0.5 ? 0.0 : (smoothstep(prog - 0.14, prog - 0.02, ff) - smoothstep(prog - 0.02, prog + 0.005, ff)) * step(prog, 0.995);
         float pulse = smoothstep(0.78, 1.0, prog) * (0.5 + 0.5 * sin(uTime * 14.0)) * step(mode, 0.5);
-        float wa = inside * (0.08 + 0.15 * filled + 0.07 * pulse) * (0.75 + 0.5 * g) * (0.8 + 0.4 * gr) * (1.0 - 0.4 * big);
-        float fa = inside * front * 0.35, ea = edge * (0.8 + 0.15 * vn(wq * 2.0 + seed));
+        // a readable wash: ~0.4 when the cast starts, ~0.6 when it lands, and a darker band 0.5 m inside the edge (the wet edge pulls
+        // pigment inward) so the deadly side of every line is plain. The storm floor is grey, so the wash is stronger there.
+        float base = mode > 0.5 ? 0.42 : mix(0.38, 0.6, prog), stormK = 1.0 + 0.4 * uStorm;
+        float band = inside * smoothstep(-0.6, -0.12, d);
+        float wa = (inside * (base * (0.55 + 0.45 * filled) + 0.07 * pulse) * (0.8 + 0.35 * g) * (0.88 + 0.24 * gr) * (1.0 - 0.3 * big) + band * 0.2) * stormK;
+        float fa = inside * front * 0.35, ea = edge * (0.8 + 0.15 * vn(wq * 2.0 + seed)) * min(stormK, 1.25);
         vec3 wc, ec, fc;
-        if (kind < 0.5) { wc = mix(VER, PAPER, 0.12); ec = mix(VER, I0, 0.3); fc = mix(VER, I0, 0.22); }
-        else if (kind < 1.5) { wc = I1; ec = I0; fc = I1; wa *= 1.6; ea *= 0.9; ea = max(ea, (1.0 - smoothstep(0.02, 0.06, abs(d + ew + 0.05))) * inside * 0.75); }
+        if (kind < 0.5) { wc = mix(mix(VER, PAPER, 0.16), mix(VER, I0, 0.25), band * 0.6); ec = mix(VER, I0, 0.3); fc = mix(VER, I0, 0.22); }
+        else if (kind < 1.5) { wc = I1; ec = I0; fc = I1; wa *= 1.3; ea *= 0.9; ea = max(ea, (1.0 - smoothstep(0.02, 0.06, abs(d + ew + 0.05))) * inside * 0.75); }
         else { wc = mix(PAPER, GLD, 0.35); ec = mix(OCH, VER, 0.15); fc = wc; wa = inside * 0.5; }
         vec3 col = wc; float a = wa;
         col = mix(col, fc, clamp(fa / max(a + fa, 1e-3), 0.0, 1.0)); a = max(a, fa);
@@ -705,7 +727,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     const TL = S.tele, M = TL.mesh; let k = 0;
     for (const h of Hz.list) {
       if (h.mesh) h.mesh.visible = false; // the stock decal stays hidden; it is painted below
-      if (h.state === 'done' || k >= TL.n) continue;
+      if (h.state === 'done' || k >= TL.n || h.name === 'Enso') continue; // the Enso ring is painted as one stroke (buildEnso)
       const s = h.shape; let ty = 0, a = 0, b2 = 0, c = 0, bound = 1;
       if (s.type === 'circle') { a = s.r; bound = s.r; } else if (s.type === 'donut') { ty = 1; a = s.r1; b2 = s.r0; bound = s.r1; }
       else if (s.type === 'cone') { ty = 2; a = s.r; b2 = s.r0 || 0; c = s.arc; bound = s.r; } else { ty = 3; a = s.len; b2 = s.w; bound = Math.max(s.len, s.w); }
@@ -721,6 +743,48 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       TL.T0.setXYZW(k, ty, a, b2, c); TL.T1.setXYZW(k, prog, fire, mode, al); TL.T2.setXYZW(k, bound, h.paintSeed, kind, 0); k++;
     }
     M.count = k; if (k) { M.instanceMatrix.needsUpdate = true; TL.T0.needsUpdate = TL.T1.needsUpdate = TL.T2.needsUpdate = true; }
+  }
+
+  // The Enso: the whole ring is one brush stroke on one quad, painted in polar coordinates. Before the brush arrives the band is a
+  // vermilion-tinted wet wash between two thin vermilion danger lines; then the brush sweeps round (in step with the wall hazards),
+  // loaded black at the start, thinning to dry-brush kasure toward the gap, which is simply where it ran dry: bare paper and an ochre tick.
+  // uE: start angle, stroke length (rad), drawn length (rad), alpha. uE2.x: telegraph progress, uE2.y: drying after the cast.
+  function buildEnso(S, g) {
+    S.eU = { uE: { value: new THREE.Vector4(0, 5.32, 0, 0) }, uE2: { value: new THREE.Vector4(0, 0, 0, 0) } };
+    const geo = new THREE.PlaneGeometry(28, 28); geo.rotateX(-PI / 2);
+    const m = new THREE.Mesh(geo, smat(S.U, VW, `
+      varying vec3 vW; uniform vec4 uE, uE2;
+      void main(){
+        vec2 p = vW.xz; float r = length(p); if (r < 8.6 || r > 13.4) discard;
+        float a = atan(p.x, p.y), rel = mod(a - uE.x, 6.28318), L = max(uE.y, 1e-3), u = clamp(rel / L, 0.0, 1.0), on = step(rel, L);
+        vec2 cs = p / max(r, 1e-3);
+        float r0 = 9.5 + (fbm(cs * 1.6 + 3.0) - 0.5) * 0.6, r1 = 12.5 + (fbm(cs * 1.6 + 9.0) - 0.5) * 0.6;
+        float inb = smoothstep(r0 - 0.07, r0 + 0.07, r) * (1.0 - smoothstep(r1 - 0.07, r1 + 0.07, r)) * on;
+        float v = clamp((r - r0) / max(r1 - r0, 0.5), 0.0, 1.0), sl = rel * 11.0;
+        // the brush: drawn up to uE.z with a soft wet head; loaded at the start, kasure growing toward the dry end
+        float drawn = 1.0 - smoothstep(uE.z - 0.04, uE.z, rel), head = (1.0 - smoothstep(0.0, 0.16, abs(rel - uE.z + 0.06))) * step(uE.z, L - 0.02) * step(0.01, uE.z);
+        float k = kas(vec2(sl * 0.06, v * 0.34), smoothstep(0.55, 1.0, u) * 0.58 + uE2.y * 0.12);
+        float wetE = 1.0 - smoothstep(0.0, 0.22, min(r - r0, r1 - r));
+        float gr = fbm(p * 0.7 + 4.0);
+        vec3 ink = mix(I0, I1, clamp(smoothstep(0.2, 0.85, u) * 0.75 + (gr - 0.5) * 0.3, 0.0, 1.0));
+        ink = mix(ink, I2, smoothstep(0.8, 1.0, u) * 0.35 + uE2.y * 0.35);
+        ink = mix(ink, I0, max(wetE * 0.75, head));
+        float ia = inb * drawn * k * (0.95 - 0.15 * u) * (1.0 - 0.4 * uE2.y);
+        // the wet wash ahead of the brush: the band that will be painted
+        float wa = inb * (1.0 - drawn) * mix(0.36, 0.58, uE2.x) * (0.85 + 0.3 * gr);
+        vec3 col = mix(mix(VER, PAPER, 0.18), mix(VER, I0, 0.25), wetE * 0.6); float al = wa;
+        col = mix(col, ink, clamp(ia / max(ia + wa * (1.0 - ia), 1e-3), 0.0, 1.0)); al = ia + al * (1.0 - ia);
+        // one thin vermilion line on each true edge of the danger band, broken here and there like a quick brush line
+        float le = min(abs(r - 9.5 - (vn(cs * 30.0) - 0.5) * 0.08), abs(r - 12.5 - (vn(cs * 30.0 + 4.0) - 0.5) * 0.08));
+        float ln = (1.0 - smoothstep(0.035, 0.075, le)) * on * smoothstep(0.25, 0.4, vn(vec2(sl * 0.4, 2.0)) + 0.2) * (1.0 - uE2.y);
+        col = mix(col, VER, ln * 0.95); al = max(al, ln * 0.95);
+        // the gap: bare paper, one ochre tick across the band at its middle
+        float gm = L + (6.28318 - L) * 0.5, tk = (1.0 - smoothstep(0.06, 0.12, abs(rel - gm) * r)) * step(9.8, r) * step(r, 12.2) * (1.0 - on) * (1.0 - uE2.y);
+        col = mix(col, OCH, tk); al = max(al, tk * 0.9);
+        al *= uE.w; if (al < 0.01) discard;
+        gl_FragColor = vec4(outc(col), clamp(al, 0.0, 1.0));
+      }`, S.eU, { transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    m.position.y = 0.06; m.renderOrder = 11; m.visible = false; g.add(m); S.ensoM = m;
   }
 
   // the seal stone that drops on the player in phase two
@@ -803,19 +867,20 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
   const CP0 = [[0, 2.3, 0.9], [0, 1.95, -0.8], [0.8, 2.0, -2.6], [2.9, 3.1, -3.6], [4.4, 5.0, -4.6], [3.5, 6.6, -5.6], [0.4, 7.0, -6.2], [-2.9, 5.8, -6.6], [-4.7, 3.3, -7.4], [-5.4, 1.7, -9.6], [-6.8, 2.9, -11.6], [-6.6, 5.2, -13.2]];
   const NB = 48, NSP = 96, NTT = 12, NHC = 52, NCARD = NSP + NTT + NHC, NPUFF = 10;
   // a strong belly swell at the shoulders, then a long taper to a thin whip of a tail
-  const bodyR = (s) => s < 0.06 ? lerp(0.55, 0.8, s / 0.06) : s < 0.2 ? lerp(0.8, 1.05, smooth((s - 0.06) / 0.14)) : 1.05 * Math.pow(Math.max(0, 1 - (s - 0.2) / 0.8), 1.35) + 0.03;
+  const bodyR = (s) => 1.2 * (s < 0.06 ? lerp(0.55, 0.8, s / 0.06) : s < 0.2 ? lerp(0.8, 1.05, smooth((s - 0.06) / 0.14)) : 1.05 * Math.pow(Math.max(0, 1 - (s - 0.2) / 0.8), 1.35) + 0.03);
   function buildDragon(S, b) {
     const D = S.D = {}, root = D.root = new THREE.Group(); b.group.add(root);
     D.U = { uInk: { value: 1 }, uDraw: { value: 1.2 }, uGrind: { value: 0 }, uFade: { value: 1 }, uFadeH: { value: 1.01 }, uFlat: { value: 0 }, uWetG: { value: 0 }, uLd: { value: new V3(-0.4, 0.8, 0.45).normalize() }, uOut: { value: 0.085 } };
-    const SKV = `attribute float aS, aK, aBelly; attribute vec2 aSc; varying vec3 vN, vW; varying float vS, vK, vBelly; varying vec2 vSc;
-      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz; vN = mat3(modelMatrix) * normal; vS = aS; vK = aK; vBelly = aBelly; vSc = aSc; gl_Position = projectionMatrix * viewMatrix * wp; }`;
+    // aFd: per body ring, 0..1 washed out because it lies on the line to the hero, > 1.5 cut away because it is at the lens
+    const SKV = `attribute float aS, aK, aBelly, aFd; attribute vec2 aSc; varying vec3 vN, vW; varying float vS, vK, vBelly, vFd; varying vec2 vSc;
+      void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz; vN = mat3(modelMatrix) * normal; vS = aS; vK = aK; vBelly = aBelly; vFd = aFd; vSc = aSc; gl_Position = projectionMatrix * viewMatrix * wp; }`;
     const skin = smat(S.U, SKV, `
       uniform float uInk, uDraw, uGrind, uFade, uFadeH, uFlat, uWetG; uniform vec3 uLd;
-      varying vec3 vN, vW; varying float vS, vK, vBelly; varying vec2 vSc;
+      varying vec3 vN, vW; varying float vS, vK, vBelly, vFd; varying vec2 vSc;
       void main(){
-        float s = vS; if (s < 1.0 - uDraw) discard;
+        float s = vS; if (s < 1.0 - uDraw || vFd > 1.5) discard;
         // washed out (not dithered) when he hides the hero: the colour runs to pale paper and the stroke turns see-through
-        float wo = clamp((1.0 - (s > 0.1 ? uFade : uFadeH)) * 1.6, 0.0, 1.0), al = 1.0 - wo * 0.92;
+        float wo = s > 0.1 ? clamp(vFd, 0.0, 1.0) : clamp((1.0 - uFadeH) * 1.6, 0.0, 1.0), al = 1.0 - wo * 0.96;
         if (uCut > 0.3 && al < 0.999 && al < ign(gl_FragCoord.xy)) discard;
         vec3 n = vN / max(length(vN), 1e-4), vd = cameraPosition - vW; vd /= max(length(vd), 1e-4);
         float ndl = dot(n, uLd) * 0.5 + 0.5, fr = 1.0 - clamp(abs(dot(n, vd)), 0.0, 1.0), nz = vn(vSc * 1.3);
@@ -824,12 +889,12 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         float streak = vn(vec2(vSc.x * 0.07, vSc.y * 2.2)), patch_ = smoothstep(0.5, 0.7, vn(vSc * vec2(0.18, 0.5) + 7.0));
         // three bands: black in shadow, charcoal, and a lit band that is still dark ink
         float lit = ndl + (nz - 0.5) * 0.14 + (streak - 0.5) * 0.12;
-        float dark = mix(0.98, 0.82, smoothstep(0.5, 0.55, lit)); dark = mix(dark, 0.6, smoothstep(0.72, 0.77, lit));
+        float dark = mix(0.98, 0.84, smoothstep(0.46, 0.6, lit)); dark = mix(dark, 0.7, smoothstep(0.7, 0.84, lit) * (0.5 + 0.5 * uWetG));
         dark += scale * 0.12 * patch_ * smoothstep(0.55, 0.8, lit) * (1.0 - vBelly);
-        // the belly: a pale wash with plate strokes
-        float bp = smoothstep(0.45, 0.85, vBelly) * step(vK, 0.5);
-        float plate = 1.0 - smoothstep(0.0, 0.1, abs(fract(vSc.x * 0.5) - 0.5) - 0.38);
-        dark = mix(dark, 0.26 + plate * 0.5, bp);
+        // the belly: a mid-grey wash with plate strokes (never a pale stripe when a coil arches overhead)
+        float bp = smoothstep(0.45, 0.9, vBelly) * step(vK, 0.5);
+        float plate = 1.0 - smoothstep(0.0, 0.12, abs(fract(vSc.x * 0.5) - 0.5) - 0.36);
+        dark = mix(dark, 0.52 + plate * 0.3, bp);
         // wet edge: pigment pools where the stroke turns away from the eye
         dark = max(dark, smoothstep(0.4, 0.78, fr) * 0.99);
         // the spine line stays black at every ink level
@@ -838,6 +903,9 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         // dry brush: paper shows through in streaks along the body, more as the ink runs low and toward the tail
         float k = kas(vec2(vSc.x * 0.04, vSc.y * 0.12), smoothstep(0.45, 1.0, s) * 0.5 + (1.0 - uInk) * 0.42);
         float flank = (1.0 - spine) * (1.0 - smoothstep(0.7, 0.92, fr)) * step(0.0, s) * step(vK, 0.5);
+        // fine hair streaks of a dry sweep run the whole length of the body: grey, not paper (paper only where the ink is low)
+        float kb = kas(vec2(vSc.x * 0.035, vSc.y * 0.26), 0.12 + 0.1 * vn(vec2(vSc.x * 0.05, 3.0)));
+        dark = mix(dark, dark * 0.55, (1.0 - kb) * flank * 0.85);
         dark = mix(dark, 0.08 + dark * 0.2, (1.0 - k) * flank);
         if (s > 0.8 && k < smoothstep(0.8, 1.0, s) * 0.9) discard;
         if (s > 0.0) dark = mix(dark, 1.0, smoothstep(1.0 - uGrind, 1.04 - uGrind, s) * step(0.001, uGrind) * 0.92);
@@ -850,7 +918,9 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         vec3 rf = reflect(-vd, n); c = mix(c, I3, smoothstep(0.9, 0.97, dot(rf, uLd)) * uWetG * step(vK, 0.5) * (1.0 - uFlat));
         // the finale: a warm rim on the lit side and flecks of gold leaf
         if (uSun > 0.002) { float sk = uSun * step(vK, 0.5) * (1.0 - uFlat);
-          c = mix(c, GLD, smoothstep(0.4, 0.58, fr) * (1.0 - smoothstep(0.68, 0.8, fr)) * smoothstep(0.6, 0.85, ndl) * 0.3 * sk);
+          // neutral ink under the warm dawn grade, and the warm light only as a thin rim on the silhouette
+          c = mix(c, vec3(dot(c, vec3(0.3333))) * vec3(0.97, 0.99, 1.04), 0.75 * uSun);
+          c = mix(c, GLD, smoothstep(0.8, 0.9, fr) * (1.0 - smoothstep(0.95, 1.0, fr)) * smoothstep(0.5, 0.8, ndl) * 0.55 * sk);
           vec2 gq = vSc * vec2(1.6, 2.4), gi = floor(gq), gf = fract(gq) - 0.5 + (vec2(hh(gi + 1.3), hh(gi + 2.9)) - 0.5) * 0.4;
           float fl = step(hh(gi + 7.7), 0.04) * (1.0 - smoothstep(0.06, 0.13 + 0.05 * hh(gi), length(gf * vec2(1.0, 1.7))));
           c = mix(c, mix(GLD, OCH, hh(gi + 2.0) * 0.5), fl * sk * (1.0 - bp)); }
@@ -862,39 +932,41 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         c = mix(c, mix(I4, PAPER, 0.5), wo * 0.85);
         gl_FragColor = vec4(outc(c), al);
       }`, D.U, { alphaToCoverage: A2C() });
-    const outl = smat(S.U, `attribute float aS, aK; attribute vec2 aSc; uniform float uOut; varying float vS; varying vec2 vSc; varying vec3 vN2, vW2;
+    const outl = smat(S.U, `attribute float aS, aK, aFd; attribute vec2 aSc; uniform float uOut; varying float vS, vFd; varying vec2 vSc; varying vec3 vN2, vW2;
       void main(){ float w = uOut * (0.6 + 0.4 * sin(aSc.x * 0.37 + aSc.y * 0.9) + 0.35 * sin(aSc.x * 1.3)) * (1.0 - clamp(aS, 0.0, 1.0) * 0.75) * (aK > 1.5 && aK < 2.5 ? 0.4 : 1.0);
-        vS = aS; vSc = aSc; vN2 = mat3(modelMatrix) * normal; vec4 wp = modelMatrix * vec4(position + normal * w, 1.0); vW2 = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }`, `
-      uniform float uDraw, uFade, uFadeH, uFlat; varying float vS; varying vec2 vSc; varying vec3 vN2, vW2;
-      void main(){ if (vS < 1.0 - uDraw) discard;
-        // faded: only the rim of the hull is left, a faint drawn contour at about a third
-        float wo = clamp((1.0 - (vS > 0.1 ? uFade : uFadeH)) * 1.6, 0.0, 1.0);
+        vS = aS; vFd = aFd; vSc = aSc; vN2 = mat3(modelMatrix) * normal; vec4 wp = modelMatrix * vec4(position + normal * w, 1.0); vW2 = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; }`, `
+      uniform float uDraw, uFade, uFadeH, uFlat; varying float vS, vFd; varying vec2 vSc; varying vec3 vN2, vW2;
+      void main(){ if (vS < 1.0 - uDraw || vFd > 1.5) discard;
+        // faded: only the rim of the hull is left, a faint drawn contour
+        float wo = vS > 0.1 ? clamp(vFd, 0.0, 1.0) : clamp((1.0 - uFadeH) * 1.6, 0.0, 1.0);
         vec3 n = vN2 / max(length(vN2), 1e-4), v = cameraPosition - vW2; v /= max(length(v), 1e-4);
-        float al = mix(1.0, 0.35 * (1.0 - smoothstep(0.25, 0.6, abs(dot(n, v)))), wo);
+        float al = mix(1.0, 0.22 * (1.0 - smoothstep(0.25, 0.6, abs(dot(n, v)))), wo);
         if (al < 0.01 || (uCut > 0.3 && al < 0.999 && al < ign(gl_FragCoord.xy + 3.0))) discard;
         float k = kas(vec2(vSc.x * 0.04, vSc.y * 0.12), smoothstep(0.45, 1.0, vS) * 0.6); if (vS > 0.8 && k < smoothstep(0.8, 1.0, vS) * 0.9) discard;
         gl_FragColor = vec4(outc(mix(I0, I2, uFlat)), al); }`, D.U, { side: THREE.BackSide, alphaToCoverage: A2C() });
     D.skin = skin; D.outl = outl;
     // body tube
-    const tb = D.tube = new TubeBuf(NB, 8), vcount = NB * 9, aS = new Float32Array(vcount), aK = new Float32Array(vcount), aSc = new Float32Array(vcount * 2), aBe = new Float32Array(vcount);
-    for (let i = 0; i < NB; i++) for (let j = 0; j <= 8; j++) { const v = i * 9 + j, s = i / (NB - 1), f = j / 8 * TAU; aS[v] = s; aSc[v * 2] = s * 78; aSc[v * 2 + 1] = j / 8 * 9; aBe[v] = sat(-Math.cos(f)); }
+    const TS = 16, tb = D.tube = new TubeBuf(NB, TS), vcount = NB * (TS + 1), aS = new Float32Array(vcount), aK = new Float32Array(vcount), aSc = new Float32Array(vcount * 2), aBe = new Float32Array(vcount);
+    for (let i = 0; i < NB; i++) for (let j = 0; j <= TS; j++) { const v = i * (TS + 1) + j, s = i / (NB - 1), f = j / TS * TAU; aS[v] = s; aSc[v * 2] = s * 78; aSc[v * 2 + 1] = j / TS * 9; aBe[v] = sat(-Math.cos(f)); }
     tb.geo.setAttribute('aS', new THREE.BufferAttribute(aS, 1)); tb.geo.setAttribute('aK', new THREE.BufferAttribute(aK, 1)); tb.geo.setAttribute('aSc', new THREE.BufferAttribute(aSc, 2)); tb.geo.setAttribute('aBelly', new THREE.BufferAttribute(aBe, 1));
+    D.fd = new THREE.BufferAttribute(new Float32Array(vcount), 1).setUsage(THREE.DynamicDrawUsage); tb.geo.setAttribute('aFd', D.fd); D.fdV = new Float32Array(NB); D.fdT = new Float32Array(NB); D.ts = TS;
     D.cp = CP0.map((c) => new V3(...c)); D.cpRaw = CP0.map((c) => new V3(...c)); D.C = []; for (let i = 0; i < NB; i++) D.C.push(new V3());
     D.duck = new Float32Array(12); D.duckT = new Float32Array(12);
     const body = new THREE.Mesh(tb.geo, skin), bodyO = new THREE.Mesh(tb.geo, outl); body.frustumCulled = bodyO.frustumCulled = false; root.add(body, bodyO);
     // head (neck joint at the origin, +Z forward)
     const H = []; const add = (geo, k) => H.push([geo, k]);
     add(T(new THREE.SphereGeometry(0.72, 26, 18), 0, 0.28, 0.35, 0, 0, 0, 0.95, 0.78, 1.15), 0);
-    add(T(new THREE.CylinderGeometry(0.34, 0.56, 1.6, 22, 4), 0, 0.12, 1.45, PI / 2 + 0.08, 0, 0, 1, 1, 0.7), 0);
-    add(T(new THREE.SphereGeometry(0.46, 18, 12), 0, 0.18, 2.22, 0, 0, 0, 1.08, 0.6, 0.66), 0);
-    add(T(new THREE.SphereGeometry(0.4, 16, 10), 0, 0.62, 0.55, 0.3, 0, 0, 0.75, 0.42, 1.2), 0); // forehead ridge
+    // a long, narrow muzzle (a dragon, not an ox), a raised brow ridge over the eyes
+    add(T(new THREE.CylinderGeometry(0.3, 0.52, 2.0, 22, 4), 0, 0.1, 1.62, PI / 2 + 0.07, 0, 0, 0.7, 1, 0.66), 0);
+    add(T(new THREE.SphereGeometry(0.46, 18, 12), 0, 0.15, 2.62, 0, 0, 0, 0.76, 0.56, 0.7), 0);
+    add(T(new THREE.SphereGeometry(0.4, 16, 10), 0, 0.76, 0.6, 0.3, 0, 0, 0.75, 0.5, 1.25), 0); // forehead ridge
     for (const sx of [-1, 1]) {
-      add(T(new THREE.SphereGeometry(0.1, 8, 6), sx * 0.2, 0.34, 2.46), 3);
-      add(T(new THREE.SphereGeometry(0.3, 14, 10), sx * 0.36, 0.56, 0.95, 0, sx * 0.25, 0, 1.1, 0.5, 1.5), 0);
+      add(T(new THREE.SphereGeometry(0.1, 8, 6), sx * 0.15, 0.3, 2.9), 3);
+      add(T(new THREE.SphereGeometry(0.3, 14, 10), sx * 0.36, 0.66, 0.98, 0, sx * 0.25, 0, 1.1, 0.6, 1.5), 0);
       add(T(new THREE.SphereGeometry(0.17, 12, 10), sx * 0.43, 0.4, 1.12, 0, 0, 0, 0.8, 0.85, 1.2), 2);
-      add(T(new THREE.SphereGeometry(0.16, 10, 8), sx * 0.42, 0.62, 1.2, 0, sx * 0.3, sx * 0.4, 1.4, 0.45, 0.9), 3); // brow: a black stroke over the eye
-      add(T(new THREE.ConeGeometry(0.075, 0.46, 6), sx * 0.3, -0.26, 2.0, PI, 0, 0), 2);
-      for (let i = 0; i < 4; i++) add(T(new THREE.ConeGeometry(0.045, 0.17, 5), sx * (0.36 - i * 0.02), -0.12, 1.8 - i * 0.24, PI, 0, 0), 2);
+      add(T(new THREE.SphereGeometry(0.16, 10, 8), sx * 0.42, 0.74, 1.22, 0, sx * 0.3, sx * 0.4, 1.5, 0.5, 0.95), 3); // brow: a black stroke over the eye
+      add(T(new THREE.ConeGeometry(0.075, 0.46, 6), sx * 0.22, -0.26, 2.32, PI, 0, 0), 2);
+      for (let i = 0; i < 4; i++) add(T(new THREE.ConeGeometry(0.045, 0.17, 5), sx * (0.26 - i * 0.012), -0.12, 2.1 - i * 0.26, PI, 0, 0), 2);
       add(orient(new THREE.ConeGeometry(0.26, 1.4, 8), sx * 0.75, 0.0, -0.05, sx * 0.6, 0.1, -1, 1, 1, 0.42), 0); // cheek frill
       add(taper([[sx * 0.3, 0.72, 0.35], [sx * 0.5, 1.15, -0.2], [sx * 0.72, 1.55, -0.9], [sx * 0.8, 1.85, -1.65]], 0.14, 0.025, 7), 1);
       add(taper([[sx * 0.55, 1.25, -0.35], [sx * 0.92, 1.7, -0.15], [sx * 1.08, 2.05, 0.25]], 0.075, 0.02, 6, 7), 1);
@@ -902,10 +974,10 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     const head = D.head = new THREE.Group(); head.scale.setScalar(1.3); root.add(head);
     const hg = mergeParts(H), hm = new THREE.Mesh(hg, skin), ho = new THREE.Mesh(hg, outl); head.add(hm, ho);
     const J = []; const addJ = (geo, k) => J.push([geo, k]);
-    addJ(T(new THREE.CylinderGeometry(0.26, 0.4, 1.5, 16, 2), 0, -0.1, 0.75, PI / 2, 0, 0, 1, 1, 0.55), 0);
-    addJ(T(new THREE.SphereGeometry(0.3, 12, 8), 0, -0.08, 1.5, 0, 0, 0, 1, 0.5, 0.8), 0);
-    addJ(T(new THREE.BoxGeometry(0.36, 0.05, 1.15), 0, 0.06, 0.8), 3);
-    for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) addJ(T(new THREE.ConeGeometry(0.045, 0.17, 5), sx * (0.25 - i * 0.015), 0.08, 1.35 - i * 0.24), 2);
+    addJ(T(new THREE.CylinderGeometry(0.24, 0.38, 1.8, 16, 2), 0, -0.1, 0.9, PI / 2, 0, 0, 0.72, 1, 0.55), 0);
+    addJ(T(new THREE.SphereGeometry(0.3, 12, 8), 0, -0.08, 1.8, 0, 0, 0, 0.72, 0.5, 0.8), 0);
+    addJ(T(new THREE.BoxGeometry(0.26, 0.05, 1.4), 0, 0.06, 0.95), 3);
+    for (const sx of [-1, 1]) for (let i = 0; i < 4; i++) addJ(T(new THREE.ConeGeometry(0.045, 0.17, 5), sx * (0.18 - i * 0.01), 0.08, 1.62 - i * 0.26), 2);
     const jaw = D.jaw = new THREE.Group(); jaw.position.set(0, -0.12, 0.55); head.add(jaw);
     const jg = mergeParts(J); jaw.add(new THREE.Mesh(jg, skin), new THREE.Mesh(jg, outl));
     // eyes: blank until the dot; then the only saturated thing on him
@@ -913,8 +985,8 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     for (const sx of [-1, 1]) { const pu = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), pm); pu.position.set(sx * 0.555, 0.43, 1.15); pu.scale.set(0.5, 1, 0.7); head.add(pu); D.pupils.push(pu); }
     // whiskers: two long S-curved strokes, rebuilt each frame
     const NW = 22;
-    D.wh = [-1, 1].map((sx) => { const t = new TubeBuf(NW, 4), n = NW * 5; const s2 = new Float32Array(n).fill(-0.05), k2 = new Float32Array(n).fill(3), sc2 = new Float32Array(n * 2), be = new Float32Array(n);
-      t.geo.setAttribute('aS', new THREE.BufferAttribute(s2, 1)); t.geo.setAttribute('aK', new THREE.BufferAttribute(k2, 1)); t.geo.setAttribute('aSc', new THREE.BufferAttribute(sc2, 2)); t.geo.setAttribute('aBelly', new THREE.BufferAttribute(be, 1));
+    D.wh = [-1, 1].map((sx) => { const t = new TubeBuf(NW, 5), n = NW * 6; const s2 = new Float32Array(n).fill(-0.05), k2 = new Float32Array(n).fill(3), sc2 = new Float32Array(n * 2), be = new Float32Array(n);
+      t.geo.setAttribute('aS', new THREE.BufferAttribute(s2, 1)); t.geo.setAttribute('aK', new THREE.BufferAttribute(k2, 1)); t.geo.setAttribute('aSc', new THREE.BufferAttribute(sc2, 2)); t.geo.setAttribute('aBelly', new THREE.BufferAttribute(be, 1)); t.geo.setAttribute('aFd', new THREE.BufferAttribute(new Float32Array(n), 1));
       const m = new THREE.Mesh(t.geo, skin); m.frustumCulled = false; head.add(m); return { t, sx, P: Array.from({ length: NW }, () => new V3()) }; });
     // legs in a bent Z (upper limb back, forearm forward), three splayed black claws
     const leg = (sx, fore) => { const L = [], k = fore ? 1.3 : 1.05;
@@ -929,14 +1001,14 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     // stroke cards: 96 spines flying back along the ridge, a 12-stroke tail tuft, and in head space a 40-stroke mane and a 12-stroke beard
     const cg = new THREE.PlaneGeometry(1, 1); cg.translate(0, 0.5, 0); const aCd = iattr(NCARD, 4), rng = mulberry(17);
     for (let i = 0; i < NCARD; i++) aCd.setXYZW(i, rng(), rng() * 10, i < NSP ? 0.03 + i / (NSP - 1) * 0.92 : i < NSP + NTT ? 0.97 : -0.05, 0);
-    cg.setAttribute('aCd', aCd);
+    cg.setAttribute('aCd', aCd); aCd.setUsage(THREE.DynamicDrawUsage); D.aCd = aCd;
     const cm = smat(S.U, `attribute vec4 aCd; varying vec2 vUv; varying vec4 vCd; void main(){ vUv = vec2(position.x + 0.5, position.y); vCd = aCd; gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0); }`, `
       uniform float uDraw, uFlat, uInk, uFade, uFadeH; varying vec2 vUv; varying vec4 vCd;
-      void main(){ if (vCd.z < 1.0 - uDraw) discard;
-        float wo = clamp((1.0 - (vCd.z > 0.1 ? uFade : uFadeH)) * 1.6, 0.0, 1.0);
+      void main(){ if (vCd.z < 1.0 - uDraw || vCd.w > 1.5) discard;
+        float wo = vCd.z > 0.1 ? clamp(vCd.w, 0.0, 1.0) : clamp((1.0 - uFadeH) * 1.6, 0.0, 1.0);
         float v = clamp(vUv.y, 0.0, 1.0), bend = sin(v * 2.6 + vCd.y) * 0.13 * v, hw = 0.5 * pow(1.0 - v, 0.7) * (0.75 + 0.25 * sin(v * 3.14159));
         float a = 1.0 - smoothstep(hw - 0.08, hw, abs(vUv.x - 0.5 - bend)); a *= kas(vec2(v * 0.6 + vCd.y, vUv.x * 0.7), 0.1 + 0.45 * v + (1.0 - uInk) * 0.2);
-        float al = 1.0 - wo * 0.88; if (a < uCut || (uCut > 0.3 && al < 0.999 && al < ign(gl_FragCoord.xy + 5.0))) discard; a *= al;
+        float al = 1.0 - wo * 0.96; if (a < uCut || (uCut > 0.3 && al < 0.999 && al < ign(gl_FragCoord.xy + 5.0))) discard; a *= al;
         float dark = mix(0.98, 0.45, uFlat) * (0.92 + 0.08 * vCd.x) - v * 0.12;
         gl_FragColor = vec4(outc(mix(tone(1.0 - dark, vCd.x), mix(I4, PAPER, 0.5), wo * 0.85)), a); }`, D.U, { side: THREE.DoubleSide, alphaToCoverage: A2C() });
     D.cards = new THREE.InstancedMesh(cg, cm, NCARD); D.cards.frustumCulled = false; root.add(D.cards);
@@ -988,7 +1060,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       const sw = P.sweep * smooth((j - 1.5) / 2); if (sw > 0.001) { const a = P.sweepA + j * 0.66; x = lerp(x, Math.sin(a) * 7.2, sw); y = lerp(y, 8.5 + Math.sin(a * 2) * 0.5 + (j - 6) * 0.15, sw); z = lerp(z, Math.cos(a) * 7.2, sw); }
       D.cpRaw[j].set(x, y, z);
       // a coil that would hide the hero, or crowd the lens, sinks low and flat out of the way
-      const dk = D.duck[j]; if (dk > 0.001) y = lerp(y, 0.95 + Math.max(0, y - 0.95) * 0.18, dk);
+      const dk = D.duck[j]; if (dk > 0.001) y = lerp(y, 0.4, dk);
       cp[j].set(x, y, z);
     }
     for (let i = 0; i < NB; i++) { const u = i / (NB - 1) * (n - 1), k = Math.min(n - 2, Math.floor(u)), f = u - k; _cr(cp[Math.max(0, k - 1)], cp[k], cp[k + 1], cp[Math.min(n - 1, k + 2)], f, D.C[i]); }
@@ -1003,8 +1075,8 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     D.hind.forEach((L, k) => { const sx = k ? 1 : -1, Ni = N[hi], Bi = B[hi], r = bodyR(hi / (NB - 1)); L.position.copy(C[hi]).addScaledVector(Bi, sx * r * 0.8).addScaledVector(Ni, -r * 0.5); L.rotation.set(0.5 + Math.sin(t * 1.3 + k) * 0.15, 0, sx * 0.25); });
     // whiskers: from the snout, two long S-curves trailing back and waving
     for (const w of D.wh) { const P2 = w.P, m = P2.length; for (let k = 0; k < m; k++) { const u = k / (m - 1);
-      P2[k].set(w.sx * (0.3 + u * 1.7 + Math.sin(u * 4.4 - t * 2.1) * 0.45 * u), 0.12 - u * 0.9 + Math.sin(u * 6.0 - t * 1.6) * 0.45 * u, 2.3 - u * 5.2 + Math.sin(u * 3.0 - t * 1.3) * 0.2 * u); }
-      w.t.build(P2, (i) => 0.05 * Math.pow(1 - i / m, 0.8) + 0.006); }
+      P2[k].set(w.sx * (0.22 + u * 1.7 + Math.sin(u * 4.4 - t * 2.1) * 0.45 * u), 0.1 - u * 0.9 + Math.sin(u * 6.0 - t * 1.6) * 0.45 * u, 2.7 - u * 5.4 + Math.sin(u * 3.0 - t * 1.3) * 0.2 * u); }
+      w.t.build(P2, (i) => 0.1 * Math.pow(1 - i / m, 0.8) + 0.012); }
     // cards: spines flying back along the ridge, alternating sides, fluttering
     const I = D.cards;
     for (let i = 0; i < NSP; i++) { const u = i / (NSP - 1), bi = Math.min(NB - 3, 1 + Math.round(u * (NB - 5))), r = bodyR(bi / (NB - 1)), sd = i % 2 ? 1 : -1, fl = Math.sin(t * 3.4 + i * 0.7) * 0.22;
@@ -1028,6 +1100,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
   const fract1 = (x) => x - Math.floor(x);
 
   // ---------------------------------------------------------------------------------------------------------------------
+  const MELEE_PTS = [[0, 2.6, 1.4], [1.8, -3.0, 1.4]];
   function build(b) {
     const g = G.world, S = b.state, low = G.q.part < 0.5;
     { const cu = Post.final && Post.final.uniforms.uChroma; if (cu) { const was = cu.value; cu.value = 0; g.addEventListener('removed', () => { cu.value = was; }); } }
@@ -1037,17 +1110,25 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     S.hemi = W.hemi(g, 0xfff4e2, 0x9a907c, 1.25);
     S.sun = W.sun(g, { dir: [-0.5, 0.8, 0.45], color: 0xfff0dc, intensity: 1.3, shadow: false });
     buildSky(S, g); buildGround(S, g); buildMountains(S, g); buildMist(S, g, low); buildMid(S, g); buildBamboo(S, g, low); buildTree(S, g, low); buildBirds(S, g);
-    buildDecals(S, g); buildBulletQuads(S, g); buildTele(S, g); buildRain(S, g); buildSealBlock(S, g); if (!G.headless) buildOverlay(S, g);
+    buildDecals(S, g); buildBulletQuads(S, g); buildTele(S, g); buildEnso(S, g); buildRain(S, g); buildSealBlock(S, g); if (!G.headless) buildOverlay(S, g);
     buildDragon(S, b);
+    // melee range is measured to the nearest of his body centre, his head and his shoulder coil (dragon space x, z, radius), so a
+    // blade under his head is in range. Same in headless sims (fixed rest-pose points, not the animated mesh).
+    b.distTo = function (x, z) { const cf = Math.cos(this.facing), sf = Math.sin(this.facing); let d = Math.hypot(x - this.pos.x, z - this.pos.z) - this.radius;
+      for (const q of MELEE_PTS) { const wx = this.pos.x + q[0] * cf + q[1] * sf, wz = this.pos.z - q[0] * sf + q[1] * cf; d = Math.min(d, Math.hypot(x - wx, z - wz) - q[2]); }
+      return Math.max(0, d); };
     Object.assign(S, { ink: 1, forceDry: false, dry: false, lk: Object.assign({}, LOOK[0]), lkT: Object.assign({}, LOOK[0]), reveal: 1, draw: 1.2, eye: 1, descend: 0, introOn: false,
-      seen: {}, leafPred: [], bleed: [], ensoN: 0, enso: null, carved: null, galeOn: 0, galeTell: 0, gwx: 0, gwz: 1, wind: new THREE.Vector2(0.25, 0.08), wash: -1, washK: 0, washDur: 2, splat: 0, frame: 0, seal: -1,
+      seen: {}, hitAt: {}, leafPred: [], bleed: [], ensoN: 0, enso: null, carved: null, galeOn: 0, galeTell: 0, gwx: 0, gwz: 1, wind: new THREE.Vector2(0.25, 0.08), wash: -1, washK: 0, washDur: 2, splat: 0, frame: 0, seal: -1,
       sealH: null, sealHitT: -1, grind: 0, slump: 0, rear: 0, rake: 0, whip: 0, roar: 0, sweep: 0, dive: 0, rip: -100, bolt: 0, boltA: 0.4, boltT: -10, boltX: 0.5, boltNext: 4, headW: new V3(0, 3, -6), sunRise: 0, birdT: 2, birdNext: 30, dead: false, flat: 0, wetG: 0, lvl: 0 });
     return {
       edge: 'wall', radius: R, spawn: { x: 0, z: 13 }, bossStart: { x: 0, z: -6, face: 0 }, camDist: 16,
       contains: (x, z) => Math.hypot(x, z) <= R - 0.6,
       clamp(p) { const d = Math.hypot(p.x, p.z), m = R - 0.6; if (d > m) { p.x *= m / d; p.z *= m / d; } },
       bulletBounds: (x, z) => Math.hypot(x, z) < 26,
-      camLimit(x, y, z) { const S = b.state, hw = S.headW;
+      camLimit(x, y, z, f) { const S = b.state, hw = S.headW;
+        // while his head is close over the hero the orbit tilts up ~6 deg (camera lower, looking more level) so the head clears the hero
+        if (f && S.camUp > 0.001 && !S.introOn) { const ox = x - f.x, oy = y - f.y, oz = z - f.z, hl = Math.hypot(ox, oz), L = Math.hypot(hl, oy);
+          if (hl > 1e-3) { const e = Math.atan2(oy, hl) - 0.105 * S.camUp, ch = Math.cos(e) * L / hl; x = f.x + ox * ch; z = f.z + oz * ch; y = f.y + Math.sin(e) * L; } }
         // the lens never sits in his head: slide it out to 5.5 m from the skull
         if (hw && S.D && !S.dead && !S.introOn) { const hx = x - hw.x, hy = y - hw.y, hz = z - hw.z, hd = Math.hypot(hx, hy, hz); if (hd < 5.5 && hd > 1e-3) { x = hw.x + hx * 5.5 / hd; y = hw.y + hy * 5.5 / hd; z = hw.z + hz * 5.5 / hd; } }
         const d = Math.hypot(x, z), m = R + 4.5; if (d > m) { x *= m / d; z *= m / d; } return { x, y: Math.max(y, 0.6), z }; },
@@ -1061,8 +1142,9 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
   function resetMech(b, i) {
     const S = b.state; if (!S.D) return;
     S.ink = 1; S.forceDry = false; S.dry = false; b.dmgTaken = 1; b.targetable = true; b.autoFace = true;
-    S.galeOn = 0; S.galeTell = 0; S.bleed.length = 0; S.leafPred.length = 0; S.enso = null; S.carved = null; S.sealH = null; S.sealHitT = -1; if (S.sealBlock) S.sealBlock.visible = false;
-    S.grind = 0; S.slump = 0; S.rear = 0; S.rake = 0; S.whip = 0; S.roar = 0; S.sweep = 0; S.dive = 0; S.rip = -100; S.wash = -1; S.splat = 0; S.bolt = 0; S.boltT = -10; S.seen = {}; S.wetG = i === 1 ? 1 : 0; S.grindN = 0;
+    S.galeOn = 0; S.galeTell = 0; S.bleed.length = 0; S.leafPred.length = 0; S.enso = null; S.ensoV = null; if (S.ensoM) S.ensoM.visible = false; S.camUp = 0;
+    S.D.duck.fill(0); S.D.fdV.fill(0); S.carved = null; S.sealH = null; S.sealHitT = -1; if (S.sealBlock) S.sealBlock.visible = false;
+    S.grind = 0; S.slump = 0; S.rear = 0; S.rake = 0; S.whip = 0; S.roar = 0; S.sweep = 0; S.dive = 0; S.rip = -100; S.wash = -1; S.splat = 0; S.bolt = 0; S.boltT = -10; S.seen = {}; S.hitAt = {}; S.wetG = i === 1 ? 1 : 0; S.grindN = 0;
     const P = S.D.pose; Object.assign(P, { rear: 0, rake: 0, whip: 0, slump: 0, sweep: 0, roar: 0, dive: 0 });
     hideDecals(S); if (S.bq) S.bq.mesh.count = S.bq.glb.count = S.bq.sh.count = 0;
     applyLook(b, i, false);
@@ -1083,7 +1165,8 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     if (!dry) for (let i = 0; i < n; i++) parts.push([len * i / n, len / n]); else for (let a = 0; a < len - 0.5; a += 8) parts.push([a, Math.min(5, len - a)]);
     parts.forEach(([a, l], i) => {
       const k = a / Math.max(len, 1e-3);
-      Hz.rect(x0 + dx * a, z0 + dz * a, dir, l, w, d0 + 0.12 * (dry ? k * n : i), dmg, { name, silent: i > 0, onFire(h) {
+      Hz.rect(x0 + dx * a, z0 + dz * a, dir, l, w, d0 + 0.12 * (dry ? k * n : i), dmg, { name, silent: i > 0, onHit() { S.hitAt[name] = G.now; }, onFire(h) {
+        if (G.now - (S.hitAt[name] === undefined ? -9 : S.hitAt[name]) < 0.6) h.dmg = 0;
         if (!G.headless) { const s = h.shape; decal(S, kind, s.x + dx * l / 2, s.z + dz * l / 2, dir, l, w * (kind === 3 ? 0.62 : 0.55), 0.12, 1.2, 7, kind === 3 ? ((a - nodeOff) % 7 + 7) % 7 : undefined); pluck(i + (dry ? 3 : 0), 0.1); Sound.sfx('slash', 0.45, 0.55); spat(s.x + dx * l / 2, s.z + dz * l / 2, 1.2, 8); FX.shake(0.15); }
         if (onSec) onSec(h, a, l); } });
     });
@@ -1091,9 +1174,9 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
 
   // ---- strokes ----
   function* rake(b) {
-    const S = b.state; useInk(b, COST.rake); const f = first(b, 'rake'), dir = b.angToPlayer(); b.autoFace = false; yield* b.turnTo(dir, 0.25);
-    const T2 = (1.1 + f) * sp(b); S.rake = 1;
-    Hz.cone(b.pos.x, b.pos.z, dir, 2.2, 9, T2, 380, { name: 'Claw Rake', onFire() {
+    const S = b.state; useInk(b, COST.rake); const f = first(b, 'rake'), face = b.angToPlayer(), side = rnd() < 0.5 ? -1 : 1, dir = face + side * 0.4; b.autoFace = false; yield* b.turnTo(face, 0.25);
+    const T2 = (1.1 + f) * sp(b); S.rake = 1; S.whipS = side;
+    Hz.cone(b.pos.x, b.pos.z, dir, 1.75, 9, T2, 340, { name: 'Claw Rake', onFire() {
       if (G.headless) return; Sound.sfx('slash', 1, 0.6); Sound.sfx('hit', 0.6, 0.6); FX.shake(0.3); const px = Math.cos(dir), pz = -Math.sin(dir);
       for (let i = -1; i <= 1; i++) { const x0 = b.pos.x + Math.sin(dir) * 2.4 + px * i * 1.0, z0 = b.pos.z + Math.cos(dir) * 2.4 + pz * i * 1.0, d2 = dir + i * 0.12; decal(S, 0, x0 + Math.sin(d2) * 3.2, z0 + Math.cos(d2) * 3.2, d2, 6.4, 0.75, 0.08, 0.8, 6); spat(x0 + Math.sin(d2) * 5, z0 + Math.cos(d2) * 5, 1, 6); }
     } });
@@ -1119,8 +1202,8 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         stalks.push({ x0: ox, z0: oz, dir, len, nodes, nodeOff: 7 }); }
     }
     for (const st of stalks) for (const nd of st.nodes) { const ld = st.dir + nd.side * 1.05; nd.x = st.x0 + Math.sin(st.dir) * nd.a; nd.z = st.z0 + Math.cos(st.dir) * nd.a; nd.dir = ld; if (!dry) S.leafPred.push({ type: 'cone', x: nd.x, z: nd.z, dir: ld, arc: 1.0, r: 4.2 }); }
-    for (const st of stalks) paint(b, st.x0, st.z0, st.dir, st.len, 2.6, 3, d0, 350, 'Bamboo Stroke', dry, 3, st.nodeOff, dry ? null : (h, a, l) => {
-      for (const nd of st.nodes) if (nd.a >= a && nd.a < a + l) Hz.cone(nd.x, nd.z, nd.dir, 1.0, 4.2, 1.0 * sp(b), 260, { name: 'Bamboo Leaves', silent: true, onFire() {
+    for (const st of stalks) paint(b, st.x0, st.z0, st.dir, st.len, 2.6, 3, d0, 385, 'Bamboo Stroke', dry, 3, st.nodeOff, dry ? null : (h, a, l) => {
+      for (const nd of st.nodes) if (nd.a >= a && nd.a < a + l) Hz.cone(nd.x, nd.z, nd.dir, 1.0, 4.2, 1.0 * sp(b), 285, { name: 'Bamboo Leaves', silent: true, onFire() {
         if (G.headless) return; for (let q = -1; q <= 1; q++) { const d2 = nd.dir + q * 0.3, L = 3.2 - Math.abs(q) * 0.6; decal(S, 0, nd.x + Math.sin(d2) * L / 2, nd.z + Math.cos(d2) * L / 2, d2, L, 0.8, 0.1, 0.8, 6); } pluck(5 + (nd.side > 0 ? 1 : 0), 0.08); } });
     });
     yield* b.cast({ name: 'Bamboo Stroke', time: 1.3 * sp(b) + f }); S.whip = 0;
@@ -1132,7 +1215,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
   function bleedZone(b, x, z, long) {
     const S = b.state; for (let i = S.bleed.length - 1; i >= 0; i--) if (S.bleed[i].state === 'done') S.bleed.splice(i, 1);
     const rmax = long ? 5 : 4.2, dur = long ? 16 : 6;
-    const h = Hz.zone({ type: 'circle', x, z, r: 3 }, dur, 100, { name: 'Wet Ink', every: 0.5, delay: 0.3, color: 0x101010, rmax, track(s, hz) { s.r = Math.min(rmax, 3 + (hz.zt || 0) * 0.4); } });
+    const h = Hz.zone({ type: 'circle', x, z, r: 3 }, dur, 120, { name: 'Wet Ink', every: 0.5, delay: 0.3, color: 0x101010, rmax, track(s, hz) { s.r = Math.min(rmax, 3 + (hz.zt || 0) * 0.4); } });
     S.bleed.push(h); while (S.bleed.length > 5) Hz.cancel(S.bleed.shift());
     decal(S, 1, x, z, 0, rmax * 2.1, rmax * 2.1, 3.0, dur - 0.5, dur + 1.5);
   }
@@ -1140,7 +1223,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
   function* drops(b, n) {
     const S = b.state, p = G.player; useInk(b, COST.drops); const f = first(b, 'drops');
     for (let i = 0; i < n; i++) {
-      Hz.circle(p.pos.x, p.pos.z, 3.0, (1.2 + f) * sp(b), 300, { name: 'Ink Drop', lock: 0.8, track(s) { s.x = p.pos.x; s.z = p.pos.z; }, onFire(h) {
+      Hz.circle(p.pos.x, p.pos.z, 3.0, (1.2 + f) * sp(b), 360, { name: 'Ink Drop', lock: 0.8, track(s) { s.x = p.pos.x; s.z = p.pos.z; }, onFire(h) {
         const s = h.shape; if (!G.headless) { decal(S, 1, s.x, s.z, vrand() * TAU, 6.6, 6.6, 0.15, 0.8, 6); spat(s.x, s.z, 2.5, 16); Sound.sfx('boom', 0.35, 1.6); pluck(i * 2, 0.1); }
         if (S.lvl === 1) bleedZone(b, s.x, s.z); } });
       yield 0.5;
@@ -1151,10 +1234,10 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
   function habokuPts() { const p = G.player, pts = [[p.pos.x, p.pos.z]]; let tries = 0; while (pts.length < 6 && tries++ < 300) { const a = rnd(TAU), r = Math.sqrt(rnd()) * (R - 2.5), x = Math.sin(a) * r, z = Math.cos(a) * r; if (pts.every(([qx, qz]) => Math.hypot(qx - x, qz - z) >= 5)) pts.push([x, z]); } return pts; }
   function* haboku(b) {
     const S = b.state, pts = habokuPts(); Sound.sfx('roar', 0.5, 1.2); S.roar = 1;
-    pts.forEach(([x, z], i) => Hz.circle(x, z, 3.4, (1.3 + 0.15 * i) * sp(b), 400, { name: 'Haboku', silent: i > 0, onFire() {
+    pts.forEach(([x, z], i) => Hz.circle(x, z, 3.4, (1.3 + 0.15 * i) * sp(b), 440, { name: 'Haboku', silent: i > 0, onFire() {
       if (!G.headless) { decal(S, 1, x, z, vrand() * TAU, 7.6, 7.6, 0.12, 1.0, 6.5); spat(x, z, 3, 20); Sound.sfx('boom', 0.5, 1.2); FX.shake(0.25); pluck(i + 2, 0.11); }
       if (S.lvl >= 1) bleedZone(b, x, z, S.lvl === 2);
-      if (S.lvl === 2 && i === 0) Bul.ring(b.pos.x, b.pos.z, 12, 6, { r: 0.4, dmg: 90, color: BINK, life: 5, kind: 'petal', name: 'Petal' }, rnd(TAU), rnd(TAU), 70 * PI / 180);
+      if (S.lvl === 2 && i === 0) Bul.ring(b.pos.x, b.pos.z, 9, 6, { r: 0.4, dmg: 90, color: BINK, life: 5, kind: 'petal', name: 'Petal' }, rnd(TAU), rnd(TAU), 70 * PI / 180);
     } }));
     yield 0.6; S.roar = 0; yield 1.3 + 0.75 - 0.6 + 0.3;
   }
@@ -1235,8 +1318,8 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     const Z = zigzag(p.pos.x, p.pos.z, a0, tw, lens);
     S.whip = 1; S.whipS = sg; Sound.sfx('dash', 0.6, 0.7);
     for (let i = 0; i < 4; i++) { const [x0, z0] = Z.V[i], end = Z.V[i + 1];
-      paint(b, x0, z0, Z.ang[i], lens[i], 2.2, 1, (1.3 + f + 0.12 * i) * sp(b), 350, 'Blossom Branch', dry, 0, 0, dry ? null : () => {
-        Hz.circle(end[0], end[1], 3.2, 0.9 * sp(b), 240, { name: 'Blossom', silent: true, onFire() {
+      paint(b, x0, z0, Z.ang[i], lens[i], 2.2, 1, (1.3 + f + 0.12 * i) * sp(b), 385, 'Blossom Branch', dry, 0, 0, dry ? null : () => {
+        Hz.circle(end[0], end[1], 3.2, 0.9 * sp(b), 265, { name: 'Blossom', silent: true, onFire() {
           if (!G.headless) { decal(S, 1, end[0], end[1], 0, 3.2, 3.2, 0.1, 0.6, 5); FX.burst(end[0], 1, end[1], { n: 18, smoke: true, color: 0xf2a6b8, color2: 0xd9728c, speed: [1, 4], life: [0.5, 1.1], size: [0.2, 0.45], alpha: 0.9, up: 1 }); pluck(4 + i, 0.1); }
           Bul.ring(end[0], end[1], 5, 5, { r: 0.4, dmg: 90, color: BINK, life: 3, kind: 'petal', name: 'Petal' }, rnd(TAU)); } });
       }); }
@@ -1247,13 +1330,14 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     const S = b.state; useInk(b, COST.enso); S.ensoN++; const inside = S.ensoN % 2 === 1, f = first(b, 'enso');
     b.autoFace = true; yield* b.moveTo(0, 0, 7);
     const pp = G.player.pos, gapA = Math.atan2(pp.x, pp.z) + rnd(-0.7, 0.7), GAP = 55 * PI / 180, arc = (TAU - GAP) / 10, T2 = (4.0 + f) * sp(b), t0 = G.now;
-    S.enso = { gapA, inside, walls: [], t0, gap: GAP, arc, fire0: (1.2 + f) * sp(b), step: 0.12 * sp(b) }; S.sweep = 1; if (!G.headless) Sound.sfx('charge', 0.6, 0.5);
-    Hz[inside ? 'circle' : 'donut'](0, 0, ...(inside ? [12.5] : [9.5, 22]), T2, 450, { name: 'Flood', blockable: false, onFire() {
+    S.enso = { gapA, inside, walls: [], t0, gap: GAP, arc, fire0: (1.2 + f) * sp(b), step: 0.12 * sp(b) }; S.sweep = 1;
+    S.ensoV = { a0: gapA + GAP / 2, L: TAU - GAP, t0, fire0: S.enso.fire0, step: S.enso.step, arc, al: 0, dry: 0 }; if (!G.headless) Sound.sfx('charge', 0.6, 0.5);
+    Hz[inside ? 'circle' : 'donut'](0, 0, ...(inside ? [12.5] : [9.5, 22]), T2, 495, { name: 'Flood', blockable: false, onFire() {
       if (!G.headless) { Sound.sfx('wave', 0.8, 0.8); Sound.sfx('bigboom', 0.5); FX.shake(0.5); FX.flash(0xefe7d3, 0.2, 2); if (inside) decal(S, 1, 0, 0, 0, 26, 26, 0.3, 0.5, 4); } } });
     for (let i = 0; i < 10; i++) { const ca = gapA + GAP / 2 + arc * (i + 0.5);
-      Hz.cone(0, 0, ca, arc, 12.5, (1.2 + f + 0.12 * i) * sp(b), 150, { name: 'Enso', r0: 9.5, silent: i > 0, onFire() {
-        const left = T2 - (G.now - t0) + 0.25; if (S.enso && left > 0.1) S.enso.walls.push(Hz.zone({ type: 'cone', x: 0, z: 0, dir: ca, arc, r: 12.5, r0: 9.5 }, left, 120, { name: 'Enso', every: 0.4, delay: 0.05, color: 0x101010 }));
-        if (!G.headless) { pluck(i, 0.1); Sound.sfx('slash', 0.4, 0.5); if (i === 0) decal(S, 5, 0, 0, 0, 9.5, 12.5, 1.2 * sp(b), T2 - (G.now - t0) + 0.2, T2 - (G.now - t0) + 2.5, gapA); } } }); }
+      Hz.cone(0, 0, ca, arc, 12.5, (1.2 + f + 0.12 * i) * sp(b), 165, { name: 'Enso', r0: 9.5, silent: i > 0, onFire() {
+        const left = T2 - (G.now - t0) + 0.25; if (S.enso && left > 0.1) S.enso.walls.push(Hz.zone({ type: 'cone', x: 0, z: 0, dir: ca, arc, r: 12.5, r0: 9.5 }, left, 130, { name: 'Enso', every: 0.4, delay: 0.05, color: 0x101010 }));
+        if (!G.headless) { pluck(i, 0.1); Sound.sfx('slash', 0.4, 0.5); } } }); }
     yield* b.cast({ name: 'Enso', time: T2 });
     yield 0.2; if (S.enso) for (const h of S.enso.walls) Hz.cancel(h); S.enso = null; S.sweep = 0; yield 0.8;
   }
@@ -1268,7 +1352,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     for (const c of cells) {
       const sx = c.x - fx * 2.5, sz = c.z - fz * 2.5;
       if (safe.has(c)) { mask += Math.pow(2, c.i + c.j * 3); Hz.mark({ type: 'rect', x: sx, z: sz, dir, len: 5, w: 5 }, T2 + 0.2, { color: GOLD }); }
-      else Hz.rect(sx, sz, dir, 5, 5, T2, 460, { name: 'Carved Seal', silent: c !== printer, onFire: c === printer ? () => {
+      else Hz.rect(sx, sz, dir, 5, 5, T2, 505, { name: 'Carved Seal', silent: c !== printer, onFire: c === printer ? () => {
         if (!G.headless) { taiko(0.7); Sound.sfx('bigboom', 0.5); FX.shake(0.5); decal(S, 4, cx, cz, dir, 15, 15, 0.05, 2.5, 6.5, mask); } } : null });
     }
     S.rear = 1; Sound.sfx('charge', 0.5, 0.8);
@@ -1401,7 +1485,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       S.gU.uBP.value.set(b.pos.x, sat(S.draw - 1) * 5 * (1 - P.dive), b.pos.z);
       S.gU.uRip.value.set(S.ripX || 0, S.ripZ || 0, S.rip % 3600, sat(1 - (t - S.rip) / 3.5));
       // sky: sun rising, lightning
-      S.sunRise = damp(S.sunRise, lt.sun, 0.5, dt); S.skyU.uSunD.value.set(0.05, lerp(-0.12, 0.04, S.sunRise), -1).normalize();
+      S.sunRise = damp(S.sunRise, lt.sun, 0.5, dt); S.skyU.uSunD.value.set(0.0, lerp(-0.12, -0.012, S.sunRise), -1).normalize();
       S.bolt = Math.max(0, S.bolt - dt * 2.2); S.skyU.uBolt.value = S.bolt > 0.6 || (S.bolt > 0.2 && Math.sin(t * 60) > 0) ? S.bolt : 0; S.skyU.uBoltA.value = S.boltA;
       if (S.lvl === 1 && lk.storm > 0.7 && G.state === 'fight' && (S.boltNext -= dt) <= 0) { S.boltNext = 6 + vrand() * 7; strike(S, vrand() * 1.6 - 0.8); Sound.sfx('thunder', 0.35); }
       if (S.rain) S.rain.visible = lk.storm > 0.01;
@@ -1424,20 +1508,31 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       S.wetG = damp(S.wetG, S.lvl === 1 ? 1 : 0, 0.4, dt); D.U.uWetG.value = S.wetG;
       for (const pu of D.pupils) { pu.visible = S.eye > 0.01; pu.scale.set(0.5 * S.eye, S.eye, 0.7 * S.eye); }
       // which coils get out of the way: tested on the un-ducked pose so a coil that has sunk does not bob straight back up
-      if (p) { const c = camera.position, sx = p.pos.x - c.x, sy = p.pos.y + 1.2 - c.y, sz = p.pos.z - c.z, l2 = Math.max(sx * sx + sy * sy + sz * sz, 1e-6), cf = Math.cos(b.facing), sf = Math.sin(b.facing), ry = D.root.position.y;
-        const blocks = (qx, qy, qz, rr, near) => { const wx = b.pos.x + qx * cf + qz * sf, wy = qy + ry, wz = b.pos.z - qx * sf + qz * cf;
-          const k = clamp(((wx - c.x) * sx + (wy - c.y) * sy + (wz - c.z) * sz) / l2, 0, 1), dx = c.x + sx * k - wx, dy = c.y + sy * k - wy, dz = c.z + sz * k - wz;
-          return (k > 0.02 && k < 0.94 && dx * dx + dy * dy + dz * dz < rr * rr) || (wx - c.x) ** 2 + (wy - c.y) ** 2 + (wz - c.z) ** 2 < (rr + near) ** 2; };
+      if (p) { const c = camera.position, sx = p.pos.x - c.x, sy = p.pos.y + 1.0 - c.y, sz = p.pos.z - c.z, l2 = Math.max(sx * sx + sy * sy + sz * sz, 1e-6), cf = Math.cos(b.facing), sf = Math.sin(b.facing), ry = D.root.position.y, live = !Cam.cine && !S.dead;
+        // squared distance from a body point (dragon space) to the lens-hero sightline, with the lens-to-point distance in _lens
+        let _lens = 0, _k = 0; const sd2 = (qx, qy, qz) => { const wx = b.pos.x + qx * cf + qz * sf, wy = qy + ry, wz = b.pos.z - qx * sf + qz * cf;
+          _k = clamp(((wx - c.x) * sx + (wy - c.y) * sy + (wz - c.z) * sz) / l2, 0, 1); const dx = c.x + sx * _k - wx, dy = c.y + sy * _k - wy, dz = c.z + sz * _k - wz;
+          _lens = Math.sqrt((wx - c.x) ** 2 + (wy - c.y) ** 2 + (wz - c.z) ** 2); return dx * dx + dy * dy + dz * dz; };
+        // which coils get out of the way: anything inside a 2.5 m capsule from the lens to the hero sinks flat to the floor. Tested on the
+        // un-ducked pose so a coil that has sunk does not bob straight back up.
         const R0 = D.cpRaw, dk = D.duckT; dk.fill(0);
-        if (!Cam.cine && !S.dead) for (let j = 4; j < 12; j++) { const rr = bodyR(j / 11) + 0.9;
-          if (blocks(R0[j].x, R0[j].y, R0[j].z, rr, 4.0)) dk[j] = 1;
-          if (j < 11 && blocks((R0[j].x + R0[j + 1].x) / 2, (R0[j].y + R0[j + 1].y) / 2, (R0[j].z + R0[j + 1].z) / 2, rr, 4.0)) dk[j] = dk[j + 1] = 1; }
-        for (let j = 0; j < 12; j++) D.duck[j] = damp(D.duck[j], dk[j], dk[j] ? 3.2 : 1.3, dt);
-        // whatever still hides the hero after that washes out toward paper
-        let hit = false; for (let i = 4; i < NB && !hit; i += 2) { const q = D.C[i]; if (blocks(q.x, q.y, q.z, bodyR(i / (NB - 1)) + 0.5, 1.5)) hit = true; }
-        D.fadeA = damp(D.fadeA, hit && !Cam.cine ? 0.45 : 1, 8, dt); D.U.uFade.value = D.fadeA > 0.98 ? 1.01 : D.fadeA;
-        // the head only pales a little, and never while he is casting (he is the source of the stroke); the camera keeps clear of it
-        D.head.getWorldPosition(_a); S.headW.copy(_a); _a.addScaledVector(_b.set(Math.sin(b.facing), 0, Math.cos(b.facing)), 1.2); const hk = clamp(((_a.x - c.x) * sx + (_a.y - c.y) * sy + (_a.z - c.z) * sz) / l2, 0, 1), hx = c.x + sx * hk - _a.x, hy = c.y + sy * hk - _a.y, hz = c.z + sz * hk - _a.z;
+        const blocks = (qx, qy, qz, r) => { const d2 = sd2(qx, qy, qz), rr = 2.5 + r; return (_k > 0.02 && _k < 0.97 && d2 < rr * rr) || _lens < r + 3.5; };
+        if (live) for (let j = 4; j < 12; j++) { const r = bodyR(j / 11);
+          if (blocks(R0[j].x, R0[j].y, R0[j].z, r)) dk[j] = 1;
+          if (j < 11 && blocks((R0[j].x + R0[j + 1].x) / 2, (R0[j].y + R0[j + 1].y) / 2, (R0[j].z + R0[j + 1].z) / 2, r)) dk[j] = dk[j + 1] = 1; }
+        for (let j = 0; j < 12; j++) D.duck[j] = damp(D.duck[j], dk[j], dk[j] ? 3.6 : 1.3, dt);
+        // per body ring, on the posed (ducked) body: a ring still on the sightline washes out (with its spine cards); a ring at the lens is cut away
+        const fv = D.fdV, fa = D.fd.array, TS1 = D.ts + 1; let hit = false;
+        for (let i = 0; i < NB; i++) { const q = D.C[i], r = bodyR(i / (NB - 1)), d2 = sd2(q.x, q.y, q.z), bl = live && _k > 0.03 && _k < 0.97 && d2 < (r + 1.0) ** 2, cut = live && _lens < r + 6.5;
+          fv[i] = damp(fv[i], bl ? 1 : 0, bl ? 9 : 3, dt); if (bl) hit = true; const v = cut ? 2 : fv[i] < 0.01 ? 0 : fv[i];
+          if (fa[i * TS1] !== v) fa.fill(v, i * TS1, (i + 1) * TS1); D.fdT[i] = v; }
+        D.fd.needsUpdate = true;
+        const ac = D.aCd.array; for (let i = 0; i < NSP; i++) ac[i * 4 + 3] = D.fdT[Math.min(NB - 3, 1 + Math.round(i / (NSP - 1) * (NB - 5)))]; for (let i = 0; i < NTT; i++) ac[(NSP + i) * 4 + 3] = D.fdT[NB - 1]; D.aCd.needsUpdate = true;
+        D.fadeA = damp(D.fadeA, hit ? 0.45 : 1, 8, dt); D.U.uFade.value = D.fadeA > 0.98 ? 1.01 : D.fadeA; // the mist puffs
+        // the head only pales a little, and never while he is casting (he is the source of the stroke); the camera keeps clear of it,
+        // and tilts up a little while the head is close over the hero
+        D.head.getWorldPosition(_a); S.headW.copy(_a); S.camUp = damp(S.camUp || 0, live && Math.hypot(_a.x - p.pos.x, _a.z - p.pos.z) < 6 ? 1 : 0, 2, dt);
+        _a.addScaledVector(_b.set(Math.sin(b.facing), 0, Math.cos(b.facing)), 1.2); const hk = clamp(((_a.x - c.x) * sx + (_a.y - c.y) * sy + (_a.z - c.z) * sz) / l2, 0, 1), hx = c.x + sx * hk - _a.x, hy = c.y + sy * hk - _a.y, hz = c.z + sz * hk - _a.z;
         const hhit = !Cam.cine && !b.castState && hk > 0.05 && hk < 0.85 && hx * hx + hy * hy + hz * hz < 2.2;
         D.fadeH = damp(D.fadeH, hhit ? 0.55 : 1, 6, dt); D.U.uFadeH.value = D.fadeH > 0.98 ? 1.01 : D.fadeH; }
       // the wet floor reflects the body, the head and the far coil
@@ -1452,10 +1547,15 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       { const BQ = S.bq, M = BQ.mesh, GB = BQ.glb, SH = BQ.sh; let n = 0;
         for (const q of Bul.list) { if (!q.kind || n >= BQ.n) continue; const pet = q.kind === 'petal', s = q.r * (q.t < 0.15 ? q.t / 0.15 : 1);
           _m.position.set(q.x, q.y + 0.05, q.z); _m.rotation.set(Math.sin(t * 5 + q.t * 7) * 0.25, q.dir + Math.sin(t * 6 + q.t * 3) * 0.4, 0); _m.scale.set(pet ? 1.2 : 0.95, 1, pet ? 1.2 : 1.9); _m.updateMatrix(); M.setMatrixAt(n, _m.matrix); M.setColorAt(n, _c.setRGB(pet ? 1 : 0, 0, 0));
-          _m.position.set(q.x, q.y, q.z); _m.rotation.set(0, q.dir, 0); _m.scale.set(s * 1.3, s * 1.3, s * 1.5); _m.updateMatrix(); GB.setMatrixAt(n, _m.matrix); GB.setColorAt(n, _c.setRGB(pet ? 1 : 0, 0, 0));
+          _m.position.set(q.x, q.y, q.z); _m.rotation.set(0, q.dir, 0); _m.scale.set(s * 1.3, s * 1.3, s * 1.5); _m.updateMatrix(); GB.setMatrixAt(n, _m.matrix); GB.setColorAt(n, _c.setRGB(pet ? 1 : 0, (n * 0.37) % 1, 0));
           const bs = 0.9 + Math.min(1.2, q.t * 0.5); _m.position.set(q.x, 0.04, q.z); _m.rotation.set(0, q.dir, 0); _m.scale.set(bs, 1, bs * 1.25); _m.updateMatrix(); SH.setMatrixAt(n, _m.matrix); SH.setColorAt(n, _c.setRGB(pet ? 1 : 0, (n * 0.37) % 1, 0)); n++; }
         M.count = GB.count = SH.count = n; if (n) for (const X of [M, GB, SH]) { X.instanceMatrix.needsUpdate = true; X.instanceColor.needsUpdate = true; } }
       syncTele(S);
+      // the Enso stroke: telegraph wash, the brush sweeping round with the walls, then drying and fading after the cast
+      if (S.ensoV) { const E = S.ensoV, el = t - E.t0, u = S.eU.uE.value;
+        if (S.enso) E.al = Math.min(1, E.al + dt * 4); else { E.al -= dt * 1.4; E.dry = Math.min(1, E.dry + dt * 2); }
+        if (E.al <= 0) { S.ensoV = null; S.ensoM.visible = false; }
+        else { S.ensoM.visible = true; u.set(E.a0, E.L, clamp((el - E.fire0 + E.step) / E.step * E.arc, 0, E.L + 0.05), E.al); S.eU.uE2.value.set(sat(el / Math.max(E.fire0, 0.1)), E.dry, 0, 0); } }
       // screen washes, the roar's spatter, the scroll mounting and seal
       if (S.ovU) { const O = S.ovU; renderer.getDrawingBufferSize(O.uRes.value);
         O.uWash.value = S.wash > 0 ? sat((t - S.wash) / S.washDur) : 0; O.uWashK.value = S.washK;
