@@ -161,14 +161,17 @@ float starF(vec3 d, float dens, float sc){ vec3 g = d * sc, c = floor(g), f = fr
   vec3 j = vec3(hh3(c + 1.7), hh3(c + 4.1), hh3(c + 8.3)) - 0.5; float b = (1.0 - smoothstep(0.0, 0.36, length(f - j * 0.45))); return step(1.0 - dens, s) * b * b * (0.6 + 2.4 * hh3(c + 2.0)); }
 /// the five gate worlds. d is a direction in that world (y = its zenith). Deep saturated zeniths, lighter horizons, mid values.
 // gold = sunrise over a cloud deck, cyan = open day sky with high cirrus, violet = stars and nebula, green = aurora over ice, rose = dusk with a low sun
+// gSun: when set (non-zero), where the gold and rose suns hang, so a gate or a mosaic panel can put its low sun where it is seen
+vec3 gSun = vec3(0.0);
+vec3 sunDir(vec3 def, float el){ return dot(gSun, gSun) > 1e-4 ? normalize(gSun) : normalize(def); }
 vec3 skyW(vec3 d, float wf){
   float h = d.y, hp = max(h, 0.0); int w = int(wf + 0.5); vec3 res = vec3(0.0);
-  if (w == 0) { // sunrise: deep umber on the side away from the sun, hot orange toward it, a bright low sun, a cloud deck with shaded undersides
-    vec3 sd = normalize(vec3(0.62, 0.3, -0.78)); float s = max(dot(d, sd), 0.0);
-    float side = dot(normalize(d.xz + vec2(1e-4, 0.0)), normalize(sd.xz)) * 0.5 + 0.5; side *= side;
-    vec3 col = mix(mix(vec3(0.34, 0.1, 0.025), vec3(1.0, 0.46, 0.1), side), mix(vec3(0.2, 0.06, 0.02), vec3(0.6, 0.22, 0.05), side), smoothstep(0.0, 0.3, h));
-    col = mix(col, mix(vec3(0.16, 0.05, 0.03), vec3(0.5, 0.19, 0.05), side), smoothstep(0.3, 0.95, h));
-    col += vec3(1.0, 0.55, 0.2) * (pow(s, 10.0) * 0.3 + pow(s, 90.0) * 0.5) + vec3(1.3, 1.0, 0.7) * smoothstep(0.9986, 0.9992, s) * 1.2;
+  if (w == 0) { // sunrise: deep amber overhead grading to pale gold at the horizon, hotter toward a small low sun, a cloud deck with shaded undersides below
+    vec3 sd = sunDir(vec3(0.62, 0.16, -0.78), 0.1); float s = max(dot(d, sd), 0.0);
+    float side = dot(normalize(d.xz + vec2(1e-4, 0.0)), normalize(sd.xz + vec2(1e-4, 0.0))) * 0.5 + 0.5; side *= side;
+    vec3 col = mix(vec3(0.92, 0.56, 0.24) * mix(0.55, 1.0, side), vec3(0.5, 0.17, 0.04) * mix(0.65, 1.0, side), smoothstep(0.0, 0.16, h));
+    col = mix(col, vec3(0.14, 0.04, 0.012), smoothstep(0.14, 0.5, h));
+    col += vec3(1.0, 0.55, 0.2) * (pow(s, 14.0) * 0.3 + pow(s, 120.0) * 0.45) + vec3(1.0, 0.86, 0.62) * smoothstep(0.9962, 0.9976, s) * 1.1;
     vec2 q = d.xz / (abs(h) + 0.07) * 0.6 + vec2(uTime * 0.008, uTime * 0.003);
     float c = fbm3(q), c2 = fbm3(q - sd.xz * 0.3); float lit = clamp((c - c2) * 5.0 + 0.3, 0.0, 1.0);
     vec3 deck = mix(vec3(0.1, 0.03, 0.03), vec3(0.95, 0.48, 0.13) * (0.5 + 0.7 * side), lit) * (0.55 + 0.55 * c);
@@ -193,8 +196,9 @@ vec3 skyW(vec3 d, float wf){
     res = col;
   } else if (w == 3) {
     vec3 col = mix(vec3(0.03, 0.14, 0.12), vec3(0.005, 0.05, 0.05), smoothstep(0.0, 0.8, h));
-    float az = atan(d.x, d.z + 1e-6); float band = fbm3(vec2(az * 2.0 + uTime * 0.03, h * 1.5));
-    float curt = smoothstep(0.02, 0.2, h) * exp(-abs(h - 0.4 - band * 0.35) * 2.6) * (0.55 + 0.45 * sin(az * 30.0 + band * 14.0 + uTime * 0.6));
+    vec2 ring = normalize(d.xz + vec2(1e-4, 0.0)); float band = fbm3(ring * 1.6 + vec2(uTime * 0.03, h * 1.5));
+    float fold = vn(ring * 7.0 + band * 2.5 + vec2(uTime * 0.05, 0.0)) * 0.65 + vn(ring * 19.0 + band * 4.0 - vec2(0.0, uTime * 0.07)) * 0.35;
+    float curt = smoothstep(0.02, 0.2, h) * exp(-abs(h - 0.4 - band * 0.35) * 2.6) * (0.2 + 0.8 * smoothstep(0.3, 0.75, fold)) * (0.75 + 0.25 * vn(vec2(h * 9.0, uTime * 0.2) + ring * 3.0));
     col += vec3(0.15, 0.85, 0.42) * curt * 1.1 + vec3(0.45, 0.2, 0.8) * curt * smoothstep(0.4, 0.8, h) * 0.6;
     float ice = (1.0 - smoothstep(-0.08, 0.03, h)); float n = vn(d.xz / (abs(h) + 0.05) * 2.4);
     col = mix(col, mix(vec3(0.12, 0.25, 0.32), vec3(0.4, 0.6, 0.7), n), ice);
@@ -202,7 +206,7 @@ vec3 skyW(vec3 d, float wf){
   } else {
     vec3 col = mix(vec3(1.0, 0.48, 0.32), vec3(0.78, 0.2, 0.34), smoothstep(0.0, 0.22, h));
     col = mix(col, vec3(0.3, 0.05, 0.16), smoothstep(0.2, 0.9, h));
-    vec3 sd = normalize(vec3(-0.45, 0.04, -0.89)); float s = max(dot(d, sd), 0.0);
+    vec3 sd = sunDir(vec3(-0.45, 0.04, -0.89), 0.05); float s = max(dot(d, sd), 0.0);
     col += vec3(1.0, 0.5, 0.35) * (pow(s, 8.0) * 0.42 + pow(s, 60.0) * 0.55) + vec3(1.4, 0.95, 0.75) * smoothstep(0.9965, 0.998, s) * 1.5;
     vec2 q = d.xz / (hp + 0.15) * vec2(0.35, 2.4) + vec2(uTime * 0.006, 0.0); float n = fbm3(q), n2 = fbm3(q + sd.xz * 0.2);
     float cov = smoothstep(0.48, 0.72, n) * smoothstep(-0.02, 0.06, h) * (1.0 - smoothstep(0.35, 0.6, h));
@@ -214,10 +218,10 @@ vec3 skyW(vec3 d, float wf){
 // a cloud deck seen through a portal, k = 0 near, 1 mid, 2 far: premultiplied colour and coverage, in the world's own style
 vec4 cloudL(vec2 q, float wf, float k){
   int w = int(wf + 0.5);
-  if (w == 1 && k > 1.5) q *= vec2(0.3, 2.6); else if (w == 3) q *= vec2(0.25, 2.2); else if (w == 4) q *= vec2(0.45, 1.9);
+  if (w == 1 && k > 1.5) q *= vec2(0.3, 2.6); else if (w == 0) q *= vec2(0.6, 2.3); else if (w == 3) q *= vec2(0.25, 2.2); else if (w == 4) q *= vec2(0.45, 1.9);
   float n = fbm3(q), n2 = fbm3(q + vec2(0.23, 0.15)); float lit = clamp((n - n2) * 6.0 + 0.5, 0.0, 1.0);
   vec3 lo, hi; float a;
-  if (w == 0) { lo = vec3(0.12, 0.035, 0.025); hi = vec3(0.98, 0.5, 0.14); a = smoothstep(0.5, 0.74, n) * 0.9; lit = clamp((n - n2) * 6.0 + 0.32, 0.0, 1.0); }
+  if (w == 0) { lo = vec3(0.13, 0.04, 0.025); hi = vec3(1.0, 0.68, 0.32); a = smoothstep(0.58, 0.82, n) * (k > 1.5 ? 0.25 : k > 0.5 ? 0.7 : 0.55); lit = clamp((n - n2) * 6.0 + 0.3, 0.0, 1.0); }
   else if (w == 1) { lo = vec3(0.3, 0.42, 0.6); hi = vec3(0.8, 0.88, 0.95); a = smoothstep(0.55, 0.78, n) * (k > 1.5 ? 0.55 : 0.9); }
   else if (w == 2) { lo = vec3(0.08, 0.015, 0.18); hi = mix(vec3(0.45, 0.12, 0.55), vec3(0.14, 0.24, 0.7), k * 0.4); a = smoothstep(0.52, 0.95, n) * 0.42; }
   else if (w == 3) { lo = vec3(0.02, 0.22, 0.14); hi = mix(vec3(0.2, 0.95, 0.5), vec3(0.5, 0.3, 0.95), k * 0.3); a = smoothstep(0.55, 0.85, n) * 0.55; }
@@ -225,10 +229,13 @@ vec4 cloudL(vec2 q, float wf, float k){
   return vec4(mix(lo, hi, lit) * a, a);
 }
 // looking down a gate: a sky bowl (zenith straight down, horizon toward the far lip) under three cloud decks at depths, so they slide against the rim and each other
+vec3 bowlDir(vec3 P, vec3 V){ vec3 o = P - vec3(0.0, 0.9, 0.0); float b = dot(o, V), c = dot(o, o) - 9.0; float t = -b + sqrt(max(b * b - c, 0.0));
+  vec3 n = (o + V * t) / 3.0; return normalize(vec3(n.x, -n.y * 1.15 - 0.12, n.z) + vec3(0.0, 1e-4, 0.0)); }
 vec3 gateSky(vec3 P, vec3 V, float wf){ // P: point on the gate's floor relative to its centre; V: view ray, V.y < 0
-  vec3 o = P - vec3(0.0, 0.9, 0.0); float b = dot(o, V), c = dot(o, o) - 9.0; float t = -b + sqrt(max(b * b - c, 0.0));
-  vec3 n = (o + V * t) / 3.0; vec3 s = normalize(vec3(n.x, -n.y * 1.15 - 0.12, n.z) + vec3(0.0, 1e-4, 0.0));
-  vec3 col = skyW(s, wf);
+  vec3 s = bowlDir(P, V); vec2 vd = normalize(V.xz + vec2(1e-4, 0.0));
+  if (wf < 0.5 || wf > 3.5) { float hs = bowlDir(vec3(vd.x * 1.6, 0.0, vd.y * 1.6), V).y - 0.03; s = normalize(vec3(s.x, (s.y - hs) * 1.9, s.z) + vec3(0.0, 1e-4, 0.0)); } // gold and rose: the horizon hangs just inside the far rim from any view, the low sun over it, the sky deepening toward the near rim
+  vec3 sm = bowlDir(vec3(vd.x * 0.95, 0.0, vd.y * 0.95), V); gSun = normalize(vec3(vd.x, wf < 0.5 || wf > 3.5 ? (sm.y - bowlDir(vec3(vd.x * 1.6, 0.0, vd.y * 1.6), V).y + 0.03) * 1.9 : sm.y, vd.y)); // the sun just inside the far rim, clear of the shaft's shade
+  vec3 col = skyW(s, wf); gSun = vec3(0.0);
   float vy = max(-V.y, 0.14);
   for (int k = 2; k >= 0; k--) { float fk = float(k), D = 1.0 + fk * 2.4 + fk * fk * 1.8;
     vec2 hp = P.xz + V.xz * (D / vy); vec2 q = hp * (0.62 - fk * 0.17) + vec2(uTime * (0.06 - fk * 0.015), uTime * 0.025) + fk * 7.3;
@@ -258,11 +265,11 @@ vec3 doorsSky(vec3 d){
   vec3 col = mix(STORM * 5.5, STORM * 1.2, smoothstep(0.0, 0.75, hp));
   // three decks of storm cloud stacked up from the horizon: dark teal masses, their upper edges lit, lightning flickering inside
   float ac = floor(az * 1.6 + 8.0), fl = step(0.965, hh(vec2(ac, floor(uTime * 5.0)))) * hh(vec2(ac, floor(uTime * 13.0)));
-  for (int k = 0; k < 3; k++) { float fk = float(k), e0 = 0.03 + fk * 0.15;
-    vec2 q = vec2(az * (2.4 + fk * 1.5) + uTime * (0.01 + fk * 0.005) + fk * 3.1, (h - e0) * (6.5 - fk * 1.6)); float m = fbm3(q), m2 = fbm3(q + vec2(0.0, -0.1));
-    float env = exp(-abs(h - e0 - 0.05) * (8.0 - fk * 2.2)), mass = smoothstep(0.48, 0.62, m + env * 0.38 - 0.24) * (0.95 - fk * 0.12);
-    float lit = clamp((m2 - m) * 7.0 + 0.25, 0.0, 1.0);
-    vec3 cc = mix(STORM * (1.6 + fk * 0.9), vec3(0.3, 0.52, 0.54) * (1.0 - fk * 0.12), lit) + vec3(0.35, 0.55, 0.6) * fl * smoothstep(0.5, 0.8, m) * 0.6;
+  for (int k = 0; k < 4; k++) { float fk = float(k), e0 = -0.02 + fk * 0.055;
+    vec2 q = vec2(az * (3.0 + fk * 1.3) + uTime * (0.01 + fk * 0.005) + fk * 3.1, (h - e0) * (10.0 - fk * 1.8)); float m = fbm3(q), m2 = fbm3(q + vec2(0.0, -0.12));
+    float env = exp(-abs(h - e0 - 0.03) * (12.0 - fk * 2.4)), mass = smoothstep(0.46, 0.6, m + env * 0.4 - 0.22) * (0.95 - fk * 0.1);
+    float lit = clamp((m2 - m) * 7.0 + 0.2, 0.0, 1.0);
+    vec3 cc = mix(STORM * (0.9 + fk * 0.6), vec3(0.42, 0.66, 0.66) * (1.0 - fk * 0.1), lit) + vec3(0.35, 0.55, 0.6) * fl * smoothstep(0.5, 0.8, m) * 0.6;
     col = mix(col, cc, mass); }
   float sc = fbm3(d.xz / (hp + 0.25) * 1.1 + vec2(uTime * 0.02, uTime * 0.008));
   col = mix(col, STORM * 0.4, smoothstep(0.45, 0.75, sc) * 0.65 * smoothstep(0.45, 0.7, hp));
@@ -285,30 +292,42 @@ vec3 doorsSky(vec3 d){
 float sdArch(vec2 o, float aw, float y0, float y1){ float d = max(abs(o.x) - aw, y0 - o.y); if (o.y > y1) d = length(vec2(o.x, (o.y - y1) * 1.6)) - aw; return d; }
 // P3: the dome is a leaded window of the five worlds, arched panels in brass came. Muted (about half a gate's brightness, desaturated) so it never competes with the beacons.
 // soft > 0: a blurred version for the mirror floor (one colour per panel, wide soft leading, no fine detail to alias)
+// which world a panel shows: a fixed pattern (neighbours always differ, each world about a fifth of any stretch of dome), stepping on per panel at its own time
+float panelW(vec2 c){ float cx = mod(c.x, 22.0), cid = hh(vec2(cx, c.y) + 0.5); return mod(cx * 2.0 + c.y * 3.0 + floor(uTime * 0.06 + cid * 7.0), 5.0); }
+// a panel is a window into its world: horizon low in the pane, each panel looking a different way, the gold and rose suns hung where the pane shows them
+vec3 panelSky(vec2 o, float w, float cid){
+  float yaw = cid * 6.2832, cy = cos(yaw), sy = sin(yaw);
+  vec3 dl = normalize(vec3(o.x * 0.55, mix(-0.16, 0.75, o.y), 1.0)), d = vec3(dl.x * cy + dl.z * sy, dl.y, -dl.x * sy + dl.z * cy);
+  float so = (hh(vec2(cid, 3.7)) - 0.5) * 0.6; gSun = vec3(sin(yaw + so), 0.08 + 0.1 * hh(vec2(cid, 5.1)), cos(yaw + so));
+  vec3 col = skyW(d, w); gSun = vec3(0.0);
+  return col;
+}
 vec3 mosaicSky(vec3 d, vec3 under, float soft){
   float h = d.y, az = atan(d.x, d.z + 1e-6) / 6.2832 + 0.5, el = asin(clamp(h, -1.0, 1.0)) / 1.5708;
   float up = step(0.0, el); vec2 g = vec2(az * 22.0, sqrt(abs(el) + 0.0005) * 5.2 * (up * 2.0 - 1.0)), c = floor(g), f = fract(g);
-  float cid = hh(vec2(mod(c.x, 22.0), c.y) + 0.5);
-  vec2 o = vec2((f.x - 0.5) * 2.0, up > 0.5 ? f.y : 1.0 - f.y); float sd = sdArch(o, 0.965, 0.02, 0.86), aa = max(fwidth(o.y), 0.004) * 1.5;
+  vec2 o = vec2((f.x - 0.5) * 2.0, up > 0.5 ? f.y : 1.0 - f.y);
+  vec2 fo = fwidth(o); float px = max(0.5 * (min(fo.x, 0.2) + min(fo.y, 0.2)), 1e-5); // o units per pixel (the atan seam is clamped)
+  float sd = max(sdArch(o, 1.0, 0.0, 0.62), o.y - 1.0), spx = -sd / px; // pixels inside the pane's edge
   if (hh(vec2(mod(c.x, 22.0), c.y) + 9.5) > uMosaic) return under;
-  float ph = uTime * 0.06 + cid * 7.0, k = fract(ph), wid = mod(floor(cid * 5.0) + floor(ph), 5.0);
-  float inC = 1.0 - smoothstep(-aa, aa, sd);
-  vec3 col = inC > 0.0 ? skyW(vec3(d.x, abs(d.y) * 0.42 + 0.05, d.z), wid) : vec3(0.0);
-  float lum = dot(col, vec3(0.2126, 0.7152, 0.0722)); col = mix(vec3(lum), col, 0.85) * (up > 0.5 ? 0.46 : 0.32);
-  vec3 lat = BRASS * (0.22 + 0.3 * exp(-abs(sd) * 60.0));
+  float cid = hh(vec2(mod(c.x, 22.0), c.y) + 0.5), k = fract(uTime * 0.06 + cid * 7.0), wid = panelW(c);
+  float inC = smoothstep(1.0, 2.2, spx); // thin brass leading, the same width on screen everywhere
+  vec3 col = inC > 0.0 ? panelSky(o, wid, cid) : vec3(0.0);
+  float lum = dot(col, vec3(0.2126, 0.7152, 0.0722)); col = mix(vec3(lum), col, 0.85) * (up > 0.5 ? 0.5 : 0.34);
+  col *= 0.8 + 0.2 * smoothstep(0.0, 14.0, spx); // a faint shade inside the came
+  vec3 lat = BRASS * (0.3 + 0.25 * (1.0 - smoothstep(0.0, 1.6, abs(spx - 0.6))));
   col = mix(lat, col, inC);
-  col += vec3(1.0, 0.86, 0.62) * (1.0 - smoothstep(0.0, 0.07, k)) * exp(-abs(sd) * 20.0) * 0.5;
+  col += vec3(1.0, 0.86, 0.62) * (1.0 - smoothstep(0.0, 0.07, k)) * exp(-max(spx, 0.0) * 0.15) * 0.4;
   return col;
 }
 // the mosaic as the mirror sees it: no leading, each panel one average colour, blended smoothly into its neighbours (a rough reflection)
-vec3 worldAvg(float w){ return w < 0.5 ? vec3(0.5, 0.2, 0.06) : w < 1.5 ? vec3(0.12, 0.34, 0.56) : w < 2.5 ? vec3(0.17, 0.07, 0.32) : w < 3.5 ? vec3(0.04, 0.28, 0.17) : vec3(0.52, 0.17, 0.25); }
+vec3 worldAvg(float w){ return w < 0.5 ? vec3(0.6, 0.3, 0.1) : w < 1.5 ? vec3(0.14, 0.38, 0.6) : w < 2.5 ? vec3(0.2, 0.08, 0.36) : w < 3.5 ? vec3(0.04, 0.24, 0.16) : vec3(0.56, 0.18, 0.26); }
 vec3 mosaicSoft(vec3 d, vec3 under){
   float h = d.y, az = atan(d.x, d.z + 1e-6) / 6.2832 + 0.5, el = asin(clamp(h, -1.0, 1.0)) / 1.5708, up = step(0.0, el);
   vec2 g = vec2(az * 22.0, sqrt(abs(el) + 0.0005) * 5.2 * (up * 2.0 - 1.0)) - 0.5, c = floor(g), f = smoothstep(0.0, 1.0, fract(g));
   vec3 acc = vec3(0.0);
   for (int j = 0; j < 4; j++) { vec2 dc = vec2(mod(float(j), 2.0), floor(float(j) / 2.0)), cc = c + dc; float cx = mod(cc.x, 22.0);
-    float cid = hh(vec2(cx, cc.y) + 0.5), wid = mod(floor(cid * 5.0) + floor(uTime * 0.06 + cid * 7.0), 5.0), rv = step(hh(vec2(cx, cc.y) + 9.5), uMosaic);
-    vec3 pc = worldAvg(wid); float lum = dot(pc, vec3(0.2126, 0.7152, 0.0722)); pc = mix(vec3(lum), pc, 0.85) * (cc.y >= 0.0 ? 0.46 : 0.32);
+    float wid = panelW(cc), rv = step(hh(vec2(cx, cc.y) + 9.5), uMosaic);
+    vec3 pc = worldAvg(wid); float lum = dot(pc, vec3(0.2126, 0.7152, 0.0722)); pc = mix(vec3(lum), pc, 0.85) * (cc.y >= 0.0 ? 0.5 : 0.34);
     vec2 wt = mix(1.0 - f, f, dc); acc += mix(under, pc, rv) * wt.x * wt.y; }
   return acc;
 }
@@ -363,8 +382,8 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
   }
   // P2 and P3: dozens of small lit doors drifting round the hall at several depths (all motion in the vertex shader)
   function buildDrift(S, g) {
-    const N = 72, geo = new THREE.PlaneGeometry(1.6, 2.4); const aP = iattr(N, 4); geo.setAttribute('aP', aP);
-    for (let i = 0; i < N; i++) { const k = i / N, r = 70 + 260 * Math.pow(vrand(), 1.3); aP.setXYZW(i, k * TAU + vrand() * 0.4, r, r * (-0.03 + 0.24 * Math.pow(vrand(), 1.6)), vrand()); }
+    const N = 320, geo = new THREE.PlaneGeometry(1.6, 2.4); const aP = iattr(N, 4); geo.setAttribute('aP', aP);
+    for (let i = 0; i < N; i++) { const k = i / N, r = 56 + 250 * Math.pow(vrand(), 1.5); aP.setXYZW(i, k * TAU + vrand() * 0.4, r, r * (-0.12 + 0.27 * Math.pow(vrand(), 1.3)), vrand()); }
     const m = new THREE.InstancedMesh(geo, smat(S.U, `uniform float uTime; attribute vec4 aP; varying vec2 vUv; varying float vS; varying float vFar;
       void main(){ vUv = uv; vS = aP.w; float sg = fract(aP.w * 3.1) > 0.5 ? 1.0 : -1.0;
         float ang = aP.x + uTime * (0.004 + 0.008 * fract(aP.w * 7.3)) * sg, r = aP.y, y = aP.z + sin(uTime * 0.12 + aP.w * 20.0) * r * 0.012;
@@ -384,7 +403,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
         vec3 col = mix(vec3(0.05, 0.04, 0.034) * (1.0 + 0.6 * smoothstep(0.3, 0.5, abs(o.x))), lit, hole);
         col = mix(col, vec3(0.09, 0.06, 0.035) + DOORL * 0.25 * boxA(o + vec2(0.34 * op * 2.0 - 0.34, 0.05), vec2(0.03, 0.8), aw), leaf);
         col = mix(col, STORM * 2.2, vFar * 0.55);
-        float a = max(fr, glow * 0.55) * uDoors * (1.0 - 0.88 * uMosaic) * (1.0 - vFar * 0.35);
+        float a = max(fr, glow * 0.55) * uDoors * (1.0 - uMosaic) * (1.0 - vFar * 0.35);
         col = mix(DOORL * 1.1, col, fr); // outside the frame only the glow shows
         gl_FragColor = vec4(max(col, 0.0) * (1.0 - vFar * 0.3), a); }`, { transparent: true, depthWrite: false }), N);
     m.frustumCulled = false; m.renderOrder = -40; m.visible = false; g.add(m); S.drift = m;
@@ -395,6 +414,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     S.shU = { uSh: { value: 0 }, uShA: { value: 0 } };
     const m = new THREE.InstancedMesh(geo, smat(Object.assign({}, S.U, S.shU), `attribute float aI; uniform float uShA; varying vec2 vS; varying float vI; varying float vNear;
       void main(){ float u = 1.0 - uv.y, v = uv.x * 2.0 - 1.0; vS = vec2(u, v); vI = aI;
+        if (mod(aI, 2.0) > 0.5) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; } // six beams, one through every other door, with clear gaps
         float ang = (aI + 0.5 + uShA) / 12.0 * 6.2832; vec3 dO = vec3(sin(ang), 0.0, cos(ang));
         vec3 A = dO * 44.0 + vec3(0.0, 13.0, 0.0), B = dO * 5.0 + vec3(0.0, -0.3, 0.0), P = mix(A, B, u), ax = normalize(B - A);
         vec3 side = normalize(cross(ax, normalize(cameraPosition - P)) + vec3(1e-4, 0.0, 0.0));
@@ -418,9 +438,10 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
       float lineAA(float d, float w){ float fw = max(fwidth(d), 1e-4); return 1.0 - smoothstep(w - fw, w + fw, abs(d)); }
       const vec3 CHEV = ${lin(0xc8102e)};
       vec2 chevF(float al, float lx, float cw){ // al: along the sweep's motion; lx: lateral offset in a cell cw wide. x = chevron, y = chevron plus a thin (1-2 px) dark edge
-        float u = (al + abs(lx) * 0.9) * 0.36 - uTime * 1.1, fw = max(fwidth(u), 1e-3);
+        float sc = mix(0.3, 0.24, uGloss), arm = mix(0.08, 0.06, uGloss); // sparser and thinner on the dark mirror, where they would otherwise swamp it
+        float u = (al + abs(lx) * 0.9) * sc - uTime * 1.1 * sc / 0.36, fw = max(fwidth(u), 1e-3);
         float c = abs(fract(u + 0.5) - 0.5), e = abs(lx) / cw, fe = max(fwidth(e), 1e-3);
-        return vec2((1.0 - smoothstep(0.1 - fw, 0.1 + fw, c)) * (1.0 - smoothstep(0.35 - fe, 0.35 + fe, e)), (1.0 - smoothstep(0.1 + fw, 0.1 + fw * 3.0, c)) * (1.0 - smoothstep(0.35 + fe, 0.35 + fe * 3.0, e))); }
+        return vec2((1.0 - smoothstep(arm - fw, arm + fw, c)) * (1.0 - smoothstep(0.35 - fe, 0.35 + fe, e)), (1.0 - smoothstep(arm + fw, arm + fw * 3.0, c)) * (1.0 - smoothstep(0.35 + fe, 0.35 + fe * 3.0, e))); }
       void main(){
         vec2 p = vW.xz; float r = length(p), a = atan(p.x, p.y + 1e-6);
         for (int i = 0; i < ${NSLOT}; i++) { vec4 q = uGate[i]; if (q.z > 0.0 && length(p - q.xy) < q.z) discard; }
@@ -428,8 +449,8 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
         float ring = floor(r / 3.6), nseg = max(6.0, floor(6.2832 * (ring + 0.5) * 3.6 / 3.4)), seg = floor((a / 6.2832 + 0.5) * nseg);
         vec2 sid = vec2(ring, seg); float th = hh(sid) * 3.1416, tone = hh(sid + 7.0);
         vec2 rq = vec2(cos(th) * p.x - sin(th) * p.y, sin(th) * p.x + cos(th) * p.y);
-        float band = vn(vec2(rq.x * 0.35 + vn(rq * 0.3) * 1.5, rq.y * 3.4)), pores = smoothstep(0.74, 0.86, vn(vec2(rq.x * 2.6, rq.y * 19.0)));
-        vec3 col = TRAV * (0.8 + 0.12 * band + 0.08 * tone) * (1.0 - pores * 0.22);
+        float band = vn(vec2(rq.x * 0.7 + vn(rq * 0.3) * 1.5, rq.y * 2.2)), pores = smoothstep(0.74, 0.86, vn(vec2(rq.x * 5.0, rq.y * 11.0)));
+        vec3 col = TRAV * (0.86 + 0.04 * band + 0.08 * tone) * (1.0 - pores * 0.08);
         col = mix(col, col * vec3(1.02, 0.97, 0.9), smoothstep(0.55, 0.9, vn(rq * 0.6 + 9.0)) * 0.6);
         float sr = (fract(r / 3.6) - 0.5) * 3.6, sa = (fract((a / 6.2832 + 0.5) * nseg) - 0.5) * 6.2832 * r / nseg;
         float seam = max(lineAA(abs(sr) - 1.8, 0.025), lineAA(abs(sa) - 3.14159 * r / nseg, 0.025) * step(2.0, r));
@@ -452,19 +473,26 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
         // pools of gate light around every open gate
         for (int i = 0; i < ${NSLOT}; i++) { vec4 q = uGate[i], c = uGCol[i]; if (q.z > 0.0 && c.w > 0.0) { float dd = length(p - q.xy) - q.z; col += c.rgb * c.w * (exp(-max(dd, 0.0) * 1.3) * 0.28 + exp(-max(dd, 0.0) * 6.0) * 0.22); } }
         // P2: warm light thrown in through the twelve open doors (the pools where the shafts in the air land)
-        if (uShaft > 0.001) { float k = a / 6.2832 * 12.0 - uShaftA; float sx = (fract(k) - 0.5) * 9.0, sh = exp(-sx * sx); col += DOORL * sh * uShaft * smoothstep(4.0, 18.0, r) * (1.0 - smoothstep(19.0, 20.5, r)) * (0.75 + 0.25 * vn(p * 0.7)) * 0.26; }
+        if (uShaft > 0.001) { float k = a / 6.2832 * 6.0 - uShaftA * 0.5 + 0.25; float sx = (fract(k) - 0.5) * 18.0, sh = exp(-sx * sx); col += DOORL * sh * uShaft * smoothstep(4.0, 18.0, r) * (1.0 - smoothstep(19.0, 20.5, r)) * (0.75 + 0.25 * vn(p * 0.7)) * 0.15; }
         // P3: the floor turns to dark glass reflecting a blurred mosaic
         if (uGloss > 0.001) {
           vec3 dk = mix(vec3(0.022, 0.02, 0.028) * (0.85 + 0.3 * band), brass * 0.9, br);
           vec3 Rf = vec3(V.x, -V.y, V.z); float fr = 0.55 + 0.45 * pow(1.0 - clamp(-V.y, 0.0, 1.0), 4.0);
           vec3 refl = domeColS(normalize(Rf + vec3(vn(p * 0.6) - 0.5, 0.0, vn(p * 0.6 + 5.0) - 0.5) * 0.03), 1.0);
-          col = mix(col, dk + refl * fr * 0.55 * (1.0 - br * 0.7), uGloss);
+          // what stands on the glass, softened: the reflected ray's closest pass to each upright (Janus, the beacons), fading with height and distance
+          vec2 rh = Rf.xz; float rl = max(dot(rh, rh), 1e-4); vec3 ob = vec3(0.0);
+          { vec4 jb = uBlob[1]; vec2 dq = jb.xy - p; float t = max(dot(dq, rh) / rl, 0.0), dd = length(p + rh * t - jb.xy);
+            float hY = Rf.y * t; ob += vec3(0.42, 0.36, 0.3) * step(0.001, jb.w) * step(0.0, dot(dq, rh)) * exp(-dd * dd * 0.35) * (1.0 - smoothstep(0.0, 7.5, hY)) * 0.55
+              + vec3(1.0, 0.86, 0.6) * step(0.001, jb.w) * step(0.0, dot(dq, rh)) * exp(-dd * dd * 4.0) * exp(-abs(hY - 3.6) * 1.6) * 0.5; }
+          for (int i = 0; i < ${NSLOT}; i++) { vec4 q = uGate[i], gc = uGCol[i]; if (q.z > 0.0 && gc.w > 0.0) { vec2 dq = q.xy - p; float t = max(dot(dq, rh) / rl, 0.0), dd = length(p + rh * t - q.xy), hY = Rf.y * t;
+            ob += gc.rgb * min(gc.w, 1.0) * step(0.0, dot(dq, rh)) * exp(-dd * dd * 2.2) * (1.0 - smoothstep(0.0, 5.0, hY)) * 0.3; } }
+          col = mix(col, dk + (refl * 0.8 + ob) * fr * (1.0 - br * 0.7), uGloss);
         }
         // the sweeping hazards: crimson chevrons on the ground they have not reached yet (pointing the way it moves), a hot line where they touch the floor
         float tel = 0.0, chev = 0.0, outl = 0.0, hot = 0.0;
         for (int i = 0; i < 3; i++) { vec4 w = uWall[i]; if (w.w > 0.001) {
           vec2 d2 = w.xy; float al = dot(p, d2), bl = dot(p, vec2(-d2.y, d2.x)), dp = al - w.z;
-          if (dp > 0.0) { vec2 cv = chevF(al, (fract(bl / 3.1) - 0.5) * 3.1, 3.1); float fd = w.w * smoothstep(0.3, 1.3, dp) * (w.w > 0.5 ? 1.0 : 0.12); // a wall still waiting its turn barely marks the floor (its ghost grille says it is coming)
+          if (dp > 0.0) { vec2 cv = chevF(al, (fract(bl / 3.1) - 0.5) * 3.1, 3.1); float fd = w.w * smoothstep(0.3, 1.3, dp) * (w.w > 0.5 ? 1.0 : 0.12 * (1.0 - uGloss)); // a wall still waiting its turn barely marks the floor (none on the mirror: its ghost grille says it is coming)
             tel = max(tel, fd); chev = max(chev, cv.x * fd); outl = max(outl, cv.y * fd); }
           hot = max(hot, w.w * (exp(-abs(dp) * 7.0) + exp(-max(-dp, 0.0) * 1.2) * step(dp, 0.0) * 0.18) * step(w.z, 21.5) * step(-21.5, w.z)); } }
         for (int i = 0; i < 2; i++) { vec4 w = uRing[i]; if (w.z > 0.001) {
@@ -472,10 +500,10 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
           if (dp > 0.0) { float cw = 6.2832 * max(r, 0.5) / 24.0; vec2 cv = chevF(w.y > 0.0 ? -r : r, (fract(a / 6.2832 * 24.0) - 0.5) * cw, cw); float fd = w.z * smoothstep(0.3, 1.3, dp);
             tel = max(tel, fd); chev = max(chev, cv.x * fd); outl = max(outl, cv.y * fd); }
           hot = max(hot, w.z * (exp(-abs(dp) * 7.0) + exp(-max(-dp, 0.0) * 1.2) * step(dp, 0.0) * 0.18) * step(0.05, w.x) * step(w.x, 21.5)); } }
-        float inF = step(r, 20.9); tel *= inF; chev *= inF; outl *= inF;
+        float inF = step(r, 20.9) * (1.0 - uGloss * step(0.001, uBlob[0].w) * (1.0 - smoothstep(1.5, 1.95, length(p - uBlob[0].xy)))); tel *= inF; chev *= inF; outl *= inF; // and none inside the hero's ring on the mirror
         col *= 1.0 - tel * 0.12;
         col = mix(col, col * mix(0.5, 0.3, uGloss), max(outl - chev, 0.0)); // a thin dark edge round each chevron, no drop shadow
-        col = mix(col, mix(CHEV * 0.92, CRIM * 1.25, uGloss) * (0.92 + 0.14 * sin(uTime * 4.2)), chev); // a slight emissive pulse
+        col = mix(col, mix(CHEV * 0.92, CHEV * 1.12, uGloss) * (0.92 + 0.14 * sin(uTime * 4.2)), chev); // the same crimson in every phase, a slight emissive pulse
         col += CRIM * vec3(1.0, 0.75, 0.75) * hot * 3.2;
         // P3: a solid pale ring of light under the hero, so the silhouette always reads against the dark glass
         { vec4 hb = uBlob[0]; float hd = length(p - hb.xy), on = uGloss * step(0.001, hb.w);
@@ -519,6 +547,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     for (let k = -7; k <= 7; k++) sp.push(box(0.45, 0.4, 0.4, k * 1.0, 26.0, 1.95)); // dentils
     const ped = new THREE.Shape(); ped.moveTo(-7.8, 0); ped.lineTo(7.8, 0); ped.lineTo(0, 4.0); ped.closePath();
     sp.push(T(new THREE.ExtrudeGeometry(ped, { depth: 3.2, bevelEnabled: false }), 0, 27.25, -1.6));
+    for (const sx of [-1, 1]) sp.push(T(new THREE.BoxGeometry(9.1, 0.5, 3.7), sx * 3.82, 29.3, 0, 0, 0, -sx * Math.atan2(4.0, 7.8))); // raking cornices: a clean edge on the slopes
     SP4[0].push(box(16, 2.6, 6, 0, -1.3, 0));
     bp.push(T(new THREE.CylinderGeometry(1.15, 1.15, 0.3, 24), 0, 24.4, 2.05, PI / 2), T(new THREE.TorusGeometry(0.9, 0.12, 6, 24), 0, 24.4, 2.25), T(new THREE.TorusGeometry(1.3, 0.1, 6, 24), 0, 28.6, 1.7));
     bp.push(box(14.8, 0.28, 0.3, 0, 23.35, 1.75));
@@ -527,6 +556,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     const tm = W.mat({ color: 0xc89a48, metalness: 0.85, roughness: 0.3, emissive: 0x2e1e0a, emissiveIntensity: 1 }); // brass capitals and bands
     const PC = [[0, -1.3, 0], [-5.7, 11.5, 0], [5.7, 11.5, 0], [0, 26.5, 0]];
     S.fParts = SP4.map((list, k) => { const st2 = new THREE.InstancedMesh(merge(list), fm, NDOOR); st2.frustumCulled = false; g.add(st2);
+      for (let i = 0; i < NDOOR; i++) { const x = Math.sin(i / NDOOR * TAU + PI / NDOOR), w2 = smooth(clamp(x * 1.6 + 0.5, 0, 1)); st2.setColorAt(i, _c.setRGB(lerp(0.84, 1.07, w2), lerp(0.88, 0.99, w2), lerp(1.0, 0.86, w2))); }
       let tr = null; if (BP4[k].length) { tr = new THREE.InstancedMesh(merge(BP4[k]), tm, NDOOR); tr.frustumCulled = false; g.add(tr); }
       return { st: st2, tr, c: new V3(...PC[k]), back: new THREE.Matrix4().makeTranslation(-PC[k][0], -PC[k][1], -PC[k][2]) }; });
     // the openings: each shows its own world with a horizon and cloud banks at depths behind the door, so they slide as you move
@@ -543,8 +573,8 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
           vec3 P = vW + V * (D / vn0); vec2 q = vec2(dot(P, tg), P.y - 7.0) * vec2(0.06, 0.16) * (1.0 - fk * 0.25) + vec2(uTime * (0.05 - fk * 0.012), 0.0) + fk * 5.1;
           vec4 L = cloudL(q, vDk.x, fk); float band = smoothstep(-0.25, 0.1, sd.y) * (1.0 - smoothstep(0.2 + fk * 0.08, 0.5, sd.y));
           L *= band; L.rgb = mix(L.rgb, col * L.a, fk * 0.25); col = col * (1.0 - L.a) + L.rgb; }
-        float e = min(min(vUv.x, 1.0 - vUv.x) * 9.0, vUv.y * 22.6); col *= 0.4 + 0.6 * smoothstep(0.0, 1.6, e);
-        col += DOORL * exp(-e * 1.6) * 0.45;
+        float lum = dot(col, vec3(0.2126, 0.7152, 0.0722)); col = max(mix(vec3(lum), col, 1.35), 0.0) * 0.85;
+        float e = min(min(vUv.x, 1.0 - vUv.x) * 9.0, vUv.y * 22.6); col *= 0.1 + 0.9 * smoothstep(0.15, 1.5, e); // a dark stone reveal round the opening
         gl_FragColor = vec4(max(col, 0.0) * 1.0 * (1.0 - vDk.y * 0.93), 1.0); }`), NDOOR);
     om.frustumCulled = false; g.add(om); S.openings = om;
     for (let i = 0; i < NDOOR; i++) S.dW.setXY(i, (i * 3) % 5, 0);
@@ -591,10 +621,12 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
         _o.position.set(cx + Math.cos(ry) * -4.5 * sd, 0, cz - Math.sin(ry) * -4.5 * sd);
         _o.rotation.set(0, ry + (s ? PI : 0) - open * sd, 0, 'XYZ'); _o.scale.setScalar(1);
         if (tear >= 0) { // torn off their hinges: thrown outward, tumbling, falling into the cloud sea
-          const sv = S.tearSeed[k], t = Math.max(0, tear - sv[1] * 0.6), out = t * (5 + sv[0] * 4);
+          const sv = S.tearSeed[k], t = Math.max(0, tear - sv[1] * 0.6), out = t * (11 + sv[0] * 12);
           _o.position.x += Math.sin(a) * out + (sv[2] - 0.5) * t * 3; _o.position.z += Math.cos(a) * out; _o.position.y += t * 6 - t * t * 7;
-          _o.rotation.x += t * (0.6 + sv[0]) * sd; _o.rotation.z += t * (0.4 + sv[2] * 0.6);
-          if (t > 6) _o.scale.setScalar(0.0001);
+          _w.set(2.25, 11.2, 0).applyEuler(_o.rotation);
+          _o.rotation.x += t * (0.9 + sv[0]) * sd; _o.rotation.y += t * (sv[1] - 0.5) * 1.6; _o.rotation.z += t * (0.6 + sv[2] * 0.8);
+          _v.set(2.25, 11.2, 0).applyEuler(_o.rotation); _o.position.add(_w).sub(_v);
+          if (t > 4.5) _o.scale.setScalar(0.0001);
         }
         _o.updateMatrix(); L.setMatrixAt(k, _o.matrix); S.leafP.setMatrixAt(k, _o.matrix);
       }
@@ -642,10 +674,10 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     for (let k = 0; k <= 10; k++) { const t = k / 10 * BW - BW * 0.5; sh.lineTo(Math.sin(t) * 1.95, Math.cos(t) * 1.95); } sh.lineTo(0, 0);
     const bg = new THREE.ExtrudeGeometry(sh, { depth: 0.04, bevelEnabled: false }); bg.rotateX(PI / 2); bg.translate(0, -0.075, 0);
     // a shut gate is a brass compass star: blades alternate bright and dark brass and each is canted like a real iris leaf, so the star reads in any light
-    const bm = W.mat({ color: 0xffffff, metalness: 0.9, roughness: 0.32, emissive: 0x3a2810, emissiveIntensity: 1 });
+    const bm = W.mat({ color: 0xffffff, metalness: 0.6, roughness: 0.42, emissive: 0x5a4018, emissiveIntensity: 1 }); // brushed: less mirror, so it never turns brown against a dark sky
     const bi = new THREE.InstancedMesh(bg, bm, n * 10); bi.frustumCulled = false; g.add(bi); S.gIris = bi;
     bi.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 30), 3);
-    for (let k = 0; k < n * 10; k++) bi.setColorAt(k, _c.setHex(k % 2 ? 0x8a6230 : 0xe0b45a));
+    for (let k = 0; k < n * 10; k++) bi.setColorAt(k, _c.setHex(k % 2 ? 0xc29548 : 0xd0a454)); // one brass, the star only a shallow engraving (blade seams and a 10% step)
     // brass rim, coloured inner line, pips
     const rimM = W.mat({ color: 0xc89a48, metalness: 1, roughness: 0.28 });
     const rg = new THREE.TorusGeometry(GATE_R + 0.14, 0.13, 10, 72); rg.rotateX(PI / 2); rg.translate(0, 0.04, 0);
@@ -713,7 +745,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
       float tooth = 1.0 - smoothstep(-fx, fx, bx - 0.22 * clamp(q.y / 1.1, 0.0, 1.0)); if (q.y < 1.1) vb = tooth;
       float hy = abs(fract((q.y - 1.6) / 2.2) - 0.5) * 2.2, hb = (1.0 - smoothstep(0.13 - fy, 0.13 + fy, hy)) * step(1.3, q.y);
       vec2 dq = vec2(q.x / 2.3, (q.y - 1.6) / 2.2); vec2 fq = fract(dq) - 0.5; float dg = min(abs(fq.x - fq.y), abs(fq.x + fq.y));
-      float lat = (1.0 - smoothstep(0.017, 0.017 + fx * 0.5, dg)) * step(1.3, q.y) * 0.6; // the X bracing at half the weight of the main bars
+      float lat = (1.0 - smoothstep(0.009, 0.009 + fx * 0.5, dg)) * step(1.3, q.y) * 0.45; // light X bracing, well under the weight of the main bars
       float top = 1.0 - smoothstep(14.8, 15.0, q.y); float crown = smoothstep(14.6, 14.8, q.y) * (1.0 - smoothstep(15.6, 15.7, q.y));
       float bar = max(max(vb, hb), max(lat, crown)) * top + crown;
       float bev = max(1.0 - smoothstep(0.0, 0.2, bx), 1.0 - smoothstep(0.0, 0.13, hy));
@@ -723,7 +755,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
       // bars fade to about a quarter near the camera and around the lines of sight to the hero and to Janus; the crimson contact seam stays
       float dc = length(vW - cameraPosition);
       vec2 sJ = sightD(uJP);
-      float fade = mix(0.27, 1.0, smoothstep(6.0, 18.0, dc)) * min(mix(0.27, 1.0, smoothstep(1.6, 4.6, sightD(uPP).x)), mix(0.3, 1.0, smoothstep(2.4, 5.0, sJ.x / max(sJ.y, 0.3)))) * smoothstep(1.5, 3.0, dc);
+      float fade = mix(0.1, 1.0, smoothstep(7.0, 22.0, dc)) * mix(1.0, 0.4, smoothstep(9.0, 13.5, q.y) * (1.0 - crown)) * min(mix(0.27, 1.0, smoothstep(1.6, 4.6, sightD(uPP).x)), mix(0.3, 1.0, smoothstep(2.4, 5.0, sJ.x / max(sJ.y, 0.3)))) * smoothstep(1.5, 3.0, dc);
       float a = (bar * 0.94 + (1.0 - bar) * g * 0.22) * fade + seam * max(fade, 0.7) * smoothstep(1.5, 3.0, dc);
       a *= uA * mix(1.0, 0.32, uGhost);
       if (a < 0.003) discard;
@@ -799,7 +831,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
   function buildJanus(S, b) {
     const J = S.J = {}, root = J.root = new THREE.Group(); b.group.add(root);
     const bronze = W.mat({ color: 0x5a4430, metalness: 0.88, roughness: 0.36 }), brass = W.mat({ color: 0xc89a48, metalness: 1, roughness: 0.26 });
-    const marble = W.mat({ color: 0xb8ab97, roughness: 0.62, metalness: 0 }), robeM = W.mat({ color: 0xc2b6a2, roughness: 0.62, metalness: 0, vertexColors: true }); J.mats = { bronze, brass, marble };
+    const marble = W.mat({ color: 0xb8ab97, roughness: 0.62, metalness: 0 }), robeM = W.mat({ color: 0xbcae98, roughness: 0.78, metalness: 0, vertexColors: true }); J.mats = { bronze, brass, marble };
     root.scale.setScalar(1.32); // a colossus: the head clears the balustrade from the play camera
     const add = (par, geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; par.add(m); return m; };
     // the robe: a lathe of warm grey marble with deep vertical folds (broad lit ridges, narrow dark creases), a hem that lifts into drapes between them, a brass band above the hem
@@ -807,9 +839,9 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     const rg = new THREE.LatheGeometry(prof, 120), rp = rg.attributes.position;
     const rc = new Float32Array(rp.count * 3);
     for (let i = 0; i < rp.count; i++) { const x = rp.getX(i), y = rp.getY(i), z = rp.getZ(i), a = Math.atan2(x, z), amp = (1 - y / 2.7) * (y < 2.5 ? 1 : 0);
-      const ridge = Math.pow(0.5 + 0.5 * Math.cos(a * 8 + y * 0.55 + 0.7 * Math.sin(a * 3)), 0.55); // 1 on a fold's crest, 0 deep in its crease
-      const k = 1 + (0.15 * (ridge - 0.62) + 0.035 * Math.sin(a * 21 - y)) * amp * 1.15; rp.setXYZ(i, x * k, y < 0.01 ? (1 - ridge) * 0.09 : y, z * k);
-      let c = (0.24 + 0.76 * ridge) * (0.88 + 0.12 * Math.min(1, y / 1.2)), r = c, gC = c * 0.97, bC = c * 0.93;
+      const ridge = 0.5 + 0.5 * Math.cos(a * 9 + y * 0.55 + 0.7 * Math.sin(a * 3)); // nine folds: 1 on a fold's crest, 0 deep in its crease
+      const k = 1 + (0.22 * (ridge - 0.55) + 0.03 * Math.sin(a * 23 - y)) * amp * 1.15; rp.setXYZ(i, x * k, y < 0.01 ? (1 - ridge) * 0.1 : y, z * k);
+      let c = (0.3 + 0.7 * Math.pow(ridge, 0.8)) * (0.86 + 0.14 * Math.min(1, y / 1.2)), r = c, gC = c * 0.97, bC = c * 0.93;
       if (y > 0.35 && y < 0.53) { r = c * 1.25; gC = c * 0.86; bC = c * 0.42; } // the brass band
       rc[i * 3] = r; rc[i * 3 + 1] = gC; rc[i * 3 + 2] = bC; }
     rg.setAttribute('color', new THREE.BufferAttribute(rc, 3)); rg.computeVertexNormals();
@@ -849,21 +881,24 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     // the head: bronze, two masks (dawn gold in front, dusk silver behind), and in P3 a doorway of light where the face was
     J.head = new THREE.Group(); J.head.position.y = 2.1; J.head.scale.setScalar(1.6); J.torso.add(J.head);
     add(J.head, new THREE.SphereGeometry(0.36, 22, 16), bronze, 0, 0.3, 0);
-    const gold = W.mat({ color: 0xffd98a, metalness: 1, roughness: 0.22, emissive: 0x7a5418, emissiveIntensity: 0.45 }), silver = W.mat({ color: 0x66708a, metalness: 1, roughness: 0.36, emissive: 0x0c1220, emissiveIntensity: 0.3 }), sock = W.mat({ color: 0x060404, metalness: 0.2, roughness: 0.9 });
-    J.eyeG = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xfff0c8).multiplyScalar(2.2) }); J.eyeS = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x9fd0ff).multiplyScalar(0.4) });
+    const gold = W.mat({ color: 0xffd98a, metalness: 1, roughness: 0.22, emissive: 0x7a5418, emissiveIntensity: 0.45 }), silver = W.mat({ color: 0xd4dce8, metalness: 0.55, roughness: 0.3, emissive: 0x3a4458, emissiveIntensity: 0.8 }), sock = W.mat({ color: 0x060404, metalness: 0.2, roughness: 0.9 }); // bright cool silver, plainly not gold
+    J.eyeG = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xfff0c8).multiplyScalar(1.1) }); J.eyeS = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x9fd0ff).multiplyScalar(0.4) });
     J.halves = [];
     for (let m = 0; m < 2; m++) for (let s = 0; s < 2; s++) { // m 0 = dawn (front), 1 = dusk (back); s = left/right half
       const hg = new THREE.Group(); J.head.add(hg);
+      const mg = new THREE.Group(); mg.position.y = 0.3 * (1 - 1.3); mg.scale.set(1, 1.3, 1); hg.add(mg); // a tall classical mask, not a ball
       const ph0 = (m ? PI : 0) + s * PI / 2, mat = m ? silver : gold;
-      add(hg, new THREE.SphereGeometry(0.43, 16, 14, ph0, PI / 2, PI * 0.1, PI * 0.74), mat, 0, 0.3, 0).material.side = THREE.DoubleSide;
+      add(mg, new THREE.SphereGeometry(0.43, 16, 14, ph0, PI / 2, PI * 0.1, PI * 0.74), mat, 0, 0.3, 0).material.side = THREE.DoubleSide;
       const fx = (s ? 1 : -1) * (m ? -1 : 1), fz = m ? -1 : 1;
-      // relief, sized to read from the play camera: a heavy brow ridge over a deep dark socket round a lit eye, a cheekbone; on one half the nose and a dark mouth between lips
-      add(hg, T(new THREE.BoxGeometry(0.26, 0.095, 0.17), 0, 0, 0, 0, 0, fx * 0.2), mat, fx * 0.15, 0.49, fz * 0.375);
-      add(hg, T(new THREE.SphereGeometry(0.09, 12, 8), 0, 0, 0, 0, 0, 0, 1.6, 0.95, 0.5), sock, fx * 0.15, 0.395, fz * 0.385).castShadow = false;
-      const eye = add(hg, T(new THREE.SphereGeometry(0.05, 10, 8), 0, 0, 0, 0, 0, 0, 1.5, 0.55, 0.6), m ? J.eyeS : J.eyeG, fx * 0.15, 0.39, fz * 0.415); eye.castShadow = false;
-      add(hg, T(new THREE.BoxGeometry(0.15, 0.065, 0.1), 0, 0, 0, 0, 0, fx * -0.3), mat, fx * 0.2, 0.29, fz * 0.375);
-      if (s === 0) { add(hg, T(new THREE.ConeGeometry(0.1, 0.34, 4), 0, 0, 0, fz * (PI / 2 - 0.25), 0, 0, 1, 1, 0.75), mat, 0, 0.29, fz * 0.46);
-        add(hg, new THREE.BoxGeometry(0.26, 0.065, 0.06), sock, 0, 0.155, fz * 0.4); add(hg, new THREE.BoxGeometry(0.3, 0.04, 0.08), mat, 0, 0.2, fz * 0.405); add(hg, new THREE.BoxGeometry(0.24, 0.04, 0.08), mat, 0, 0.115, fz * 0.4); }
+      // calm relief: a heavy level brow over eye sockets in shadow (a small glint, no lamp), a soft cheekbone; on one half a straight nose, a closed mouth and a chin
+      add(mg, T(new THREE.BoxGeometry(0.3, 0.075, 0.14), 0, 0, 0, 0, 0, -fx * 0.08), mat, fx * 0.14, 0.45, fz * 0.36);
+      add(mg, T(new THREE.SphereGeometry(0.085, 12, 8), 0, 0, 0, 0, 0, 0, 1.5, 0.8, 0.5), sock, fx * 0.14, 0.37, fz * 0.37).castShadow = false;
+      const eye = add(mg, T(new THREE.SphereGeometry(0.045, 10, 8), 0, 0, 0, 0, 0, 0, 1.3, 0.45, 0.5), m ? J.eyeS : J.eyeG, fx * 0.14, 0.365, fz * 0.395); eye.castShadow = false;
+      add(mg, T(new THREE.SphereGeometry(0.07, 10, 8), 0, 0, 0, 0, 0, 0, 1.4, 0.7, 0.5), mat, fx * 0.2, 0.27, fz * 0.36);
+      if (s === 0) { add(mg, T(new THREE.CylinderGeometry(0.03, 0.065, 0.22, 3), 0, 0, 0, -0.2 * fz, m ? PI : 0, 0), mat, 0, 0.28, fz * 0.415);
+        add(mg, new THREE.BoxGeometry(0.1, 0.03, 0.05), mat, 0, 0.175, fz * 0.435);
+        add(mg, new THREE.BoxGeometry(0.16, 0.014, 0.04), sock, 0, 0.115, fz * 0.41); add(mg, new THREE.BoxGeometry(0.18, 0.028, 0.05), mat, 0, 0.132, fz * 0.405); add(mg, new THREE.BoxGeometry(0.13, 0.032, 0.05), mat, 0, 0.096, fz * 0.4);
+        add(mg, T(new THREE.SphereGeometry(0.08, 10, 8), 0, 0, 0, 0, 0, 0, 1.3, 0.8, 0.6), mat, 0, 0.0, fz * 0.32); }
       hg.userData = { m, s }; J.halves.push(hg);
     }
     const fl = new THREE.Shape(); fl.moveTo(-0.16, -0.2); fl.lineTo(0.16, -0.2); fl.lineTo(0.16, 0.08); fl.absarc(0, 0.08, 0.16, 0, PI, false); fl.lineTo(-0.16, -0.2);
@@ -884,10 +919,10 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     // the small Deadbolt key in his left hand
     J.dkey = new THREE.Mesh(keyGeo(1.1), W.mat({ color: 0xffd98a, metalness: 1, roughness: 0.2, emissive: 0xffc860, emissiveIntensity: 1.6 })); J.dkey.position.y = -0.25; J.dkey.rotation.x = PI; J.dkey.scale.setScalar(0.001); J.armL.hand.add(J.dkey);
     // the halo: eight keys radiating from a gold ring standing behind his head, turning slowly, clear of the shoulders
-    J.halo = new THREE.Group(); J.halo.position.set(0, 5.15, -0.75); root.add(J.halo);
+    J.halo = new THREE.Group(); J.halo.position.set(0, 5.0, -0.75); root.add(J.halo);
     const hk = W.mat({ color: 0xffd98a, metalness: 1, roughness: 0.22, emissive: 0x8a6420, emissiveIntensity: 0.7 });
     J.hkeys = new THREE.InstancedMesh(keyGeo(1.5), hk, 8); J.hkeys.frustumCulled = false; J.halo.add(J.hkeys);
-    const hr = new THREE.Mesh(new THREE.TorusGeometry(1.48, 0.03, 4, 96), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd98a).multiplyScalar(1.4), transparent: true, opacity: 0.7, depthWrite: false })); J.halo.add(hr); J.hring = hr;
+    const hr = new THREE.Mesh(new THREE.TorusGeometry(1.36, 0.03, 4, 96), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd98a).multiplyScalar(1.4), transparent: true, opacity: 0.7, depthWrite: false })); J.halo.add(hr); J.hring = hr;
     J.haloA = 0;
     // the great key, 5 m, built from the tip of the bit (y 0) up to the bow (y 5)
     const kb = [T(new THREE.CylinderGeometry(0.085, 0.085, 4.15, 10), 0, 2.3, 0), T(new THREE.TorusGeometry(0.42, 0.085, 10, 28), 0, 4.5, 0), T(new THREE.CylinderGeometry(0.15, 0.15, 0.14, 12), 0, 4.0, 0), T(new THREE.CylinderGeometry(0.12, 0.12, 0.1, 12), 0, 3.75, 0)];
@@ -945,10 +980,10 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
       hg.rotation.set(0, ang * o - (m ? PI : 0) * o, 0);
     }
     J.faceL.visible = J.faceB.visible = J.orbit > 0.3 && J.dead < 0; if (J.faceL.visible) { const s = smooth((J.orbit - 0.3) / 0.7); J.faceL.scale.setScalar(s); J.faceB.scale.setScalar(s); }
-    J.eyeS.color.setHex(0x9fd0ff).multiplyScalar(0.4 + 2.2 * clamp(J.head2, 0, 1));
+    J.eyeS.color.setHex(0x9fd0ff).multiplyScalar(0.4 + 0.9 * clamp(J.head2, 0, 1));
     // halo
     const still = wn('kneel'); J.haloA += dt * (0.55 * (1 - still)); const hy = still * -0.6;
-    for (let i = 0; i < 8; i++) { const an = J.haloA + i / 8 * TAU; const hr2 = 1.52 + Math.sin(t * 1.1 + i) * 0.04; _o.position.set(Math.sin(an) * hr2, Math.cos(an) * hr2 + hy * (0.5 + 0.5 * Math.sin(i * 2.1)), 0);
+    for (let i = 0; i < 8; i++) { const an = J.haloA + i / 8 * TAU; const hr2 = 1.4 + Math.sin(t * 1.1 + i) * 0.04; _o.position.set(Math.sin(an) * hr2, Math.cos(an) * hr2 + hy * (0.5 + 0.5 * Math.sin(i * 2.1)), 0);
       _o.rotation.set(0, 0, -an + still * 0.6 * (i % 2 ? 1 : -1), 'XYZ'); _o.scale.setScalar(S.haloHide && S.haloHide[i] > G.now ? 0.0001 : 1); _o.updateMatrix(); J.hkeys.setMatrixAt(i, _o.matrix); }
     J.hkeys.instanceMatrix.needsUpdate = true;
     // the great key: in the hand, held level for the sweep, raised for the throw, standing in the air for the turn, planted while he kneels
@@ -969,7 +1004,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     const ch = (1 - 0.7 * wn('kneel')) * (1 + 0.6 * wn('turn')) * (S.dead ? Math.max(0, 1 - (G.now - S.deadT) / 1.5) : 1);
     S.chestU.uChest.value = damp(S.chestU.uChest.value, ch, 5, dt); J.light.intensity = 18 * S.chestU.uChest.value;
   }
-  function root_y(J, drop) { J.root.position.y = J.rise || 0; J.robe.scale.y = (2.5 + drop) / 2.5; J.torso.position.y = 2.5 + drop; J.halo.position.y = 5.15 + drop; }
+  function root_y(J, drop) { J.root.position.y = J.rise || 0; J.robe.scale.y = (2.5 + drop) / 2.5; J.torso.position.y = 2.5 + drop; J.halo.position.y = 5.0 + drop; }
 
   // ---------------------------------------------------------------------------------------------------------------------
   function build(b) {
@@ -989,7 +1024,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     { const s = S.gs[10]; s.x = 0; s.z = 0; s.pair = 0; s.twin = 10; s.on = false; }
     g.addEventListener('removed', () => { Cam.fov = 55; });
     return {
-      edge: 'wall', radius: R, spawn: { x: 0, z: 9 }, bossStart: { x: 0, z: 0, face: 0 }, camDist: 17,
+      edge: 'wall', radius: R, spawn: { x: 0, z: 9 }, bossStart: { x: 0, z: 0, face: 0 }, camDist: 19, camPitch: 0.3,
       contains: (x, z) => Math.hypot(x, z) <= R - 0.6,
       clamp(p) { const d = Math.hypot(p.x, p.z), m = R - 0.6; if (d > m) { p.x *= m / d; p.z *= m / d; } },
       bulletBounds: (x, z) => Math.hypot(x, z) < 26,
@@ -1309,7 +1344,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
 
   // ---------------------------------------------------------------------------------------------------------------------
   // cosmetics, every rendered frame
-  const SEA = [[0x3a2a40, 0xf0b890, 0x9a7480], [0x061a20, 0x2c6470, 0x0c2a34], [0x140c20, 0x5a3a7a, 0x281c38]];
+  const SEA = [[0x3a2a40, 0xf0b890, 0x9a7480], [0x03141a, 0x5a96a2, 0x0c2a34], [0x140c20, 0x5a3a7a, 0x281c38]];
   const _ca = new THREE.Color(), _cb = new THREE.Color();
   function lookStep(S, b, dt) {
     const lk = S.lk, lt = S.lkT, U = S.U;
@@ -1319,7 +1354,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     lk.shaft = damp(lk.shaft, sweeping ? 1 : lt.shaft, 2, dt);
     U.uSplit.value = lk.split; U.uDoors.value = lk.doors; U.uMosaic.value = lk.mosaic;
     S.fU.uGloss.value = lk.gloss; S.fU.uShaft.value = lk.shaft; S.fU.uShaftA.value = sweeping ? sw / 3.5 * 3 : 0;
-    S.drift.visible = lk.doors > 0.01; S.shafts.visible = lk.shaft > 0.01 && lk.mosaic < 0.5; S.shU.uSh.value = Math.min(1, lk.shaft * 2.4) * (1 - lk.mosaic); S.shU.uShA.value = S.fU.uShaftA.value;
+    S.drift.visible = lk.doors > 0.01 && lk.mosaic < 0.99; S.shafts.visible = lk.shaft > 0.01 && lk.mosaic < 0.5; S.shU.uSh.value = Math.min(1, lk.shaft * 2.4) * (1 - lk.mosaic); S.shU.uShA.value = S.fU.uShaftA.value;
     // the leaves: shut, ajar, thrown open, torn off
     const la = [0, 0.42, 1.85, 1.85][lt.leaves];
     S.leafA = damp(S.leafA, la, lt.leaves >= 2 && S.leafA < 1.6 ? 1.6 : 2.2, dt);
@@ -1346,7 +1381,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
       _m4.makeTranslation(g.x, 0, g.z); if (!show) _m4.scale(_s.set(0.0001, 0.0001, 0.0001));
       for (const m of [S.gInt, S.gShaft, S.gRim, S.gLine, S.gGlow, S.gBeacon]) m.setMatrixAt(i, _m4);
       _ca.setHex(PAIR_HEX[pr]).lerp(_cb.setRGB(1, 1, 1), g.white * 0.35).multiplyScalar(1.1 + 1.6 * g.vis); S.gLine.setColorAt(i, _ca); // shut gates keep a faint ring of their pair colour
-      for (let j = 0; j < 10; j++) { const a = j / 10 * TAU, o = g.vis; _o.position.set(g.x + Math.sin(a + o * 0.55) * o * 2.15, -j * 0.0025, g.z + Math.cos(a + o * 0.55) * o * 2.15); _o.rotation.set(0, a + o * 0.55, 0.045, 'YXZ'); _o.scale.setScalar(show ? 1 : 0.0001); _o.updateMatrix(); S.gIris.setMatrixAt(i * 10 + j, _o.matrix); }
+      for (let j = 0; j < 10; j++) { const a = j / 10 * TAU, o = g.vis; _o.position.set(g.x + Math.sin(a + o * 0.55) * o * 2.15, -j * 0.0025, g.z + Math.cos(a + o * 0.55) * o * 2.15); _o.rotation.set(0, a + o * 0.55, 0.012, 'YXZ'); _o.scale.setScalar(show ? 1 : 0.0001); _o.updateMatrix(); S.gIris.setMatrixAt(i * 10 + j, _o.matrix); }
       for (let j = 0; j < 5; j++) { const ok = show && j <= pr && i !== 10, a = angTo(g.x, g.z, 0, 0) + (j - pr / 2) * 0.32; _o.position.set(g.x + Math.sin(a) * (GATE_R + 0.14), 0.2, g.z + Math.cos(a) * (GATE_R + 0.14)); _o.rotation.set(0, 0, 0); _o.scale.setScalar(ok ? 1 : 0.0001); _o.updateMatrix(); S.gPip.setMatrixAt(i * 5 + j, _o.matrix); S.gPip.setColorAt(i * 5 + j, _ca.setHex(PAIR_HEX[pr]).multiplyScalar(0.7 + 1.5 * g.vis));
         _o.position.y = 0.17; _o.updateMatrix(); S.gPipC.setMatrixAt(i * 5 + j, _o.matrix); }
       fu.uGate.value[i].set(g.x, g.z, show ? GATE_R : 0, 0); _c.setHex(PAIR_HEX[pr]).lerp(_cb.setRGB(1, 1, 1), g.white * 0.35); fu.uGCol.value[i].set(_c.r, _c.g, _c.b, g.vis * show * (1 + fl));

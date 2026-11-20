@@ -14,7 +14,7 @@ const fs = require('fs'), path = require('path');
   await page.evaluate('document.getElementById("fade").style.transition="none"; window.__t0 = window.__game.G.now');
   const frames = (n) => page.evaluate((n) => new Promise((res) => { let k = 0; const f = () => { if (++k >= n) res(); else requestAnimationFrame(f); }; requestAnimationFrame(f); }), n);
   // the autopilot never turns the camera: before each fight shot, put it behind the hero facing Janus (as a player would)
-  const face = () => page.evaluate(() => { const g = window.__game, p = g.G.player, b = g.G.boss; if (g.G.state === 'fight' && !g.Cam.cine) { g.Cam.yaw = Math.atan2(b.pos.x - p.pos.x, b.pos.z - p.pos.z); g.Cam.pitch = 0.4; g.Cam.tDist = g.Cam.dist = 17; } });
+  const face = () => page.evaluate(() => { const g = window.__game, p = g.G.player, b = g.G.boss; if (g.G.state === 'fight' && !g.Cam.cine) { g.Cam.yaw = Math.atan2(b.pos.x - p.pos.x, b.pos.z - p.pos.z); const A = g.G.arena; g.Cam.pitch = A.camPitch !== undefined ? A.camPitch : 0.4; g.Cam.tDist = g.Cam.dist = A.camDist || 17; } });
   const snap = async (name) => { await face(); await page.evaluate('window.__game.G.paused = true'); await frames(4); const f = path.join(out, name + '.png'); await page.screenshot({ path: f }); await page.evaluate('window.__game.G.paused = false'); console.log(f); };
   const at = async (sec) => page.waitForFunction((s) => window.__game.G.now - window.__t0 >= s, sec, { timeout: 120000 });
   // the intro, in real time
