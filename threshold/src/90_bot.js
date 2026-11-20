@@ -1,6 +1,6 @@
 // Autopilot + test hooks (window.__game). Used for balance sims in Playwright; never active for players unless ?bot=N.
 const Bot = {
-  level: 0, timer: 0, goal: null, pressT: 0, passive: false,
+  level: 0, timer: 0, goal: null, pressT: 0, passive: false, swapBlind: false,
   update(dt) {
     const p = G.player, b = G.boss;
     if (!this.level || !p || !b || G.state !== 'fight' || !p.alive) { Input.bot = this.level && p ? { moveX: 0, moveZ: 0 } : null; return; }

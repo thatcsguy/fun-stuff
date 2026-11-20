@@ -1,4 +1,4 @@
-// node hitch.js <boss> [cls] : plays the fight in real frames (god + bot), forces each phase in turn, and reports
+// node hitch.js <boss> [cls] (FRAMES=n frames per phase, default 300) : plays the fight in real frames (god + bot), forces each phase in turn, and reports
 // every shader program compiled after the fight started, plus the longest frames around each transition.
 const { launch } = require('./harness.js');
 (async () => {
@@ -7,7 +7,7 @@ const { launch } = require('./harness.js');
   await page.goto('http://game.local/threshold/?mute=1&quality=' + q + '&seed=3');
   await page.waitForFunction('window.__game && window.__game.G.state === "menu"', null, { timeout: 90000 });
   if (process.env.FAST) await page.evaluate(() => { window.__game.G.headless = false; });
-  const r = await page.evaluate(async ({ boss, cls }) => {
+  const r = await page.evaluate(async ({ boss, cls, frames }) => {
     const g = window.__game, R = g.renderer, raf = () => new Promise((res) => requestAnimationFrame(res));
     g.bot(3); g.god(true); g.start(boss, { cls, skipIntro: true });
     const def = g.def(boss), n = def.phases.length, log = [];
@@ -23,11 +23,11 @@ const { launch } = require('./harness.js');
       log.push(label + ' worst frame ' + worst.toFixed(0) + 'ms');
     };
     await watch('p0', 120);
-    for (let ph = 1; ph < n; ph++) { g.setPhase(ph); await watch('p' + ph, 300); }
+    for (let ph = 1; ph < n; ph++) { g.setPhase(ph); await watch('p' + ph, frames); }
     // phase clocks (nightmare): run the clock out in the last phase and watch the overtime play through
     if (def.phases.some((p) => p.budget)) { const b = g.G.boss; b.phaseT = (def.phases[b.phase].budget || 0) - 0.5; await watch('overtime', 900); }
     return { base, total: R.info.programs.length, log };
-  }, { boss, cls });
+  }, { boss, cls, frames: +(process.env.FRAMES || 300) });
   console.log(boss, cls, 'programs at fight start', r.base, 'after all phases', r.total); console.log(r.log.join('\n'));
   await browser.close();
 })();
