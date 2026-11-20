@@ -38,14 +38,14 @@ const fs = require('fs'), path = require('path');
     await page.evaluate('window.__game.setPhase(1)'); await until('G.boss.phase === 1', 0, 5);
     await until('false', 2.6, 0.01); perf.p2 = await ftime();
     if (on('p2trans')) await snap('08_p2_transition');
-    if (on('iris')) { await until('S.mechOn === "iris" && S.haz.length && G.now > S.haz[0].t0 + 1.4', 0.2); await snap('09_iris'); }
-    if (on('doors')) { await until('S.mechOn === "doors" && S.haz.length && G.now > S.haz[0].t0 + 2.55', 0.15); await snap('10_double_doors'); }
+    if (on('iris')) { await until('S.mechOn === "iris" && S.haz.length && G.now > S.haz[0].t0 + 1.4 && !S.tr', 0.2); await snap('09_iris'); }
+    if (on('doors')) { await until('S.mechOn === "doors" && S.haz.length && G.now > S.haz[0].t0 + 2.55 && !S.tr', 0.15); await snap('10_double_doors'); }
   }
   if (on('p3trans') || on('triptych') || on('lockout')) {
     await page.evaluate('window.__game.setPhase(2)'); await until('G.boss.phase === 2', 0, 5);
     await until('false', 3.2, 0.01); perf.p3 = await ftime();
     if (on('p3trans')) await snap('11_p3_transition');
-    if (on('triptych')) { await until('S.mechOn === "triptych" && S.haz.length === 3 && G.now > S.haz[0].t0 + 0.6', 0.25, 120); await snap('12_triptych'); }
+    if (on('triptych')) { await until('S.mechOn === "triptych" && S.haz.length === 3 && G.now > S.haz[0].t0 + 0.6 && !S.tr && G.now - S.lastExit > 0.4', 0.25, 120); await snap('12_triptych'); }
     if (on('lockout')) { await until('S.lockout && S.lockAt - G.now < 1.6', 0.3, 120); await snap('13_lockout'); }
   }
   if (on('death')) { await page.evaluate('window.__game.G.god = false; window.__game.kill()'); await page.waitForTimeout(3600); await snap('14_death'); }
