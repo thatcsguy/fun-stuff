@@ -24,14 +24,14 @@ const fails = []; const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') +
 
   // ---- mouse
   await page.click('#set-diff span[data-v="nightmare"]'); await frames(); s = await st();
-  ok(s.diff === 'nightmare' && s.nm && s.na === 19 && s.nav === 1, `mouse: Nightmare greys 19 doors, leaves 1 (${s.na}/${s.nav})`);
+  ok(s.diff === 'nightmare' && s.nm && s.na === 18 && s.nav === 2, `mouse: Nightmare greys 18 doors, leaves III and XIX (${s.na}/${s.nav})`);
   const box = await page.locator('#doors .door').nth(0).boundingBox(); await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); await frames(10); s = await st();
   ok(s.state === 'menu', 'mouse: clicking greyed door I does nothing');
-  await page.reload(); await menu(); s = await st(); ok(s.diff === 'nightmare' && s.nm && s.na === 19, 'reload: Nightmare is remembered');
+  await page.reload(); await menu(); s = await st(); ok(s.diff === 'nightmare' && s.nm && s.na === 18, 'reload: Nightmare is remembered');
   await page.click('#set-diff span[data-v="normal"]'); await frames(); s = await st(); ok(s.diff === 'normal' && s.na === 0, 'mouse: back to Normal');
   await page.click('#diffrow', { position: { x: 2, y: 2 } }); await frames(); s = await st(); ok(s.diff === 'nightmare', 'mouse: clicking the row edge flips it');
 
-  // ---- keyboard: classes (4) -> toggle -> the one open door -> Settings -> Fullscreen
+  // ---- keyboard: classes (4) -> toggle -> the open doors (III, XIX) -> Settings -> Fullscreen
   await page.reload(); await menu();
   for (let i = 0; i < 5; i++) await key('ArrowDown'); s = await st(); ok(s.focus === 'diffrow', `keys: 5 x down reaches the toggle (${s.focus})`);
   await key('ArrowLeft'); s = await st(); ok(s.diff === 'normal' && s.focus === 'diffrow', `keys: left = Normal, focus stays (${s.diff}, ${s.focus})`);
@@ -39,7 +39,8 @@ const fails = []; const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') +
   await key('Enter'); s = await st(); ok(s.diff === 'normal', 'keys: Enter flips to Normal');
   await key('Enter'); s = await st(); ok(s.diff === 'nightmare', 'keys: Enter flips back');
   await key('ArrowDown'); s = await st(); ok(s.focus === 'door:duelist', `keys: down from the toggle skips greyed doors I-II, lands on III (${s.focus})`);
-  await key('ArrowDown'); s = await st(); ok(s.focus === 'btn-settings', `keys: next is Settings, no greyed door in between (${s.focus})`);
+  await key('ArrowDown'); s = await st(); ok(s.focus === 'door:atelier', `keys: next is door XIX, no greyed door in between (${s.focus})`);
+  await key('ArrowDown'); s = await st(); ok(s.focus === 'btn-settings', `keys: then Settings (${s.focus})`);
 
   // ---- simulated controller
   await page.reload(); await menu(); await page.evaluate(() => { window.__padOn = true; }); await frames(4);
@@ -58,6 +59,13 @@ const fails = []; const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') +
   await page.click('#set-diff span[data-v="normal"]'); await frames();
   await page.click('#doors .door >> nth=0'); await fight(); s = await st();
   ok(s.gnm === false && await page.evaluate(() => !window.__game.G.boss.def.nm && window.__game.G.boss.def.id === 'cathedral'), 'Normal door I click starts Normal');
+  await page.evaluate(() => window.__game.Game.quit()); await menu();
+  // door XIX on Nightmare starts its nightmare version; on Normal, the normal fight
+  await page.click('#set-diff span[data-v="nightmare"]'); await frames(); await page.click('#doors .door >> nth=18'); await fight();
+  ok(await page.evaluate(() => window.__game.G.nightmare && window.__game.G.boss.def.nm && window.__game.G.boss.def.id === 'atelier' && window.__game.G.boss.def.phases.length === 3 && window.__game.G.boss.def.phases[2].budget > 0), 'Nightmare door XIX click starts the nightmare version');
+  await page.evaluate(() => window.__game.Game.quit()); await menu(); await page.click('#set-diff span[data-v="normal"]'); await frames();
+  await page.click('#doors .door >> nth=18'); await fight();
+  ok(await page.evaluate(() => !window.__game.G.nightmare && !window.__game.G.boss.def.nm && window.__game.G.boss.def.id === 'atelier' && window.__game.G.boss.def.enrage === 450 && !window.__game.G.boss.def.phases.some((p) => p.budget)), 'Normal door XIX click starts Normal');
   await page.evaluate(() => window.__game.Game.quit()); await menu();
   // a door with a nightmare version clicked on Normal stays Normal
   await page.click('#doors .door >> nth=2'); await fight();

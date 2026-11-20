@@ -3,6 +3,7 @@
 // "OUT" = the clock ran out (the overtime blow killed the god-mode player; it pierces god mode on purpose).
 // PASSIVE=1: the autopilot never attacks (the clock must run out in every phase).
 // SWAPBLIND=1: the autopilot ignores who is awake in a twin phase and always attacks the boss (door III phase IV must fail).
+// SIDEBLIND=1: the autopilot ignores the called half in door XIX's finale (wears the right paint, stands anywhere: must fail it).
 // PHASES=2,3 limits the phases (0-based).
 // RAW=1: lifts every budget to 999 s for the run, to measure how long each phase really takes (for tuning).
 const { launch } = require('./harness.js');
@@ -11,18 +12,18 @@ const { launch } = require('./harness.js');
   const { browser, page } = await launch({ w: 320, h: 200 });
   await page.goto('http://game.local/threshold/?mute=1&quality=low&nm=1&seed=' + (process.env.SEED || 7));
   await page.waitForFunction('window.__game && window.__game.G.state === "menu"', null, { timeout: 90000 });
-  const r = await page.evaluate(([boss, clsArg, runs, passive, raw, blind, phases]) => {
+  const r = await page.evaluate(([boss, clsArg, runs, passive, raw, blind, phases, side]) => {
     const g = window.__game, def = g.def(boss), n = def.phases.length, out = [], keep = def.phases.map((p) => p.budget);
     if (raw) def.phases.forEach((p) => { p.budget = 999; });
     const classes = clsArg === 'all' ? g.G.classes.map((c) => c.id) : clsArg.split(',');
-    g.G.headless = true; g.bot(3); g.god(true); g.Bot.passive = passive; g.Bot.swapBlind = blind; const only = phases ? phases.split(',').map(Number) : null;
+    g.G.headless = true; g.bot(3); g.god(true); g.Bot.passive = passive; g.Bot.swapBlind = blind; g.Bot.sideBlind = side; const only = phases ? phases.split(',').map(Number) : null;
     for (const cls of classes) {
       const row = { cls, ph: [] };
       for (let ph = 0; ph < n; ph++) {
         const res = []; if (only && !only.includes(ph)) { row.ph.push(null); continue; }
         for (let k = 0; k < runs; k++) {
           g.start(boss, { cls, phase: ph }); const b = g.G.boss; let s;
-          for (let i = 0; i < 60; i++) { s = g.fastForward(2); if (s.state !== 'fight' || b.phase !== ph) break; }
+          for (let i = 0; i < (raw ? 100 : 60); i++) { s = g.fastForward(2); if (s.state !== 'fight' || b.phase !== ph) break; }
           const q = (b.phaseLog || [])[ph] || { time: +(b.phaseT || 0).toFixed(1), budget: def.phases[ph].budget, over: !!b.overtime };
           res.push({ time: q.time, budget: q.budget, over: q.over || (s.state === 'dead' && s.src === 'enrage'), dps: Math.round((q.dmg || 0) / Math.max(1, q.time)), state: s.state, src: s.src, err: s.errors });
         }
@@ -30,8 +31,8 @@ const { launch } = require('./harness.js');
       }
       out.push(row);
     }
-    g.god(false); g.Bot.passive = false; g.Bot.swapBlind = false; def.phases.forEach((p, i) => { p.budget = keep[i]; }); return { out, budgets: keep };
-  }, [boss, clsArg, +runs, !!process.env.PASSIVE, !!process.env.RAW, !!process.env.SWAPBLIND, process.env.PHASES || '']);
+    g.god(false); g.Bot.passive = false; g.Bot.swapBlind = false; g.Bot.sideBlind = false; def.phases.forEach((p, i) => { p.budget = keep[i]; }); return { out, budgets: keep };
+  }, [boss, clsArg, +runs, !!process.env.PASSIVE, !!process.env.RAW, !!process.env.SWAPBLIND, process.env.PHASES || '', !!process.env.SIDEBLIND]);
   console.log('budgets ' + r.budgets.join(' / ') + ' s');
   for (const row of r.out) {
     console.log(row.cls.padEnd(12) + row.ph.map((res, i) => { if (!res) return null;

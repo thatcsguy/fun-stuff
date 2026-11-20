@@ -11,8 +11,18 @@
   function hueLock(m, S, key) { const pv = m.onBeforeCompile; m.onBeforeCompile = (sh, rr) => { if (pv) pv(sh, rr); sh.uniforms.uHue = S.hueU; sh.uniforms.uHueMax = S.hueMax; sh.fragmentShader = 'uniform vec3 uHue; uniform float uHueMax;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', HUE); }; m.customProgramCacheKey = () => 'atelierHue' + key; return m; }
   const INK = 0x16161e, _c = new THREE.Color(), _a = new V3(), _b = new V3();
   const px = (v) => (v + R) * U, bitsOf = (m) => [RED, YEL, BLU].filter((q) => m & q);
-  const need = (S) => S.neg ? 7 ^ S.col : S.col; // in the negative the rule inverts with the world
-  const tel = (S) => S.neg ? 0xf4f4ff : INK;
+  // nightmare finale ("Chiaroscuro"): a seam through the centre turns once in 40 s and splits the canvas into a white half
+  // (s > 0) and a black half. He calls a half and a colour: white + red = be red in the white half; black + red = be the
+  // complement (green) in the black half; bare = clean (white) or mud (black). Standing on the seam counts as neither half.
+  const SEAM = 0.6, FIN_LOOK = 1.35, VARN = 0xd8a050, NMTEL = 0x8f93b0, WALK = 5.6, DETOUR = 1.25;
+  const wantWear = (c) => c.tone === 'w' ? c.col : 7 ^ c.col, wantSide = (c) => c.tone === 'w' ? 1 : -1;
+  const sideAt = (A, x, z) => { const s = x * Math.cos(A) - z * Math.sin(A); return s > SEAM ? 1 : s < -SEAM ? -1 : 0; };
+  const sideOf = (S, x, z) => sideAt(S.lineA, x, z);
+  const need = (S) => S.split && S.call ? wantWear(S.call) : S.neg ? 7 ^ S.col : S.col; // in the negative the rule inverts with the world
+  // the rule, at a point: the right paint (and, in the finale, the called half)
+  const matched = (S, x, z) => S.wear === need(S) && (!S.split || !S.call || sideOf(S, x, z) === wantSide(S.call));
+  const tel = (S) => S.split ? NMTEL : S.neg ? 0xf4f4ff : INK;
+  const inWash = (S, p) => !!p && Math.hypot(p.pos.x - S.wash.x, p.pos.z - S.wash.z) < S.wash.r;
   const CLIP = R - 0.25; // paint stops just inside the drawn edge of the tondo
 
   // ---- the floor: a grid of wet pigment for the rules, a canvas of strokes for the eye ----
@@ -41,6 +51,9 @@
     if (!c) { const fx = Math.sin(sh.dir), fz = Math.cos(sh.dir), tc = -(sh.x * fx + sh.z * fz), RR = R + sh.w / 2 + 0.6, D = RR * RR - (sh.x * sh.x + sh.z * sh.z - tc * tc); if (D <= 0) return; const q = Math.sqrt(D); t0 = Math.max(0, tc - q); t1 = Math.min(sh.len, tc + q); if (t1 <= t0) return; }
     for (const k of [x, s]) { k.save(); k.translate(px(sh.x), px(sh.z)); k.rotate(-(sh.dir || 0)); k.scale(U, U); }
     const blob = (k, pts) => { const n = pts.length, md = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], m0 = md(pts[n - 1], pts[0]); k.beginPath(); k.moveTo(m0[0], m0[1]); for (let i = 0; i < n; i++) { const p = pts[i], m = md(p, pts[(i + 1) % n]); k.quadraticCurveTo(p[0], p[1], m[0], m[1]); } k.closePath(); };
+    // nightmare only: paint coverage (same opacity as the colour) added into the free blue channel of the surface canvas, so the
+    // floor shader can build the negative per pixel on the black side of the seam. A knife scrape writes blue 0 like any fill.
+    const cov = (draw, a) => { if (!S.cov) return; s.save(); s.globalCompositeOperation = 'lighter'; s.globalAlpha = a; s.fillStyle = '#0000ff'; draw(); s.restore(); };
     if (!sh.m) { // palette knife: scraped back to clean canvas, smooth, with a ridge of pushed paint along each side
       x.globalAlpha = 0.93; x.fillStyle = neg ? '#0a0a10' : '#d9d2c2'; s.globalAlpha = 0.93; s.fillStyle = 'rgb(112,175,0)';
       if (c) { for (const k of [x, s]) { k.beginPath(); k.arc(0, 0, sh.r, 0, TAU); k.fill(); } }
@@ -52,7 +65,7 @@
     x.globalAlpha = A; x.fillStyle = col; s.globalAlpha = wet ? 0.95 : 0.6; s.fillStyle = `rgb(${wet ? 172 : 150},${gB},0)`;
     if (c) {
       const pts = []; for (let i = 0; i < 22; i++) { const a = i / 22 * TAU, rr = sh.r * (0.9 + r() * 0.14); pts.push([Math.sin(a) * rr, Math.cos(a) * rr]); }
-      blob(x, pts); x.fill(); blob(s, pts); s.fill();
+      blob(x, pts); x.fill(); blob(s, pts); s.fill(); cov(() => { blob(s, pts); s.fill(); }, A);
       for (let i = 0; i < 11; i++) { const a = r() * TAU, d = sh.r * (1.0 + r() * 0.42), rad = (0.08 + r() * 0.2) * (i < 5 ? 1 : 0.6), cx = Math.sin(a) * d, cy = Math.cos(a) * d; for (const k of [x, s]) { k.beginPath(); k.arc(cx, cy, rad, 0, TAU); k.fill(); } }
       for (let i = 0; i < 4; i++) { const a = r() * TAU, d = sh.r * (0.98 + r() * 0.12), cx = Math.sin(a) * d, cy = Math.cos(a) * d, rad = 0.1 + r() * 0.1; for (const k of [x, s]) { k.beginPath(); k.ellipse(cx, cy, rad * 2.4, rad, PI / 2 - a, 0, TAU); k.fill(); } }
       if (wet) { x.globalAlpha = 0.5; x.strokeStyle = dk; x.lineWidth = 0.22; blob(x, pts); x.stroke(); s.globalAlpha = 0.9; s.strokeStyle = 'rgb(236,112,0)'; s.lineWidth = 0.17; blob(s, pts); s.stroke();
@@ -60,7 +73,7 @@
         s.globalAlpha = 0.45; s.strokeStyle = 'rgb(200,130,0)'; s.lineWidth = 0.1; s.beginPath(); s.arc(0, 0, sh.r * 0.45, 0, TAU); s.stroke(); }
     } else {
       const L = t1 - t0, hw = sh.w / 2, nW = Math.max(2, Math.ceil(L / 0.7)), wl = [], wr = [], wa = 0.09 + sh.w * 0.012; for (let i = 0; i <= nW; i++) { wl.push((r() - 0.5) * wa); wr.push((r() - 0.5) * wa); }
-      const body = (k) => { k.beginPath(); for (let i = 0; i <= nW; i++) k.lineTo(-hw + wl[i], t0 + L * i / nW); for (let i = nW; i >= 0; i--) k.lineTo(hw + wr[i], t0 + L * i / nW); k.closePath(); }; body(x); x.fill(); body(s); s.fill();
+      const body = (k) => { k.beginPath(); for (let i = 0; i <= nW; i++) k.lineTo(-hw + wl[i], t0 + L * i / nW); for (let i = nW; i >= 0; i--) k.lineTo(hw + wr[i], t0 + L * i / nW); k.closePath(); }; body(x); x.fill(); body(s); s.fill(); cov(() => { body(s); s.fill(); }, A);
       const brk = (k, xo, w, al, mn, mx) => { for (let a = t0 + r() * 1.5; a < t1;) { const ln = mn + r() * mx; k.globalAlpha = al * (0.4 + r() * 0.6); k.fillRect(xo, a, w, Math.min(ln, t1 - a)); a += ln + 0.3 + r() * 1.6; } };
       const ns = Math.min(18, 5 + Math.round(sh.w * 3)); // bristle streaks: fine, broken, a shade lighter or darker of the same hue, fading in and out
       for (let i = 0; i < ns; i++) { const o = (r() - 0.5) * sh.w * 0.94, ww = 0.025 + r() * 0.05, lit = r() < 0.5; x.fillStyle = lit && !neg && sh.m !== RED ? LT2[sh.m] : DK2[sh.m]; brk(x, o - ww / 2, ww, A * 0.22, 0.6, 2.6); }
@@ -71,10 +84,11 @@
       if (wet) { x.fillStyle = DK2[sh.m]; brk(x, -hw, 0.035, 0.55, 1, 3); brk(x, hw - 0.035, 0.035, 0.55, 1, 3); if (!neg && sh.m !== RED) { const sd = Math.sin(sh.dir) > 0 ? 1 : -1, gw = clamp(sh.w * 0.1, 0.2, 0.7); x.fillStyle = LT2[sh.m]; brk(x, sd * (hw - 0.14) - 0.04, 0.08, 0.75, 1.5, 4); brk(x, -sd * (hw - 0.1) - 0.025, 0.05, 0.3, 1.5, 4); x.fillStyle = LT[sh.m]; brk(x, sd * hw * 0.42 - gw / 2, gw, 0.28, 2, 6); }
         s.globalAlpha = 0.9; s.fillStyle = 'rgb(240,100,0)'; s.fillRect(-sh.w / 2 + 0.04, t0, 0.15, L); s.fillRect(sh.w / 2 - 0.19, t0, 0.15, L); }
     }
-    if (wet) { // each pigment has its own mark as well as its own colour: red is hatched, yellow dotted, blue ringed
+    if (wet) { // each pigment has its own mark as well as its own colour: red is hatched, yellow dotted, blue ringed (a mixed dab, nightmare only: each of its marks)
+      const mk = sh.m === RED || sh.m === YEL || sh.m === BLU ? [sh.m] : bitsOf(sh.m);
       x.globalAlpha = 0.3; x.strokeStyle = x.fillStyle = neg ? '#ffffff' : '#000000'; x.lineWidth = 0.09; const L = sh.t === 'c' ? sh.r * 1.4 : sh.len, W2 = sh.t === 'c' ? sh.r * 0.7 : sh.w / 2 - 0.3, y0 = sh.t === 'c' ? -sh.r * 0.7 : 0.4;
       for (let y = y0; y < y0 + L - 0.4; y += 1.5) { if (sh.t !== 'c' && Math.hypot(sh.x + Math.sin(sh.dir) * y, sh.z + Math.cos(sh.dir) * y) > R) continue;
-        if (sh.m === RED) { x.beginPath(); x.moveTo(-W2, y); x.lineTo(W2, y + 0.9); x.stroke(); } else if (sh.m === YEL) { for (const o of [-0.6, 0, 0.6]) { x.beginPath(); x.arc(o * W2, y, 0.16, 0, TAU); x.fill(); } } else { x.beginPath(); x.arc(0, y, Math.min(0.5, W2 * 0.6), 0, TAU); x.stroke(); } }
+        for (const q of mk) { if (q === RED) { x.beginPath(); x.moveTo(-W2, y); x.lineTo(W2, y + 0.9); x.stroke(); } else if (q === YEL) { for (const o of [-0.6, 0, 0.6]) { x.beginPath(); x.arc(o * W2, y, 0.16, 0, TAU); x.fill(); } } else { x.beginPath(); x.arc(0, y, Math.min(0.5, W2 * 0.6), 0, TAU); x.stroke(); } } }
     }
     x.restore(); s.restore();
   }
@@ -164,6 +178,62 @@
         }` });
   }
 
+  // nightmare: a world-space side test against the seam, run just before the material's output (nmB = 1 on the black side)
+  function splitify(sh, S, chunk) {
+    Object.assign(sh.uniforms, S.splitU);
+    sh.vertexShader = 'varying vec3 vWP;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'varying vec3 vWP; uniform float uSplit; uniform vec2 uLine;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', '{ float nmB = uSplit * (1.0 - smoothstep(-0.3, 0.3, dot(vWP.xz, uLine)));\n' + chunk + '\n}\n#include <opaque_fragment>');
+  }
+  // nightmare floor: the canvas stays painted in the positive look; on the black side of the seam the shader builds the negative
+  // per pixel (bare canvas near black, paint as pure emission in its own hue, unmixed from the canvas with the coverage in the
+  // surface canvas's blue channel), with a 2 cm feathered edge. The closing varnish ring of the overtime lives here too.
+  const FLOOR_NM_MAP = `
+    vec2 nmW = vec2(vMapUv.x * 2.0 - 1.0, 1.0 - vMapUv.y * 2.0) * ${R}.0;
+    float nmK = uSplit * (1.0 - smoothstep(-0.02, 0.02, dot(nmW, uLine)));
+    float nmCov = texture2D(roughnessMap, vRoughnessMapUv).b;
+    vec3 nmBare = vec3(0.69, 0.64, 0.54);
+    vec3 nmPaint = clamp((diffuseColor.rgb - nmBare * (1.0 - nmCov)) / max(nmCov, 0.08), 0.0, 1.0);
+    float nmLw = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float nmInk = clamp((0.3 - nmLw) * 4.0, 0.0, 1.0) * (1.0 - smoothstep(0.05, 0.2, nmCov));
+    vec3 nmEm = nmPaint * nmCov * 0.9 * smoothstep(0.02, 0.12, nmCov) + vec3(0.55, 0.56, 0.68) * nmInk * 0.6 + vec3(0.002, 0.002, 0.005);
+    float nmR = length(nmW); float nmV = uVarnOn * smoothstep(uVarn - 0.12, uVarn + 0.12, nmR);
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.0), nmK);
+    diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.9, 0.62, 0.3) + vec3(0.16, 0.09, 0.02), nmV * 0.85);`;
+  const FLOOR_NM_EM = `
+    totalEmissiveRadiance = mix(totalEmissiveRadiance, nmEm, nmK);
+    totalEmissiveRadiance += vec3(0.85, 0.52, 0.18) * (nmV * 0.1 + (1.0 - smoothstep(0.0, 0.4, abs(nmR - uVarn))) * uVarnOn * 1.4);`;
+  // nightmare body: in the finale he is a whole white or a whole black figure (uToneK), and the called colour is a ribbon of wet paint
+  // winding up him like a barber pole (two arms, climbing slowly, brushed edge), cut at height uTop so it can drain and rise. One chunk
+  // shared by every material on the rig, in rig space (vRig) so the swirl runs on across limbs. uFinK = 0 leaves the material as it was.
+  const BODY = `{
+    vec3 nV = normalize(normal); vec3 vv = normalize(vViewPosition);
+    float fr = 1.0 - clamp(abs(dot(nV, vv)), 0.0, 1.0);
+    float lam = clamp(dot(nV, uKeyV), 0.0, 1.0);
+    vec3 wC = vec3(0.86, 0.84, 0.8) * (0.4 + 0.5 * lam + 0.1 * (0.5 + 0.5 * nV.y));
+    vec3 bC = vec3(0.012, 0.012, 0.016) + vec3(0.62, 0.66, 0.82) * pow(max(fr, 0.0), 2.5) * 0.8;
+    vec3 tC = mix(wC, bC, uToneK);
+    float an = atan(vRig.x, vRig.z + 1e-4);
+    float wob = (n2(vec2(an * 2.0 + vRig.y * 3.0, vRig.y * 5.0 - uBT * 0.4)) - 0.5) * 0.09;
+    float ph = fract(an / 6.2831853 * 2.0 + vRig.y * 0.55 - uBT * 0.22);
+    float d = abs(ph - 0.5), hw = 0.15 + wob;
+    float inB = 1.0 - smoothstep(hw - 0.025, hw + 0.025, d);
+    float top = 1.0 - smoothstep(uTop - 0.12, uTop + 0.12, vRig.y);
+    float k = inB * top * uBand;
+    float hl = 1.0 - smoothstep(0.0, 0.045, abs(d - hw * 0.35));
+    float lip = (1.0 - smoothstep(0.0, 0.03, abs(d - hw))) * top * uBand;
+    vec3 cW = uCallC * (0.34 + 0.66 * lam) + vec3(0.45) * hl * pow(lam, 3.0);
+    vec3 cB = uCallC * (1.35 + 0.6 * hl);
+    vec3 col = mix(tC, mix(cW, cB, uToneK), k);
+    col = mix(col, mix(col * 0.55, col + uCallC * 0.4, uToneK), lip * (1.0 - k * 0.5));
+    outgoingLight = mix(outgoingLight, col, uFinK);
+  }`;
+  function toneify(S, m) {
+    const pv = m.onBeforeCompile, k0 = m.customProgramCacheKey ? m.customProgramCacheKey() : '';
+    m.onBeforeCompile = (sh, rr) => { if (pv) pv(sh, rr); Object.assign(sh.uniforms, S.bodyU);
+      sh.vertexShader = 'uniform mat4 uRigInv; varying vec3 vRig;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvRig = (uRigInv * modelMatrix * vec4(transformed, 1.0)).xyz;');
+      sh.fragmentShader = 'uniform float uToneK, uFinK, uBand, uTop, uBT; uniform vec3 uCallC, uKeyV; varying vec3 vRig;\n' + NOISE + '\n' + sh.fragmentShader.replace('#include <opaque_fragment>', BODY + '\n#include <opaque_fragment>'); };
+    m.customProgramCacheKey = () => 'atelierTone|' + k0; return m;
+  }
   // fresnel rim added to a standard material's emissive (cool rim on the wood; in the negative a thin cyan line on every prop)
   function rimify(m, U2, key) { m.onBeforeCompile = (sh) => { sh.uniforms.uRimC = U2; sh.fragmentShader = 'uniform vec3 uRimC;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n{ vec3 vv = vViewPosition / max(length(vViewPosition), 1e-4); float fr = 1.0 - clamp(abs(dot(normal, vv)), 0.0, 1.0); totalEmissiveRadiance += uRimC * pow(max(fr, 0.0), 3.0); }'); }; m.customProgramCacheKey = () => 'atelierRim' + key; return m; }
   // the studio around the canvas: floorboards and a drop cloth, plaster walls with north-light windows, giant props
@@ -194,14 +264,18 @@
     const pl = W.bake(256, (u, v) => { const n = W.fbm(u * 8, v * 8, 9, 5, 8), m = W.fbm(u * 32, v * 32, 11, 3, 32); return [n * 0.6 + m * 0.4, 0.62 + n * 0.3 + m * 0.08, 0.92]; }, { dark: 0xd2ccc0, light: 0xf4f2ec, strength: 1.2 });
     for (const t of [pl.map, pl.normalMap]) t.repeat.set(10, 1);
     S.wallM = sm({ map: pl.map, normalMap: pl.normalMap, roughness: 0.95, side: THREE.BackSide, emissive: 0x58534a }, 0xe0c4ac);
-    S.wallM.onBeforeCompile = (sh) => { sh.uniforms.uChalk = S.chalk; sh.uniforms.uRimC = S.propRim; sh.fragmentShader = 'uniform float uChalk; uniform vec3 uRimC;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n{ float fu = fract(vMapUv.x * 2.0); float du = min(fu, 1.0 - fu) / max(fwidth(vMapUv.x * 2.0), 1e-4); float dv = min(min(abs(vMapUv.y - 0.1), abs(vMapUv.y - 0.86)), abs(vMapUv.y - 0.35)) / max(fwidth(vMapUv.y), 1e-4); float ln = max(1.0 - smoothstep(0.5, 1.6, du), 1.0 - smoothstep(0.5, 1.6, dv)); totalEmissiveRadiance += vec3(0.42, 0.44, 0.58) * ln * uChalk; }'); };
-    S.wallM.customProgramCacheKey = () => 'atelierWall';
+    const nmw = !!S.splitU; // nightmare: the wall splits with the seam (noon plaster on the white side, chalk lines on night on the black)
+    S.wallM.onBeforeCompile = (sh) => { sh.uniforms.uChalk = S.chalk; sh.uniforms.uRimC = S.propRim; sh.fragmentShader = 'uniform float uChalk; uniform vec3 uRimC;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n' + (nmw ? 'float nmLn = 0.0;\n' : '') + '{ float fu = fract(vMapUv.x * 2.0); float du = min(fu, 1.0 - fu) / max(fwidth(vMapUv.x * 2.0), 1e-4); float dv = min(min(abs(vMapUv.y - 0.1), abs(vMapUv.y - 0.86)), abs(vMapUv.y - 0.35)) / max(fwidth(vMapUv.y), 1e-4); float ln = max(1.0 - smoothstep(0.5, 1.6, du), 1.0 - smoothstep(0.5, 1.6, dv)); totalEmissiveRadiance += vec3(0.42, 0.44, 0.58) * ln * uChalk;' + (nmw ? ' nmLn = ln;' : '') + ' }');
+      if (nmw) splitify(sh, S, '{ outgoingLight = mix(outgoingLight, outgoingLight * 0.07 + vec3(0.42, 0.44, 0.58) * nmLn * 0.8, nmB); }'); };
+    S.wallM.customProgramCacheKey = () => nmw ? 'atelierWallN' : 'atelierWall';
     add(new THREE.CylinderGeometry(WR, WR, WH, 72, 1, true), S.wallM, 0, WH / 2 - 0.6, 0);
     const dkw = sm({ color: 0x6a4a2e, roughness: 0.6 }, 0xffb890); add(new THREE.CylinderGeometry(WR - 0.5, WR - 0.5, 6, 72, 1, true), sf({ color: 0xc0a47e, roughness: 0.6, side: THREE.BackSide }, 0xd8bca4), 0, 2.4, 0);
     const ceil = add(new THREE.CircleGeometry(WR, 48), sf({ color: 0xe0d8c8, roughness: 1, emissive: 0x2a261e }, 0xffb890), 0, WH - 0.6, 0); ceil.rotation.x = PI / 2;
     for (let i = -2; i <= 2; i++) add(new THREE.BoxGeometry(3.5, 4.5, WR * 2), dkw, i * 28, WH - 4, 0);
     // north-light windows on the far wall; the middle one throws a slanted shaft with dust in it
-    S.paneM = new THREE.MeshBasicMaterial({ color: 0xe8f0ff, vertexColors: true, fog: false }); const frM = sm({ color: 0x3a3028, roughness: 0.7 }, 0xc09070);
+    S.paneM = new THREE.MeshBasicMaterial({ color: 0xe8f0ff, vertexColors: true, fog: false });
+    if (nmw) { S.paneM.onBeforeCompile = (sh) => splitify(sh, S, '{ outgoingLight = mix(outgoingLight, outgoingLight * vec3(0.36, 0.3, 0.66), nmB); }'); S.paneM.customProgramCacheKey = () => 'atelierPaneN'; }
+    const frM = sm({ color: 0x3a3028, roughness: 0.7 }, 0xc09070);
     for (const [wa, ww, wh] of [[PI, 40, 56], [PI - 1.08, 30, 50], [PI + 1.08, 30, 50]]) { const win = new THREE.Group(), p2 = at(wa, WR - 0.6); win.position.set(p2[0], -0.6, p2[1]); win.rotation.y = wa + PI; g.add(win);
       const pg = new THREE.PlaneGeometry(ww, wh, 1, 4), pcol = []; for (let i = 0; i < pg.attributes.position.count; i++) { const k = pg.attributes.position.getY(i) / wh + 0.5; pcol.push(0.86 - 0.04 * k, 0.84 + 0.04 * k, 0.74 + 0.22 * k); } pg.setAttribute('color', new THREE.Float32BufferAttribute(pcol, 3)); add(pg, S.paneM, 0, 3 + wh / 2, -0.2, win);
       const nc = Math.round(ww / 10); for (let i = 0; i <= nc; i++) add(new THREE.BoxGeometry(i % nc ? 1.1 : 2.4, wh, 1.4), frM, -ww / 2 + i * ww / nc, 3 + wh / 2, 0.6, win);
@@ -263,7 +337,10 @@
     S.cv = cv(N); S.ctx = S.cv.getContext('2d'); S.tex = ctex(S.cv); S.scv = cv(N); S.sctx = S.scv.getContext('2d'); S.stex = ctex(S.scv, false);
     S.bmp = cv(N); S.bctx = S.bmp.getContext('2d'); S.sbmp = cv(N); S.bsctx = S.sbmp.getContext('2d');
     S.floorM = new THREE.MeshStandardMaterial({ map: S.tex, emissiveMap: S.tex, emissive: 0x000000, roughness: 1, roughnessMap: S.stex, bumpMap: S.stex, bumpScale: 1.4, metalness: 0, envMapIntensity: 0.16 });
-    S.floorM.onBeforeCompile = (sh) => { sh.uniforms.uT = S.pT; sh.uniforms.uNegK = S.negK; sh.fragmentShader = 'uniform float uT, uNegK;\n' + sh.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 1.0, uNegK);').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n{ float wk = smoothstep(0.64, 0.56, texture2D(roughnessMap, vRoughnessMapUv).g); vec2 q = vRoughnessMapUv * 40.0; float bd = pow(max(0.0, sin(q.x * 0.33 + q.y * 0.21 - uT * 1.4)), 36.0) * (0.6 + 0.4 * sin(q.x * 3.1 - q.y * 2.3)); float sk = bd * wk * (1.0 - smoothstep(0.3, 0.55, diffuseColor.r - max(diffuseColor.g, diffuseColor.b))); diffuseColor.rgb = mix(diffuseColor.rgb, min(diffuseColor.rgb * 1.3, vec3(1.0)), sk * 0.45); totalEmissiveRadiance *= 1.0 + sk * 0.08; }'); }; S.floorM.customProgramCacheKey = () => 'atelierFloor';
+    const NMB = !!G.nightmare; // the nightmare version builds its finale (split floor, seam, wall, body tone, varnish ring) up front
+    if (NMB) S.splitU = { uSplit: { value: 0 }, uLine: { value: new THREE.Vector2(1, 0) }, uVarn: { value: 99 }, uVarnOn: { value: 0 } };
+    S.floorM.onBeforeCompile = (sh) => { sh.uniforms.uT = S.pT; sh.uniforms.uNegK = S.negK; if (NMB) Object.assign(sh.uniforms, S.splitU);
+      sh.fragmentShader = 'uniform float uT, uNegK;\n' + (NMB ? 'uniform float uSplit, uVarn, uVarnOn; uniform vec2 uLine;\n' : '') + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>' + (NMB ? FLOOR_NM_MAP : '')).replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 1.0, uNegK);' + (NMB ? '\nroughnessFactor = mix(mix(roughnessFactor, 1.0, nmK), 0.12, nmV);' : '')).replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n{ float wk = smoothstep(0.64, 0.56, texture2D(roughnessMap, vRoughnessMapUv).g); vec2 q = vRoughnessMapUv * 40.0; float bd = pow(max(0.0, sin(q.x * 0.33 + q.y * 0.21 - uT * 1.4)), 36.0) * (0.6 + 0.4 * sin(q.x * 3.1 - q.y * 2.3)); float sk = bd * wk * (1.0 - smoothstep(0.3, 0.55, diffuseColor.r - max(diffuseColor.g, diffuseColor.b))); diffuseColor.rgb = mix(diffuseColor.rgb, min(diffuseColor.rgb * 1.3, vec3(1.0)), sk * 0.45); totalEmissiveRadiance *= 1.0 + sk * 0.08; }' + (NMB ? FLOOR_NM_EM : '')); }; S.floorM.customProgramCacheKey = () => NMB ? 'atelierFloorN' : 'atelierFloor';
     const floor = new THREE.Mesh(new THREE.CircleGeometry(R, 160), S.floorM); floor.rotation.x = -PI / 2; floor.receiveShadow = true; floor.position.y = 0.01; g.add(floor);
     studio(S, g);
     // wash water: a sunk dish of clean turpentine; the aura you wear; the roller
@@ -339,6 +416,7 @@
     S.shBM = shadowMat(); S.shB = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 5.4), S.shBM); S.shB.rotation.x = -PI / 2; S.shB.renderOrder = 2; g.add(S.shB);
     S.shTM = shadowMat(); S.shT = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.8), S.shTM); S.shT.rotation.x = -PI / 2; S.shT.renderOrder = 2; g.add(S.shT);
     Object.assign(S, { pig: new Uint8Array(GN * GN), dryAt: new Float32Array(GN * GN), strokes: [], baked: [], fresh: [], full: true, reset: true, seed: 11, neg: false, col: RED, wear: 0, wearK: 0, lvl: 0, wash: { x: 0, z: 16.2, r: 2.5 }, roll: null, down: 0, swing: 0, look: 0, lookT: 0, bag: [], dryT: 0, scanT: 0, goal: null, flood: 0, blots: 0, blotList: [], match: 0, dr: { t: 1, on: false, v: 0 }, vr: mulberry(5) });
+    if (NMB) nmBuild(b, S, g);
     return {
       edge: 'wall', radius: R, spawn: { x: 0, z: 12 }, bossStart: { x: 0, z: -3, face: 0 }, camDist: 17, camPitch: 0.55,
       contains: (x, z) => Math.hypot(x, z) <= R - 0.5, bulletBounds: (x, z) => Math.hypot(x, z) < R + 1,
@@ -346,7 +424,8 @@
   }
 
   const nextPig = (S) => { if (!S.bag.length) S.bag = shuffle([RED, YEL, BLU]); return S.bag.pop(); };
-  function tint(S, m, loud) { if ((S.wear | m) === S.wear) return; S.wear |= m; S.wearK = 1; if (loud !== false) Sound.sfx('wave', 0.5, 1.5); }
+  // (finale: nothing tints you while you stand in the dish)
+  function tint(S, m, loud) { if ((S.wear | m) === S.wear || (S.split && inWash(S, G.player))) return; S.wear |= m; S.wearK = 1; if (loud !== false) Sound.sfx('wave', 0.5, 1.5); }
   function* recolor(b, c) {
     const S = b.state; S.flood = 1;
     yield* b.cast({ name: 'Fresh Coat', time: 1.3 }); S.col = c; S.flood = 0; Sound.sfx('wave', 0.9, 0.7); FX.flash(HEX[c], 0.16, 3);
@@ -397,11 +476,14 @@
         mesh.scale.set(1 + Math.sin(G.now * 7) * 0.12, 0.8 - Math.sin(G.now * 7) * 0.1, 1 + Math.cos(G.now * 6) * 0.12); } });
     S.blotList.push(ent); Sound.sfx('cast', 0.5, 0.6);
   }
-  function* critique(b, T) {
-    const S = b.state, p = G.player; S.crit = T;
+  // o (nightmare signature only): stagger false = a matched verdict deals its blow without knocking him down; quick = no pause after
+  function* critique(b, T, o) {
+    const S = b.state, p = G.player, stag = !o || o.stagger !== false; S.crit = T;
     yield* b.cast({ name: 'Critique', time: T, onTick(k, cs) { S.crit = T - cs.t; } }); S.crit = 0;
-    if (S.wear === need(S)) { S.down = 5; b.exposed = 5; Sound.sfx('shatter', 0.9, 0.9); Sound.sfx('parry', 0.9, 0.6); FX.flash(0xffffff, 0.2, 3); FX.shake(0.5); b.damage(Math.round(b.maxHp * 0.03), { src: 'player', crit: true }); if (!G.headless) { const c = HEX[S.wear] || 0xffffff; FX.burst(b.pos.x, 3, b.pos.z, { n: 46, color: c, color2: 0xffffff, speed: [4, 11], life: [0.4, 1.0], size: [0.25, 0.7], drag: 2.2 }); FX.burst(b.pos.x, 2.5, b.pos.z, { n: 10, smoke: true, color: 0xe8e0d0, color2: 0xc8beb0, speed: [1, 3], life: [0.8, 1.6], size: [1, 2.2], up: 1.5, alpha: 0.28, drag: 1.5 }); FX.ring(b.pos.x, b.pos.z, { r0: 0.3, r1: 6, color: c, dur: 0.5, width: 0.16 }); FX.light(b.pos.x, 4, b.pos.z, c, 60, 0.4, 15); } yield 5; S.down = 0; }
-    else { if (p.alive) p.hurt(350, { blockable: false, src: { name: 'Critique' } }); Sound.sfx('bigboom', 0.7); FX.flash(tel(S), 0.25, 2); FX.shake(0.6); if (!G.headless) FX.beam(new V3(b.pos.x, 4, b.pos.z), new V3(p.pos.x, 1, p.pos.z), { color: S.neg ? 0xffffff : 0x202028, width: 0.9, dur: 0.35 }); yield 1.0; }
+    if (S.split && S.critLog.length) Object.assign(S.critLog[S.critLog.length - 1], { ok: matched(S, p.pos.x, p.pos.z), vw: S.wear, vs: sideOf(S, p.pos.x, p.pos.z) }); // the verdict, for tools/critfuzz.js
+    if (!stag && matched(S, p.pos.x, p.pos.z)) { Sound.sfx('shatter', 0.8, 1.1); FX.flash(0xffffff, 0.14, 4); b.damage(Math.round(b.maxHp * 0.03), { src: 'player', crit: true }); if (!G.headless) FX.burst(b.pos.x, 3, b.pos.z, { n: 30, color: HEX[S.wear] || 0xffffff, color2: 0xffffff, speed: [4, 10], life: [0.3, 0.8], size: [0.2, 0.5], drag: 2.2 }); }
+    else if (matched(S, p.pos.x, p.pos.z)) { S.down = 5; b.exposed = 5; Sound.sfx('shatter', 0.9, 0.9); Sound.sfx('parry', 0.9, 0.6); FX.flash(0xffffff, 0.2, 3); FX.shake(0.5); b.damage(Math.round(b.maxHp * 0.03), { src: 'player', crit: true }); if (!G.headless) { const c = HEX[S.wear] || 0xffffff; FX.burst(b.pos.x, 3, b.pos.z, { n: 46, color: c, color2: 0xffffff, speed: [4, 11], life: [0.4, 1.0], size: [0.25, 0.7], drag: 2.2 }); FX.burst(b.pos.x, 2.5, b.pos.z, { n: 10, smoke: true, color: 0xe8e0d0, color2: 0xc8beb0, speed: [1, 3], life: [0.8, 1.6], size: [1, 2.2], up: 1.5, alpha: 0.28, drag: 1.5 }); FX.ring(b.pos.x, b.pos.z, { r0: 0.3, r1: 6, color: c, dur: 0.5, width: 0.16 }); FX.light(b.pos.x, 4, b.pos.z, c, 60, 0.4, 15); } yield 5; S.down = 0; }
+    else { if (p.alive) p.hurt(350, { blockable: false, src: { name: 'Critique' } }); Sound.sfx('bigboom', 0.7); FX.flash(tel(S), 0.25, 2); FX.shake(0.6); if (!G.headless) FX.beam(new V3(b.pos.x, 4, b.pos.z), new V3(p.pos.x, 1, p.pos.z), { color: S.neg || (S.split && sideOf(S, p.pos.x, p.pos.z) < 0) ? 0xffffff : 0x202028, width: 0.9, dur: 0.35 }); if (stag) yield 1.0; }
   }
   function* wander(b) { const a = rnd(0, TAU), d = rnd(0, 6); yield* b.moveTo(Math.sin(a) * d, Math.cos(a) * d, 5); }
   // one colour's worth of fight: he floods with it, lays down what you need and what you must not touch, then judges you
@@ -421,16 +503,295 @@
   function setLvl(b, n) { const S = b.state; S.lvl = n; S.lookT = n; S.down = 0; S.roll = null; S.crit = 0; S.flood = 0; if ((n >= 2) !== S.neg) { S.neg = n >= 2; S.full = true; S.reset = true; } }
   function moveWash(S) { const a = rnd(0, TAU); S.wash = { x: Math.sin(a) * 16.2, z: Math.cos(a) * 16.2, r: 2.5 }; S.washK = 0; }
 
+  // ---- phases two and three of the normal fight, shared with the nightmare (which opens in colour and goes to the Negative)
+  const NEG_POST = { bloom: 0.32, threshold: 0.9, exposure: 1.0, tint: [1.0, 1.0, 1.04], contrast: 1.1 };
+  function* colourRun(b) {
+    const S = b.state; setLvl(b, 1); let k = 0, last = S.col;
+    while (true) { const c = pick([1, 2, 4, 3, 5, 6].filter((q) => q !== last)); last = c; yield* block(b, c, k); k++; }
+  }
+  function* negEnter(b) {
+    const S = b.state; setLvl(b, 1); S.lookT = 2;
+    yield* b.cast({ name: 'Negative', time: 3.2, onTick: (k) => { FX.shake(k * 0.45); } });
+    setLvl(b, 2); Sound.sfx('shatter', 1, 0.4); Sound.sfx('bigboom', 0.9); FX.flash(0x000000, 0.5, 1.2); Co.start(Post.lerpTo(Object.assign({}, NEG_POST), 1.5), 'fight'); yield 1.4;
+  }
+  function* negRun(b) {
+    const S = b.state; setLvl(b, 2); let k = 0, last = S.col;
+    while (true) { const c = pick([1, 2, 4, 3, 5, 6].filter((q) => q !== last)); last = c; yield* block(b, c, k); k++; }
+  }
+  const POST = { bloom: 0.22, threshold: 0.97, radius: 0.6, exposure: 0.92, vig: 0.7, sat: 1.08, contrast: 1.04, tint: [1.0, 1.0, 1.0] };
+  const MUSIC = { bpm: 100, root: 43, scale: [0, 2, 4, 7, 9, 11, 12], prog: [0, 3, 4, 0, 5, 3, 1, 4],
+    layers: [
+      { v: 'flute', pat: ['0...2...4.....2.', '4...2...0.......'], oct: 1, len: 4, vol: 0.07, to: 1 }, { v: 'bell', pat: '0.....4...2.....', oct: 1, len: 6, vol: 0.06, to: 1 }, { v: 'pad', pat: '0...............', len: 16, vol: 0.09 },
+      { v: 'kick', from: 1, to: 1, pat: 'x.....x.x.......', vol: 0.2 }, { v: 'tom', from: 1, to: 1, pat: '....x.......x.x.', vol: 0.12 }, { v: 'koto', from: 1, to: 1, pat: '0.2.4.2.0.4.2.4.', oct: 0, len: 1, vol: 0.06 }, { v: 'bass', from: 1, pat: '0.......0...4...', oct: -1, len: 3, vol: 0.12 },
+      { v: 'sub', from: 2, pat: '0.......0.......', oct: -2, len: 6, vol: 0.16 }, { v: 'pulse', from: 2, pat: '0.0.4.0.0.0.2.0.', oct: 0, len: 1, vol: 0.06 }, { v: 'kick', from: 2, pat: 'x...x...x...x.x.', vol: 0.22 }, { v: 'choir', from: 2, pat: '0.......4.......', oct: 1, len: 8, vol: 0.06 },
+    ] };
+
+  // ================================================================ NIGHTMARE ("Chiaroscuro")
+  // finale music (level 3): a low solo line against the choir, the kick doubled
+  function nmMusic(base) {
+    return Object.assign({}, base, { layers: base.layers.concat([
+      { v: 'brass', from: 3, pat: ['0.......2...4...', '5.......4...2...', '4.......2...0...', '2.......1...0...'], oct: -1, len: 7, vol: 0.05 },
+      { v: 'kick', from: 3, pat: '..x.......x...x.', vol: 0.16 },
+    ]) });
+  }
+  // Nightmare phase clocks in seconds (strict, no carry-over) on 24,000 health, tuned with tools/nmclock.js (RAW=1: god-mode level-3
+  // autopilot, eight runs per class and phase, measured at 27,000 and checked at 24,000). At the plan's 31,000 the clocks would have needed far more than the 300 s cap, so the
+  // health came down instead (the plan's lever). Rule: the worst run of Stormcaller and Hexslinger keeps at least 5% of each clock.
+  // The Ashwarden and Duskblade autopilots are the slow outliers on this door (on Normal too): paint fetching pulls their melee away
+  // from him, and their times spread by 2x from run to run; they get the rest of the 300 s and clear most runs of each phase.
+  // Measured at 27,000 (storm / ash / hex / dusk, worst; best in brackets; at 24,000 these times shrink by about 11%):
+  //   I   87 (69) / 200 (91) / 81 (70) / 123 (76)    II  69 (43) / 140 (53) / 76 (49) / 119 (53)    III  94 (54) / 93 (40) / 87 (49) / 85 (50)
+  // Checked at 24,000 with [105, 90, 105], eight runs: storm and hex clear every run (worst I 88 / 73, II 61 / 53, III 87 / 89); the
+  // time then moved toward phase I, where the slow autopilots lose most. With these clocks (eight runs): storm and hex clear every run
+  // with 18-32% left (worst I 88 / 87, II 64 / 64, III 82 / 68); dusk clears 7/8, 6/8, 7/8 of I-III; ash 2/8, 6/8, 8/8.
+  const NM_CLOCK = [115, 85, 100];
+  const SEAM_FS = `uniform float uT, uP, uW, uPulse, uSide; uniform vec3 uPC; varying vec2 vUv;
+    void main(){
+      float c = (vUv.x - 0.5) * 1.2, zl = (0.5 - vUv.y) * ${2 * R}.0;
+      if (length(vec2(c, zl)) > ${R}.0 - 0.1) discard;
+      float head = -${R}.0 + ${2 * R + 1}.0 * uP; if (zl > head) discard;
+      float hw = 0.6 * uW, ac = abs(c); if (ac > hw) discard;
+      float u = ac / max(hw, 1e-3);
+      float sh = 0.8 + 0.2 * sin(zl * 2.3 - uT * 2.0) * sin(zl * 0.7 + uT * 1.3);
+      float core = (1.0 - smoothstep(0.0, 0.5, u)) * sh;
+      float edge = smoothstep(0.72, 0.82, u);
+      vec3 col = vec3(1.0, 0.97, 0.92) * (0.7 + 1.6 * core);
+      col = mix(col, vec3(0.0), edge * step(0.0, c));
+      col = mix(col, vec3(1.3), edge * step(c, 0.0));
+      float pl = uPulse * edge * step(0.0, c * uSide) * (0.55 + 0.45 * sin(uT * 14.0));
+      col = mix(col, uPC * 2.2, pl);
+      float fade = 1.0 - smoothstep(-0.8, 0.0, zl - head) * step(uP, 0.999);
+      gl_FragColor = vec4(max(col, vec3(0.0)) * fade, fade);
+    }`;
+  // everything the finale shows is built here, hidden (nothing is made mid-fight)
+  function nmBuild(b, S, g) {
+    Object.assign(S, { nm: true, cov: true, split: 0, lineA: 0, lineW: TAU / 40, call: null, fin: 0, finK: 0, toneK: 0, top: 7.5, varnR: 99, seamOn: false, seamP: 1, seamW: 1, pulse: 0,
+      tones: [], cbag: [], fk: 0, sigDone: false, sig: 0, holdWash: 0, faceSide: false, routeFail: 0, critLog: [], look: 1, lookT: 1 }); // the fight opens in colour
+    S.bodyU = { uToneK: { value: 0 }, uFinK: { value: 0 }, uBand: { value: 0 }, uTop: { value: 7.5 }, uBT: S.pT, uCallC: { value: new THREE.Color(1, 1, 1) }, uKeyV: { value: new V3(0, 1, 0) }, uRigInv: { value: new THREE.Matrix4() } };
+    const bm = new Set(); S.rig.traverse((o) => { if (o.isMesh) bm.add(o.material); }); bm.delete(S.tipM); for (const m of bm) toneify(S, m);
+    S.seamU = { uT: S.pT, uP: { value: 1 }, uW: { value: 1 }, uPulse: { value: 0 }, uSide: { value: 1 }, uPC: { value: new THREE.Color(1, 1, 1) } };
+    const sgm = new THREE.PlaneGeometry(1.2, 2 * R); sgm.rotateX(-PI / 2);
+    S.seam = new THREE.Mesh(sgm, new THREE.ShaderMaterial(Object.assign({ uniforms: S.seamU, vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }', fragmentShader: SEAM_FS }, PREMUL)));
+    S.seam.position.y = 0.035; S.seam.renderOrder = 3; S.seam.visible = false; g.add(S.seam);
+    S.arcM = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }); S.arcG = new THREE.Group(); const arc = new THREE.Mesh(new THREE.TorusGeometry(R + 0.02, 0.14, 8, 120, PI), S.arcM); arc.rotation.x = PI / 2; S.arcG.add(arc); S.arcG.position.y = -0.03; S.arcG.visible = false; g.add(S.arcG);
+  }
+  // Co.stopTag('phase') skips a coroutine's cleanup, so every per-mechanic state a cut-off mechanic can leave behind (roller, blots,
+  // stagger, a Critique cast, the flood, a half-drawn swirl, the brush pointing at a half, the varnish ring, a cinematic camera, slow
+  // time) is reset here, in every nightmare phase's enter. The look of the world (colour, Negative, the split) is not per-mechanic.
+  function resetMech(b) {
+    const S = b.state; S.down = 0; S.roll = null; S.crit = 0; S.flood = 0; S.faceSide = false; S.top = 7.5; S.sig = 0; S.varnR = 99; S.holdWash = 0;
+    for (const e of S.blotList.slice()) if (e.alive) e.die(); S.blotList = []; S.blots = 0;
+    if (S.cine) { S.cine = false; Cam.release(); } G.timeScale = 1;
+  }
+  // the order of calls: white + a primary (only the half is new), black + a secondary, bare (either tone), then a shuffled bag of the
+  // rest, never the same tone three times running and never a call you already answer where you stand
+  const CALLS = []; for (const tone of ['w', 'b']) for (let col = 0; col <= 6; col++) CALLS.push({ tone, col });
+  function nextCall(b) {
+    const S = b.state, p = G.player, k = S.fk;
+    let c;
+    if (k === 0) c = { tone: 'w', col: pick([RED, YEL, BLU]) };
+    else if (k === 1) c = { tone: 'b', col: pick([3, 5, 6]) };
+    else if (k === 2) c = { tone: rnd() < 0.5 ? 'w' : 'b', col: 0 };
+    else {
+      const h = S.tones.slice(-2), fine = (q) => !(h.length === 2 && h[0] === q.tone && h[1] === q.tone) && !(p && S.wear === wantWear(q) && sideOf(S, p.pos.x, p.pos.z) === wantSide(q));
+      if (!S.cbag.length) S.cbag = shuffle(CALLS.filter((q) => !S.used || !S.used.some((u) => u.tone === q.tone && u.col === q.col)));
+      let i = S.cbag.findIndex(fine); if (i < 0) { S.cbag = shuffle(CALLS.slice()); i = S.cbag.findIndex(fine); if (i < 0) i = 0; }
+      c = S.cbag.splice(i, 1)[0]; S.used = null;
+    }
+    if (k < 3) (S.used || (S.used = [])).push(c);
+    return c;
+  }
+  // Fresh Coat: the old swirl drains down off him into the floor, the tone turns (white or black), the new colour winds up from his
+  // feet to his head, and a few drops fling off the top. He points the brush at the half he calls.
+  function* freshCoat(b, call, quick) {
+    const S = b.state, D = quick ? 0.15 : 0.4, U = quick ? 0.35 : 0.9; S.faceSide = true; S.flood = 0;
+    if (!quick) Sound.sfx('wave', 0.5, 1.4);
+    const step = (tt) => {
+      if (tt < D) S.top = lerp(7.5, -0.4, tt / D);
+      else { if (S.call !== call) { S.call = call; S.tones.push(call.tone); Sound.sfx('charge', quick ? 0.4 : 0.6, call.tone === 'w' ? 1.3 : 0.8); } S.top = lerp(-0.4, 7.5, smooth(Math.min(1, (tt - D) / U))); }
+    };
+    if (quick) { let t = 0; while (t < D + U) { t += G.dt; step(t); yield; } }
+    else yield* b.cast({ name: 'Fresh Coat', time: 1.3, onTick(k, cs) { step(cs.t); } });
+    step(D + 0.01); S.top = 7.5;
+    if (!quick) { Sound.sfx('wave', 0.9, 0.7); FX.flash(call.col ? HEX[call.col] : call.tone === 'w' ? 0xffffff : 0x000000, 0.14, 3); }
+    if (!G.headless && call.col) { S.head.getWorldPosition(_a); FX.burst(_a.x, _a.y + 0.5, _a.z, { n: quick ? 6 : 14, color: HEX[call.col], color2: 0xffffff, speed: [3, 7], up: 3, life: [0.4, 0.9], size: [0.12, 0.26], grav: 14 }); }
+    if (!quick) yield 0.4;
+  }
+  // ---- every Critique has an answer: the route check
+  // Seconds a careful walker needs, from (px, pz) wearing `wear`, to answer `call` when the verdict lands at tLand: to the dish if
+  // the paint holds a pigment the answer does not (a clean call: the part of the dish deepest in the wanted half), then the nearest
+  // wet cell of a pigment the answer still lacks (pure: nothing outside the answer, still wet half a second after arrival, not in
+  // the dish), then 1.2 m inside the wanted half as it will be at tLand. The paint legs are walked at mud speed (5.6 m/s) with
+  // straight lines x 1.25 for detours and hops; the last leg over the seam at walking speed (mud speed in mud) x 1.1. Infinity if
+  // no wet paint can supply a missing pigment. o.dab: a drop he could lay ({x, z, r, m}), counted as wet paint. `o` collects the legs.
+  function route(S, px, pz, wear, call, tLand, o = {}) {
+    const nd = wantWear(call), sg = wantSide(call), A = S.lineA + S.lineW * Math.max(0, tLand - G.ft), ca = Math.cos(A), sa = Math.sin(A), Wh = S.wash, D = o.dab;
+    const deep = (x, z) => sg * (x * ca - z * sa); // how far inside the wanted half
+    let x = px, z = pz, d = 0, w = wear;
+    if (w & ~nd) {
+      const dw = Math.hypot(x - Wh.x, z - Wh.z), ri = Wh.r - 0.4; let qx, qz;
+      if (dw <= ri) { qx = x; qz = z; } else { qx = Wh.x + (x - Wh.x) / dw * ri; qz = Wh.z + (z - Wh.z) / dw * ri; }
+      if (nd === 0 && deep(qx, qz) < 1.2) { let bd = Infinity; for (let i = 0; i < 24; i++) { for (const rr of [0, ri * 0.5, ri]) { const ax = Wh.x + Math.sin(i / 24 * TAU) * rr, az = Wh.z + Math.cos(i / 24 * TAU) * rr; if (deep(ax, az) < 1.2) continue; const dd = Math.hypot(ax - x, az - z); if (dd < bd) { bd = dd; qx = ax; qz = az; } } } }
+      d += Math.hypot(qx - x, qz - z); x = qx; z = qz; w = 0; o.wash = d;
+    }
+    o.px = x; o.pz = z;
+    for (let guard = 0; (nd & ~w) && guard < 3; guard++) {
+      const miss = nd & ~w; let best = null, bd = Infinity;
+      for (let j = 0; j < GN; j++) for (let i = 0; i < GN; i++) {
+        const k = j * GN + i, m = S.pig[k]; if (!m || (m & ~nd) || !(m & miss)) continue;
+        const cx = (i + 0.5) * CELL - R, cz = (j + 0.5) * CELL - R, dd = Math.hypot(cx - x, cz - z); if (dd >= bd) continue;
+        if (S.dryAt[k] < G.ft + (d + dd) * DETOUR / WALK + 0.5 || Math.hypot(cx - Wh.x, cz - Wh.z) < Wh.r) continue;
+        bd = dd; best = [cx, cz, m];
+      }
+      if (D && !(D.m & ~nd) && (D.m & miss)) { const dc = Math.hypot(D.x - x, D.z - z), dd = Math.max(0, dc - (D.r - 0.4)); if (dd < bd) { bd = dd; const k = dc > 1e-3 ? dd / dc : 0; best = [x + (D.x - x) * k, z + (D.z - z) * k, D.m]; } }
+      if (!best) { o.miss = miss; return Infinity; }
+      d += bd; x = best[0]; z = best[1]; w |= best[2];
+    }
+    let h = 0; const gap = 1.2 - deep(x, z);
+    if (gap > 0) { let qx = x + sg * ca * gap, qz = z - sg * sa * gap; const r = Math.hypot(qx, qz); if (r > R - 1) { qx *= (R - 1) / r; qz *= (R - 1) / r; } h = Math.hypot(qx - x, qz - z); }
+    return d * DETOUR / WALK + h * 1.1 / (w === 7 ? WALK : 7);
+  }
+  const dabAt = (S, bx, bz, sg, ca, sa, dist, m) => {
+    let x = bx + sg * ca * dist, z = bz - sg * sa * dist; const rr = Math.hypot(x, z); if (rr > R - 2.2) { x *= (R - 2.2) / rr; z *= (R - 2.2) / rr; }
+    const W = S.wash, dx = x - W.x, dz = z - W.z, dl = Math.hypot(dx, dz); if (dl < W.r + 1.8) { const k = (W.r + 1.8) / (dl || 1); x = W.x + (dl ? dx : 1) * k; z = W.z + dz * k; } // never in the dish
+    return { x, z, r: 1.6, m };
+  };
+  // Before each finale Critique: if the walk takes longer than the cast allows (less 0.75 s), he helps, free for the player: the dish
+  // moves toward you (for a clean call, into the wanted half; the rim point nearest you, nearer in if need be) and/or a fat drop of
+  // exactly the missing paint falls next to where you will be, toward the half. The first fix that fits wins, in that order of
+  // preference (no move, nearest dish). If none fits (the far rim of the wrong half on a mud call, or a signature call after you
+  // lost the paint), the cast is stretched by the shortfall (S.stretch); S.routeFail counts a call with no answer at all (never).
+  function repair(b, call, T) {
+    const S = b.state, p = G.player, lim = T - 0.75, tLand = G.ft + T, nd = wantWear(call), sg = wantSide(call);
+    const A = S.lineA + S.lineW * T, ca = Math.cos(A), sa = Math.sin(A), px = p.pos.x, pz = p.pos.z;
+    const r0 = route(S, px, pz, S.wear, call, tLand); let r = r0;
+    const fixes = [];
+    if (r0 > lim) {
+      const save = S.wash, washes = [null]; let best = null;
+      if (S.wear & ~nd) { const ap = Math.atan2(px, pz); for (const rad of [16.2, 13, 10, 7]) for (let i = 0; i <= 18; i++) for (const sgn of i ? [1, -1] : [1]) { const a = ap + sgn * i * 0.17, wx = Math.sin(a) * rad, wz = Math.cos(a) * rad; if (nd === 0 && sg * (wx * ca - wz * sa) < 2.2) continue; washes.push({ x: wx, z: wz, r: 2.5 }); } }
+      for (const W of washes) {
+        if (W) S.wash = W;
+        const o = {}; let rw = W ? route(S, px, pz, S.wear, call, tLand, o) : (route(S, px, pz, S.wear, call, tLand, o), r0), dab = null;
+        const m = nd & ~((S.wear & ~nd) ? 0 : S.wear);
+        if (rw > lim && m) for (const dist of [2.6, 1.2, 4]) { const Dd = dabAt(S, o.px, o.pz, sg, ca, sa, dist, m), r2 = route(S, px, pz, S.wear, call, tLand, { dab: Dd }); if (r2 < rw) { rw = r2; dab = Dd; } if (rw <= lim) break; }
+        S.wash = save;
+        if (!best || rw < best.r) best = { W, dab, r: rw };
+        if (rw <= lim) break;
+      }
+      if (best.W) { S.wash = best.W; S.washK = 0; S.washT = 0; fixes.push('wash'); if (!G.headless) FX.ring(S.wash.x, S.wash.z, { r0: 0.5, r1: 3.5, color: 0x9fd8f0, dur: 0.5 }); Sound.sfx('heal', 0.4, 0.8); }
+      if (best.dab) { const q = best.dab; lay(S, { t: 'c', x: q.x, z: q.z, r: q.r, m: q.m }); fixes.push('paint'); Sound.sfx('wave', 0.6, 1.6);
+        if (!G.headless) { FX.burst(q.x, 4, q.z, { n: 26, color: HEX[q.m], color2: 0xffffff, speed: [1, 4], life: [0.3, 0.7], size: [0.15, 0.35], grav: 20 }); FX.ring(q.x, q.z, { r0: 0.4, r1: 2.4, color: HEX[q.m], dur: 0.45 }); } }
+      r = best.dab || best.W ? route(S, px, pz, S.wear, call, tLand) : r0;
+    }
+    let ext = 0; if (r > lim) { if (r === Infinity) { ext = 2; S.routeFail++; } else { ext = r - lim; S.stretch = (S.stretch || 0) + 1; } fixes.push('time'); }
+    S.holdWash = G.ft + T + ext + 0.5;
+    S.critLog.push({ call: call.tone + call.col, wear: S.wear, sig: S.sig, r0: r0 === Infinity ? 99 : +r0.toFixed(2), r: r === Infinity ? 99 : +r.toFixed(2), T, fix: fixes.join('+'), stretch: +ext.toFixed(2), fail: r === Infinity });
+    return ext;
+  }
+  function* judge(b, call, T, o) {
+    const S = b.state, p = G.player; let ext = 0;
+    if (p && p.alive) ext = repair(b, call, T);
+    S.faceSide = true; yield* critique(b, T + ext, o); S.faceSide = false;
+  }
+  // one sitting: Fresh Coat with the call, three strokes (what the answer needs first), one pressure mechanic, the route check, Critique
+  function* sitting(b, call, T, k) {
+    const S = b.state, nd = wantWear(call), nb = bitsOf(nd), others = [RED, YEL, BLU].filter((m) => nb.indexOf(m) < 0);
+    yield* freshCoat(b, call); S.faceSide = false;
+    yield* strokes(b, shuffle(nb.concat(others).slice(0, 3)));
+    const r = k % 4; if (r === 0) yield* splatter(b, 4); else if (r === 1) yield* roller(b); else if (r === 2) yield* knife(b); else { blot(b, pick(others.length ? others : nb)); yield* drips(b, 4); }
+    yield* judge(b, call, T);
+  }
+  // the signature, once, under 10%: three fast Critiques with the same answer paint (the one you wear, if it is a colour), the half
+  // flipping each time. What he shows changes completely (white + red, black + green, white + red); what you do is keep your red and step.
+  function* signature(b) {
+    const S = b.state, p = G.player, N = S.wear >= 1 && S.wear <= 6 ? S.wear : pick([1, 2, 4, 3, 5, 6]);
+    const w0 = !p || sideOf(S, p.pos.x, p.pos.z) >= 0, cw = { tone: 'w', col: N }, cb = { tone: 'b', col: 7 ^ N }, seq = w0 ? [cw, cb, cw] : [cb, cw, cb];
+    yield* freshCoat(b, seq[0]); S.faceSide = false;
+    const nb = bitsOf(N); yield* strokes(b, shuffle(nb.concat([RED, YEL, BLU].filter((m) => nb.indexOf(m) < 0)).slice(0, 3)));
+    yield 3; S.sig = 1;
+    for (let i = 0; i < 3; i++) {
+      if (i) yield* freshCoat(b, seq[i], true);
+      yield* judge(b, seq[i], 2.6, { stagger: i === 2 }); S.sig = i + 2;
+      if (i < 2) yield 0.5;
+    }
+    S.sig = 0;
+  }
+  function* finRun(b) {
+    const S = b.state;
+    while (true) {
+      if (!S.sigDone && b.hp <= b.maxHp * 0.1) { S.sigDone = true; yield* signature(b); continue; }
+      const call = nextCall(b); yield* sitting(b, call, S.fk === 0 ? 6.0 : 4.5, S.fk); S.fk++;
+    }
+  }
+  // Chiaroscuro: he walks to the centre, the camera rises over the rim, and he drags the palette knife once across the whole canvas.
+  // White flash: the world tears along the cut, one half snaps back to white, the other stays black, and the line starts to turn.
+  function* finEnter(b) {
+    const S = b.state; resetMech(b); Object.assign(S, { call: null, fk: 0, tones: [], cbag: [], used: null, sigDone: false }); Music.intensity(0);
+    yield* b.moveTo(0, 0, 7);
+    const p = G.player, a = (p ? Math.atan2(p.pos.x, p.pos.z) : 0) + PI / 2, fx = Math.sin(a), fz = Math.cos(a);
+    S.cine = true; Co.start(Cam.shot([-fx * 25, 15, -fz * 25], [fx * 6, 0, fz * 6], [-fx * 22 + fz * 4, 20, -fz * 22 - fx * 4], [fx * 2, 0, fz * 2], 3.6, 50), 'phase');
+    b.facing = a; S.lineA = a;
+    yield* b.cast({ name: 'Chiaroscuro', time: 2.2, onTick: (k) => { FX.shake(k * 0.15); } });
+    S.swing = 1; Sound.sfx('sword', 0.9, 0.5); Sound.sfx('wave', 0.8, 0.6); S.seamOn = true; S.seamW = 1;
+    lay(S, { t: 'r', x: -fx * 22, z: -fz * 22, dir: a, len: 44, w: 2.4, m: 0 });
+    let t = 0; while (t < 0.7) { t += G.dt; S.seamP = smooth(Math.min(1, t / 0.7)); if (!G.headless && vrand() < 0.7) { const q = -R + 2 * R * S.seamP; FX.burst(fx * q, 0.1, fz * q, { n: 2, color: 0xffffff, color2: 0xd9d2c2, speed: [1, 4], up: 1.5, life: [0.2, 0.5], size: [0.1, 0.2] }); } yield; }
+    S.seamP = 1;
+    FX.flash(0xffffff, 0.75, 1.4); Sound.sfx('shatter', 1, 0.5); Sound.sfx('bigboom', 0.8); FX.shake(0.5);
+    S.neg = false; S.split = 1; S.reset = true; S.full = true; S.look = S.lookT = FIN_LOOK; S.fin = 1; moveWash(S); S.washT = 0;
+    Co.start(Post.lerpTo({ bloom: 0.28, threshold: 0.92, contrast: 1.08, exposure: 0.95, tint: [1.0, 1.0, 1.0], sat: 1.1 }, 1.0), 'fight');
+    yield 0.5; Sound.sfx('bell', 0.7, 0.5); yield 0.6; S.cine = false; Cam.release();
+  }
+  // Out of time (every nightmare phase): the music stops, and he varnishes the unfinished work: amber varnish floods the canvas from
+  // the rim inward as a closing ring, sealing the paint (and you) under it. He can still be killed while it closes.
+  function* varnishOver(b) {
+    const S = b.state; resetMech(b); Music.stop(0.1); b.otMusic = true; Sound.sfx('wave', 0.9, 0.35); FX.flash(VARN, 0.25, 1.5);
+    const T = 6;
+    Hz.circle(0, 0, 80, T, 0, { blockable: false, name: 'Varnish', color: VARN, quiet: true, alpha: 0.35, onFire: () => {
+      const p = G.player; FX.flash(VARN, 0.6, 2); Sound.sfx('bigboom', 0.8); if (p && p.alive) p.hurt(9999, { blockable: false, src: 'enrage', pierce: true });
+    } });
+    let t = 0; while (t < T) { t += G.dt; S.varnR = (R + 0.6) * (1 - smooth(Math.min(1, t / T))); yield; }
+    S.varnR = 0; yield 0.5; while (true) yield 1;
+  }
+  // The kill (nightmare): the seam stops and closes like a healed cut, both halves resolve into the warm painted look, he lowers the
+  // brush, and the camera lifts straight up over the canvas, which holds every stroke of the fight, and stays on it as a painting.
+  function* paintingDeath(b) {
+    const S = b.state; resetMech(b); S.lineW = 0; G.timeScale = 0.3; S.faceSide = false;
+    let t = 0; while (t < 0.35) { t += G.dt; S.seamW = 1 - smooth(Math.min(1, t / 0.35)); yield; }
+    S.seamOn = false; S.split = 0; S.neg = false; S.fin = 0; S.lookT = 1; S.full = true; FX.flash(0xffe0b0, 0.4, 1.5); Sound.sfx('bell', 0.8, 0.6);
+    Co.start(Post.lerpTo({ bloom: 0.24, threshold: 0.96, contrast: 1.04, exposure: 0.92, tint: [1.02, 1.0, 0.98], sat: 1.12 }, 1.5), 'fight');
+    G.timeScale = 1; S.cine = true;
+    const c = camera.position; yield* Cam.shot([c.x, c.y, c.z], [b.pos.x, 2, b.pos.z], [0, 46, 4], [0, 0, 0.4], 2.8, 52);
+    yield 1.0;
+  }
+  // the finale's look (only the nightmare version builds it): the body tone and swirl, the seam, the called half's rim, the split floor,
+  // wall and windows, the player's light in the black half
+  function nmLook(b, dt) {
+    const S = b.state, p = G.player, t = G.now, U = S.bodyU, c = S.call;
+    S.finK = damp(S.finK, S.fin ? 1 : 0, 5, dt); S.toneK = damp(S.toneK, c && c.tone === 'b' ? 1 : 0, 9, dt);
+    U.uFinK.value = S.finK; U.uToneK.value = S.toneK; U.uBand.value = c && c.col ? 1 : 0; U.uTop.value = S.top; if (c && c.col) U.uCallC.value.setHex(HEX[c.col]);
+    U.uKeyV.value.set(-0.7, 1, 0.25).normalize().transformDirection(camera.matrixWorldInverse);
+    S.rig.updateWorldMatrix(true, false); U.uRigInv.value.copy(S.rig.matrixWorld).invert();
+    const A = S.lineA, ca = Math.cos(A), sa = Math.sin(A), sg = c ? wantSide(c) : 1, cc = c ? (c.col ? HEX[c.col] : 0xe8e4dc) : HEX[S.col];
+    S.splitU.uSplit.value = S.split ? 1 : 0; S.splitU.uLine.value.set(ca, -sa); S.splitU.uVarn.value = S.varnR; S.splitU.uVarnOn.value = S.varnR < R + 1 ? 1 : 0;
+    S.seam.visible = !!S.seamOn; S.seam.rotation.y = A; S.seamU.uP.value = S.seamP; S.seamU.uW.value = S.seamW; S.pulse = damp(S.pulse, S.crit > 0 && c ? 1 : 0, 8, dt);
+    S.seamU.uPulse.value = S.pulse; S.seamU.uSide.value = sg; S.seamU.uPC.value.setHex(c && c.col ? HEX[c.col] : 0xc8c8d4);
+    S.arcG.visible = !!(S.split && c && S.fin); if (S.arcG.visible) { S.arcG.rotation.y = Math.atan2(sg * ca, -sg * sa); S.arcM.color.setHex(c.col ? HEX[c.col] : 0xb4b4c0).multiplyScalar(1.3 + 0.25 * Math.sin(t * 3) + S.pulse * 0.6); }
+    if (S.split) {
+      S.wallM.emissive.setHex(0x58534a); S.chalk.value = 0; S.paneM.color.setHex(0xffb070).multiplyScalar(1.12);
+      const ps = p ? sideOf(S, p.pos.x, p.pos.z) : 1; S.pk = damp(S.pk || 0, ps < 0 ? 1 : 0, 6, dt); S.plight.intensity = 40 * S.pk;
+      if (p && S.wear) S.auraM.color.multiplyScalar(1 + 0.6 * S.pk);
+    }
+    if (S.finK > 0.01) {
+      S.varnU.uC.value.setScalar(lerp(S.neg ? 0.75 : 0.32, lerp(0.3, 0.8, S.toneK), S.finK)); S.shBM.uniforms.uA.value = 0.45 * (1 - S.toneK * S.finK);
+      for (const m of [S.tipM, S.dripM]) { m.color.setHex(cc); m.emissive.setHex(cc); m.emissiveIntensity = 0.3 + 0.5 * S.toneK; } S.hueU.value.setHex(cc); S.light.color.setHex(cc);
+    }
+  }
+
   G.bosses.push({
     id: 'atelier', name: 'PENTIMENTO', title: 'The Unfinished Canvas', hint: 'Wet paint', color: '#f0e8d8', telegraph: INK,
     hp: 31000, radius: 1.5, aimY: 3.6, enrage: 450,
-    post: { bloom: 0.22, threshold: 0.97, radius: 0.6, exposure: 0.92, vig: 0.7, sat: 1.08, contrast: 1.04, tint: [1.0, 1.0, 1.0] },
-    music: { bpm: 100, root: 43, scale: [0, 2, 4, 7, 9, 11, 12], prog: [0, 3, 4, 0, 5, 3, 1, 4],
-      layers: [
-        { v: 'flute', pat: ['0...2...4.....2.', '4...2...0.......'], oct: 1, len: 4, vol: 0.07, to: 1 }, { v: 'bell', pat: '0.....4...2.....', oct: 1, len: 6, vol: 0.06, to: 1 }, { v: 'pad', pat: '0...............', len: 16, vol: 0.09 },
-        { v: 'kick', from: 1, to: 1, pat: 'x.....x.x.......', vol: 0.2 }, { v: 'tom', from: 1, to: 1, pat: '....x.......x.x.', vol: 0.12 }, { v: 'koto', from: 1, to: 1, pat: '0.2.4.2.0.4.2.4.', oct: 0, len: 1, vol: 0.06 }, { v: 'bass', from: 1, pat: '0.......0...4...', oct: -1, len: 3, vol: 0.12 },
-        { v: 'sub', from: 2, pat: '0.......0.......', oct: -2, len: 6, vol: 0.16 }, { v: 'pulse', from: 2, pat: '0.0.4.0.0.0.2.0.', oct: 0, len: 1, vol: 0.06 }, { v: 'kick', from: 2, pat: 'x...x...x...x.x.', vol: 0.22 }, { v: 'choir', from: 2, pat: '0.......4.......', oct: 1, len: 8, vol: 0.06 },
-      ] },
+    post: POST,
+    music: MUSIC,
     build,
     *intro(b) { Sound.sfx('wave', 0.7, 0.5); yield* Cam.shot([-14, 22, 26], [0, 2, 0], [4, 4.5, 8], [0, 3.8, -3], 5.2, 46); },
     phases: [
@@ -442,27 +803,34 @@
         const S = b.state; setLvl(b, 0); S.lookT = 1;
         yield* b.cast({ name: 'Colour', time: 3.0, onTick: (k) => { FX.shake(k * 0.2); } });
         Sound.sfx('wave', 1, 0.4); Sound.sfx('roar', 0.4, 1.5); FX.flash(0xffb060, 0.3, 1.5); Co.start(Post.lerpTo({ tint: [1.02, 1.0, 0.98], sat: 1.12 }, 3), 'fight'); yield 1.0;
-      }, *run(b) {
-        const S = b.state; setLvl(b, 1); let k = 0, last = S.col;
-        while (true) { const c = pick([1, 2, 4, 3, 5, 6].filter((q) => q !== last)); last = c; yield* block(b, c, k); k++; }
-      } },
-      { at: 0.33, skipTo(b) { b.state.look = 2; }, *enter(b) {
-        const S = b.state; setLvl(b, 1); S.lookT = 2;
-        yield* b.cast({ name: 'Negative', time: 3.2, onTick: (k) => { FX.shake(k * 0.45); } });
-        setLvl(b, 2); Sound.sfx('shatter', 1, 0.4); Sound.sfx('bigboom', 0.9); FX.flash(0x000000, 0.5, 1.2); Co.start(Post.lerpTo({ bloom: 0.32, threshold: 0.9, exposure: 1.0, tint: [1.0, 1.0, 1.04], contrast: 1.1 }, 1.5), 'fight'); yield 1.4;
-      }, *run(b) {
-        const S = b.state; setLvl(b, 2); let k = 0, last = S.col;
-        while (true) { const c = pick([1, 2, 4, 3, 5, 6].filter((q) => q !== last)); last = c; yield* block(b, c, k); k++; }
-      } },
+      }, run: colourRun },
+      { at: 0.33, skipTo(b) { b.state.look = 2; }, enter: negEnter, run: negRun },
     ],
+    // ---- Nightmare ("Chiaroscuro"). Opens in colour (today's phase 2), then the Negative, then the split canvas. Per-phase clocks.
+    nightmare: {
+      hp: 24000,
+      post: Object.assign({}, POST, { tint: [1.02, 1.0, 0.98], sat: 1.12 }),
+      music: nmMusic(MUSIC),
+      overtime: varnishOver, death: paintingDeath,
+      phases: [
+        { at: 1, budget: NM_CLOCK[0], music: 1, *run(b) { resetMech(b); yield 0.6; yield* colourRun(b); } },
+        { at: 0.62, budget: NM_CLOCK[1], music: 2, skipTo(b) { b.state.look = 2; Object.assign(Post.cur, NEG_POST); Post.apply(); }, *enter(b) { resetMech(b); yield* negEnter(b); }, run: negRun },
+        { at: 0.30, budget: NM_CLOCK[2], music: 3, skipTo(b) { setLvl(b, 2); b.state.look = 2; }, enter: finEnter, run: finRun },
+      ],
+    },
+    nmTest: { wantWear, wantSide, sideAt, route: (S, ...a) => route(S, ...a) },
     update(b, dt) {
       const S = b.state, p = G.player, t = G.now, fight = G.state === 'fight' && p && p.alive;
-      if (S.down > 0) S.down -= dt; S.washT = (S.washT || 0) + dt; if (S.washT > 18) { S.washT = 0; moveWash(S); }
+      if (S.down > 0) S.down -= dt; S.washT = (S.washT || 0) + dt; if (S.washT > 18 && !(S.split && S.holdWash > G.ft)) { S.washT = 0; moveWash(S); } // finale: the dish holds still while a Critique it answers is cast
       if (fight) {
         const inWash = Math.hypot(p.pos.x - S.wash.x, p.pos.z - S.wash.z) < S.wash.r;
         if (inWash) { if (S.wear) { S.wear = 0; S.wearK = 1; Sound.sfx('heal', 0.5, 1.6); } }
         else if (p.grounded && p.pos.y < 0.15) { const m = wetAt(S, p.pos.x, p.pos.z); if (m) tint(S, m); }
-        p.speedMul = S.wear === 7 ? 0.8 : 1; const ok = S.wear === need(S); b.dmgTaken = ok ? 1.3 : 0.35; if (ok) S.match += dt;
+        p.speedMul = S.wear === 7 ? 0.8 : 1; const ok = matched(S, p.pos.x, p.pos.z); b.dmgTaken = ok ? 1.3 : 0.35; if (ok) S.match += dt;
+      }
+      if (S.split) { // the finale: the seam turns; he holds the pivot, facing the half he calls while he paints or judges, else you
+        if (G.state === 'fight') S.lineA += S.lineW * dt;
+        if (b.alive && p) { const c = S.call, sg = c ? wantSide(c) : 1; b.facing = dampAng(b.facing, S.faceSide && c ? Math.atan2(sg * Math.cos(S.lineA), -sg * Math.sin(S.lineA)) : b.angToPlayer(), 6, dt); }
       }
       S.dryT -= dt; if (S.dryT <= 0) { S.dryT = 0.5; for (const L of [S.strokes, S.baked]) for (const sh of L) if (!sh.dry && sh.m && G.ft - sh.t0 > WET) { sh.dry = true; S.full = true; } }
       if (G.headless) return;
@@ -482,7 +850,7 @@
       for (const m of [S.smockM, S.sleeveM]) { m.color.setHex(cc); m.emissive.setHex(cc); m.emissiveIntensity = (S.neg ? 0.55 : 0.3) + S.fl * 0.5; }
       S.hueU.value.setHex(cc); S.hueMax.value = 1.0; for (const [m, c0] of S.woodMats) { m.color.copy(c0).multiply(_c.setRGB(1 - 0.8 * k2, 1 - 0.77 * k2, 1 - 0.7 * k2)); m.emissive.setRGB(0.05, 0.048, 0.046).multiplyScalar(k2); } for (const m of [S.tipM, S.dripM]) { m.color.setHex(cc); m.emissive.setHex(cc); m.emissiveIntensity = S.neg ? 1.0 : 0.3; }
       S.light.color.setHex(cc); S.light.intensity = S.neg ? 4 : 2 + S.fl * 8;
-      const ok = S.wear === need(S); S.vk = damp(S.vk === undefined ? 1 : S.vk, ok || S.down > 0 ? 0 : 1, 6, dt); S.varn.visible = S.vk > 0.02; S.varnU.uA.value = S.vk; S.varn.rotation.y += dt * 0.3;
+      const ok = p ? matched(S, p.pos.x, p.pos.z) : S.wear === need(S); S.vk = damp(S.vk === undefined ? 1 : S.vk, ok || S.down > 0 ? 0 : 1, 6, dt); S.varn.visible = S.vk > 0.02; S.varnU.uA.value = S.vk; S.varn.rotation.y += dt * 0.3;
       S.swing = Math.max(0, S.swing - dt * 2.4); const dn = S.down > 0 ? 1 : 0; S.dnK = damp(S.dnK || 0, dn, 6, dt); const cast = b.castState ? 1 : 0; S.ck = damp(S.ck || 0, cast, 5, dt);
       S.armR.rotation.set(-0.6 - S.ck * 1.3 + S.swing * 1.9, 0, 0.25 - S.swing * 0.8); S.elR.rotation.x = -0.3 - S.ck * 0.2; S.brush.rotation.x = 0.7 + S.swing * 0.6 + S.ck * 0.2;
       S.armL.rotation.set(-0.5 + Math.sin(t * 1.1) * 0.06, 0, -0.5 - S.dnK * 0.8); S.elL.rotation.x = -0.55;
@@ -497,6 +865,7 @@
       S.wearK = Math.max(0, S.wearK - dt * 2); S.aura.visible = !!p && S.wear > 0; if (p && S.wear) { S.aura.position.set(p.pos.x, 0, p.pos.z); S.drop.position.y = p.pos.y + 2.75 + Math.sin(t * 3) * 0.08; S.auraM.color.setHex(HEX[S.wear]).multiplyScalar(S.neg ? 1.5 : 1 + S.wearK * 0.6); S.aura.scale.setScalar(1 + S.wearK * 0.5); }
       if (p) { _b.set(p.pos.x - camera.position.x, 0, p.pos.z - camera.position.z); const l = Math.max(_b.length(), 1e-3); S.plight.position.set(p.pos.x + _b.x / l * 2.4, p.pos.y + 3.2, p.pos.z + _b.z / l * 2.4); S.plight.intensity = S.neg ? 40 : 0; }
       S.rollG.visible = !!S.roll; if (S.roll) { const q = S.roll; S.rollG.position.set(q.cx + q.fx * q.s, 0, q.cz + q.fz * q.s); S.rollG.rotation.y = q.a; S.rollC.rotation.x += dt * q.v; }
+      if (S.nm) nmLook(b, dt);
     },
     danger(b, x, z) {
       const S = b.state, q = S.roll; if (!q) return Infinity; const dx = x - q.cx, dz = z - q.cz, al = dx * q.fx + dz * q.fz, sd = dx * q.fz - dz * q.fx;
@@ -509,6 +878,9 @@
       // hop over paint you must not touch
       if (p.grounded && p.moving && !bad(p.pos.x, p.pos.z)) { const l = Math.hypot(p.intentX, p.intentZ) || 1; if (bad(p.pos.x + p.intentX / l * 1.1, p.pos.z + p.intentZ / l * 1.1)) p.jump(); }
       out.avoid = bad; if (S.blotList.length) out.target = S.blotList.reduce((a, e) => Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z) < Math.hypot(a.pos.x - p.pos.x, a.pos.z - p.pos.z) ? e : a);
+      if (S.split && Bot.lazy) return out; // test switch (tools/critfuzz.js): never washes or fetches paint
+      // finale: with the right paint, hold a spot inside the called half at fighting range, aimed where the seam will be in a second
+      if (S.split && S.call && !extra && !miss && !Bot.sideBlind) { const sg = wantSide(S.call), A = S.lineA + S.lineW, rr = p.cls.melee ? b.radius + 2.4 : 8; out.x = sg * Math.cos(A) * rr; out.z = -sg * Math.sin(A) * rr; out.w = 4; S.goal = null; return out; }
       if (extra) { out.x = S.wash.x * 0.97; out.z = S.wash.z * 0.97; out.w = 4; return out; }
       if (miss) {
         S.scanT -= G.dt; if (S.scanT <= 0 || !S.goal) { S.scanT = 0.3; let best = null, bd = Infinity; for (let j = 0; j < GN; j += 1) for (let i = 0; i < GN; i += 1) { const k = j * GN + i, m = S.dryAt[k] > G.ft + 0.5 ? S.pig[k] : 0; if (!m || (m & ~nd) || !(m & miss)) continue; const x = (i + 0.5) * CELL - R, z = (j + 0.5) * CELL - R, d = Math.hypot(x - p.pos.x, z - p.pos.z); if (Math.hypot(x - S.wash.x, z - S.wash.z) < S.wash.r + 0.4) continue; if (d < bd) { bd = d; best = { x, z }; } } S.goal = best; }
