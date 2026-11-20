@@ -6,6 +6,7 @@
   <div id="bossframe">
     <div class="bn"><span id="bname"></span><small id="bhp"></small></div>
     <div class="bar" id="bbar"><div class="lag"></div><div class="fill"></div></div>
+    <div id="bfuse"></div>
     <div class="bar cast" id="bcast"><div class="fill"></div><div class="cn"></div></div>
   </div>
   <div id="tgtframe">
@@ -32,6 +33,7 @@
   <div class="tag">Many doors. No two alike.</div>
   <h2>Choose who walks through</h2>
   <div id="classes"></div>
+  <div class="diff nav" id="diffrow" data-adj="diff"><div class="seg" id="set-diff"><span data-v="normal">Normal</span><span data-v="nightmare">Nightmare</span></div></div>
   <h2>Choose a door</h2>
   <div id="doors"></div>
   <div class="row"><button class="btn nav" id="btn-settings">Settings &amp; controls</button><button class="btn nav" id="btn-fs">Fullscreen</button></div>
@@ -50,6 +52,7 @@
   <h2 id="death-sub">You fell</h2>
   <h1 id="death-title">DEFEAT</h1>
   <div class="stat-line" id="death-stats"></div>
+  <div class="ptable" id="death-phases"></div>
   <button class="btn nav primary" data-act="restart">Try again</button>
   <button class="btn nav" data-act="quit">Leave</button>
 </div>
@@ -58,6 +61,7 @@
   <h2 id="vic-sub">The door closes behind you</h2>
   <h1 id="vic-title">VICTORY</h1>
   <div class="stat-line" id="vic-stats"></div>
+  <div class="ptable" id="vic-phases"></div>
   <button class="btn nav primary" data-act="quit">Back to the doors</button>
   <button class="btn nav" data-act="restart">Fight again</button>
 </div>

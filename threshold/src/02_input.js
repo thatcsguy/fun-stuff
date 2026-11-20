@@ -159,7 +159,7 @@ const Input = {
       const b = gp.buttons.map((x, i) => (i === 6 || i === 7) ? x.value > 0.4 : x.pressed);
       const prev = this.padPrev, edge = (i) => b[i] && !prev[i];
       if (Settings.pad === undefined) { // never chosen: the first button press switches the controller on
-        if (b.some((x, i) => edge(i))) { this.padPrev = b; this.setPad(true); if (typeof UI !== 'undefined') UI.padWoke(); }
+        if (b.some((x, i) => edge(i))) { this.setPad(true); this.padPrev = b; if (typeof UI !== 'undefined') UI.padWoke(); }
         else this.padPrev = b;
       } else if (this.capture) {
         for (let i = 0; i < b.length; i++) if (edge(i)) {

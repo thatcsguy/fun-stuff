@@ -49,6 +49,32 @@ Angles: angle `a` points along `(sin a, cos a)` on the XZ plane, the same as `ro
 
 A floor that turns under the player (carrying them with `player.push`) should also turn `Cam.yaw` and `player.facing` by the same angular velocity each frame, or the floor appears to spin around the player and camera-relative WASD drifts. See the "carry the player" block in `27_boss_wheel.js` `update()`, which also blends the rate when the player steps between rings and skips while `Cam.cine` is set.
 
+## A nightmare version
+
+A door can have a harder version, picked with the Difficulty toggle on the door page (or `?nm=1`). Add a `nightmare` block to the def;
+`Game.start` lays it over the normal def (prototype chain), so anything not in it reads through to Normal, and Normal itself never changes:
+
+```js
+nightmare: {
+  hp: 23000, post: { ... }, music: { ... },        // any def field can be overridden
+  overtime: lastPetal,                              // optional: the "out of time" coroutine for every phase (else Boss.defaultOvertime)
+  death: myKill,                                    // optional: a custom kill sequence
+  phases: [
+    { at: 1,   budget: 64, music: 1, *run(b) { ... } },
+    { at: 0.5, budget: 68, *enter(b) { ... }, *run(b) { ... }, overtime: special },   // a phase may have its own overtime
+  ],
+},
+```
+
+- `budget` (seconds) gives the phase a clock. It runs only in `fight`, while the boss is alive and not in `enter` (cinematics never cost time), and not during the rehearsal. At zero the phase coroutine is stopped, phase hazards and bullets cleared, and the overtime coroutine starts (tagged `'phase'`). The boss stays hittable: a kill or a phase change during overtime still counts. The killing blow should be `p.hurt(9999, { blockable: false, src: 'enrage', pierce: true })`: `'enrage'` makes the death screen say "Out of time", `pierce` gets through god mode and immunities (tests rely on it).
+- A def whose phases have budgets skips the flat `enrage` timer. Leftover time is not carried over.
+- `G.nightmare` is set before `build()` runs. Use it to build the nightmare-only things in `build()` (and hide them): nothing should be created mid-fight. `NM(normal, nightmare)` picks a number by difficulty.
+- `Co.stopTag('phase')` skips a coroutine's cleanup. Every per-mechanic visual or flag a cut-off mechanic can leave behind (kneel, rings, a hidden or untargetable body, a grade, slow time) must be reset in the next phase's `enter` and in your overtime. `tools/nmphase.js` checks this.
+- `ent.hpOwner = boss` makes a second body share the boss's health (hits on it land on the boss). `ent.onImmuneHit(info, ent)` is called when an immune body is hit; return true to hide the "IMMUNE" text.
+- Phase results (`b.phaseLog`) and the fuse need nothing from the boss file.
+
+Check it with `NM=1 node tools/smoke.js <id>`, `node tools/nmclock.js <id> all 6` (with `RAW=1` to tune), `node tools/nmphase.js <id>`, `NM=1 node tools/hitch.js <id>` and `NM=1 node tools/nanscan.js <id>`.
+
 ## Scripting
 
 Phases are generator coroutines. `yield 1.5` waits seconds, `yield` waits a frame, `yield () => cond` waits for a condition, `yield*` calls another generator. When health crosses the next phase's `at`, the running `run` is cancelled, hazards tagged `'phase'` are cleared, and `enter` then `run` of the next phase start. Use `Co.start(gen, 'fight')` for things that must survive a phase change.

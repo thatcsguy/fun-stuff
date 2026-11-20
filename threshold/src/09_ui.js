@@ -4,7 +4,7 @@ const UI = (() => {
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
   const svg = (name, color) => `<svg viewBox="0 0 24 24"><path d="${ICON[name]}" fill="${color}" fill-rule="evenodd"/></svg>`;
   const fmtT = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
-  let slots = [], cur = null, settingsFrom = 'menu', focusI = -1, hurtA = 0;
+  let fuse = [], tickS = -1, slots = [], cur = null, settingsFrom = 'menu', focusI = -1, hurtA = 0;
   const cache = {};
   const setTxt = (key, node, v) => { if (cache[key] !== v) { cache[key] = v; node.textContent = v; } };
   const setCls = (key, node, cls, on) => { if (cache[key] !== on) { cache[key] = on; node.classList.toggle(cls, on); } };
@@ -14,19 +14,21 @@ const UI = (() => {
   function buildMenu() {
     const cw = $('#classes'); cw.innerHTML = '';
     for (const c of G.classes) {
-      const b = document.createElement('button'); b.className = 'cls nav' + (c === selectedClass() ? ' sel' : ''); b.style.setProperty('--c', c.color);
+      const b = document.createElement('button'); b.className = 'cls nav' + (c === selectedClass() ? ' sel' : ''); b.dataset.cls = c.id; b.style.setProperty('--c', c.color);
       const kb = (i) => { const l = Binds.slotLabel(i); return `<kbd${l.c ? ` style="color:${l.c}"` : ''}>${l.t || '·'}</kbd>`; };
       b.innerHTML = `<div class="cn">${c.name}</div><div class="cr">${c.role}</div><div class="sk">` + c.skills.map((s, i) => !s ? '' : `<div class="ic">${svg(s.icon, c.color)}</div><div>${kb(i)}<b>${s.name}</b> ${s.desc}</div>`).join('') + '</div>';
       b.onclick = () => { Settings.cls = c.id; saveSettings(); Sound.sfx('uiok'); buildMenu(); };
       cw.appendChild(b);
     }
+    // Difficulty: on Nightmare, doors with no nightmare version are greyed out, skipped by focus and cannot be clicked
+    const nm = Settings.diff === 'nightmare'; segSet('diff', nm ? 'nightmare' : 'normal'); el.menu.classList.toggle('nm', nm);
     const dw = $('#doors'); dw.innerHTML = '';
     G.bosses.forEach((d, i) => {
-      const b = document.createElement('button'); b.className = 'door nav'; b.style.setProperty('--c', d.color || '#e8c77a');
-      const seen = Save.seen && Save.seen[d.id], kills = (Save.kills && Save.kills[d.id]) || {};
+      const ok = !nm || Game.nmAvailable(d), b = document.createElement('button'); b.className = 'door' + (ok ? ' nav' : ' na') + (nm && ok ? ' nmok' : ''); b.dataset.door = d.id; b.style.setProperty('--c', d.color || '#e8c77a');
+      const seen = Save.seen && Save.seen[d.id], kills = nm ? Object.fromEntries(Object.entries((Save.nm && Save.nm[d.id]) || {}).map(([k, v]) => [k, v.best])) : (Save.kills && Save.kills[d.id]) || {};
       const best = Object.values(kills).length ? Math.min(...Object.values(kills)) : 0;
       b.innerHTML = `<div class="rn">${ROMAN[i]}</div>${best ? `<div class="dk">✓ ${fmtT(best)}</div>` : ''}<div class="dn">${seen ? d.name : '? ? ?'}</div><div class="dh">${seen ? d.title : (d.hint || '')}</div>`;
-      b.onclick = () => { Sound.resume(); Sound.sfx('uiok'); Game.start(d.id); };
+      if (ok) b.onclick = () => { Sound.resume(); Sound.sfx('uiok'); Game.start(d.id, { nm }); }; else b.disabled = true;
       dw.appendChild(b);
     });
     focusI = -1;
@@ -66,16 +68,24 @@ const UI = (() => {
     else for (let i = 0; i < c.resource.max; i++) pips.appendChild(document.createElement('i'));
     const b = G.boss, bar = $('#bbar'); bar.querySelectorAll('.tick').forEach((t) => t.remove());
     for (const ph of b.def.phases) if (ph.at < 1) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (ph.at * 100) + '%'; bar.appendChild(t); }
-    $('#bname').textContent = b.def.name;
+    $('#bname').textContent = b.def.name; $('#bname').classList.toggle('nm', !!b.def.nm);
+    // the fuse: one segment per phase clock, each under its own slice of the health bar, burning right to left
+    const fz = $('#bfuse'); fz.innerHTML = ''; fuse = []; tickS = -1;
+    if (b.budgeted) b.def.phases.forEach((ph, i) => { const lo = b.def.phases[i + 1] ? b.def.phases[i + 1].at : 0, sg = document.createElement('div'); sg.className = 'fz wait'; sg.style.left = (lo * 100) + '%'; sg.style.width = ((ph.at - lo) * 100) + '%'; sg.innerHTML = '<b></b>'; fz.appendChild(sg); fuse.push({ sg, b: sg.firstChild }); });
+    fz.classList.toggle('on', fuse.length > 0);
   }
   // Called whenever the controller toggle, prompt style, connected pad or a binding changes: every on-screen button label follows.
   function deviceChanged() {
     document.body.classList.toggle('dev-pad', Input.device === 'pad');
     slots.forEach((s, i) => { if (s) { const l = Binds.slotLabel(i); s.key.textContent = l.t; s.key.style.color = l.c; } });
     const f = focusI;
-    if (cur === 'menu') { buildMenu(); if (f >= 0) setFocus(f); }
+    if (cur === 'menu') { const k = focusKey(); buildMenu(); if (f >= 0) focusByKey(k, f); }
     if (cur === 'settings') refreshSettings();
   }
+  // menu focus is restored by element, not index: greyed doors drop out of the focus order when the difficulty changes
+  const navKey = (n) => n.id || (n.dataset.door ? 'door:' + n.dataset.door : n.dataset.cls ? 'cls:' + n.dataset.cls : '');
+  function focusKey() { const n = navItems()[focusI]; return n ? navKey(n) : ''; }
+  function focusByKey(k, fallback) { const j = navItems().findIndex((n) => navKey(n) === k); setFocus(j >= 0 ? j : fallback, true); }
   function padWoke() { if (cur && focusI < 0) moveFocus(0, true); }
   function castBar(key, node, cs) {
     const on = !!cs; setCls(key + 'on', node, 'on', on);
@@ -87,8 +97,9 @@ const UI = (() => {
     setSx('bhp', $('#bbar .fill'), b.hp / b.maxHp); setSx('bhpl', $('#bbar .lag'), b.hp / b.maxHp);
     setTxt('bhpt', $('#bhp'), (b.hp / b.maxHp * 100).toFixed(1) + '%');
     castBar('bc', $('#bcast'), b.castState);
+    if (fuse.length) updFuse(b);
     const t = p.target, showT = t && t !== b && t.alive; setCls('tf', $('#tgtframe'), 'on', !!showT);
-    if (showT) { setTxt('tn', $('#tname'), t.name); setSx('thp', $('#tbar .fill'), t.hp / t.maxHp); castBar('tc', $('#tcast'), t.castState); }
+    if (showT) { const th = t.hpOwner || t; setTxt('tn', $('#tname'), t.name); setSx('thp', $('#tbar .fill'), th.hp / th.maxHp); castBar('tc', $('#tcast'), t.castState); }
     if (b.def.enrage) { const left = Math.max(0, b.def.enrage - G.ft); setTxt('enr', $('#enrage'), fmtT(G.ft)); setCls('enrh', $('#enrage'), 'hot', left < 30); }
     setSx('php', $('#pbar .fill'), p.hp / p.maxHp); setCls('plow', $('#pbar'), 'low', p.hp / p.maxHp < 0.35);
     setTxt('phpt', $('#pbar .hpt'), Math.ceil(p.hp) + ' / ' + p.maxHp);
@@ -119,6 +130,25 @@ const UI = (() => {
     setCls('hint', el.hint, 'on', p.hintT > 0); if (p.hintT > 0) setTxt('hintt', el.hint, p.hint);
     if (G.debug) el.dbg.textContent = `t ${G.ft.toFixed(1)}  phase ${b.phase}  boss ${Math.round(b.hp)}  dps ${(p.stats.dmg / Math.max(1, G.ft)).toFixed(0)}  hz ${Hz.list.length} bul ${Bul.list.length} co ${Co.list.length}\n${G.errors.slice(-3).join('\n')}`;
   }
+  // fuse states: done (frozen where it stopped, dim gold), live (burning; pulses and ticks in its last 15 s), wait (full, dim), out (ran out: red)
+  function updFuse(b) {
+    const L = b.phaseLog || [];
+    for (let i = 0; i < fuse.length; i++) {
+      const f = fuse[i], bud = b.def.phases[i].budget || 1, cur = i === b.phase && !L[i];
+      const st = L[i] ? (L[i].over ? 'out' : 'done') : cur ? (b.overtime ? 'out' : 'live') : i < b.phase ? 'done' : 'wait';
+      const left = L[i] ? 1 - L[i].time / bud : cur ? 1 - (b.phaseT || 0) / bud : 1;
+      if (cache['fz' + i] !== st) { cache['fz' + i] = st; f.sg.className = 'fz ' + st; }
+      setSx('fzs' + i, f.b, sat(left));
+      const hot = st === 'live' && G.state === 'fight' && (b.phaseT || 0) > bud - 15; setCls('fzh' + i, f.sg, 'hot', hot);
+      if (hot && !b.transitioning && !G.paused) { const s = Math.floor(b.phaseT); if (s !== tickS) { tickS = s; Sound.sfx('tick', 0.9, 0.8 + (15 - (bud - b.phaseT)) * 0.06); } }
+    }
+  }
+  // per-phase results under the death / victory stat line: time on the clock / budget, damage per second; red = ran out
+  function phaseTable(node, b, best = []) {
+    const L = b.phaseLog; if (!L || !b.budgeted) { node.innerHTML = ''; node.classList.remove('on'); return; }
+    node.innerHTML = b.def.phases.map((ph, i) => { const q = L[i]; return q ? `<div class="pr${q.over ? ' out' : ''}"><span>${ROMAN[i]}</span><span>${fmtT(q.time)} / ${fmtT(q.budget)}</span><span>${Math.round(q.dmg / Math.max(1, q.time))} dps</span><span>${best[i] ? 'best' : ''}</span></div>` : `<div class="pr na"><span>${ROMAN[i]}</span><span>– / ${fmtT(ph.budget || 0)}</span><span>–</span><span></span></div>`; }).join('');
+    node.classList.add('on');
+  }
   function slotFlash(i) { const s = slots[i]; if (s) { s.flash = 0.1; s.d.classList.add('press'); } }
   function hurtFlash(frac) { hurtA = Math.min(1, hurtA + 0.25 + frac * 1.6); }
 
@@ -147,13 +177,19 @@ const UI = (() => {
     else if (k === 'q') { Settings.q = v; Post.setQuality(v); }
     else if (k === 'pad') { Input.setPad(String(v) === '1'); refreshSettings(); return; }
     else if (k === 'glyphs') Settings.glyphs = v;
+    else if (k === 'diff') {
+      const nm = v === 'nightmare'; if ((Settings.diff === 'nightmare') === nm) return;
+      const had = focusI >= 0; Settings.diff = nm ? 'nightmare' : 'normal'; saveSettings();
+      if (nm) Sound.sfx('bell', 0.5, 0.5); else Sound.sfx('uiok');
+      buildMenu(); if (had || Input.device === 'pad') focusByKey('diffrow', 0); Game.menuDiff(nm); return;
+    }
     saveSettings(); if (k === 'glyphs') deviceChanged(); else refreshSettings();
   }
   function adjust(k, d) { // left / right on a focused row
     if (k in RANGE) { setOpt(k, Settings[k] + d * RANGE[k][2]); Sound.sfx('ui'); return; }
     const vals = [...segOf(k).children].map((n) => n.dataset.v), on = segOf(k).querySelector('.on');
     const i = on ? vals.indexOf(on.dataset.v) : 0, j = d === 0 ? (i + 1) % vals.length : clamp(i + d, 0, vals.length - 1);
-    if (j !== i) { setOpt(k, vals[j]); Sound.sfx('ui'); }
+    if (j !== i) { setOpt(k, vals[j]); if (k !== 'diff') Sound.sfx('ui'); }
   }
   for (const k in RANGE) $('#set-' + k).oninput = (e) => setOpt(k, e.target.value);
   $('#settings .set-wrap').addEventListener('click', (e) => {
@@ -161,6 +197,7 @@ const UI = (() => {
     if (sv) { setOpt(row.dataset.adj, sv.dataset.v); Sound.sfx('uiok'); }
     else if (row && !e.target.closest('input') && !(row.dataset.adj in RANGE)) adjust(row.dataset.adj, 0);
   });
+  $('#diffrow').addEventListener('click', (e) => { const sv = e.target.closest('.seg span'); if (sv) setOpt('diff', sv.dataset.v); else adjust('diff', 0); });
   function padLabel() {
     const gp = Input.padId ? Input.pickPad() : null; if (!gp) return 'No controller found. Press a button on it.';
     return gp.id.replace(/\s*\(.*$/, '').slice(0, 48) + (gp.mapping === 'standard' ? '' : ' (unusual layout: rebind anything that feels wrong)');
@@ -219,7 +256,7 @@ const UI = (() => {
   function moveFocus(d, absolute) {
     const items = navItems(); if (!items.length) return;
     let i = absolute ? 0 : ((focusI < 0 ? 0 : focusI + d) + items.length) % items.length;
-    if (cur === 'menu' && absolute) i = Math.min(items.length - 1, G.classes.length);
+    if (cur === 'menu' && absolute) { const k = items.findIndex((n) => n.classList.contains('door')); i = k >= 0 ? k : Math.max(0, items.findIndex((n) => n.id === 'diffrow')); }
     // in the binding table, up / down stay in the same column
     const f = items[focusI];
     if (!absolute && f && f.dataset.col !== undefined && Input.device === 'kbm') {
@@ -238,5 +275,5 @@ const UI = (() => {
   };
   document.body.classList.toggle('dev-pad', Input.device === 'pad');
   Hooks.frame.push((rdt, stage) => { if (stage === 1) update(rdt); });
-  return { el, show, fade, titleCard, hideCard, buildHud, deviceChanged, padWoke, slotFlash, hurtFlash, selectedClass, fmtT, ROMAN, hud(on) { el.hud.classList.toggle('on', on); }, get screen() { return cur; } };
+  return { el, show, fade, titleCard, hideCard, buildHud, phaseTable, deviceChanged, padWoke, slotFlash, hurtFlash, selectedClass, fmtT, ROMAN, hud(on) { el.hud.classList.toggle('on', on); }, get screen() { return cur; } };
 })();
