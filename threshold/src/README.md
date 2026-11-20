@@ -73,7 +73,7 @@ HUD hooks on a skill: `rdy(p)` (glow), `act(p)` (lit while active), `interrupt: 
 
 `?boss=cathedral|leviathan|duelist|engine|titan|gorgon|theatre|wheel|express|winter|origami|lamp|chess|festival|fall`, `&class=duskblade|stormcaller|ashwarden|hexslinger`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`, `&strictmath` (testing only: out-of-domain shader math returns NaN and NaN pixels show bright magenta).
 
-Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `sumi`.
+Doors XVI to XX use the ids `ballpark`, `clock`, `portal`, `atelier`, `sumi`. Door XVIII also takes `&gate=walk|dwell|jump`, the rule for entering a gate (default `walk`).
 
 ## Test hooks
 
@@ -95,7 +95,8 @@ Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `sumi`.
 - `awcap.js <outDir> [boss,boss] [groups]`: the same review for the Ashwarden (cuts, Overhead wind-up and slam, roll and hop, Kindle, Ember Flask, opening, Winded), with the one-shot moves in slow motion so screenshot latency cannot skip them. `AW_LAB=1` hides the arena and lights the knight evenly on grey.
 - `montage.js <out.png> <cols> <x,y,w,h | full> img...`: tiles (optionally cropped) screenshots into one contact sheet.
 - `diag.js <boss> <class> <expr> <seconds> [phase]`: autopilot run that prints `expr` (JS with `g, G, b, p, S` in scope) every half second, for tracing a mechanic.
-- `logicfuzz.js`: no browser; fuzzes the circuit generator of door `logic` (every circuit must be survivable).
+- `gatefuzz.js [step] [mode]`: no browser; door `portal`. For every gate layout, pairing and single sealed pair, from start positions all over the floor, every gate mechanic must have a variant the route solver can beat (or else the fight's fallback Slam). Prints how often the intended number of trips is available and solver timings.
+- `gatesoak.js [classes] [runs] [botLevel]`: door `portal` autopilot soak in god mode; counts hits from the gate mechanics (a level-3 autopilot should take none). `GATE=dwell|jump` tests the other entry rules.
 - `chessfuzz.js [N]`: no browser; fuzzes the Gambit board generator of door `chess` (N boards per act, default 10000). Every board must leave a reachable square that is safe and gives check. Prints good-square counts and how often each relaxation fired.
 - `chesssim.js <class> [runs] [mode]`: door `chess` autopilot fights with Gambit outcomes. Mode `mix` skips check on a quarter of Gambits, `nocheck` never gives check (that bot should die).
 - `chesslock.js`: door `chess` lock-in audit: every class presses every skill while locked; nobody may leave the square.
