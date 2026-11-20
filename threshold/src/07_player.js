@@ -186,8 +186,8 @@ class Player {
     if (typeof UI !== 'undefined') UI.slotFlash(i);
   }
   hurt(amt, o = {}) {
-    if (!this.alive || G.god || G.state !== 'fight') return 0;
-    if (this.invuln > 0 && o.src !== 'fall') return 0;
+    if (!this.alive || (G.god && !o.pierce) || G.state !== 'fight') return 0; // pierce: a nightmare 'out of time' blow, which even god mode and immunities do not stop
+    if (this.invuln > 0 && o.src !== 'fall' && !o.pierce) return 0;
     if (o.blockable && this.dodgeT > 0) { if (this.cls.onDodge) this.cls.onDodge(this, o); return 0; } // roll i-frames: like a parry, they never beat an unblockable
     if (o.blockable && this.parryT > 0) { this.parryT = 0; this.cls.onParry(this, o); return 0; }
     amt = Math.round(amt * this.dmgTakenMul);

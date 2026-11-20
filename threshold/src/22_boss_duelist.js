@@ -365,7 +365,7 @@
       ribbon(torso, crim, { n: 10, x: -0.06, y: 0.04, z: -0.3, len: 0.85, w: 0.12, drop: 1, trail: 0.3, amp: 0.07, f: 2.0, k: 3, ph: 2.1, speedK: 0.12 }),
     ];
     // nodachi: long curved blade with a glowing edge
-    const weapon = M2.wtip.parent; for (let i = 1; i < weapon.children.length; i++) if (weapon.children[i].isMesh) weapon.children[i].visible = false;
+    const weapon = S.weapon = M2.wtip.parent; for (let i = 1; i < weapon.children.length; i++) if (weapon.children[i].isMesh) weapon.children[i].visible = false;
     weapon.children[0].scale.y = 1.7; weapon.children[0].position.z = -0.06;
     const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.022, 16), W.mat({ color: 0x2a2018, roughness: 0.5, metalness: 0.7 })); tsuba.rotation.x = PI / 2; tsuba.position.z = 0.2; weapon.add(tsuba);
     const BL = 2.35, cv = (a) => 0.1 * (a / BL) * (a / BL), wd = (a) => 0.088 * (1 - 0.3 * a / BL);
@@ -413,6 +413,7 @@
     S.orbHalo = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), haloMat(new THREE.Color(0xff3a78).multiplyScalar(0.22)), 320); S.orbHalo.count = 0; S.orbHalo.frustumCulled = false; S.orbHalo.renderOrder = 14; g.add(S.orbHalo);
     S.cuts = []; S.haste = 0; S.still = false; S.warn = 0; S.graceT = 0; S.walk = false; S.kneel = 0; S.night = 0; S.open = 0; S.torn = false; S.tv = new V3();
     b.onDamaged = (amt, info) => { if (S.still && !S.countered && G.now >= S.graceT && info.src === 'player') { S.countered = true; Co.start(counter(b), 'phase'); } };
+    if (G.nightmare) deepenFn(b)(1); // nightmare opens at sunset (its grade comes through nightmare.post), torn haori from the first frame
     return { edge: 'wall', radius: R, spawn: { x: 0, z: 10 }, bossStart: { x: 0, z: -5, face: 0 }, contains: (x, z) => x * x + z * z <= R * R,
       camLimit(x, y, z) { const r = Math.hypot(x, z); if (r > 25) { x *= 25 / r; z *= 25 / r; } return { x, y: Math.min(y, 15), z }; } };
   }
@@ -523,13 +524,13 @@
   }
   function* finalVerse(b, n = 9) {
     const S = b.state; S.walk = false; yield* b.cast({ name: 'Final Verse', time: 1.1 });
-    petals(b.pos.x, b.pos.z, 40); b.targetable = false; b.group.visible = false; Co.start(Post.lerpTo({ sat: 0.75, vig: 1.05 }, 0.4), 'fight');
+    petals(b.pos.x, b.pos.z, 40); b.targetable = false; b.group.visible = false; S.verse = true; Co.start(Post.lerpTo({ sat: 0.75, vig: 1.05 }, 0.4), 'fight');
     for (let i = 0; i < n; i++) {
       const qa = rnd(TAU), qr = i % 3 === 0 ? 0 : rnd(2, 10), p = G.player, qx = i % 3 === 0 ? p.pos.x : Math.sin(qa) * qr, qz = i % 3 === 0 ? p.pos.z : Math.cos(qa) * qr, dir = rnd(TAU), ox = qx - Math.sin(dir) * 20, oz = qz - Math.cos(dir) * 20;
       vTele(b, ox, oz, dir, 40, tele(b, 1.2)); Hz.rect(ox, oz, dir, 40, 2.1, tele(b, 1.2), 300, { name: 'Final Verse', color: ROSE, quiet: true, silent: true, onFire: () => cutFx(b, ox, oz, dir, 40, i % 2 ? PALE : 0xffffff) }); Sound.sfx('tick', 1, 1 + i * 0.08);
       yield tele(b, 0.27);
     }
-    yield tele(b, 1.2); Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.5), 'fight');
+    yield tele(b, 1.2); S.verse = false; Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.5), 'fight');
     const p = G.player, a = rnd(TAU); let tx = p.pos.x + Math.sin(a) * 4, tz = p.pos.z + Math.cos(a) * 4; const d = Math.hypot(tx, tz); if (d > 13) { tx *= 13 / d; tz *= 13 / d; }
     b.pos.set(tx, 0, tz); b.group.visible = true; b.targetable = true; petals(tx, tz, 40); b.facing = b.angToPlayer(); yield 0.4;
   }
@@ -564,10 +565,56 @@
     });
   }
 
+  // ---------------------------------------------------------------- phase bodies shared by Normal and Nightmare
+  function* sunsetRun(b) {
+    const S = b.state;
+    while (true) {
+      yield* focus(b); yield* drawCut(b, 4); yield* echo(b, 1); S.walk = true; yield 1.0;
+      yield* petalStorm(b); yield* moon(b, ['c', 'n', 'o']); S.walk = true; yield 0.8;
+      yield* stillness(b); yield* drawCut(b, 4); yield* moon(b, ['o', 'c']); yield* echo(b, 1); S.walk = true; yield 1.0;
+    }
+  }
+  function* nightEnter(b) { const S = b.state; clearGhosts(S); S.walk = false; b.pos.set(0, 0, 0); b.facing = 0; S.kneel = 1; Sound.sfx('bell', 0.9, 0.6); Co.start(Post.lerpTo({ bloom: 0.5, threshold: 1.0, tint: [0.96, 0.98, 1.06], exposure: 1.1, sat: 1.05, vig: 0.78, lift: [0.012, 0.012, 0.024] }, 4), 'fight'); yield* nightfall(b); S.kneel = 0; Sound.sfx('sword'); petals(0, 0, 80, 0xff3050); yield 0.6; }
+  function* nightRun(b) {
+    const S = b.state;
+    while (true) {
+      yield* finalVerse(b, 9); yield* moon(b, ['c', 'o']); yield* drawCut(b, 5); yield* echo(b, 2); S.walk = true; yield 0.8;
+      yield* focus(b); yield* stillness(b, 3.0); yield* petalStorm(b, 6, 5); yield* moon(b, ['n', 'o', 'c', 'n']); S.walk = true; yield 0.6;
+    }
+  }
+  // Nightmare: Co.stopTag('phase') skips a coroutine's cleanup, so every per-mechanic state a cut-off mechanic can leave
+  // behind (kneel, stillness ring, hidden or untargetable body, verse grade, sheathed blade, slow time) is reset here.
+  function resetMech(b) {
+    const S = b.state; S.walk = false; S.warn = 0; S.still = false; S.kneel = 0; S.open = 0; S.countered = false; b.dmgTaken = 1; S.fake.parryT = 0;
+    b.group.visible = true; b.targetable = true; if (S.weapon) S.weapon.visible = true; G.timeScale = 1;
+    if (S.verse) { S.verse = false; Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.4), 'fight'); }
+  }
+  // Out of time (every nightmare phase): the music stops dead, he sheathes the sword, one petal falls past the camera in
+  // silence, the whole deck fills, and a single white cut crosses it. He can still be cut down while it winds up.
+  function* lastPetal(b) {
+    const S = b.state; resetMech(b); clearGhosts(S); b.facing = b.angToPlayer();
+    Music.stop(0.08); b.otMusic = true; G.timeScale = 0.6; S.model.swing(0, 0.6); Sound.sfx('sword', 0.5, 0.45);
+    yield 0.55; if (S.weapon) S.weapon.visible = false; Sound.sfx('parry', 0.5, 0.5); S.kneel = 0.25;
+    if (!G.headless) { const c = camera.position, f = camera.getWorldDirection(S.tv); FX.burst(c.x + f.x * 2.4, c.y + 0.9, c.z + f.z * 2.4, { n: 1, color: PALE, color2: ROSE, speed: [0.05, 0.2], life: [3.2, 3.4], size: [0.16, 0.18], grav: 0.35, drag: 2.5 }); }
+    yield 0.75; G.timeScale = 1;
+    const T = 5.5;
+    Hz.circle(0, 0, R + 0.5, T, 0, { blockable: false, name: 'The Last Petal', color: PALE, quiet: true, onFire: () => {
+      const p = G.player, a = p ? Math.atan2(p.pos.x, p.pos.z) + PI / 2 : 0;
+      FX.flash(0xffffff, 0.7, 2.2); cutFx(b, -Math.sin(a) * R, -Math.cos(a) * R, a, R * 2, 0xffffff); FX.shake(0.6); Sound.sfx('crit');
+      if (p && p.alive) p.hurt(9999, { blockable: false, src: 'enrage', pierce: true });
+    } });
+    yield T + 0.4; S.kneel = 0;
+    while (true) yield 1;
+  }
+  // Nightmare phase clocks in seconds (strict, no carry-over). Tuned with tools/nmclock.js (RAW=1, god-mode level-3 autopilot,
+  // six runs per class): the slowest class keeps at least 5% of every clock. Measured worst runs: sunset 49-68 s, nightfall 63-74 s.
+  const NM_CLOCK = [72, 78];
+  const POST = { bloom: 0.42, threshold: 1.0, radius: 0.55, exposure: 0.92, vig: 0.72, sat: 1.1, tint: [1.04, 1.0, 0.98] };
+
   G.bosses.push({
     id: 'duelist', name: 'ISSEN', title: 'The Last Petal', hint: 'A duel', color: '#ff7a9a', telegraph: ROSE,
     hp: 23000, radius: 0.9, aimY: 1.6, enrage: 420,
-    post: { bloom: 0.42, threshold: 1.0, radius: 0.55, exposure: 0.92, vig: 0.72, sat: 1.1, tint: [1.04, 1.0, 0.98] },
+    post: POST,
     music: { bpm: 92, root: 45, scale: [0, 2, 3, 7, 8], prog: [0, 0, 3, 2, 0, 0, 4, 2],
       layers: [
         { v: 'koto', pat: ['0...2...4..3....', '0...4...3..2....'], oct: 1, len: 4, vol: 0.14 }, { v: 'flute', pat: ['........4.......', '7.......5.......'], oct: 2, len: 7, vol: 0.07 },
@@ -590,23 +637,19 @@
       { at: 0.66, *enter(b) { const S = b.state; clearGhosts(S); S.walk = false; petals(b.pos.x, b.pos.z, 60); b.pos.set(0, 0, 0); Sound.sfx('sword', 1, 0.5); FX.dome(0, 1, 0, { r: 9, color: ROSE, dur: 0.8 }); Co.start(Post.lerpTo({ bloom: 0.46, sat: 1.14 }, 2), 'fight'); Co.start(deepen(b), 'fight'); yield 1.6; },
         // started directly at a later phase: apply this phase's sunset deepening and grade instantly
         skipTo(b) { deepenFn(b)(1); Object.assign(Post.cur, { bloom: 0.46, sat: 1.14 }); Post.apply(); },
-        *run(b) {
-          const S = b.state;
-          while (true) {
-            yield* focus(b); yield* drawCut(b, 4); yield* echo(b, 1); S.walk = true; yield 1.0;
-            yield* petalStorm(b); yield* moon(b, ['c', 'n', 'o']); S.walk = true; yield 0.8;
-            yield* stillness(b); yield* drawCut(b, 4); yield* moon(b, ['o', 'c']); yield* echo(b, 1); S.walk = true; yield 1.0;
-          }
-        } },
-      { at: 0.33, *enter(b) { const S = b.state; clearGhosts(S); S.walk = false; b.pos.set(0, 0, 0); b.facing = 0; S.kneel = 1; Sound.sfx('bell', 0.9, 0.6); Co.start(Post.lerpTo({ bloom: 0.5, threshold: 1.0, tint: [0.96, 0.98, 1.06], exposure: 1.1, sat: 1.05, vig: 0.78, lift: [0.012, 0.012, 0.024] }, 4), 'fight'); yield* nightfall(b); S.kneel = 0; Sound.sfx('sword'); petals(0, 0, 80, 0xff3050); yield 0.6; },
-        *run(b) {
-          const S = b.state;
-          while (true) {
-            yield* finalVerse(b, 9); yield* moon(b, ['c', 'o']); yield* drawCut(b, 5); yield* echo(b, 2); S.walk = true; yield 0.8;
-            yield* focus(b); yield* stillness(b, 3.0); yield* petalStorm(b, 6, 5); yield* moon(b, ['n', 'o', 'c', 'n']); S.walk = true; yield 0.6;
-          }
-        } },
+        run: sunsetRun },
+      { at: 0.33, enter: nightEnter, run: nightRun },
     ],
+    // ---- Nightmare ("Niten"). Per-phase clocks (strict, no carry-over); the look starts at sunset.
+    nightmare: {
+      hp: 11500,
+      post: Object.assign({}, POST, { bloom: 0.46, sat: 1.14 }),
+      overtime: lastPetal,
+      phases: [
+        { at: 1, budget: NM_CLOCK[0], music: 1, *run(b) { yield 0.8; yield* sunsetRun(b); } },
+        { at: 0.5, budget: NM_CLOCK[1], music: 2, *enter(b) { resetMech(b); yield* nightEnter(b); }, run: nightRun },
+      ],
+    },
     update(b, dt) {
       const S = b.state, p = G.player, ox = b.pos.x, oz = b.pos.z;
       if (S.walk && b.alive && G.state === 'fight' && !b.castState) { const d = b.distToPlayer(); b.facing = dampAng(b.facing, b.angToPlayer(), 8, dt); if (d > 3.2) { const s = Math.min(d - 3.2, 4.6 * dt); b.pos.x += Math.sin(b.facing) * s; b.pos.z += Math.cos(b.facing) * s; } }
@@ -620,7 +663,7 @@
       for (let i = 0; i < S.sleeves.length; i++) { const sl = S.sleeves[i]; sl.rotation.x = Math.sin(G.now * 2.1 + i * 1.7) * 0.1 + Math.min(S.fake.moveSpeed, 6) * 0.05; sl.rotation.z = sl.userData.sx * 0.13 + Math.sin(G.now * 1.6 + i) * 0.05; }
       S.hak.rotation.x = -Math.min(S.fake.moveSpeed, 6) * 0.025; S.hak.scale.y = 1 - S.kneel * 0.25;
       // phase marks: torn haori + shoulder petal embers from phase 2, cracked glowing mask in phase 3
-      const ph = Math.max(0, b.phase);
+      const ph = G.nightmare ? Math.min(2, Math.max(0, b.phase) + 1) : Math.max(0, b.phase);
       if (ph >= 1 && !S.torn) { S.torn = true; for (const [a, c] of S.cloak) { a.visible = false; c.visible = true; } S.sleeves[1].scale.y = 0.75; S.sleeves[1].position.y = -0.24; for (const r of S.ribbons.slice(0, 2)) { r.len *= 1.4; r.amp *= 1.35; r.trail += 0.8; r.f *= 1.25; } }
       if (ph >= 1 && b.group.visible && vrand() < dt * (ph >= 2 ? 26 : 16)) { const sh = S.shs[vrand() < 0.5 ? 0 : 1]; sh.getWorldPosition(S.tv); FX.burst(S.tv.x, S.tv.y + 0.1, S.tv.z, { n: 1, color: ph >= 2 ? 0xff3048 : 0xffb0c4, color2: ph >= 2 ? 0x400010 : ROSE, speed: [0.4, 1.4], up: 1.6, life: [0.6, 1.2], size: [0.1, 0.2], radius: 0.25 }); }
       const mk = ph >= 2 ? S.night : 0; const eg = ph >= 1 ? 1.35 + 0.15 * Math.sin(G.now * 4) : 1; S.edgeMat.color.setRGB(lerp(2.4 * eg, 4.2, mk), lerp(0.7 * eg, 0.35, mk), lerp(1.0 * eg, 0.45, mk)); S.trimM.emissiveIntensity = ph >= 1 ? lerp(0.9, 2.2, mk) : 0.4;
