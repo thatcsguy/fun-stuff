@@ -72,6 +72,21 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 @media (max-height:980px){#menu{padding:1.6vh 3vw 1.2vh;gap:1vh}#menu .logo{font-size:clamp(28px,6.4vh,64px)}#menu .tag{font-size:13px}
 .cls{padding:8px 14px}.cls .cn{font-size:20px}.cls .cr{font-size:10.5px;margin:0 0 5px}.cls .sk{font-size:11.5px;line-height:1.22;gap:2px 8px;grid-template-columns:24px 1fr}.cls .sk .ic{width:22px;height:22px}.cls .sk .ic svg{width:16px;height:16px}
 .door{height:min(19vh,170px);min-height:104px}.door .rn{font-size:24px;top:8px}#menu .foot{font-size:10.5px;line-height:1.5}}
+/* difficulty toggle (one compact line) and the nightmare look of the menu */
+#diffrow{display:flex;justify-content:center;padding:2px;border:1px solid transparent;cursor:pointer;margin-top:.4vh}
+#diffrow .seg{width:min(320px,70vw);background:rgba(5,6,10,.5)}
+#diffrow .seg span{padding:6px 10px;font-size:12px;letter-spacing:.24em;text-transform:uppercase}
+#diffrow.focus,#diffrow:hover{border-color:rgba(255,255,255,.25)}
+#menu.nm #diffrow .seg span.on{background:rgba(200,24,52,.28);color:#ffb0bc;text-shadow:0 0 10px rgba(255,40,70,.8)}
+#menu.nm .logo{text-shadow:0 0 60px rgba(220,30,60,.55),0 0 18px rgba(255,40,70,.25)}
+#menu.nm .tag,#menu.nm h2{color:#e8506a}
+#menu.nm #diffrow.focus,#menu.nm #diffrow:hover{border-color:rgba(255,70,100,.5)}
+.door.na{opacity:.28;filter:grayscale(1);cursor:default;pointer-events:none}
+.door.na::before{display:none}
+.door.na .rn{text-shadow:none}
+.door.nmok{border-color:rgba(255,60,90,.45);box-shadow:0 0 26px rgba(220,20,50,.25)}
+.door.nmok .rn{color:#ffd0d8;text-shadow:0 0 18px #ff2040,0 0 6px #ff4060}
+.door.nmok .dk{color:#ff7088}
 #menu .foot kbd{font:11px ui-monospace,Consolas,monospace;border:1px solid var(--line);padding:0 5px;border-radius:3px;color:#cfcabd}
 
 /* ---------- settings ---------- */
@@ -140,6 +155,25 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
 #tgtframe.on{opacity:1}
 #tgtframe .bn{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#fff;text-shadow:0 1px 4px #000;margin-bottom:3px;text-align:center}
 #tgtframe .bar{height:10px}
+/* the fuse: one strip per phase clock under the boss bar */
+#bfuse{position:relative;height:4px;margin-top:2px;display:none;background:rgba(0,0,0,.6);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+#bfuse.on{display:block}
+#bfuse .fz{position:absolute;top:0;bottom:0;padding:0 1px;box-sizing:border-box}
+#bfuse .fz b{display:block;height:100%;transform-origin:left;background:#c9a24a;opacity:.35}
+#bfuse .fz.live b{background:linear-gradient(90deg,#ffcf6a,#fff2c0);opacity:1;box-shadow:0 0 6px rgba(255,200,90,.8)}
+#bfuse .fz.live.hot b{animation:fzp .5s ease-in-out infinite alternate;background:linear-gradient(90deg,#ff7a3a,#ffd27a)}
+#bfuse .fz.done b{background:#b8913f;opacity:.55}
+#bfuse .fz.out b{background:#ff2a2a;opacity:1;transform:none!important;box-shadow:0 0 8px rgba(255,40,40,.9)}
+@keyframes fzp{from{opacity:.55}to{opacity:1}}
+#bname.nm::before{content:"\25C6";color:#ff3a58;font-size:.82em;margin-right:.5em;vertical-align:.08em;text-shadow:0 0 2px #000,0 0 3px #000,0 0 10px #ff2040}
+/* per-phase results on the death and victory screens */
+.ptable{display:none;font:13px ui-monospace,Consolas,monospace;color:#c9c5ba;letter-spacing:.04em;margin-top:-6px}
+.ptable.on{display:grid;gap:3px}
+.ptable .pr{display:grid;grid-template-columns:44px 120px 80px 40px;gap:10px;text-align:right}
+.ptable .pr span:first-child{text-align:left;font-family:var(--serif);color:var(--accent)}
+.ptable .pr span:last-child{color:#ffd76a;text-align:left;font-size:11px}
+.ptable .pr.out{color:#ff6a5a}
+.ptable .pr.na{color:#5a5850}
 #enrage{position:absolute;top:22px;right:24px;font:13px ui-monospace,Consolas,monospace;color:#ddd;text-shadow:0 1px 4px #000;letter-spacing:.08em}
 #enrage.hot{color:#ff6a5a}
 #playerframe{position:absolute;bottom:104px;left:50%;transform:translateX(-50%);width:min(34vw,430px);display:flex;flex-direction:column;gap:5px}

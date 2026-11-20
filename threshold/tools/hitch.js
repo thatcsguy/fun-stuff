@@ -10,7 +10,7 @@ const { launch } = require('./harness.js');
   const r = await page.evaluate(async ({ boss, cls }) => {
     const g = window.__game, R = g.renderer, raf = () => new Promise((res) => requestAnimationFrame(res));
     g.bot(3); g.god(true); g.start(boss, { cls, skipIntro: true });
-    const def = g.G.bosses.find((d) => d.id === boss), n = def.phases.length, log = [];
+    const def = g.def(boss), n = def.phases.length, log = [];
     for (let i = 0; i < 20; i++) await raf();
     const base = R.info.programs.length; let seen = new Set(R.info.programs), lastL = -1; const lightsAt = new Set(); g.scene.traverse((o) => { if (o.isLight) lightsAt.add(o); });
     const watch = async (label, frames) => {
@@ -24,6 +24,8 @@ const { launch } = require('./harness.js');
     };
     await watch('p0', 120);
     for (let ph = 1; ph < n; ph++) { g.setPhase(ph); await watch('p' + ph, 300); }
+    // phase clocks (nightmare): run the clock out in the last phase and watch the overtime play through
+    if (def.phases.some((p) => p.budget)) { const b = g.G.boss; b.phaseT = (def.phases[b.phase].budget || 0) - 0.5; await watch('overtime', 900); }
     return { base, total: R.info.programs.length, log };
   }, { boss, cls });
   console.log(boss, cls, 'programs at fight start', r.base, 'after all phases', r.total); console.log(r.log.join('\n'));

@@ -25,6 +25,8 @@ const G = {
   errors: [],
   debug: QS.has('debug'),
   headless: false, // true while fastForward runs: skip purely cosmetic work
+  nightmare: false, // the current fight is a door's nightmare version (set by Game.start before the arena is built)
+  rehearsing: false, // the invisible pre-fight rehearsal is running (phase clocks stand still)
 };
 
 // ---------- math ----------
@@ -48,9 +50,10 @@ const rndi = (a, b) => Math.floor(rnd(a, b + 1));
 const pick = (arr) => arr[Math.floor(G.rng() * arr.length)];
 const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(G.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const vrand = Math.random; // cosmetic-only randomness (never affects the sim)
+const NM = (normal, nightmare) => G.nightmare ? nightmare : normal; // pick a number by difficulty
 
 // ---------- settings ----------
-const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null, camY: 50 },
+const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null, camY: 50, diff: 'normal' },
   (() => { try { return JSON.parse(localStorage.getItem('th_settings') || '{}'); } catch (e) { return {}; } })());
 function saveSettings() { try { localStorage.setItem('th_settings', JSON.stringify(Settings)); } catch (e) { /* private mode */ } }
 if (QS.get('quality')) Settings.q = QS.get('quality');

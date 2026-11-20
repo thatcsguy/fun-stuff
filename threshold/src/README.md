@@ -20,7 +20,7 @@ A PC-first 3D raid game: unrelated boss fights, one behind each door, four class
 | `07_model_duskblade.js` | The Duskblade's model on `HeroKit` (registers `HERO_MODELS.duskblade`): helm, kit, half-cape, blade with Momentum runes and a swing trail, keyframed swings (kinds 0-2 Slash, 3 Sunder, 5 Sever, 6 thrust, 7 parry counter) |
 | `07_player.js` | Generic procedural hero model (used by classes without their own, and by any `look` with `generic: true`, like Issen in door III), `Player` (movement, casting, GCD, buffs, dashes, damage) |
 | `08_classes.js` | The four classes and their autopilot rotations (see "Classes" below) |
-| `09_ui.js`, `10_game.js` | HUD/menus, fight lifecycle (including the hidden rehearsal at load), the hall-of-doors menu scene |
+| `09_ui.js`, `10_game.js` | HUD/menus (including the Difficulty toggle, the phase-clock fuse and the per-phase results), fight lifecycle (including the hidden rehearsal at load and nightmare versions), the hall-of-doors menu scene |
 | `11_warm.js` | Warm-up frame and light keeper that stop shader compiles mid-fight |
 | `2x_boss_*.js`, `3x_boss_*.js` | One file per boss. Adding a file here adds a door. See `BOSS_AUTHORING.md` |
 | `90_bot.js` | Autopilot and the `window.__game` test hooks |
@@ -39,7 +39,8 @@ bindings when the controller is off and pad buttons when it is on; click a bindi
 Taking a key another action uses swaps the two. Keyboard bindings can be any key, Shift + a key, or the middle and side mouse buttons;
 Esc cancels, Backspace clears. Fixed and not remappable: left/right mouse camera, wheel zoom, click to target, Esc pause, both sticks,
 Start / Options pause, and A / B (✕ / ○) plus the d-pad in menus. Everything is stored in `localStorage.th_settings`
-(`pad`: true / false / unset, where unset means the first controller button press turns it on; `glyphs`: auto / xbox / ps; `binds`).
+(`pad`: true / false / unset, where unset means the first controller button press turns it on; `glyphs`: auto / xbox / ps; `binds`;
+`diff`: normal / nightmare, the Difficulty toggle on the door page).
 Button prompts follow the connected pad (PlayStation pads are detected by Sony's vendor id 054c) unless overridden.
 Pad buttons use the W3C standard mapping that Chrome gives Xbox, DualShock 4 and DualSense pads.
 
@@ -69,19 +70,37 @@ Optional: a dash (no fight needs one; the Ashwarden roll and leap and the Duskbl
 
 HUD hooks on a skill: `rdy(p)` (glow), `act(p)` (lit while active), `interrupt: true` (glow while the target casts something stoppable), `view(p)` (icon override). `resource.kind` picks the resource display: pips (default), `'bar'` or `'cylinder'`. A `usable()` reason that starts with a capital letter is shown to the player as a hint.
 
+## Difficulty (Normal / Nightmare)
+
+The door page has a Normal / Nightmare toggle between the classes and the doors (mouse, arrows / d-pad left-right on it, Enter / A flips it).
+On Nightmare, a door without a nightmare version is greyed out, cannot be focused or clicked, and the hall behind the menu dims it.
+Only door III has one so far. Normal play is untouched by any of this.
+
+A nightmare version is a `nightmare` block on the boss def (see `BOSS_AUTHORING.md`). It has per-phase clocks: each phase has a
+`budget` in seconds, shown as a fuse under the boss bar (one segment under each phase's slice of health, burning right to left, ticking
+in its last 15 s). Running out starts that phase's overtime (a themed blow nothing survives, src `enrage`, so the death screen says
+"Out of time"). Clocks are strict: leftover time is not carried over. The death and victory screens list each phase (time / budget, dps,
+red when it ran out). Nightmare records live in `localStorage.th_save` as `Save.nm[doorId][classId] = { best, splits, clears }` (best total,
+best time per phase on its own, clears); `Save.kills` is Normal only.
+
 ## URL parameters
 
-`?boss=cathedral|leviathan|duelist|engine|titan|gorgon|theatre|wheel|express|winter|origami|lamp|chess|festival|fall`, `&class=duskblade|stormcaller|ashwarden|hexslinger`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`, `&strictmath` (testing only: out-of-domain shader math returns NaN and NaN pixels show bright magenta).
+`?boss=cathedral|leviathan|duelist|engine|titan|gorgon|theatre|wheel|express|winter|origami|lamp|chess|festival|fall`, `&class=duskblade|stormcaller|ashwarden|hexslinger`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`, `&strictmath` (testing only: out-of-domain shader math returns NaN and NaN pixels show bright magenta), `&nm=1` (the nightmare version of `boss`, if it has one; does not change the saved difficulty).
 
 Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `sumi`.
 
 ## Test hooks
 
-`window.__game`: `start(id, {cls, phase})`, `bot(level)`, `god(on)`, `state()`, `fastForward(seconds)` (runs the sim without rendering), `setPhase(n)`, `hurtBoss(frac)`, `kill()`, plus `G`, `Game`, `Bot`, `Hz`, `Bul`, `FX`, `Cam`. Set `G.headless = true` before long `fastForward` runs to skip cosmetic effects.
+`window.__game`: `start(id, {cls, phase, nm})` (`nm` defaults to the page's `?nm=1`), `def(id)` (the def a start would use), `bot(level)`, `god(on)`, `state()`, `fastForward(seconds)` (runs the sim without rendering), `setPhase(n)`, `hurtBoss(frac)`, `kill()`, plus `G`, `Game`, `Bot`, `Hz`, `Bul`, `FX`, `Cam`. Set `G.headless = true` before long `fastForward` runs to skip cosmetic effects.
 
 `../tools/` has Playwright scripts built on those hooks (they serve the repo locally and swap the CDN for a local three.js package, so they work offline):
 
 - `smoke.js <boss>`: every phase with every class in god mode, reports script errors.
+- `NM=1` before any of these tools adds `&nm=1` to every page they load, so `smoke`, `sim`, `matrix`, `hitch`, `nanscan`, `shot` and the rest run the nightmare version unchanged. The nightmare overtime blow pierces god mode on purpose, so god-mode runs still fail a clock.
+- `nmclock.js <boss> [classes|all] [runs]`: nightmare phase clocks. Starts each phase in god mode with the level-3 autopilot and reports the time it took against the budget (`OUT` = ran out). `RAW=1` lifts the budgets to measure raw phase times for tuning; `PASSIVE=1` never attacks (every clock must run out).
+- `nmphase.js [boss]`: forces each nightmare phase change in the middle of a mechanic (Stillness, a Counter, Final Verse, overtime) and checks the next phase's `enter` left no per-mechanic state behind.
+- `nmshots.js <outDir> [class]`: screenshots of the nightmare flow through the real menu and the full intro (door page on both settings, title card, fuse, last 15 s, overtime, death and victory tables).
+- `menunav.js`: the Difficulty toggle with mouse, keyboard and a simulated controller (values, greyed doors skipped, focus, persistence, Restart keeps Nightmare, Normal still starts Normal). Must print `ALL PASS`.
 - `matrix.js <class,class|all> [runs] [boss,boss]`: autopilot attempts for every door and class, one summary line each (wins, boss health left, dps). `GOD=1` checks instead that each class can finish every fight before the enrage.
 - `sim.js <boss> <class> <botLevel> [runs] [maxSec] [phase]`: full autopilot attempts.
 - `tank.js <boss> <class> <botLevel> [hpMult]`: one attempt with extra health, totals damage taken per mechanic.
@@ -111,6 +130,7 @@ Run them with `NODE_PATH=<global node_modules with playwright> THREE_DIR=<unpack
 - Mechanic damage and telegraph time: the `delay` and `dmg` arguments of each `Hz.*` call in the boss file.
 - Player health and speed: `Player` in `07_player.js` (1000 hp, speed 7). Class numbers: `08_classes.js`.
 - Look per fight: the `post` block of each boss (bloom, exposure, tint) and its `build()`.
+- Nightmare clocks: the `budget` of each phase in the boss's `nightmare` block (door III: `NM_CLOCK` in `22_boss_duelist.js`). Tune them with `tools/nmclock.js` (`RAW=1`): the slowest class should keep at least 5% of each clock. If a class cannot make a phase, lengthen that phase rather than touching class numbers.
 
 The autopilot is a rough stand-in for a player who already knows the fight. At the time of writing it clears the cathedral and the engine, gets the leviathan and titan into their last phase, and dies in phase two of the duelist. Nothing has been tuned against a human yet.
 

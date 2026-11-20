@@ -15,7 +15,7 @@ const { launch } = require('./harness.js');
     const row = [boss.padEnd(10)];
     for (const cls of classes) {
       const r = await page.evaluate(([boss, cls, runs, god]) => {
-        const g = window.__game; g.G.headless = true; g.bot(3); g.god(god); const enr = g.G.bosses.find((d) => d.id === boss).enrage || 1e9; let wins = 0, left = 0, dps = 0, taken = 0, t = 0; const err = new Set();
+        const g = window.__game; g.G.headless = true; g.bot(3); g.god(god); const enr = g.def(boss).enrage || 1e9; let wins = 0, left = 0, dps = 0, taken = 0, t = 0; const err = new Set();
         for (let i = 0; i < runs; i++) { g.start(boss, { cls }); let out; for (let k = 0; k < 120; k++) { out = g.fastForward(5); if (out.state !== 'fight') break; }
           if (out.state === 'win' && out.t <= enr) wins++; left += out.boss; dps += out.dps; taken += out.taken; t += out.t; out.errors.forEach((e) => err.add(e)); }
         g.god(false); return { wins, left: left / runs, dps: dps / runs, taken: taken / runs, t: t / runs, enr, err: [...err] };

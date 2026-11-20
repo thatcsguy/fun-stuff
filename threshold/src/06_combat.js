@@ -201,15 +201,18 @@ class Ent {
   }
   aim(out) { return out.set(this.pos.x, this.pos.y + this.aimY, this.pos.z); }
   distTo(x, z) { return Math.max(0, Math.hypot(x - this.pos.x, z - this.pos.z) - this.radius); }
+  // hpOwner: a second body that shares another entity's health (hits land on the owner; dmgTaken, exposed and onDamaged stay
+  // with the body that was hit). onImmuneHit(info, ent): called when an immune body is hit; returning true hides "IMMUNE".
   damage(amt, info = {}) {
-    if (!this.alive) return 0;
-    if (this.immune) { if (!G.headless && info.show !== false) FX.num(this.aim(_tv), 'IMMUNE', 'note'); return 0; }
+    const tgt = this.hpOwner || this;
+    if (!this.alive || !tgt.alive) return 0;
+    if (this.immune) { if (this.onImmuneHit && this.onImmuneHit(info, this)) return 0; if (!G.headless && info.show !== false) FX.num(this.aim(_tv), 'IMMUNE', 'note'); return 0; }
     amt *= this.dmgTaken * (this.exposed > 0 ? 1.12 : 1) * (G.player ? G.player.dmgMul : 1);
-    amt = Math.round(amt); this.hp -= amt;
+    amt = Math.round(amt); tgt.hp -= amt;
     if (G.player) G.player.stats.dmg += amt;
     if (this.onDamaged) this.onDamaged(amt, info, this);
     if (!G.headless) { this.aim(_tv); _tv.x += (vrand() - 0.5) * this.radius; _tv.y += vrand() * 0.8; FX.num(_tv, String(amt), info.crit ? 'crit' : ''); }
-    if (this.hp <= 0) { this.hp = 0; this.die(); }
+    if (tgt.hp <= 0) { tgt.hp = 0; tgt.die(); }
     return amt;
   }
   die() { if (!this.alive) return; this.alive = false; this.castState = null; if (this.onDeath) this.onDeath(this); }
@@ -261,6 +264,9 @@ class Boss extends Ent {
   }
   goPhase(i) {
     const b = this, ph = this.def.phases[i];
+    this.logPhase();
+    if (this.overtime) { G.timeScale = 1; if (this.otMusic && this.def.music) Music.play(this.def.music, ph.music !== undefined ? ph.music : i); }
+    this.phaseT = 0; this.overtime = false; this.otMusic = false; this.phaseDmg0 = G.player ? G.player.stats.dmg : 0;
     Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null; this.phase = i; this.nextPhase = i + 1; this.transitioning = true;
     Co.start(function* () {
       if (ph.enter) { b.immune = true; yield* ph.enter(b); b.immune = false; }
@@ -268,12 +274,34 @@ class Boss extends Ent {
       yield* ph.run(b);
     }, 'phase');
   }
+  // ---- per-phase clocks (a phase with `budget` seconds). Only nightmare versions use them; a def without budgets keeps the flat enrage.
+  get budgeted() { return this.def.phases.some((p) => p.budget); }
+  // record how the phase that is ending went: time on its clock, budget, damage dealt, whether it ran out
+  logPhase() {
+    if (!this.budgeted || this.phase < 0) return; const L = this.phaseLog || (this.phaseLog = []); if (L[this.phase]) return;
+    const ph = this.def.phases[this.phase];
+    L[this.phase] = { time: Math.round((this.phaseT || 0) * 10) / 10, budget: ph.budget || 0, dmg: Math.round((G.player ? G.player.stats.dmg : 0) - (this.phaseDmg0 || 0)), over: !!this.overtime };
+  }
+  startOvertime() {
+    const d = this.def, ph = d.phases[this.phase];
+    this.overtime = true; Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null;
+    Co.start((ph.overtime || d.overtime || Boss.defaultOvertime)(this), 'phase');
+  }
+  // generic "out of time": a whole-arena unblockable telegraph, then a blow nothing survives (src 'enrage' -> "Out of time")
+  static *defaultOvertime(b) {
+    FX.flash(0xff2010, 0.5, 1.5); Sound.sfx('roar');
+    Hz.circle(b.pos.x, b.pos.z, 80, 6, 0, { blockable: false, name: 'Out of time', color: 0xff3010, quiet: true, onFire: () => { const p = G.player; FX.flash(0xff2010, 0.6, 2); FX.ring(b.pos.x, b.pos.z, { r1: 40, color: 0xff3010, dur: 0.8 }); if (p && p.alive) p.hurt(9999, { blockable: false, src: 'enrage', pierce: true }); } });
+    yield 6.5; while (true) yield 1;
+  }
   update(dt) {
     super.update(dt);
     if (!this.alive || G.state !== 'fight') return;
     const d = this.def;
     if (!this.transitioning && this.nextPhase < d.phases.length && this.hp / this.maxHp <= d.phases[this.nextPhase].at) this.goPhase(this.nextPhase);
-    if (d.enrage && G.ft > d.enrage) {
+    if (this.budgeted) {
+      const ph = d.phases[this.phase];
+      if (ph && ph.budget && !this.transitioning && !G.rehearsing) { this.phaseT += dt; if (!this.overtime && this.phaseT >= ph.budget) this.startOvertime(); }
+    } else if (d.enrage && G.ft > d.enrage) {
       if (!this.enraged) { this.enraged = true; this.enrageT = 0; FX.flash(0xff2010, 0.5, 1.5); Sound.sfx('roar'); }
       this.enrageT -= dt; if (this.enrageT <= 0) { this.enrageT = 2; const p = G.player; if (p && p.alive) { p.hurt(120 + (G.ft - d.enrage) * 14, { blockable: false, src: 'enrage' }); FX.flash(0xff2010, 0.3, 3); FX.ring(this.pos.x, this.pos.z, { r1: 40, color: 0xff3010, dur: 0.8 }); } }
     }

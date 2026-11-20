@@ -15,7 +15,7 @@ const { launch } = require('./harness.js');
   for (const boss of bosses) {
     const r = await page.evaluate(([boss, only]) => {
       const g = window.__game, out = []; g.bot(3); g.god(true);
-      const n = g.G.bosses.find((d) => d.id === boss).phases.length;
+      const n = g.def(boss).phases.length;
       for (const cls of (only || g.G.classes.map((c) => c.id))) for (let ph = 0; ph < n; ph++) {
         g.start(boss, { cls, phase: ph }); const b = g.G.boss; let worst = { bad: 0 }, shots = 0;
         for (let k = 0; k < 8; k++) {

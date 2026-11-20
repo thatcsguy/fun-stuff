@@ -22,6 +22,8 @@ async function launch(o = {}) {
     route.fulfill({ status: 200, contentType: types[path.extname(f)] || 'text/plain', body: fs.readFileSync(f) });
   });
   const page = await ctx.newPage();
+  // NM=1: every game URL gets &nm=1, so the usual tools (smoke, sim, matrix, hitch, nanscan, shot...) run the nightmare versions
+  if (process.env.NM) { const go = page.goto.bind(page); page.goto = (u, o) => go(/^http:\/\/game\.local\//.test(u) && !/[?&]nm=/.test(u) ? u + (u.includes('?') ? '&' : '?') + 'nm=1' : u, o); }
   page.on('console', (m) => { if (m.type() === 'error' || (m.type() === 'warning' && !/GPU stall|swiftshader|Automatic fallback|X3595/i.test(m.text()))) console.log('[console.' + m.type() + ']', m.text().slice(0, 400)); });
   page.on('pageerror', (e) => console.log('[pageerror]', (e.stack||e.message).split('\n').slice(0,4).join(' | ')));
   return { browser, page };

@@ -1,6 +1,6 @@
 // Autopilot + test hooks (window.__game). Used for balance sims in Playwright; never active for players unless ?bot=N.
 const Bot = {
-  level: 0, timer: 0, goal: null, pressT: 0,
+  level: 0, timer: 0, goal: null, pressT: 0, passive: false,
   update(dt) {
     const p = G.player, b = G.boss;
     if (!this.level || !p || !b || G.state !== 'fight' || !p.alive) { Input.bot = this.level && p ? { moveX: 0, moveZ: 0 } : null; return; }
@@ -40,7 +40,8 @@ const Bot = {
     Input.bot = gd > 0.25 ? { moveX: gx / gd, moveZ: gz / gd } : { moveX: 0, moveZ: 0 };
     // finish a cast in progress when nothing will land before it completes
     if (p.casting && this.level >= 2) { const left = p.casting.time - p.casting.t; if (danger(p.pos.x, p.pos.z) > left + 0.3 && !Hz.persist(p.pos.x, p.pos.z) && !Bul.threat(p.pos.x, p.pos.z, left + 0.3)) Input.bot = { moveX: 0, moveZ: 0 }; }
-    // rotation
+    // rotation (passive: a test switch that never attacks, e.g. to check that a phase clock runs out)
+    if (this.passive) return;
     this.pressT -= dt; if (this.pressT > 0) return; this.pressT = [0, 0.25, 0.12, 0.05][this.level];
     const here = danger(p.pos.x, p.pos.z), cs = t.castState;
     const ctx = { hp: p.hp / p.maxHp, danger: here < 0.3 && this.level >= 2, calm: here, wantInterrupt: !!(cs && cs.int && cs.t > (this.level >= 3 ? 0.3 : 0.8)), chase: gd < 1.5, holdFire: !!hint.holdFire, saveInterrupt: !!def.botSaveInterrupt || !!hint.saveInterrupt || this.level < 3,
@@ -56,6 +57,8 @@ window.__game = {
   G, Game, Bot, Hz, Bul, FX, Cam, Input, Binds, Settings, renderer, scene, camera,
   start(id, opts = {}) { Game.start(id, Object.assign({ instant: true }, opts)); },
   bot(n) { Bot.level = n; },
+  // the def a fight started from this page would use (the nightmare version when the URL has ?nm=1 and the door has one)
+  def(id) { const d = G.bosses.find((q) => q.id === id) || G.bosses[(+id || 1) - 1]; return QS.has('nm') && Game.nmAvailable(d) ? Game.nightmareDef(d) : d; },
   god(on = true) { G.god = on; },
   state() { const p = G.player, b = G.boss; return { state: G.state, t: +G.ft.toFixed(1), phase: b ? b.phase : -1, boss: b ? +(b.hp / b.maxHp * 100).toFixed(1) : 0, hp: p ? Math.round(p.hp) : 0, dps: p ? Math.round(p.stats.dmg / Math.max(1, G.ft)) : 0, taken: p ? Math.round(p.stats.taken) : 0, src: p && p.deathSrc && (typeof p.deathSrc === 'string' ? p.deathSrc : (p.deathSrc.name || (p.deathSrc.shape && p.deathSrc.shape.type) || 'bullet')), errors: G.errors.slice(0, 5) }; },
   // Run the sim headless for `sec` seconds (stops early on death/victory). Returns state().

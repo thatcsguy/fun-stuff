@@ -72,6 +72,21 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 @media (max-height:980px){#menu{padding:1.6vh 3vw 1.2vh;gap:1vh}#menu .logo{font-size:clamp(28px,6.4vh,64px)}#menu .tag{font-size:13px}
 .cls{padding:8px 14px}.cls .cn{font-size:20px}.cls .cr{font-size:10.5px;margin:0 0 5px}.cls .sk{font-size:11.5px;line-height:1.22;gap:2px 8px;grid-template-columns:24px 1fr}.cls .sk .ic{width:22px;height:22px}.cls .sk .ic svg{width:16px;height:16px}
 .door{height:min(19vh,170px);min-height:104px}.door .rn{font-size:24px;top:8px}#menu .foot{font-size:10.5px;line-height:1.5}}
+/* difficulty toggle (one compact line) and the nightmare look of the menu */
+#diffrow{display:flex;justify-content:center;padding:2px;border:1px solid transparent;cursor:pointer;margin-top:.4vh}
+#diffrow .seg{width:min(320px,70vw);background:rgba(5,6,10,.5)}
+#diffrow .seg span{padding:6px 10px;font-size:12px;letter-spacing:.24em;text-transform:uppercase}
+#diffrow.focus,#diffrow:hover{border-color:rgba(255,255,255,.25)}
+#menu.nm #diffrow .seg span.on{background:rgba(200,24,52,.28);color:#ffb0bc;text-shadow:0 0 10px rgba(255,40,70,.8)}
+#menu.nm .logo{text-shadow:0 0 60px rgba(220,30,60,.55),0 0 18px rgba(255,40,70,.25)}
+#menu.nm .tag,#menu.nm h2{color:#e8506a}
+#menu.nm #diffrow.focus,#menu.nm #diffrow:hover{border-color:rgba(255,70,100,.5)}
+.door.na{opacity:.28;filter:grayscale(1);cursor:default;pointer-events:none}
+.door.na::before{display:none}
+.door.na .rn{text-shadow:none}
+.door.nmok{border-color:rgba(255,60,90,.45);box-shadow:0 0 26px rgba(220,20,50,.25)}
+.door.nmok .rn{color:#ffd0d8;text-shadow:0 0 18px #ff2040,0 0 6px #ff4060}
+.door.nmok .dk{color:#ff7088}
 #menu .foot kbd{font:11px ui-monospace,Consolas,monospace;border:1px solid var(--line);padding:0 5px;border-radius:3px;color:#cfcabd}
 
 /* ---------- settings ---------- */
@@ -140,6 +155,25 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
 #tgtframe.on{opacity:1}
 #tgtframe .bn{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#fff;text-shadow:0 1px 4px #000;margin-bottom:3px;text-align:center}
 #tgtframe .bar{height:10px}
+/* the fuse: one strip per phase clock under the boss bar */
+#bfuse{position:relative;height:4px;margin-top:2px;display:none;background:rgba(0,0,0,.6);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+#bfuse.on{display:block}
+#bfuse .fz{position:absolute;top:0;bottom:0;padding:0 1px;box-sizing:border-box}
+#bfuse .fz b{display:block;height:100%;transform-origin:left;background:#c9a24a;opacity:.35}
+#bfuse .fz.live b{background:linear-gradient(90deg,#ffcf6a,#fff2c0);opacity:1;box-shadow:0 0 6px rgba(255,200,90,.8)}
+#bfuse .fz.live.hot b{animation:fzp .5s ease-in-out infinite alternate;background:linear-gradient(90deg,#ff7a3a,#ffd27a)}
+#bfuse .fz.done b{background:#b8913f;opacity:.55}
+#bfuse .fz.out b{background:#ff2a2a;opacity:1;transform:none!important;box-shadow:0 0 8px rgba(255,40,40,.9)}
+@keyframes fzp{from{opacity:.55}to{opacity:1}}
+#bname.nm::before{content:"\25C6";color:#ff3a58;font-size:.82em;margin-right:.5em;vertical-align:.08em;text-shadow:0 0 2px #000,0 0 3px #000,0 0 10px #ff2040}
+/* per-phase results on the death and victory screens */
+.ptable{display:none;font:13px ui-monospace,Consolas,monospace;color:#c9c5ba;letter-spacing:.04em;margin-top:-6px}
+.ptable.on{display:grid;gap:3px}
+.ptable .pr{display:grid;grid-template-columns:44px 120px 80px 40px;gap:10px;text-align:right}
+.ptable .pr span:first-child{text-align:left;font-family:var(--serif);color:var(--accent)}
+.ptable .pr span:last-child{color:#ffd76a;text-align:left;font-size:11px}
+.ptable .pr.out{color:#ff6a5a}
+.ptable .pr.na{color:#5a5850}
 #enrage{position:absolute;top:22px;right:24px;font:13px ui-monospace,Consolas,monospace;color:#ddd;text-shadow:0 1px 4px #000;letter-spacing:.08em}
 #enrage.hot{color:#ff6a5a}
 #playerframe{position:absolute;bottom:104px;left:50%;transform:translateX(-50%);width:min(34vw,430px);display:flex;flex-direction:column;gap:5px}
@@ -208,6 +242,7 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
   <div id="bossframe">
     <div class="bn"><span id="bname"></span><small id="bhp"></small></div>
     <div class="bar" id="bbar"><div class="lag"></div><div class="fill"></div></div>
+    <div id="bfuse"></div>
     <div class="bar cast" id="bcast"><div class="fill"></div><div class="cn"></div></div>
   </div>
   <div id="tgtframe">
@@ -234,6 +269,7 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
   <div class="tag">Many doors. No two alike.</div>
   <h2>Choose who walks through</h2>
   <div id="classes"></div>
+  <div class="diff nav" id="diffrow" data-adj="diff"><div class="seg" id="set-diff"><span data-v="normal">Normal</span><span data-v="nightmare">Nightmare</span></div></div>
   <h2>Choose a door</h2>
   <div id="doors"></div>
   <div class="row"><button class="btn nav" id="btn-settings">Settings &amp; controls</button><button class="btn nav" id="btn-fs">Fullscreen</button></div>
@@ -252,6 +288,7 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
   <h2 id="death-sub">You fell</h2>
   <h1 id="death-title">DEFEAT</h1>
   <div class="stat-line" id="death-stats"></div>
+  <div class="ptable" id="death-phases"></div>
   <button class="btn nav primary" data-act="restart">Try again</button>
   <button class="btn nav" data-act="quit">Leave</button>
 </div>
@@ -260,6 +297,7 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
   <h2 id="vic-sub">The door closes behind you</h2>
   <h1 id="vic-title">VICTORY</h1>
   <div class="stat-line" id="vic-stats"></div>
+  <div class="ptable" id="vic-phases"></div>
   <button class="btn nav primary" data-act="quit">Back to the doors</button>
   <button class="btn nav" data-act="restart">Fight again</button>
 </div>
@@ -326,6 +364,8 @@ const G = {
   errors: [],
   debug: QS.has('debug'),
   headless: false, // true while fastForward runs: skip purely cosmetic work
+  nightmare: false, // the current fight is a door's nightmare version (set by Game.start before the arena is built)
+  rehearsing: false, // the invisible pre-fight rehearsal is running (phase clocks stand still)
 };
 
 // ---------- math ----------
@@ -349,9 +389,10 @@ const rndi = (a, b) => Math.floor(rnd(a, b + 1));
 const pick = (arr) => arr[Math.floor(G.rng() * arr.length)];
 const shuffle = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(G.rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const vrand = Math.random; // cosmetic-only randomness (never affects the sim)
+const NM = (normal, nightmare) => G.nightmare ? nightmare : normal; // pick a number by difficulty
 
 // ---------- settings ----------
-const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null, camY: 50 },
+const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null, camY: 50, diff: 'normal' },
   (() => { try { return JSON.parse(localStorage.getItem('th_settings') || '{}'); } catch (e) { return {}; } })());
 function saveSettings() { try { localStorage.setItem('th_settings', JSON.stringify(Settings)); } catch (e) { /* private mode */ } }
 if (QS.get('quality')) Settings.q = QS.get('quality');
@@ -771,7 +812,7 @@ const Input = {
       const b = gp.buttons.map((x, i) => (i === 6 || i === 7) ? x.value > 0.4 : x.pressed);
       const prev = this.padPrev, edge = (i) => b[i] && !prev[i];
       if (Settings.pad === undefined) { // never chosen: the first button press switches the controller on
-        if (b.some((x, i) => edge(i))) { this.padPrev = b; this.setPad(true); if (typeof UI !== 'undefined') UI.padWoke(); }
+        if (b.some((x, i) => edge(i))) { this.setPad(true); this.padPrev = b; if (typeof UI !== 'undefined') UI.padWoke(); }
         else this.padPrev = b;
       } else if (this.capture) {
         for (let i = 0; i < b.length; i++) if (edge(i)) {
@@ -1804,15 +1845,18 @@ class Ent {
   }
   aim(out) { return out.set(this.pos.x, this.pos.y + this.aimY, this.pos.z); }
   distTo(x, z) { return Math.max(0, Math.hypot(x - this.pos.x, z - this.pos.z) - this.radius); }
+  // hpOwner: a second body that shares another entity's health (hits land on the owner; dmgTaken, exposed and onDamaged stay
+  // with the body that was hit). onImmuneHit(info, ent): called when an immune body is hit; returning true hides "IMMUNE".
   damage(amt, info = {}) {
-    if (!this.alive) return 0;
-    if (this.immune) { if (!G.headless && info.show !== false) FX.num(this.aim(_tv), 'IMMUNE', 'note'); return 0; }
+    const tgt = this.hpOwner || this;
+    if (!this.alive || !tgt.alive) return 0;
+    if (this.immune) { if (this.onImmuneHit && this.onImmuneHit(info, this)) return 0; if (!G.headless && info.show !== false) FX.num(this.aim(_tv), 'IMMUNE', 'note'); return 0; }
     amt *= this.dmgTaken * (this.exposed > 0 ? 1.12 : 1) * (G.player ? G.player.dmgMul : 1);
-    amt = Math.round(amt); this.hp -= amt;
+    amt = Math.round(amt); tgt.hp -= amt;
     if (G.player) G.player.stats.dmg += amt;
     if (this.onDamaged) this.onDamaged(amt, info, this);
     if (!G.headless) { this.aim(_tv); _tv.x += (vrand() - 0.5) * this.radius; _tv.y += vrand() * 0.8; FX.num(_tv, String(amt), info.crit ? 'crit' : ''); }
-    if (this.hp <= 0) { this.hp = 0; this.die(); }
+    if (tgt.hp <= 0) { tgt.hp = 0; tgt.die(); }
     return amt;
   }
   die() { if (!this.alive) return; this.alive = false; this.castState = null; if (this.onDeath) this.onDeath(this); }
@@ -1864,6 +1908,9 @@ class Boss extends Ent {
   }
   goPhase(i) {
     const b = this, ph = this.def.phases[i];
+    this.logPhase();
+    if (this.overtime) { G.timeScale = 1; if (this.otMusic && this.def.music) Music.play(this.def.music, ph.music !== undefined ? ph.music : i); }
+    this.phaseT = 0; this.overtime = false; this.otMusic = false; this.phaseDmg0 = G.player ? G.player.stats.dmg : 0;
     Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null; this.phase = i; this.nextPhase = i + 1; this.transitioning = true;
     Co.start(function* () {
       if (ph.enter) { b.immune = true; yield* ph.enter(b); b.immune = false; }
@@ -1871,12 +1918,34 @@ class Boss extends Ent {
       yield* ph.run(b);
     }, 'phase');
   }
+  // ---- per-phase clocks (a phase with `budget` seconds). Only nightmare versions use them; a def without budgets keeps the flat enrage.
+  get budgeted() { return this.def.phases.some((p) => p.budget); }
+  // record how the phase that is ending went: time on its clock, budget, damage dealt, whether it ran out
+  logPhase() {
+    if (!this.budgeted || this.phase < 0) return; const L = this.phaseLog || (this.phaseLog = []); if (L[this.phase]) return;
+    const ph = this.def.phases[this.phase];
+    L[this.phase] = { time: Math.round((this.phaseT || 0) * 10) / 10, budget: ph.budget || 0, dmg: Math.round((G.player ? G.player.stats.dmg : 0) - (this.phaseDmg0 || 0)), over: !!this.overtime };
+  }
+  startOvertime() {
+    const d = this.def, ph = d.phases[this.phase];
+    this.overtime = true; Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null;
+    Co.start((ph.overtime || d.overtime || Boss.defaultOvertime)(this), 'phase');
+  }
+  // generic "out of time": a whole-arena unblockable telegraph, then a blow nothing survives (src 'enrage' -> "Out of time")
+  static *defaultOvertime(b) {
+    FX.flash(0xff2010, 0.5, 1.5); Sound.sfx('roar');
+    Hz.circle(b.pos.x, b.pos.z, 80, 6, 0, { blockable: false, name: 'Out of time', color: 0xff3010, quiet: true, onFire: () => { const p = G.player; FX.flash(0xff2010, 0.6, 2); FX.ring(b.pos.x, b.pos.z, { r1: 40, color: 0xff3010, dur: 0.8 }); if (p && p.alive) p.hurt(9999, { blockable: false, src: 'enrage', pierce: true }); } });
+    yield 6.5; while (true) yield 1;
+  }
   update(dt) {
     super.update(dt);
     if (!this.alive || G.state !== 'fight') return;
     const d = this.def;
     if (!this.transitioning && this.nextPhase < d.phases.length && this.hp / this.maxHp <= d.phases[this.nextPhase].at) this.goPhase(this.nextPhase);
-    if (d.enrage && G.ft > d.enrage) {
+    if (this.budgeted) {
+      const ph = d.phases[this.phase];
+      if (ph && ph.budget && !this.transitioning && !G.rehearsing) { this.phaseT += dt; if (!this.overtime && this.phaseT >= ph.budget) this.startOvertime(); }
+    } else if (d.enrage && G.ft > d.enrage) {
       if (!this.enraged) { this.enraged = true; this.enrageT = 0; FX.flash(0xff2010, 0.5, 1.5); Sound.sfx('roar'); }
       this.enrageT -= dt; if (this.enrageT <= 0) { this.enrageT = 2; const p = G.player; if (p && p.alive) { p.hurt(120 + (G.ft - d.enrage) * 14, { blockable: false, src: 'enrage' }); FX.flash(0xff2010, 0.3, 3); FX.ring(this.pos.x, this.pos.z, { r1: 40, color: 0xff3010, dur: 0.8 }); } }
     }
@@ -4033,8 +4102,8 @@ class Player {
     if (typeof UI !== 'undefined') UI.slotFlash(i);
   }
   hurt(amt, o = {}) {
-    if (!this.alive || G.god || G.state !== 'fight') return 0;
-    if (this.invuln > 0 && o.src !== 'fall') return 0;
+    if (!this.alive || (G.god && !o.pierce) || G.state !== 'fight') return 0; // pierce: a nightmare 'out of time' blow, which even god mode and immunities do not stop
+    if (this.invuln > 0 && o.src !== 'fall' && !o.pierce) return 0;
     if (o.blockable && this.dodgeT > 0) { if (this.cls.onDodge) this.cls.onDodge(this, o); return 0; } // roll i-frames: like a parry, they never beat an unblockable
     if (o.blockable && this.parryT > 0) { this.parryT = 0; this.cls.onParry(this, o); return 0; }
     amt = Math.round(amt * this.dmgTakenMul);
@@ -4449,7 +4518,7 @@ const UI = (() => {
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
   const svg = (name, color) => `<svg viewBox="0 0 24 24"><path d="${ICON[name]}" fill="${color}" fill-rule="evenodd"/></svg>`;
   const fmtT = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
-  let slots = [], cur = null, settingsFrom = 'menu', focusI = -1, hurtA = 0;
+  let fuse = [], tickS = -1, slots = [], cur = null, settingsFrom = 'menu', focusI = -1, hurtA = 0;
   const cache = {};
   const setTxt = (key, node, v) => { if (cache[key] !== v) { cache[key] = v; node.textContent = v; } };
   const setCls = (key, node, cls, on) => { if (cache[key] !== on) { cache[key] = on; node.classList.toggle(cls, on); } };
@@ -4459,19 +4528,21 @@ const UI = (() => {
   function buildMenu() {
     const cw = $('#classes'); cw.innerHTML = '';
     for (const c of G.classes) {
-      const b = document.createElement('button'); b.className = 'cls nav' + (c === selectedClass() ? ' sel' : ''); b.style.setProperty('--c', c.color);
+      const b = document.createElement('button'); b.className = 'cls nav' + (c === selectedClass() ? ' sel' : ''); b.dataset.cls = c.id; b.style.setProperty('--c', c.color);
       const kb = (i) => { const l = Binds.slotLabel(i); return `<kbd${l.c ? ` style="color:${l.c}"` : ''}>${l.t || '·'}</kbd>`; };
       b.innerHTML = `<div class="cn">${c.name}</div><div class="cr">${c.role}</div><div class="sk">` + c.skills.map((s, i) => !s ? '' : `<div class="ic">${svg(s.icon, c.color)}</div><div>${kb(i)}<b>${s.name}</b> ${s.desc}</div>`).join('') + '</div>';
       b.onclick = () => { Settings.cls = c.id; saveSettings(); Sound.sfx('uiok'); buildMenu(); };
       cw.appendChild(b);
     }
+    // Difficulty: on Nightmare, doors with no nightmare version are greyed out, skipped by focus and cannot be clicked
+    const nm = Settings.diff === 'nightmare'; segSet('diff', nm ? 'nightmare' : 'normal'); el.menu.classList.toggle('nm', nm);
     const dw = $('#doors'); dw.innerHTML = '';
     G.bosses.forEach((d, i) => {
-      const b = document.createElement('button'); b.className = 'door nav'; b.style.setProperty('--c', d.color || '#e8c77a');
-      const seen = Save.seen && Save.seen[d.id], kills = (Save.kills && Save.kills[d.id]) || {};
+      const ok = !nm || Game.nmAvailable(d), b = document.createElement('button'); b.className = 'door' + (ok ? ' nav' : ' na') + (nm && ok ? ' nmok' : ''); b.dataset.door = d.id; b.style.setProperty('--c', d.color || '#e8c77a');
+      const seen = Save.seen && Save.seen[d.id], kills = nm ? Object.fromEntries(Object.entries((Save.nm && Save.nm[d.id]) || {}).map(([k, v]) => [k, v.best])) : (Save.kills && Save.kills[d.id]) || {};
       const best = Object.values(kills).length ? Math.min(...Object.values(kills)) : 0;
       b.innerHTML = `<div class="rn">${ROMAN[i]}</div>${best ? `<div class="dk">✓ ${fmtT(best)}</div>` : ''}<div class="dn">${seen ? d.name : '? ? ?'}</div><div class="dh">${seen ? d.title : (d.hint || '')}</div>`;
-      b.onclick = () => { Sound.resume(); Sound.sfx('uiok'); Game.start(d.id); };
+      if (ok) b.onclick = () => { Sound.resume(); Sound.sfx('uiok'); Game.start(d.id, { nm }); }; else b.disabled = true;
       dw.appendChild(b);
     });
     focusI = -1;
@@ -4511,16 +4582,24 @@ const UI = (() => {
     else for (let i = 0; i < c.resource.max; i++) pips.appendChild(document.createElement('i'));
     const b = G.boss, bar = $('#bbar'); bar.querySelectorAll('.tick').forEach((t) => t.remove());
     for (const ph of b.def.phases) if (ph.at < 1) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (ph.at * 100) + '%'; bar.appendChild(t); }
-    $('#bname').textContent = b.def.name;
+    $('#bname').textContent = b.def.name; $('#bname').classList.toggle('nm', !!b.def.nm);
+    // the fuse: one segment per phase clock, each under its own slice of the health bar, burning right to left
+    const fz = $('#bfuse'); fz.innerHTML = ''; fuse = []; tickS = -1;
+    if (b.budgeted) b.def.phases.forEach((ph, i) => { const lo = b.def.phases[i + 1] ? b.def.phases[i + 1].at : 0, sg = document.createElement('div'); sg.className = 'fz wait'; sg.style.left = (lo * 100) + '%'; sg.style.width = ((ph.at - lo) * 100) + '%'; sg.innerHTML = '<b></b>'; fz.appendChild(sg); fuse.push({ sg, b: sg.firstChild }); });
+    fz.classList.toggle('on', fuse.length > 0);
   }
   // Called whenever the controller toggle, prompt style, connected pad or a binding changes: every on-screen button label follows.
   function deviceChanged() {
     document.body.classList.toggle('dev-pad', Input.device === 'pad');
     slots.forEach((s, i) => { if (s) { const l = Binds.slotLabel(i); s.key.textContent = l.t; s.key.style.color = l.c; } });
     const f = focusI;
-    if (cur === 'menu') { buildMenu(); if (f >= 0) setFocus(f); }
+    if (cur === 'menu') { const k = focusKey(); buildMenu(); if (f >= 0) focusByKey(k, f); }
     if (cur === 'settings') refreshSettings();
   }
+  // menu focus is restored by element, not index: greyed doors drop out of the focus order when the difficulty changes
+  const navKey = (n) => n.id || (n.dataset.door ? 'door:' + n.dataset.door : n.dataset.cls ? 'cls:' + n.dataset.cls : '');
+  function focusKey() { const n = navItems()[focusI]; return n ? navKey(n) : ''; }
+  function focusByKey(k, fallback) { const j = navItems().findIndex((n) => navKey(n) === k); setFocus(j >= 0 ? j : fallback, true); }
   function padWoke() { if (cur && focusI < 0) moveFocus(0, true); }
   function castBar(key, node, cs) {
     const on = !!cs; setCls(key + 'on', node, 'on', on);
@@ -4532,8 +4611,9 @@ const UI = (() => {
     setSx('bhp', $('#bbar .fill'), b.hp / b.maxHp); setSx('bhpl', $('#bbar .lag'), b.hp / b.maxHp);
     setTxt('bhpt', $('#bhp'), (b.hp / b.maxHp * 100).toFixed(1) + '%');
     castBar('bc', $('#bcast'), b.castState);
+    if (fuse.length) updFuse(b);
     const t = p.target, showT = t && t !== b && t.alive; setCls('tf', $('#tgtframe'), 'on', !!showT);
-    if (showT) { setTxt('tn', $('#tname'), t.name); setSx('thp', $('#tbar .fill'), t.hp / t.maxHp); castBar('tc', $('#tcast'), t.castState); }
+    if (showT) { const th = t.hpOwner || t; setTxt('tn', $('#tname'), t.name); setSx('thp', $('#tbar .fill'), th.hp / th.maxHp); castBar('tc', $('#tcast'), t.castState); }
     if (b.def.enrage) { const left = Math.max(0, b.def.enrage - G.ft); setTxt('enr', $('#enrage'), fmtT(G.ft)); setCls('enrh', $('#enrage'), 'hot', left < 30); }
     setSx('php', $('#pbar .fill'), p.hp / p.maxHp); setCls('plow', $('#pbar'), 'low', p.hp / p.maxHp < 0.35);
     setTxt('phpt', $('#pbar .hpt'), Math.ceil(p.hp) + ' / ' + p.maxHp);
@@ -4564,6 +4644,25 @@ const UI = (() => {
     setCls('hint', el.hint, 'on', p.hintT > 0); if (p.hintT > 0) setTxt('hintt', el.hint, p.hint);
     if (G.debug) el.dbg.textContent = `t ${G.ft.toFixed(1)}  phase ${b.phase}  boss ${Math.round(b.hp)}  dps ${(p.stats.dmg / Math.max(1, G.ft)).toFixed(0)}  hz ${Hz.list.length} bul ${Bul.list.length} co ${Co.list.length}\n${G.errors.slice(-3).join('\n')}`;
   }
+  // fuse states: done (frozen where it stopped, dim gold), live (burning; pulses and ticks in its last 15 s), wait (full, dim), out (ran out: red)
+  function updFuse(b) {
+    const L = b.phaseLog || [];
+    for (let i = 0; i < fuse.length; i++) {
+      const f = fuse[i], bud = b.def.phases[i].budget || 1, cur = i === b.phase && !L[i];
+      const st = L[i] ? (L[i].over ? 'out' : 'done') : cur ? (b.overtime ? 'out' : 'live') : i < b.phase ? 'done' : 'wait';
+      const left = L[i] ? 1 - L[i].time / bud : cur ? 1 - (b.phaseT || 0) / bud : 1;
+      if (cache['fz' + i] !== st) { cache['fz' + i] = st; f.sg.className = 'fz ' + st; }
+      setSx('fzs' + i, f.b, sat(left));
+      const hot = st === 'live' && G.state === 'fight' && (b.phaseT || 0) > bud - 15; setCls('fzh' + i, f.sg, 'hot', hot);
+      if (hot && !b.transitioning && !G.paused) { const s = Math.floor(b.phaseT); if (s !== tickS) { tickS = s; Sound.sfx('tick', 0.9, 0.8 + (15 - (bud - b.phaseT)) * 0.06); } }
+    }
+  }
+  // per-phase results under the death / victory stat line: time on the clock / budget, damage per second; red = ran out
+  function phaseTable(node, b, best = []) {
+    const L = b.phaseLog; if (!L || !b.budgeted) { node.innerHTML = ''; node.classList.remove('on'); return; }
+    node.innerHTML = b.def.phases.map((ph, i) => { const q = L[i]; return q ? `<div class="pr${q.over ? ' out' : ''}"><span>${ROMAN[i]}</span><span>${fmtT(q.time)} / ${fmtT(q.budget)}</span><span>${Math.round(q.dmg / Math.max(1, q.time))} dps</span><span>${best[i] ? 'best' : ''}</span></div>` : `<div class="pr na"><span>${ROMAN[i]}</span><span>– / ${fmtT(ph.budget || 0)}</span><span>–</span><span></span></div>`; }).join('');
+    node.classList.add('on');
+  }
   function slotFlash(i) { const s = slots[i]; if (s) { s.flash = 0.1; s.d.classList.add('press'); } }
   function hurtFlash(frac) { hurtA = Math.min(1, hurtA + 0.25 + frac * 1.6); }
 
@@ -4592,13 +4691,19 @@ const UI = (() => {
     else if (k === 'q') { Settings.q = v; Post.setQuality(v); }
     else if (k === 'pad') { Input.setPad(String(v) === '1'); refreshSettings(); return; }
     else if (k === 'glyphs') Settings.glyphs = v;
+    else if (k === 'diff') {
+      const nm = v === 'nightmare'; if ((Settings.diff === 'nightmare') === nm) return;
+      const had = focusI >= 0; Settings.diff = nm ? 'nightmare' : 'normal'; saveSettings();
+      if (nm) Sound.sfx('bell', 0.5, 0.5); else Sound.sfx('uiok');
+      buildMenu(); if (had || Input.device === 'pad') focusByKey('diffrow', 0); Game.menuDiff(nm); return;
+    }
     saveSettings(); if (k === 'glyphs') deviceChanged(); else refreshSettings();
   }
   function adjust(k, d) { // left / right on a focused row
     if (k in RANGE) { setOpt(k, Settings[k] + d * RANGE[k][2]); Sound.sfx('ui'); return; }
     const vals = [...segOf(k).children].map((n) => n.dataset.v), on = segOf(k).querySelector('.on');
     const i = on ? vals.indexOf(on.dataset.v) : 0, j = d === 0 ? (i + 1) % vals.length : clamp(i + d, 0, vals.length - 1);
-    if (j !== i) { setOpt(k, vals[j]); Sound.sfx('ui'); }
+    if (j !== i) { setOpt(k, vals[j]); if (k !== 'diff') Sound.sfx('ui'); }
   }
   for (const k in RANGE) $('#set-' + k).oninput = (e) => setOpt(k, e.target.value);
   $('#settings .set-wrap').addEventListener('click', (e) => {
@@ -4606,6 +4711,7 @@ const UI = (() => {
     if (sv) { setOpt(row.dataset.adj, sv.dataset.v); Sound.sfx('uiok'); }
     else if (row && !e.target.closest('input') && !(row.dataset.adj in RANGE)) adjust(row.dataset.adj, 0);
   });
+  $('#diffrow').addEventListener('click', (e) => { const sv = e.target.closest('.seg span'); if (sv) setOpt('diff', sv.dataset.v); else adjust('diff', 0); });
   function padLabel() {
     const gp = Input.padId ? Input.pickPad() : null; if (!gp) return 'No controller found. Press a button on it.';
     return gp.id.replace(/\s*\(.*$/, '').slice(0, 48) + (gp.mapping === 'standard' ? '' : ' (unusual layout: rebind anything that feels wrong)');
@@ -4664,7 +4770,7 @@ const UI = (() => {
   function moveFocus(d, absolute) {
     const items = navItems(); if (!items.length) return;
     let i = absolute ? 0 : ((focusI < 0 ? 0 : focusI + d) + items.length) % items.length;
-    if (cur === 'menu' && absolute) i = Math.min(items.length - 1, G.classes.length);
+    if (cur === 'menu' && absolute) { const k = items.findIndex((n) => n.classList.contains('door')); i = k >= 0 ? k : Math.max(0, items.findIndex((n) => n.id === 'diffrow')); }
     // in the binding table, up / down stay in the same column
     const f = items[focusI];
     if (!absolute && f && f.dataset.col !== undefined && Input.device === 'kbm') {
@@ -4683,19 +4789,19 @@ const UI = (() => {
   };
   document.body.classList.toggle('dev-pad', Input.device === 'pad');
   Hooks.frame.push((rdt, stage) => { if (stage === 1) update(rdt); });
-  return { el, show, fade, titleCard, hideCard, buildHud, deviceChanged, padWoke, slotFlash, hurtFlash, selectedClass, fmtT, ROMAN, hud(on) { el.hud.classList.toggle('on', on); }, get screen() { return cur; } };
+  return { el, show, fade, titleCard, hideCard, buildHud, phaseTable, deviceChanged, padWoke, slotFlash, hurtFlash, selectedClass, fmtT, ROMAN, hud(on) { el.hud.classList.toggle('on', on); }, get screen() { return cur; } };
 })();
 
 // ==== 10_game.js ====
 // Game flow: menu scene, fight lifecycle (build, intro, fight, death/victory), pause, per-frame entity updates.
 const Game = (() => {
-  let curDef = null, menuGroup = null, tries = 0;
+  let curDef = null, menuGroup = null, tries = 0, menuDoors = [], menuNm = 0;
 
   function clearWorld() {
     Co.clear(); Hz.clear(); Bul.clear(); FX.clear(); Music.stop(0.8); Cam.cine = null; Cam.cineW = 0; G.timeScale = 1;
     if (G.world) { scene.remove(G.world); disposeTree(G.world); G.world = null; }
     if (G.player) { scene.remove(G.player.group); scene.remove(G.player.ring); disposeTree(G.player.group); G.player = null; }
-    if (menuGroup) { scene.remove(menuGroup); disposeTree(menuGroup); menuGroup = null; }
+    if (menuGroup) { scene.remove(menuGroup); disposeTree(menuGroup); menuGroup = null; } menuDoors = [];
     G.boss = null; G.arena = null; G.ents.length = 0; scene.fog = null; scene.environment = null; Input.bot = null;
   }
 
@@ -4711,13 +4817,30 @@ const Game = (() => {
       const frame = new THREE.Mesh(new THREE.BoxGeometry(4.6, 9.6, 0.5), W.mat({ color: 0x0c0d14, roughness: 0.35, metalness: 0.8 })); frame.position.set(x, 4.8, z); frame.lookAt(0, 4.8, 0); g.add(frame);
       const pane = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 8.6), new THREE.MeshBasicMaterial({ color: col.clone().multiplyScalar(1.5) })); pane.position.set(x * 0.985, 4.7, z * 0.985); pane.lookAt(0, 4.7, 0); g.add(pane);
       const L = new THREE.PointLight(col, 60, 30, 1.6); L.position.set(x * 0.9, 4, z * 0.9); g.add(L);
+      menuDoors.push({ pane, L, col, avail: nmAvailable(d) });
     });
     g.add(W.motes({ n: 500, box: [70, 20, 70], color: 0xbfd0ff, size: 0.09, vel: [0, 0.25, 0], sway: 0.6, center: [0, 10, -10] }));
     scene.fog = new THREE.FogExp2(0x04050b, 0.012);
     Post.set({ bloom: 0.9, threshold: 0.7, vig: 1.1 });
+    menuNm = -1; menuDiff(Settings.diff === 'nightmare', true);
     Co.start(function* () { const c = { pos: new V3(), look: new V3(0, 4.5, -26), fov: 46 }; Cam.cine = c; Cam.cineW = 1; while (G.state === 'menu') { c.pos.set(Math.sin(G.rt * 0.07) * 5, 3.2 + Math.sin(G.rt * 0.11) * 0.5, 6 + Math.cos(G.rt * 0.05) * 2); yield; } }, 'sys');
   }
-  function toMenu() { clearWorld(); G.state = 'menu'; G.paused = false; UI.hud(false); UI.hideCard(); buildMenuScene(); UI.show('menu'); UI.fade(false); }
+  // the hall answers the Difficulty toggle: on Nightmare, doors with no nightmare version go dark (never removed, so no
+  // shader recompiles) and the ones that have one burn hotter; the fog darkens and reddens. Tweened, or instant on open.
+  const HOT = new THREE.Color(2.4, 0.42, 0.5), HOTL = new THREE.Color(0xff3048), FOGN = new THREE.Color(0x04050b), FOGM = new THREE.Color(0x0c0308), _c = new THREE.Color();
+  function menuDiff(on, instant) {
+    const to = on ? 1 : 0; if (!menuGroup || menuNm === to) return; const from = menuNm < 0 ? to : menuNm; menuNm = to;
+    const apply = (k) => {
+      for (const m of menuDoors) {
+        if (m.avail) { m.pane.material.color.copy(m.col).multiplyScalar(1.5).lerp(HOT, k); m.L.color.copy(m.col).lerp(HOTL, k); m.L.intensity = lerp(60, 95, k); }
+        else { m.pane.material.color.copy(m.col).multiplyScalar(lerp(1.5, 0.09, k)); m.L.color.copy(m.col); m.L.intensity = lerp(60, 4, k); }
+      }
+      if (scene.fog) { scene.fog.color.copy(FOGN).lerp(FOGM, k); scene.fog.density = lerp(0.012, 0.016, k); }
+    };
+    Co.stopTag('menudiff');
+    if (instant) apply(to); else Co.start(function* () { let t = 0; while (t < 0.6) { t += G.rdt || 0.016; apply(lerp(from, to, smooth(t / 0.6))); yield; } apply(to); }, 'menudiff');
+  }
+  function toMenu() { clearWorld(); G.nightmare = false; G.state = 'menu'; G.paused = false; UI.hud(false); UI.hideCard(); buildMenuScene(); UI.show('menu'); UI.fade(false); }
 
   function build(def, opts = {}) {
     const rh = (!G.headless && !opts.noRehearsal) ? rehearse(def, opts) : null;
@@ -4732,7 +4855,7 @@ const Game = (() => {
   const REHEARSE_SEC = 24, REHEARSE_DT = 1 / 20;
   function rehearse(def, opts) {
     const t0 = performance.now(), rng = G.rng, god = G.god, bot = Bot.level, kept = [];
-    G.rng = mulberry(0x5eed); G.god = true; Bot.level = 3; G.headless = true;
+    G.rng = mulberry(0x5eed); G.god = true; Bot.level = 3; G.headless = true; G.rehearsing = true;
     const known = new Set(); let found = new Map();
     const mats = (o) => o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
     const scan = (root) => root.traverse((o) => { if (o.isMesh || o.isPoints || o.isLine || o.isSprite) for (const m of mats(o)) if (!known.has(m) && !found.has(m)) found.set(m, o); });
@@ -4752,7 +4875,7 @@ const Game = (() => {
       }
     } catch (e) { console.warn('rehearsal stopped early', e); }
     try { G.keepDisposed = kept; clearWorld(); } catch (e) { console.warn(e); }
-    G.keepDisposed = null; G.headless = false; G.rng = rng; G.god = god; Bot.level = bot; G.ft = 0;
+    G.keepDisposed = null; G.headless = false; G.rehearsing = false; G.rng = rng; G.god = god; Bot.level = bot; G.ft = 0;
     for (const r of kept) scan(r);
     G.warmStats = { boss: def.id, rehearsalMs: Math.round(performance.now() - t0), newMaterials: found.size };
     return { found, kept };
@@ -4780,7 +4903,7 @@ const Game = (() => {
     if (def.music) Music.play(def.music, 0);
     if (!opts.skipIntro) {
       UI.fade(false); yield 0.3;
-      UI.titleCard('DOOR ' + UI.ROMAN[G.bosses.indexOf(def)], def.name, def.title, def.color);
+      UI.titleCard('DOOR ' + UI.ROMAN[G.bosses.indexOf(def.base || def)] + (def.nm ? ' · NIGHTMARE' : ''), def.name, def.title, def.color);
       if (def.intro) yield* def.intro(b);
       else { const a = angTo(b.pos.x, b.pos.z, p.pos.x, p.pos.z), r = b.radius * 2 + 9, h = b.aimY; yield* Cam.shot([b.pos.x + Math.sin(a + 0.9) * r, h + 2, b.pos.z + Math.cos(a + 0.9) * r], [b.pos.x, h, b.pos.z], [b.pos.x + Math.sin(a - 0.3) * r * 1.2, h + 4, b.pos.z + Math.cos(a - 0.3) * r * 1.2], [b.pos.x, h * 0.8, b.pos.z], 4.2); }
       UI.hideCard(); Cam.release(); yield 0.7;
@@ -4790,8 +4913,14 @@ const Game = (() => {
     if (start > 0) { b.hp = Math.min(b.maxHp, b.maxHp * def.phases[start].at - 1); for (let i = 0; i < start; i++) if (def.phases[i + 1] && def.phases[i + 1].skipTo) def.phases[i + 1].skipTo(b); }
     b.goPhase(start);
   }
+  // A door's nightmare version is its def with the `nightmare` block laid over it (prototype chain, so anything not
+  // overridden reads through to the normal def). Built once per door and cached.
+  function nightmareDef(base) { return base._nmDef || (base._nmDef = Object.assign(Object.create(base), base.nightmare, { base, nm: true })); }
+  function nmAvailable(d) { return !!(d && d.nightmare); }
   function start(id, opts = {}) {
-    const def = typeof id === 'object' ? id : G.bosses.find((d) => d.id === id) || G.bosses[(+id || 1) - 1]; if (!def) return;
+    const d0 = typeof id === 'object' ? id : G.bosses.find((d) => d.id === id) || G.bosses[(+id || 1) - 1]; if (!d0) return;
+    const base = d0.base || d0, nm = !!(opts.nm === undefined ? QS.has('nm') : opts.nm) && nmAvailable(base), def = nm ? nightmareDef(base) : base;
+    G.nightmare = nm;
     tries = (curDef === def) ? tries + 1 : 1;
     UI.show(null); UI.hud(false);
     if (G.headless || opts.instant) { build(def, opts); Co.start(runIntro(def, Object.assign({ skipIntro: true }, opts)), 'sys'); return; }
@@ -4807,20 +4936,29 @@ const Game = (() => {
     if (G.paused) { if (document.pointerLockElement) document.exitPointerLock(); Input.clear(); UI.show('pause'); } else UI.show(null);
   }
   function onPlayerDead() {
-    if (G.state !== 'fight') return; G.state = 'dead'; const b = G.boss, p = G.player;
+    if (G.state !== 'fight') return; G.state = 'dead'; const b = G.boss, p = G.player; b.logPhase();
     Co.start(function* () {
       G.timeScale = 0.35; Music.stop(2.5); let t = 0; while (t < 1.9) { t += G.rdt || 0.016; yield; }
       $('#death-sub').textContent = p.deathSrc === 'fall' ? 'You fell from the arena' : p.deathSrc === 'enrage' ? 'Out of time' : 'Attempt ' + tries;
       $('#death-stats').innerHTML = `<b>${b.def.name}</b> had <b>${(b.hp / b.maxHp * 100).toFixed(1)}%</b> left after <b>${UI.fmtT(G.ft)}</b>`;
+      UI.phaseTable($('#death-phases'), b);
       UI.hud(false); UI.show('death'); if (document.pointerLockElement) document.exitPointerLock();
     }, 'sys');
   }
   function onBossDead() {
     if (G.state !== 'fight') return; G.state = 'win'; const b = G.boss, p = G.player, def = b.def;
     Co.stopTag('phase'); for (const e of G.ents) if (e.isAdd && e.alive) e.die(); Co.stopTag('fight'); Hz.clear(); Bul.clear(); p.invuln = 999;
-    const time = G.ft;
-    if (!Save.kills) Save.kills = {}; if (!Save.kills[def.id]) Save.kills[def.id] = {};
-    const prev = Save.kills[def.id][p.cls.id]; const best = !prev || time < prev; if (best) Save.kills[def.id][p.cls.id] = Math.round(time * 10) / 10; saveSave();
+    const time = G.ft; b.logPhase();
+    let prev, best, newSplit = [];
+    if (def.nm) { // nightmare records live apart from the normal kills: best total, best time per phase on its own, clears
+      if (!Save.nm) Save.nm = {}; if (!Save.nm[def.id]) Save.nm[def.id] = {};
+      const r = Save.nm[def.id][p.cls.id] || { best: 0, splits: [], clears: 0 }; prev = r.best; best = !prev || time < prev; if (best) r.best = Math.round(time * 10) / 10;
+      (b.phaseLog || []).forEach((q, i) => { if (q && (!r.splits[i] || q.time < r.splits[i])) { if (r.splits[i]) newSplit[i] = true; r.splits[i] = q.time; } });
+      r.clears++; Save.nm[def.id][p.cls.id] = r; saveSave();
+    } else {
+      if (!Save.kills) Save.kills = {}; if (!Save.kills[def.id]) Save.kills[def.id] = {};
+      prev = Save.kills[def.id][p.cls.id]; best = !prev || time < prev; if (best) Save.kills[def.id][p.cls.id] = Math.round(time * 10) / 10; saveSave();
+    }
     Co.start(function* () {
       Music.stop(3); Sound.sfx('kill'); G.timeScale = 0.3; FX.flash(0xffffff, 0.5, 1.2);
       if (def.death) yield* def.death(b);
@@ -4832,6 +4970,7 @@ const Game = (() => {
       G.timeScale = 1; let t = 0; while (t < 1.6) { t += G.rdt || 0.016; yield; }
       $('#vic-title').textContent = def.name + ' FALLS';
       $('#vic-stats').innerHTML = `<b>${p.cls.name}</b> &nbsp; time <b>${UI.fmtT(time)}</b>${best && prev ? ' (new best)' : ''} &nbsp; attempts <b>${tries}</b> &nbsp; damage taken <b>${Math.round(p.stats.taken)}</b>`;
+      UI.phaseTable($('#vic-phases'), b, newSplit);
       UI.hud(false); UI.show('victory'); if (document.pointerLockElement) document.exitPointerLock();
     }, 'sys');
   }
@@ -4855,7 +4994,7 @@ const Game = (() => {
     else if (name === 'click') p.pickTarget(arg.x, arg.y); else if (name === 'camreset') Cam.reset(p.target ? angTo(p.pos.x, p.pos.z, p.target.pos.x, p.target.pos.z) : p.facing);
   };
   let skipIntro = false;
-  return { start(id, opts = {}) { lastOpts = opts; start(id, opts); }, restart, quit, pause, toMenu, onPlayerDead, onBossDead, get def() { return curDef; }, get tries() { return tries; } };
+  return { start(id, opts = {}) { lastOpts = opts; start(id, opts); }, nmAvailable, nightmareDef, menuDiff, restart, quit, pause, toMenu, onPlayerDead, onBossDead, get def() { return curDef; }, get tries() { return tries; } };
 })();
 
 // ==== 11_warm.js ====
@@ -7056,7 +7195,7 @@ const Warm = (() => {
       ribbon(torso, crim, { n: 10, x: -0.06, y: 0.04, z: -0.3, len: 0.85, w: 0.12, drop: 1, trail: 0.3, amp: 0.07, f: 2.0, k: 3, ph: 2.1, speedK: 0.12 }),
     ];
     // nodachi: long curved blade with a glowing edge
-    const weapon = M2.wtip.parent; for (let i = 1; i < weapon.children.length; i++) if (weapon.children[i].isMesh) weapon.children[i].visible = false;
+    const weapon = S.weapon = M2.wtip.parent; for (let i = 1; i < weapon.children.length; i++) if (weapon.children[i].isMesh) weapon.children[i].visible = false;
     weapon.children[0].scale.y = 1.7; weapon.children[0].position.z = -0.06;
     const tsuba = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.022, 16), W.mat({ color: 0x2a2018, roughness: 0.5, metalness: 0.7 })); tsuba.rotation.x = PI / 2; tsuba.position.z = 0.2; weapon.add(tsuba);
     const BL = 2.35, cv = (a) => 0.1 * (a / BL) * (a / BL), wd = (a) => 0.088 * (1 - 0.3 * a / BL);
@@ -7104,6 +7243,7 @@ const Warm = (() => {
     S.orbHalo = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), haloMat(new THREE.Color(0xff3a78).multiplyScalar(0.22)), 320); S.orbHalo.count = 0; S.orbHalo.frustumCulled = false; S.orbHalo.renderOrder = 14; g.add(S.orbHalo);
     S.cuts = []; S.haste = 0; S.still = false; S.warn = 0; S.graceT = 0; S.walk = false; S.kneel = 0; S.night = 0; S.open = 0; S.torn = false; S.tv = new V3();
     b.onDamaged = (amt, info) => { if (S.still && !S.countered && G.now >= S.graceT && info.src === 'player') { S.countered = true; Co.start(counter(b), 'phase'); } };
+    if (G.nightmare) deepenFn(b)(1); // nightmare opens at sunset (its grade comes through nightmare.post), torn haori from the first frame
     return { edge: 'wall', radius: R, spawn: { x: 0, z: 10 }, bossStart: { x: 0, z: -5, face: 0 }, contains: (x, z) => x * x + z * z <= R * R,
       camLimit(x, y, z) { const r = Math.hypot(x, z); if (r > 25) { x *= 25 / r; z *= 25 / r; } return { x, y: Math.min(y, 15), z }; } };
   }
@@ -7214,13 +7354,13 @@ const Warm = (() => {
   }
   function* finalVerse(b, n = 9) {
     const S = b.state; S.walk = false; yield* b.cast({ name: 'Final Verse', time: 1.1 });
-    petals(b.pos.x, b.pos.z, 40); b.targetable = false; b.group.visible = false; Co.start(Post.lerpTo({ sat: 0.75, vig: 1.05 }, 0.4), 'fight');
+    petals(b.pos.x, b.pos.z, 40); b.targetable = false; b.group.visible = false; S.verse = true; Co.start(Post.lerpTo({ sat: 0.75, vig: 1.05 }, 0.4), 'fight');
     for (let i = 0; i < n; i++) {
       const qa = rnd(TAU), qr = i % 3 === 0 ? 0 : rnd(2, 10), p = G.player, qx = i % 3 === 0 ? p.pos.x : Math.sin(qa) * qr, qz = i % 3 === 0 ? p.pos.z : Math.cos(qa) * qr, dir = rnd(TAU), ox = qx - Math.sin(dir) * 20, oz = qz - Math.cos(dir) * 20;
       vTele(b, ox, oz, dir, 40, tele(b, 1.2)); Hz.rect(ox, oz, dir, 40, 2.1, tele(b, 1.2), 300, { name: 'Final Verse', color: ROSE, quiet: true, silent: true, onFire: () => cutFx(b, ox, oz, dir, 40, i % 2 ? PALE : 0xffffff) }); Sound.sfx('tick', 1, 1 + i * 0.08);
       yield tele(b, 0.27);
     }
-    yield tele(b, 1.2); Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.5), 'fight');
+    yield tele(b, 1.2); S.verse = false; Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.5), 'fight');
     const p = G.player, a = rnd(TAU); let tx = p.pos.x + Math.sin(a) * 4, tz = p.pos.z + Math.cos(a) * 4; const d = Math.hypot(tx, tz); if (d > 13) { tx *= 13 / d; tz *= 13 / d; }
     b.pos.set(tx, 0, tz); b.group.visible = true; b.targetable = true; petals(tx, tz, 40); b.facing = b.angToPlayer(); yield 0.4;
   }
@@ -7255,10 +7395,56 @@ const Warm = (() => {
     });
   }
 
+  // ---------------------------------------------------------------- phase bodies shared by Normal and Nightmare
+  function* sunsetRun(b) {
+    const S = b.state;
+    while (true) {
+      yield* focus(b); yield* drawCut(b, 4); yield* echo(b, 1); S.walk = true; yield 1.0;
+      yield* petalStorm(b); yield* moon(b, ['c', 'n', 'o']); S.walk = true; yield 0.8;
+      yield* stillness(b); yield* drawCut(b, 4); yield* moon(b, ['o', 'c']); yield* echo(b, 1); S.walk = true; yield 1.0;
+    }
+  }
+  function* nightEnter(b) { const S = b.state; clearGhosts(S); S.walk = false; b.pos.set(0, 0, 0); b.facing = 0; S.kneel = 1; Sound.sfx('bell', 0.9, 0.6); Co.start(Post.lerpTo({ bloom: 0.5, threshold: 1.0, tint: [0.96, 0.98, 1.06], exposure: 1.1, sat: 1.05, vig: 0.78, lift: [0.012, 0.012, 0.024] }, 4), 'fight'); yield* nightfall(b); S.kneel = 0; Sound.sfx('sword'); petals(0, 0, 80, 0xff3050); yield 0.6; }
+  function* nightRun(b) {
+    const S = b.state;
+    while (true) {
+      yield* finalVerse(b, 9); yield* moon(b, ['c', 'o']); yield* drawCut(b, 5); yield* echo(b, 2); S.walk = true; yield 0.8;
+      yield* focus(b); yield* stillness(b, 3.0); yield* petalStorm(b, 6, 5); yield* moon(b, ['n', 'o', 'c', 'n']); S.walk = true; yield 0.6;
+    }
+  }
+  // Nightmare: Co.stopTag('phase') skips a coroutine's cleanup, so every per-mechanic state a cut-off mechanic can leave
+  // behind (kneel, stillness ring, hidden or untargetable body, verse grade, sheathed blade, slow time) is reset here.
+  function resetMech(b) {
+    const S = b.state; S.walk = false; S.warn = 0; S.still = false; S.kneel = 0; S.open = 0; S.countered = false; b.dmgTaken = 1; S.fake.parryT = 0;
+    b.group.visible = true; b.targetable = true; if (S.weapon) S.weapon.visible = true; G.timeScale = 1;
+    if (S.verse) { S.verse = false; Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.4), 'fight'); }
+  }
+  // Out of time (every nightmare phase): the music stops dead, he sheathes the sword, one petal falls past the camera in
+  // silence, the whole deck fills, and a single white cut crosses it. He can still be cut down while it winds up.
+  function* lastPetal(b) {
+    const S = b.state; resetMech(b); clearGhosts(S); b.facing = b.angToPlayer();
+    Music.stop(0.08); b.otMusic = true; G.timeScale = 0.6; S.model.swing(0, 0.6); Sound.sfx('sword', 0.5, 0.45);
+    yield 0.55; if (S.weapon) S.weapon.visible = false; Sound.sfx('parry', 0.5, 0.5); S.kneel = 0.25;
+    if (!G.headless) { const c = camera.position, f = camera.getWorldDirection(S.tv); FX.burst(c.x + f.x * 2.4, c.y + 0.9, c.z + f.z * 2.4, { n: 1, color: PALE, color2: ROSE, speed: [0.05, 0.2], life: [3.2, 3.4], size: [0.16, 0.18], grav: 0.35, drag: 2.5 }); }
+    yield 0.75; G.timeScale = 1;
+    const T = 5.5;
+    Hz.circle(0, 0, R + 0.5, T, 0, { blockable: false, name: 'The Last Petal', color: PALE, quiet: true, onFire: () => {
+      const p = G.player, a = p ? Math.atan2(p.pos.x, p.pos.z) + PI / 2 : 0;
+      FX.flash(0xffffff, 0.7, 2.2); cutFx(b, -Math.sin(a) * R, -Math.cos(a) * R, a, R * 2, 0xffffff); FX.shake(0.6); Sound.sfx('crit');
+      if (p && p.alive) p.hurt(9999, { blockable: false, src: 'enrage', pierce: true });
+    } });
+    yield T + 0.4; S.kneel = 0;
+    while (true) yield 1;
+  }
+  // Nightmare phase clocks in seconds (strict, no carry-over). Tuned with tools/nmclock.js (RAW=1, god-mode level-3 autopilot,
+  // six runs per class): the slowest class keeps at least 5% of every clock. Measured worst runs: sunset 49-68 s, nightfall 63-74 s.
+  const NM_CLOCK = [72, 78];
+  const POST = { bloom: 0.42, threshold: 1.0, radius: 0.55, exposure: 0.92, vig: 0.72, sat: 1.1, tint: [1.04, 1.0, 0.98] };
+
   G.bosses.push({
     id: 'duelist', name: 'ISSEN', title: 'The Last Petal', hint: 'A duel', color: '#ff7a9a', telegraph: ROSE,
     hp: 23000, radius: 0.9, aimY: 1.6, enrage: 420,
-    post: { bloom: 0.42, threshold: 1.0, radius: 0.55, exposure: 0.92, vig: 0.72, sat: 1.1, tint: [1.04, 1.0, 0.98] },
+    post: POST,
     music: { bpm: 92, root: 45, scale: [0, 2, 3, 7, 8], prog: [0, 0, 3, 2, 0, 0, 4, 2],
       layers: [
         { v: 'koto', pat: ['0...2...4..3....', '0...4...3..2....'], oct: 1, len: 4, vol: 0.14 }, { v: 'flute', pat: ['........4.......', '7.......5.......'], oct: 2, len: 7, vol: 0.07 },
@@ -7281,23 +7467,19 @@ const Warm = (() => {
       { at: 0.66, *enter(b) { const S = b.state; clearGhosts(S); S.walk = false; petals(b.pos.x, b.pos.z, 60); b.pos.set(0, 0, 0); Sound.sfx('sword', 1, 0.5); FX.dome(0, 1, 0, { r: 9, color: ROSE, dur: 0.8 }); Co.start(Post.lerpTo({ bloom: 0.46, sat: 1.14 }, 2), 'fight'); Co.start(deepen(b), 'fight'); yield 1.6; },
         // started directly at a later phase: apply this phase's sunset deepening and grade instantly
         skipTo(b) { deepenFn(b)(1); Object.assign(Post.cur, { bloom: 0.46, sat: 1.14 }); Post.apply(); },
-        *run(b) {
-          const S = b.state;
-          while (true) {
-            yield* focus(b); yield* drawCut(b, 4); yield* echo(b, 1); S.walk = true; yield 1.0;
-            yield* petalStorm(b); yield* moon(b, ['c', 'n', 'o']); S.walk = true; yield 0.8;
-            yield* stillness(b); yield* drawCut(b, 4); yield* moon(b, ['o', 'c']); yield* echo(b, 1); S.walk = true; yield 1.0;
-          }
-        } },
-      { at: 0.33, *enter(b) { const S = b.state; clearGhosts(S); S.walk = false; b.pos.set(0, 0, 0); b.facing = 0; S.kneel = 1; Sound.sfx('bell', 0.9, 0.6); Co.start(Post.lerpTo({ bloom: 0.5, threshold: 1.0, tint: [0.96, 0.98, 1.06], exposure: 1.1, sat: 1.05, vig: 0.78, lift: [0.012, 0.012, 0.024] }, 4), 'fight'); yield* nightfall(b); S.kneel = 0; Sound.sfx('sword'); petals(0, 0, 80, 0xff3050); yield 0.6; },
-        *run(b) {
-          const S = b.state;
-          while (true) {
-            yield* finalVerse(b, 9); yield* moon(b, ['c', 'o']); yield* drawCut(b, 5); yield* echo(b, 2); S.walk = true; yield 0.8;
-            yield* focus(b); yield* stillness(b, 3.0); yield* petalStorm(b, 6, 5); yield* moon(b, ['n', 'o', 'c', 'n']); S.walk = true; yield 0.6;
-          }
-        } },
+        run: sunsetRun },
+      { at: 0.33, enter: nightEnter, run: nightRun },
     ],
+    // ---- Nightmare ("Niten"). Per-phase clocks (strict, no carry-over); the look starts at sunset.
+    nightmare: {
+      hp: 11500,
+      post: Object.assign({}, POST, { bloom: 0.46, sat: 1.14 }),
+      overtime: lastPetal,
+      phases: [
+        { at: 1, budget: NM_CLOCK[0], music: 1, *run(b) { yield 0.8; yield* sunsetRun(b); } },
+        { at: 0.5, budget: NM_CLOCK[1], music: 2, *enter(b) { resetMech(b); yield* nightEnter(b); }, run: nightRun },
+      ],
+    },
     update(b, dt) {
       const S = b.state, p = G.player, ox = b.pos.x, oz = b.pos.z;
       if (S.walk && b.alive && G.state === 'fight' && !b.castState) { const d = b.distToPlayer(); b.facing = dampAng(b.facing, b.angToPlayer(), 8, dt); if (d > 3.2) { const s = Math.min(d - 3.2, 4.6 * dt); b.pos.x += Math.sin(b.facing) * s; b.pos.z += Math.cos(b.facing) * s; } }
@@ -7311,7 +7493,7 @@ const Warm = (() => {
       for (let i = 0; i < S.sleeves.length; i++) { const sl = S.sleeves[i]; sl.rotation.x = Math.sin(G.now * 2.1 + i * 1.7) * 0.1 + Math.min(S.fake.moveSpeed, 6) * 0.05; sl.rotation.z = sl.userData.sx * 0.13 + Math.sin(G.now * 1.6 + i) * 0.05; }
       S.hak.rotation.x = -Math.min(S.fake.moveSpeed, 6) * 0.025; S.hak.scale.y = 1 - S.kneel * 0.25;
       // phase marks: torn haori + shoulder petal embers from phase 2, cracked glowing mask in phase 3
-      const ph = Math.max(0, b.phase);
+      const ph = G.nightmare ? Math.min(2, Math.max(0, b.phase) + 1) : Math.max(0, b.phase);
       if (ph >= 1 && !S.torn) { S.torn = true; for (const [a, c] of S.cloak) { a.visible = false; c.visible = true; } S.sleeves[1].scale.y = 0.75; S.sleeves[1].position.y = -0.24; for (const r of S.ribbons.slice(0, 2)) { r.len *= 1.4; r.amp *= 1.35; r.trail += 0.8; r.f *= 1.25; } }
       if (ph >= 1 && b.group.visible && vrand() < dt * (ph >= 2 ? 26 : 16)) { const sh = S.shs[vrand() < 0.5 ? 0 : 1]; sh.getWorldPosition(S.tv); FX.burst(S.tv.x, S.tv.y + 0.1, S.tv.z, { n: 1, color: ph >= 2 ? 0xff3048 : 0xffb0c4, color2: ph >= 2 ? 0x400010 : ROSE, speed: [0.4, 1.4], up: 1.6, life: [0.6, 1.2], size: [0.1, 0.2], radius: 0.25 }); }
       const mk = ph >= 2 ? S.night : 0; const eg = ph >= 1 ? 1.35 + 0.15 * Math.sin(G.now * 4) : 1; S.edgeMat.color.setRGB(lerp(2.4 * eg, 4.2, mk), lerp(0.7 * eg, 0.35, mk), lerp(1.0 * eg, 0.45, mk)); S.trimM.emissiveIntensity = ph >= 1 ? lerp(0.9, 2.2, mk) : 0.4;
@@ -19524,7 +19706,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
 // ==== 90_bot.js ====
 // Autopilot + test hooks (window.__game). Used for balance sims in Playwright; never active for players unless ?bot=N.
 const Bot = {
-  level: 0, timer: 0, goal: null, pressT: 0,
+  level: 0, timer: 0, goal: null, pressT: 0, passive: false,
   update(dt) {
     const p = G.player, b = G.boss;
     if (!this.level || !p || !b || G.state !== 'fight' || !p.alive) { Input.bot = this.level && p ? { moveX: 0, moveZ: 0 } : null; return; }
@@ -19564,7 +19746,8 @@ const Bot = {
     Input.bot = gd > 0.25 ? { moveX: gx / gd, moveZ: gz / gd } : { moveX: 0, moveZ: 0 };
     // finish a cast in progress when nothing will land before it completes
     if (p.casting && this.level >= 2) { const left = p.casting.time - p.casting.t; if (danger(p.pos.x, p.pos.z) > left + 0.3 && !Hz.persist(p.pos.x, p.pos.z) && !Bul.threat(p.pos.x, p.pos.z, left + 0.3)) Input.bot = { moveX: 0, moveZ: 0 }; }
-    // rotation
+    // rotation (passive: a test switch that never attacks, e.g. to check that a phase clock runs out)
+    if (this.passive) return;
     this.pressT -= dt; if (this.pressT > 0) return; this.pressT = [0, 0.25, 0.12, 0.05][this.level];
     const here = danger(p.pos.x, p.pos.z), cs = t.castState;
     const ctx = { hp: p.hp / p.maxHp, danger: here < 0.3 && this.level >= 2, calm: here, wantInterrupt: !!(cs && cs.int && cs.t > (this.level >= 3 ? 0.3 : 0.8)), chase: gd < 1.5, holdFire: !!hint.holdFire, saveInterrupt: !!def.botSaveInterrupt || !!hint.saveInterrupt || this.level < 3,
@@ -19580,6 +19763,8 @@ window.__game = {
   G, Game, Bot, Hz, Bul, FX, Cam, Input, Binds, Settings, renderer, scene, camera,
   start(id, opts = {}) { Game.start(id, Object.assign({ instant: true }, opts)); },
   bot(n) { Bot.level = n; },
+  // the def a fight started from this page would use (the nightmare version when the URL has ?nm=1 and the door has one)
+  def(id) { const d = G.bosses.find((q) => q.id === id) || G.bosses[(+id || 1) - 1]; return QS.has('nm') && Game.nmAvailable(d) ? Game.nightmareDef(d) : d; },
   god(on = true) { G.god = on; },
   state() { const p = G.player, b = G.boss; return { state: G.state, t: +G.ft.toFixed(1), phase: b ? b.phase : -1, boss: b ? +(b.hp / b.maxHp * 100).toFixed(1) : 0, hp: p ? Math.round(p.hp) : 0, dps: p ? Math.round(p.stats.dmg / Math.max(1, G.ft)) : 0, taken: p ? Math.round(p.stats.taken) : 0, src: p && p.deathSrc && (typeof p.deathSrc === 'string' ? p.deathSrc : (p.deathSrc.name || (p.deathSrc.shape && p.deathSrc.shape.type) || 'bullet')), errors: G.errors.slice(0, 5) }; },
   // Run the sim headless for `sec` seconds (stops early on death/victory). Returns state().
@@ -19624,7 +19809,7 @@ if (QS.has('bot')) Bot.level = +QS.get('bot') || 0;
 if (QS.has('god')) G.god = true;
 if (QS.get('class')) Settings.cls = QS.get('class');
 G.state = 'menu';
-if (QS.has('boss')) Game.start(QS.get('boss'), { skipIntro: QS.has('skipintro'), phase: +(QS.get('phase') || 0) });
+if (QS.has('boss')) Game.start(QS.get('boss'), { skipIntro: QS.has('skipintro'), phase: +(QS.get('phase') || 0), nm: QS.has('nm') }); // ?nm=1: the nightmare version (does not touch the saved difficulty)
 else Game.toMenu();
 requestAnimationFrame(frame);
 </script>
