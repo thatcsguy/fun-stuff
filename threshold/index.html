@@ -18244,6 +18244,9 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     D.a.setXYZW(i, G.now % 3600, draw, kind, seed === undefined ? vrand() * 50 : seed); D.b.setXYZW(i, len, w, wet, life);
     D.mesh.instanceMatrix.needsUpdate = true; D.a.needsUpdate = true; D.b.needsUpdate = true;
   }
+  function dryPrints(S) { if (!S.dec) return; const D = S.dec, now = G.now % 3600; let ch = false;
+    for (let i = 0; i < D.n; i++) { const k = D.a.getZ(i); if (k < 1.5 || (k > 2.5 && k < 3.5) || k > 4.5) continue; let age = now - D.a.getX(i); if (age < 0) age += 3600; if (age < D.b.getW(i)) { D.b.setW(i, Math.min(D.b.getW(i), age + 1.6)); ch = true; } }
+    if (ch) D.b.needsUpdate = true; }
   function hideDecals(S) { if (!S.dec) return; for (let i = 0; i < S.dec.n; i++) S.dec.a.setX(i, -1e4); S.dec.a.needsUpdate = true; }
 
   // leaf and petal shapes drawn over gale/blossom bullets (the bullet's vermilion core stays inside)
@@ -18409,6 +18412,117 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         gl_FragColor = vec4(outc(col), clamp(al, 0.0, 1.0));
       }`, S.eU, { transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
     m.position.y = 0.06; m.renderOrder = 11; m.visible = false; g.add(m); S.ensoM = m;
+  }
+
+  // One Breath: the figure on the floor. One instanced mesh (8 line quads, 9 joint quads, the seal's square border), drawn between the
+  // stroke decals and the telegraphs. Per instance: aG0 kind (0 line, 1 joint, 2 border), length, width, seed; aG1 sketch, ink (line: drawn
+  // fraction; joint: visited / eye dotted), from (line: inked from its b end), one-way (joint: eye); aG2 vermilion, alpha, dry, blot.
+  // Pale wash with a thin darker edge = sketch (harmless); glossy black = the player's stroke; vermilion = the eye and the finished seal.
+  const FIG_N = 18;
+  function buildFigure(S, g) {
+    const fg = new THREE.PlaneGeometry(1, 1); fg.rotateX(-PI / 2);
+    const A = iattr(FIG_N, 4), B = iattr(FIG_N, 4), C = iattr(FIG_N, 4); for (const a of [A, B, C]) a.setUsage(THREE.DynamicDrawUsage);
+    fg.setAttribute('aG0', A); fg.setAttribute('aG1', B); fg.setAttribute('aG2', C);
+    const fm = smat(S.U, `attribute vec4 aG0, aG1, aG2; varying vec2 vL; varying vec4 vA, vB, vC;
+      void main(){ vL = vec2(position.x + 0.5, position.z + 0.5); vA = aG0; vB = aG1; vC = aG2; gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0); }`, `
+      varying vec2 vL; varying vec4 vA, vB, vC;
+      void main(){
+        float kind = vA.x, len = vA.y, w = vA.z, seed = vA.w, sk = vB.x, ink = vB.y, from = vB.z, ow = vB.w, verm = vC.x, al = vC.y, dry = vC.z, blot = vC.w;
+        if (al < 0.003) discard;
+        vec3 pale = mix(I4, PAPER, uStorm * 0.85), edgeC = mix(I2, I1, uStorm * 0.4), blk = mix(I0, I0 * vec3(0.9, 0.97, 1.12), uSun);
+        vec3 col = pale; float a = 0.0;
+        if (kind < 0.5) {
+          float u = clamp(vL.y, 0.0, 1.0), xm = u * len, vv = (vL.x - 0.5) * w, wob = (vn(vec2(xm * 0.5, seed)) - 0.5) * 0.08;
+          // the sketch, drawn on head to tail; a one-way line is pressed thick at its head and flicked thin at its tail
+          float sw = ow > 0.5 ? mix(0.66, 0.14, u) : 0.4, dv = abs(vv + wob) - sw, pax = max(fwidth(vv), 1e-4);
+          float shown = 1.0 - smoothstep(sk * len - 0.35, sk * len, xm);
+          float body = (1.0 - smoothstep(-pax, pax, dv)) * shown, rim = (1.0 - smoothstep(0.03, 0.03 + max(0.04, pax * 1.5), abs(dv + 0.04))) * shown;
+          if (ow > 0.5) { rim *= 1.0 - smoothstep(0.8, 1.0, u) * 0.6; body *= mix(1.0, kas(vec2(xm * 0.2, vv * 0.5 + seed), 0.45), smoothstep(0.55, 1.0, u)); }
+          vec3 sc = ow > 0.5 ? mix(pale, I3, 0.55) : pale;
+          // the storm wind's wet glint, running head to tail along a one-way line
+          float gl = ow > 0.5 ? smoothstep(0.72, 0.96, fract(xm / 3.2 - uTime * 0.85)) * (1.0 - smoothstep(0.0, sw * 0.7, abs(vv + wob))) * body : 0.0;
+          sc = mix(sc, PAPER, gl * 0.9);
+          float sa = body * (ow > 0.5 ? 0.75 : 0.5) + rim * 0.75;
+          col = mix(sc, edgeC, clamp(rim / max(sa, 1e-3), 0.0, 1.0) * 0.85); a = clamp(sa, 0.0, 1.0);
+          // the player's stroke: glossy black from the end they set out from, dry-brush toward its end; rain bleeds it a little wider
+          float s = from > 0.5 ? 1.0 - u : u, sm = s * len, nA = vn(vec2(sm * 0.35, seed * 7.0));
+          float hw = (0.5 + 0.14 * (1.0 - s) + 0.08 * nA) * (1.0 + 0.22 * uStorm) * (1.0 + 0.3 * verm);
+          float ib = 1.0 - smoothstep(hw - 0.07 - 0.12 * uStorm, hw, abs(vv + wob * 0.6) + (vn(vec2(sm * 2.0, seed)) - 0.5) * 0.12);
+          ib *= 1.0 - smoothstep(ink * len - 0.25, ink * len + 0.02, sm + (vn(vec2(vv * 3.0, seed)) - 0.5) * 0.25);
+          ib *= kasA(vec2(sm * 0.08, vv * 0.6 + seed), mix(mix(0.1, 0.5, smoothstep(0.55, 1.0, s)) + dry * 0.12, 0.2, verm)) * step(0.001, ink);
+          // a wet sheen, broken along the stroke, only while it is fresh; the seal print is vermilion with the paper's grain in it
+          float gls = (1.0 - smoothstep(0.0, 0.1, abs(vv / max(hw, 0.1) + 0.32))) * smoothstep(0.45, 0.7, vn(vec2(sm * 0.6, seed + 3.0))) * (1.0 - dry);
+          vec3 vmc = mix(mix(VER, I1, 0.06), mix(VER, PAPER, 0.3), smoothstep(0.5, 0.85, vn(vec2(sm * 1.7, vv * 4.0 + seed))) * 0.7);
+          vec3 ic = mix(mix(blk, I3, gls * 0.3), mix(I3, I4, 0.35), dry); ic = mix(ic, vmc, verm);
+          col = mix(col, ic, ib); a = max(a * (1.0 - ib), ib);
+        } else if (kind < 1.5) {
+          vec2 q = (vL - 0.5) * w; float d = length(q), ang = atan(q.x, q.y), e = (vn(vec2(ang * 2.0, seed)) - 0.5) * 0.1;
+          float px2 = max(fwidth(d), 1e-4);
+          // pale ring and wash where the lines will meet
+          float ring = (1.0 - smoothstep(0.035, 0.035 + max(0.035, px2 * 1.5), abs(d - 0.56 - e))) * sk, fill = (1.0 - smoothstep(0.5, 0.56, d + e)) * sk;
+          float hide = 1.0 - ink * (1.0 - ow); ring *= hide; fill *= hide; // once the stroke has turned here the sketch ring is gone
+          col = mix(pale, edgeC, clamp(ring * 0.75 / max(ring * 0.75 + fill * 0.4, 1e-3), 0.0, 1.0)); a = max(ring * 0.75, fill * 0.4);
+          // the eye: a vermilion ring, empty until the stroke ends on it
+          if (ow > 0.5) { float er = (1.0 - smoothstep(0.07, 0.07 + max(0.04, px2 * 1.5), abs(d - 0.8 - e))) * sk, dot = (1.0 - smoothstep(0.64 * ink - 0.05, 0.64 * ink, d + e)) * step(0.01, ink);
+            col = mix(col, VER, max(er, dot)); a = max(a, max(er, dot) * 0.95); }
+          // a corner the stroke has turned (visited), and the glossy blot where the brush is resting
+          float vd = (1.0 - smoothstep(0.54, 0.64, d + e * 1.5 + (vn(q * 5.0 + seed) - 0.5) * 0.08)) * ink * (1.0 - ow);
+          vec3 vc = mix(mix(blk, mix(I3, I4, 0.35), dry), mix(VER, I1, 0.06), verm); col = mix(col, vc, vd); a = max(a, vd);
+          float br = 0.86 + 0.06 * sin(uTime * 5.0), bf = (1.0 - smoothstep(br - 0.08, br, d + (fbm(q * 2.6 + seed) - 0.5) * 0.22)) * blot;
+          float gl = 1.0 - smoothstep(0.06, 0.2, length(q - vec2(-0.24, 0.26)) + (vn(q * 9.0 + seed) - 0.5) * 0.06); // one wet glint, not a ring
+          col = mix(col, mix(blk, I3, gl * 0.55), bf); a = max(a, bf);
+        } else {
+          // the seal's border: a rough vermilion square round the figure
+          vec2 q = vL; float ed = min(min(q.x, 1.0 - q.x), min(q.y, 1.0 - q.y)) * len + (vn(q * 22.0 + seed) - 0.5) * 0.22;
+          float bd = smoothstep(0.0, 0.06, ed) * (1.0 - smoothstep(0.62, 0.7, ed));
+          col = mix(VER, I1, 0.06); a = bd * verm * (0.85 + 0.15 * vn(q * 70.0));
+        }
+        a *= al; if (a < 0.01) discard;
+        gl_FragColor = vec4(outc(col), clamp(a, 0.0, 1.0));
+      }`, {}, { transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1.5, polygonOffsetUnits: -1.5 });
+    const m = new THREE.InstancedMesh(fg, fm, FIG_N); m.frustumCulled = false; m.renderOrder = 7; m.visible = false; g.add(m);
+    for (let i = 0; i < FIG_N; i++) { _m.position.set(0, -50, 0); _m.rotation.set(0, 0, 0); _m.scale.set(0.001, 1, 0.001); _m.updateMatrix(); m.setMatrixAt(i, _m.matrix); }
+    S.figM = { mesh: m, A, B, C };
+  }
+  function syncFigure(S, b, t, dt) {
+    const FM = S.figM, F = S.fig, M = FM.mesh, p = G.player;
+    if (!F) { M.visible = false; return; }
+    M.visible = true; const n = F.L.length, el = t - F.t0, dl = (FIG_SK - 0.1) / n, A = FM.A, B = FM.B, C = FM.C, done = F.state === 'done', dR = done ? t - F.tR : 0;
+    if (!F.vIni) { F.vIni = true; const sd = vrand() * 40;
+      for (let i = 0; i < FIG_NL; i++) { if (i < n) { const l = F.L[i], P = F.J[l.a]; _m.position.set(P.x + Math.sin(l.dir) * l.len / 2, 0.035, P.z + Math.cos(l.dir) * l.len / 2); _m.rotation.set(0, l.dir, 0); _m.scale.set(2.2, 1, l.len); A.setXYZW(i, 0, l.len, 2.2, sd + i * 3.7); }
+        else { _m.position.set(0, -50, 0); _m.scale.set(0.001, 1, 0.001); A.setXYZW(i, 0, 1, 1, 0); } _m.updateMatrix(); M.setMatrixAt(i, _m.matrix); }
+      for (let j = 0; j < FIG_NJ; j++) { const k = FIG_NL + j, P = F.J[j], on = F.used.includes(j); _m.position.set(on ? P.x : 0, on ? 0.037 : -50, on ? P.z : 0); _m.rotation.set(0, 0, 0); _m.scale.set(on ? 2.6 : 0.001, 1, on ? 2.6 : 0.001); _m.updateMatrix(); M.setMatrixAt(k, _m.matrix); A.setXYZW(k, 1, 0, 2.6, sd + j * 5.1); }
+      const sq = F.ext * 2 + 3.4; _m.position.set(F.cx, 0.036, F.cz); _m.rotation.set(0, F.th, 0); _m.scale.set(sq, 1, sq); _m.updateMatrix(); M.setMatrixAt(FIG_N - 1, _m.matrix); A.setXYZW(FIG_N - 1, 2, sq, sq, sd);
+      M.instanceMatrix.needsUpdate = true; A.needsUpdate = true; }
+    // the sketch, one koto pluck per line
+    const si = Math.min(n - 1, Math.floor(el / dl)); if (el >= 0 && si > F.vPk) { F.vPk = si; pluck(si + 1, 0.09); }
+    // the live line: from the blot toward the player's projection on a line they can ink, shrinking back if they turn round
+    let li = -1, lk = 0;
+    if (F.state === 'live' && F.cur >= 0 && p) for (const [i, j] of figMoves(F, F.cur, F.mask)) {
+      const P = F.J[F.cur], Q = F.J[j], dx = Q.x - P.x, dz = Q.z - P.z, l2 = dx * dx + dz * dz, k = ((p.pos.x - P.x) * dx + (p.pos.z - P.z) * dz) / l2;
+      if (k > 0 && k < 1.05 && figSegD(p.pos.x, p.pos.z, P, Q) < 2.4 && k > lk) { lk = k; li = i; } }
+    const verm = F.res === 'seal' ? sat(dR / 0.12) : 0, sealA = F.res === 'seal' ? 1 - sat((dR - 1.0) / 5) : 1, dry = done ? sat((dR - 0.6) / 1.8) : 0;
+    const fadeA = F.res === 'seal' ? sealA : done ? 1 - sat((dR - 2.2) / 2.2) : 1;
+    for (let i = 0; i < FIG_NL; i++) {
+      if (i >= n) { C.setXYZW(i, 0, 0, 0, 0); continue; }
+      const l = F.L[i]; let ink = 0, from = 0;
+      if (l.by) { ink = 1; from = l.from === l.b ? 1 : 0; F.vk[i] = 0; }
+      else { F.vk[i] = i === li ? Math.max(F.vk[i], 0) + (Math.min(lk, 0.97) - F.vk[i]) * Math.min(1, dt * 16) : Math.max(0, F.vk[i] - dt * 4); ink = F.vk[i]; from = F.cur === l.b ? 1 : 0; }
+      const lineA = l.fT > 0 ? 1 - sat((t - l.fT) / 0.25) : !l.by && done && F.res !== 'fail' ? 1 - sat(dR / 1.2) : 1;
+      B.setXYZW(i, sat((el - i * dl) / dl), ink, from, l.ow); C.setXYZW(i, l.by ? verm : 0, fadeA * lineA, l.by ? dry : 0, 0);
+    }
+    for (let j = 0; j < FIG_NJ; j++) {
+      const k = FIG_NL + j; if (!F.used.includes(j)) { C.setXYZW(k, 0, 0, 0, 0); continue; }
+      let f0 = n; F.L.forEach((l, i) => { if (l.a === j || l.b === j) f0 = Math.min(f0, i); });
+      const visited = F.L.some((l) => l.by && (l.a === j || l.b === j)) ? 1 : 0, eye = j === F.eye ? 1 : 0;
+      F.vb[j] = damp(F.vb[j], !done && F.cur === j ? 1 : 0, 10, dt);
+      const ink = eye ? (done && F.res === 'seal' ? sat(dR / 0.3) : 0) : visited, eyeA = eye && F.res === 'eyeless' ? 1 - sat(dR / 1.5) : 1;
+      B.setXYZW(k, sat((el - f0 * dl) / 0.25), ink, 0, eye); C.setXYZW(k, eye ? 0 : visited ? verm : 0, fadeA * eyeA, dry, F.vb[j]);
+    }
+    C.setXYZW(FIG_N - 1, F.res === 'seal' ? sat((dR - 0.15) / 0.12) : 0, sealA, 0, 0);
+    B.needsUpdate = true; C.needsUpdate = true;
+    // the hero drips ink while the brush is down
+    if (F.state === 'live' && F.cur >= 0 && p && vrand() < dt * 9) FX.burst(p.pos.x, 0.9, p.pos.z, { n: 1, color: 0x14130f, speed: [0, 0.6], life: [0.3, 0.5], size: [0.08, 0.14], grav: 16, radius: 0.3 });
   }
 
   // the seal stone that drops on the player in phase two
@@ -18755,7 +18869,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     S.hemi = W.hemi(g, 0xfff4e2, 0x9a907c, 1.25);
     S.sun = W.sun(g, { dir: [-0.5, 0.8, 0.45], color: 0xfff0dc, intensity: 1.3, shadow: false });
     buildSky(S, g); buildGround(S, g); buildMountains(S, g); buildMist(S, g, low); buildMid(S, g); buildBamboo(S, g, low); buildTree(S, g, low); buildBirds(S, g);
-    buildDecals(S, g); buildBulletQuads(S, g); buildTele(S, g); buildEnso(S, g); buildRain(S, g); buildSealBlock(S, g); if (!G.headless) buildOverlay(S, g);
+    buildDecals(S, g); buildFigure(S, g); buildBulletQuads(S, g); buildTele(S, g); buildEnso(S, g); buildRain(S, g); buildSealBlock(S, g); if (!G.headless) buildOverlay(S, g);
     buildDragon(S, b);
     // melee range is measured to the nearest of his body centre, his head and his shoulder coil (dragon space x, z, radius), so a
     // blade under his head is in range. Same in headless sims (fixed rest-pose points, not the animated mesh).
@@ -18764,7 +18878,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       return Math.max(0, d); };
     Object.assign(S, { ink: 1, forceDry: false, dry: false, lk: Object.assign({}, LOOK[0]), lkT: Object.assign({}, LOOK[0]), reveal: 1, draw: 1.2, eye: 1, descend: 0, introOn: false,
       seen: {}, hitAt: {}, leafPred: [], bleed: [], ensoN: 0, enso: null, carved: null, galeOn: 0, galeTell: 0, gwx: 0, gwz: 1, wind: new THREE.Vector2(0.25, 0.08), wash: -1, washK: 0, washDur: 2, splat: 0, frame: 0, seal: -1,
-      sealH: null, sealHitT: -1, grind: 0, slump: 0, rear: 0, rake: 0, whip: 0, roar: 0, sweep: 0, dive: 0, rip: -100, bolt: 0, boltA: 0.4, boltT: -10, boltX: 0.5, boltNext: 4, headW: new V3(0, 3, -6), sunRise: 0, birdT: 2, birdNext: 3, dead: false, flat: 0, wetG: 0, lvl: 0 });
+      sealH: null, sealHitT: -1, grind: 0, slump: 0, rear: 0, rake: 0, whip: 0, roar: 0, sweep: 0, dive: 0, rip: -100, bolt: 0, boltA: 0.4, boltT: -10, boltX: 0.5, boltNext: 4, headW: new V3(0, 3, -6), fig: null, figN: 0, figPrev: -1, sunRise: 0, birdT: 2, birdNext: 3, dead: false, flat: 0, wetG: 0, lvl: 0 });
     return {
       edge: 'wall', radius: R, spawn: { x: 0, z: 13 }, bossStart: { x: 0, z: -6, face: 0 }, camDist: 16,
       contains: (x, z) => Math.hypot(x, z) <= R - 0.6,
@@ -18791,7 +18905,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     const S = b.state; if (!S.D) return;
     S.ink = 1; S.forceDry = false; S.dry = false; b.dmgTaken = 1; b.targetable = true; b.autoFace = true;
     S.galeOn = 0; S.galeTell = 0; S.bleed.length = 0; S.leafPred.length = 0; S.enso = null; S.ensoV = null; if (S.ensoM) S.ensoM.visible = false; S.camUp = 0;
-    S.D.duck.fill(0); S.D.fdV.fill(0); S.carved = null; S.sealH = null; S.sealHitT = -1; if (S.sealBlock) S.sealBlock.visible = false;
+    S.D.duck.fill(0); S.D.fdV.fill(0); S.fig = null; if (S.figM) S.figM.mesh.visible = false; S.carved = null; S.sealH = null; S.sealHitT = -1; if (S.sealBlock) S.sealBlock.visible = false;
     S.grind = 0; S.slump = 0; S.rear = 0; S.rake = 0; S.whip = 0; S.roar = 0; S.sweep = 0; S.dive = 0; S.rip = -100; S.wash = -1; S.splat = 0; S.bolt = 0; S.boltT = -10; S.seen = {}; S.hitAt = {}; S.wetG = i === 1 ? 1 : 0; S.grindN = 0;
     const P = S.D.pose; Object.assign(P, { rear: 0, rake: 0, whip: 0, slump: 0, sweep: 0, roar: 0, dive: 0 });
     hideDecals(S); if (S.bq) S.bq.mesh.count = S.bq.glb.count = S.bq.sh.count = 0;
@@ -18818,6 +18932,161 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         if (!G.headless) { const s = h.shape; decal(S, kind, s.x + dx * l / 2, s.z + dz * l / 2, dir, l, w * (kind === 3 ? 0.62 : 0.55), 0.12, 1.2, 7, kind === 3 ? ((a - nodeOff) % 7 + 7) % 7 : undefined); pluck(i + (dry ? 3 : 0), 0.1); Sound.sfx('slash', 0.45, 0.55); spat(s.x + dx * l / 2, s.z + dz * l / 2, 1.2, 8); FX.shake(0.15); }
         if (onSec) onSec(h, a, l); } });
     });
+  }
+
+  // <figure> One Breath: one-stroke figures. Pure (no game state): tools/figfuzz.js loads this block on its own.
+  // Joints sit on a 3 x 3 lattice 5.5 m apart (0 1 2 / 3 4 5 / 6 7 8). Lines join neighbours or two corners of one cell, so a joint is
+  // never closer than 3.9 m to a line it is not on and no two lines overlap (the two diagonals of a cell may cross, away from any joint).
+  // A one-way line (ow) can only be inked from a to b.
+  const FIG_SP = 5.5, FIG_RMAX = 17.5, FIG_NEAR = 4;
+  const FIG_SHAPES = [
+    // 3-line paths, only for the fight's first figure: start at an end and it completes, start in the middle and it dead-ends
+    { e: [[3, 0], [0, 4], [4, 1]], path: 1 }, { e: [[0, 1], [1, 3], [3, 4]], path: 1 }, { e: [[6, 3], [3, 4], [4, 2]], path: 1 },
+    // two odd joints: start on one of them
+    { e: [[0, 1], [1, 4], [4, 0], [4, 7]] },                         // triangle with a tail
+    { e: [[0, 1], [1, 2], [2, 4], [4, 1]] },                         // hook
+    { e: [[0, 1], [1, 4], [4, 3], [3, 0], [0, 4]] },                 // square with one diagonal
+    { e: [[1, 3], [3, 7], [7, 5], [5, 1], [3, 4]] },                 // kite with a spur
+    { e: [[1, 4], [4, 7], [1, 2], [2, 5], [5, 4]] },                 // flag
+    { e: [[0, 3], [3, 4], [4, 1], [1, 0], [3, 6]] },                 // chair
+    { e: [[3, 4], [4, 6], [6, 3], [4, 5], [5, 8]] },                 // pennant
+    { e: [[6, 4], [4, 8], [6, 7], [7, 8], [7, 4]] },                 // tent
+    { e: [[0, 1], [1, 4], [4, 3], [3, 0], [1, 2]] },                 // square with a tail
+    { e: [[3, 4], [4, 7], [7, 6], [6, 3], [3, 1], [1, 4]] },         // house
+    { e: [[1, 3], [3, 7], [7, 5], [5, 1], [1, 4], [4, 7]] },         // diamond with a spine
+    { e: [[0, 1], [1, 4], [4, 3], [3, 0], [0, 4], [4, 8]] },         // square, diagonal and tail
+    { e: [[1, 3], [3, 7], [7, 5], [5, 1], [3, 4], [4, 5]] },         // diamond with a bar
+    { e: [[0, 1], [1, 5], [5, 8], [8, 7], [7, 3], [3, 0], [3, 4]] }, // ring with a spoke
+    { e: [[0, 1], [1, 4], [4, 0], [4, 8], [8, 7], [7, 4], [1, 2]] }, // bow tie with a tail
+    { e: [[3, 4], [4, 7], [7, 6], [6, 3], [3, 1], [1, 4], [4, 5]] }, // house with a porch
+    { e: [[3, 4], [4, 0], [0, 3], [4, 5], [5, 8], [8, 4], [1, 4]] }, // two triangles and a post
+    // no odd joints: every start works with plain lines, so these need one-way lines or the eye
+    { e: [[0, 1], [1, 4], [4, 0], [4, 8], [8, 7], [7, 4]] },         // bow tie
+    { e: [[3, 4], [4, 0], [0, 3], [4, 5], [5, 8], [8, 4]] },         // two triangles
+    { e: [[0, 1], [1, 5], [5, 8], [8, 7], [7, 3], [3, 0]] },         // ring
+  ];
+  const figUsed = (L) => [...new Set(L.flatMap((l) => [l.a, l.b]))];
+  const figOddN = (e) => { const d = new Array(9).fill(0); for (const [a, b] of e) { d[a]++; d[b]++; } return d.filter((v) => v & 1).length; };
+  function figSegD(x, z, A, B) { const dx = B.x - A.x, dz = B.z - A.z, l2 = dx * dx + dz * dz || 1, k = Math.max(0, Math.min(1, ((x - A.x) * dx + (z - A.z) * dz) / l2)); return Math.hypot(x - A.x - dx * k, z - A.z - dz * k); }
+  // the lines that can be inked next from joint c (mask m = lines already inked), as pairs [line, joint it leads to]
+  function figMoves(F, c, m) { const o = []; for (let i = 0; i < F.L.length; i++) { if (m >> i & 1) continue; const l = F.L[i]; if (l.a === c) o.push([i, l.b]); else if (l.b === c && !l.ow) o.push([i, l.a]); } return o; }
+  // the rest of a one-stroke route from joint c with mask m inked (ending on the eye if eye >= 0), as the list of joints to visit, or null
+  function figSolve(F, c, m, eye) {
+    if (m === (1 << F.L.length) - 1) return eye < 0 || c === eye ? [] : null;
+    for (const [i, j] of figMoves(F, c, m)) { const r = figSolve(F, j, m | 1 << i, eye); if (r) { r.unshift(j); return r; } }
+    return null;
+  }
+  const figStarts = (F, eye) => figUsed(F.L).filter((j) => figSolve(F, j, 0, eye));
+  // lay the figure out on the floor: about 9 m from the player toward the middle, no joint within 4 m of them, every joint inside r 17.5,
+  // and a spot beyond it, clear of every joint and line, where the dragon holds still
+  function figPlace(F, r, px, pz) {
+    const used = figUsed(F.L); let ux = -px, uz = -pz; const ul = Math.hypot(ux, uz);
+    if (ul < 1) { const a = r() * Math.PI * 2; ux = Math.sin(a); uz = Math.cos(a); } else { ux /= ul; uz /= ul; }
+    const a0 = Math.atan2(ux, uz);
+    for (let t = 0; t < 200; t++) {
+      const d = 9 + Math.floor(t / 20) * 0.6, a = a0 + (t < 40 ? 0 : (r() - 0.5) * Math.min(2.6, t / 40)), cx = px + Math.sin(a) * d, cz = pz + Math.cos(a) * d;
+      const th = r() * Math.PI * 2, mir = r() < 0.5 ? -1 : 1, cs = Math.cos(th), sn = Math.sin(th), J = [];
+      for (let j = 0; j < 9; j++) { const gx = ((j % 3) - 1) * FIG_SP * mir, gz = (Math.floor(j / 3) - 1) * FIG_SP; J.push({ x: cx + gx * cs + gz * sn, z: cz - gx * sn + gz * cs }); }
+      if (!used.every((j) => Math.hypot(J[j].x, J[j].z) < FIG_RMAX && Math.hypot(J[j].x - px, J[j].z - pz) >= FIG_NEAR)) continue;
+      let ext = 0; for (const j of used) ext = Math.max(ext, Math.hypot(J[j].x - cx, J[j].z - cz));
+      let bx = 0, bz = 0, ok = false;
+      for (let q = 0; q < 11 && !ok; q++) { const ba = a + (q % 2 ? 1 : -1) * Math.ceil(q / 2) * 0.42;
+        for (const rr of [ext + 4.5, ext + 3.2]) { bx = cx + Math.sin(ba) * rr; bz = cz + Math.cos(ba) * rr; const br = Math.hypot(bx, bz); if (br > 16.5) { bx *= 16.5 / br; bz *= 16.5 / br; }
+          if (Math.hypot(bx - px, bz - pz) >= 6 && used.every((j) => Math.hypot(J[j].x - bx, J[j].z - bz) >= 4.5) && F.L.every((l) => figSegD(bx, bz, J[l.a], J[l.b]) >= 3.5)) { ok = true; break; } } }
+      if (!ok) continue;
+      Object.assign(F, { J, used, cx, cz, th, mir, ext, bx, bz }); return true;
+    }
+    return false;
+  }
+  // a figure for phase lvl (0..2) for a player at (px, pz). r() is the fight's seeded stream, prev the last shape, first the fight's first figure.
+  // Phase 1: plain lines, two odd joints. Phase 2: one or two one-way lines that change which starts work. Phase 3: the stroke must end on the eye.
+  function figMake(lvl, r, px, pz, prev, first) {
+    const pool = []; FIG_SHAPES.forEach((s, k) => { const n = s.e.length;
+      if (first ? s.path : !s.path && k !== prev && (lvl === 0 ? n <= 5 && figOddN(s.e) === 2 : lvl === 1 ? n >= 5 && n <= 6 : n >= 6 && n <= 7)) pool.push(k); });
+    for (let att = 0; att < 100; att++) {
+      const k = pool[Math.floor(r() * pool.length)], L = FIG_SHAPES[k].e.map(([a, b]) => ({ a, b, ow: 0 })), F = { shape: k, L, eye: -1, lvl };
+      if (lvl === 1 || (lvl === 2 && r() < 0.5)) { const idx = L.map((l, i) => i), nOw = lvl === 1 && r() < 0.45 ? 2 : 1;
+        for (let q = 0; q < nOw; q++) { const l = L[idx.splice(Math.floor(r() * idx.length), 1)[0]]; l.ow = 1; if (r() < 0.5) { const t = l.a; l.a = l.b; l.b = t; } } }
+      const used = figUsed(L), deg = new Array(9).fill(0); for (const l of L) { deg[l.a]++; deg[l.b]++; } const odd = used.filter((j) => deg[j] & 1);
+      if (lvl === 2) F.eye = odd.length === 2 ? odd[Math.floor(r() * 2)] : used[Math.floor(r() * used.length)];
+      const starts = figStarts(F, F.eye);
+      if (!starts.length || starts.length === used.length) continue;
+      if (lvl === 1 && figStarts({ L: L.map((l) => ({ a: l.a, b: l.b, ow: 0 })) }, -1).every((j) => starts.includes(j))) continue;
+      if (!figPlace(F, r, px, pz)) continue;
+      let len = 0; for (const l of L) { l.len = Math.hypot(F.J[l.b].x - F.J[l.a].x, F.J[l.b].z - F.J[l.a].z); l.dir = Math.atan2(F.J[l.b].x - F.J[l.a].x, F.J[l.b].z - F.J[l.a].z); len += l.len; }
+      let near = 1e9; for (const s of starts) near = Math.min(near, Math.hypot(F.J[s].x - px, F.J[s].z - pz));
+      F.starts = starts; F.len = len; F.Lmin = near + len; F.T = 1.2 + (lvl === 2 ? 0.9 : 1) * (2.8 + 1.35 * F.Lmin / 7);
+      return F;
+    }
+    return null;
+  }
+  // </figure>
+
+  // ---- One Breath: the dragon sketches a figure and holds his breath; the player is the brush ----
+  const FIG_NL = 8, FIG_NJ = 9, FIG_ARR = 1.4, FIG_SK = 1.2, FIG_REW = [0.015, 0.025], FIG_HOLD = 0.3; // reward: share of max health for a seal, for a seal with the eye dotted; damage he takes while a figure is open
+  function* oneBreath(b) {
+    const S = b.state, p = G.player, lvl = S.lvl;
+    for (const h of S.bleed) Hz.cancel(h); S.bleed.length = 0; S.leafPred.length = 0; // no pool sits on a joint
+    const F = figMake(lvl, () => rnd(), p.pos.x, p.pos.z, S.figPrev, S.figN === 0 && lvl === 0);
+    if (!F) return;
+    S.figPrev = F.shape; S.figN++;
+    Object.assign(F, { t0: G.now, state: 'sketch', cur: -1, at: -1, n: 0, mask: 0, tR: -1, res: '', refT: -9, vk: new Float32Array(FIG_NL), vb: new Float32Array(FIG_NJ), vPk: -1, vIni: false });
+    for (const l of F.L) { l.by = 0; l.from = -1; l.t = -1; l.fT = -1; }
+    S.fig = F; S.rear = 0; b.autoFace = true;
+    if (!G.headless) { dryPrints(S); Sound.sfx('wave', 0.3, 1.6); Sound.note(69, 'flute', 1.4, 0.06); }
+    Co.start((function* () { yield* b.moveTo(F.bx, F.bz, 11); if (S.fig === F && F.state !== 'done') S.rear = 1; })(), 'phase');
+    yield* b.cast({ name: 'One Breath', time: F.T, onTick: (k, cs) => { if (S.fig !== F || F.state === 'done') cs.result = 'done'; } });
+    if (S.fig !== F) return;
+    if (F.state !== 'done') figResolve(b, F, 'fail');
+    S.rear = 0; yield 0.25;
+    if (F.res === 'seal') {
+      // his ink is spent: the seal pulls him down onto the print and binds him, and everything he paints until the next Grind lands dry
+      const big = F.eye >= 0; b.damage(Math.round(b.maxHp * (big ? FIG_REW[1] : FIG_REW[0])), { src: 'player', crit: true });
+      S.ink = 0.05; S.slump = 1; b.autoFace = false; if (!G.headless) { spat(b.pos.x, b.pos.z, 3, 24); Sound.sfx('roar', 0.5, 1.3); }
+      Co.start(b.moveTo(F.cx, F.cz, 13, { face: false }), 'phase');
+      yield big ? 6 : 4.5; S.slump = 0; b.autoFace = true; yield 0.4;
+    } else if (F.res === 'fail') {
+      // he finishes every line you left, then drinks the ink back
+      const left = F.L.filter((l) => !l.by), f = first(b, 'fig'), done = new Set(); if (!G.headless) Sound.sfx('charge', 0.5, 0.7);
+      left.forEach((l, i) => { const A = F.J[l.a], mx = A.x + Math.sin(l.dir) * l.len / 2, mz = A.z + Math.cos(l.dir) * l.len / 2;
+        Hz.rect(A.x, A.z, l.dir, l.len, 2.4, 1.0 + f + 0.12 * i, 380, { name: 'Final Stroke', silent: i > 0, onHit() { S.hitAt['Final Stroke'] = G.now; }, onFire(h) {
+          if (G.now - (S.hitAt['Final Stroke'] === undefined ? -9 : S.hitAt['Final Stroke']) < 0.6) h.dmg = 0;
+          l.fT = G.now;
+          if (!G.headless) { decal(S, 0, mx, mz, l.dir, l.len, 2.4 * 0.55, 0.12, 1.2, 7); pluck(i, 0.1); Sound.sfx('slash', 0.45, 0.55); spat(mx, mz, 1.2, 8); FX.shake(0.15); }
+          for (const j of [l.a, l.b]) { if (done.has(j)) continue; done.add(j); const q = F.J[j];
+            if (lvl === 1) bleedZone(b, q.x, q.z);
+            else if (lvl === 2) Hz.circle(q.x, q.z, 3.2, 0.9 * sp(b), 265, { name: 'Blossom', silent: true, onFire() {
+              if (!G.headless) { decal(S, 1, q.x, q.z, 0, 3.2, 3.2, 0.1, 0.6, 5); FX.burst(q.x, 1, q.z, { n: 18, smoke: true, color: 0xf2a6b8, color2: 0xd9728c, speed: [1, 4], life: [0.5, 1.1], size: [0.2, 0.45], alpha: 0.9, up: 1 }); pluck(4 + j, 0.1); }
+              Bul.ring(q.x, q.z, 5, 5, { r: 0.4, dmg: 90, color: BINK, life: 3, kind: 'petal', name: 'Petal' }, rnd(TAU)); } }); } } }); });
+      S.ink = 1; S.forceDry = false;
+      yield 1.0 + f + 0.12 * left.length + 0.3;
+    } else yield 0.4;
+  }
+  function figResolve(b, F, res) {
+    const S = b.state; F.state = 'done'; F.res = res; F.tR = G.now; S.rear = 0;
+    if (G.headless) return;
+    if (res === 'seal') { taiko(0.85); Sound.sfx('boom', 0.4, 0.8); FX.flash(VERM, 0.1, 4); FX.shake(0.35);
+      if (F.eye >= 0) for (const j of F.used) FX.burst(F.J[j].x, 0.5, F.J[j].z, { n: 22, smoke: true, color: 0xf2a6b8, color2: 0xd9728c, speed: [1, 4.5], life: [0.6, 1.3], size: [0.2, 0.5], alpha: 0.9, up: 2 }); }
+    else if (res === 'eyeless') Sound.note(50, 'flute', 1.8, 0.09);
+    else Sound.sfx('roar', 0.45, 1.15);
+  }
+  // the brush: arrivals at joints (within 1.4 m) ink lines; how the player got there does not matter
+  function figStep(b) {
+    const S = b.state, F = S.fig, p = G.player; if (!F) return;
+    if (F.state === 'done') { if (G.now - F.tR > 8) S.fig = null; return; }
+    if (F.state === 'sketch') { if (G.now - F.t0 < FIG_SK) return; F.state = 'live'; }
+    if (!p || !p.alive) return;
+    let at = -1; for (const j of F.used) if (Math.hypot(p.pos.x - F.J[j].x, p.pos.z - F.J[j].z) < FIG_ARR) { at = j; break; }
+    if (at === F.at) return; F.at = at; if (at < 0 || at === F.cur) return;
+    if (F.cur < 0) { F.cur = at; if (!G.headless) { pluck(0, 0.12); Sound.sfx('slash', 0.2, 0.35); } return; }
+    const mv = figMoves(F, F.cur, F.mask).find(([, j]) => j === at);
+    if (!mv) { // the brush never lifts: a dry scratch, and the blot waits where it was
+      F.refT = G.now; if (!G.headless) { if (Sound.ok()) Sound.noise({ dur: 0.22, vol: 0.12, f: 3400, fEnd: 1300, q: 0.7 }); decal(S, 0, p.pos.x, p.pos.z, p.facing + PI / 2 + vrand() - 0.5, 1.8, 0.5, 0.04, 0.2, 1.4); }
+      return; }
+    const l = F.L[mv[0]]; l.by = 1; l.from = F.cur; l.t = G.now; F.mask |= 1 << mv[0]; F.n++; F.cur = at;
+    if (!G.headless) { pluck(F.n, 0.13); Sound.sfx('slash', 0.25, 0.45); }
+    if (F.mask === (1 << F.L.length) - 1) figResolve(b, F, F.eye < 0 || at === F.eye ? 'seal' : 'eyeless');
+    else if (!figMoves(F, at, F.mask).length) figResolve(b, F, 'fail');
   }
 
   // ---- strokes ----
@@ -19038,7 +19307,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
 
   G.bosses.push({
     id: 'sumi', name: 'GARYO', title: 'The Final Stroke', hint: 'One breath', color: '#e0452c', telegraph: 0xe63a1e,
-    hp: 34000, radius: 2.0, aimY: 2.6, enrage: 300, botSaveInterrupt: true,
+    hp: 34000, radius: 2.0, aimY: 2.6, enrage: 345, botSaveInterrupt: true,
     post: PG[0],
     music: { bpm: 84, root: 38, scale: [0, 2, 3, 7, 9], prog: [0, 0, 3, 0, 0, 0, 4, 2],
       layers: [
@@ -19093,21 +19362,21 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
         resetMech(b, 0); yield 1.0;
         while (true) {
           yield* rake(b); yield 0.8; yield* bamboo(b, false); yield 2.0; yield* drops(b, 3); yield 1.2;
-          yield* rake(b); yield 0.8; yield* bamboo(b, false); yield 2.0; yield* grind(b); yield* drift(b);
+          if (!b.enraged) { yield* oneBreath(b); yield 0.8; } yield* bamboo(b, false); yield 2.0; yield* grind(b); yield* drift(b);
         }
       } },
       { at: 0.66, skipTo(b) { resetMech(b, 1); applyLook(b, 1, true); b.state.wetG = 1; Post.set(PG[1]); }, *enter(b) { yield* toStorm(b); }, *run(b) {
         resetMech(b, 1); yield 0.6;
         while (true) {
-          yield* rake(b); yield 0.6; yield* bamboo(b, true); yield 0.6; yield* drops(b, 4); yield 1.2;
-          yield* gale(b, 3, false); yield 0.3; yield* seal(b); yield* thunder(b); yield 1.2; yield* grind(b); yield* drift(b);
+          yield* bamboo(b, true); yield 0.6; yield* drops(b, 4); yield 1.2;
+          if (!b.enraged) { yield* oneBreath(b); yield 0.6; } yield* gale(b, 3, false); yield 0.3; yield* seal(b); yield* thunder(b); yield 1.2; yield* grind(b); yield* drift(b);
         }
       } },
       { at: 0.33, skipTo(b) { resetMech(b, 2); applyLook(b, 2, true); Post.set(PG[2]); }, *enter(b) { yield* toDawn(b); }, *run(b) {
         resetMech(b, 2); yield 0.6;
         while (true) {
-          yield* rake(b); yield 0.6; yield* branch(b); yield 1.2; yield* enso(b); yield* carved(b);
-          yield* gale(b, 4, true); yield 0.6; yield* branch(b); yield 1.2; yield* grind(b); yield* drift(b);
+          yield* branch(b); yield 1.2; yield* enso(b); yield* carved(b);
+          if (!b.enraged) { yield* oneBreath(b); yield 0.6; } yield* gale(b, 4, true); yield 0.6; yield* branch(b); yield 1.2; yield* grind(b); yield* drift(b);
         }
       } },
     ],
@@ -19116,9 +19385,10 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
       if (!S.D) return;
       // ---- sim ----
       S.dry = isDry(b);
-      if (G.state === 'fight' && !b.transitioning) b.dmgTaken = S.dry && S.lvl < 2 ? 1.25 : 1;
+      if (G.state === 'fight' && !b.transitioning) b.dmgTaken = (S.dry && S.lvl < 2 ? 1.25 : 1) * (S.fig && S.fig.state !== 'done' ? FIG_HOLD : 1); // holding his breath over a figure he is guarded
       if (S.galeOn > 0) { S.galeOn -= dt; if (fight) { p.push.x += S.gwx * 3.2; p.push.z += S.gwz * 3.2; } }
       if (G.state === 'fight' && S.introOn) finishIntro(S);
+      figStep(b);
       if (G.headless) return;
       // ---- cosmetics ----
       const U = S.U, t = G.now, D = S.D, P = D.pose, lk = S.lk, lt = S.lkT;
@@ -19202,7 +19472,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
           _m.position.set(q.x, q.y, q.z); _m.rotation.set(0, q.dir, 0); _m.scale.set(s * 1.3, s * 1.3, s * 1.5); _m.updateMatrix(); GB.setMatrixAt(n, _m.matrix); GB.setColorAt(n, _c.setRGB(pet ? 1 : 0, (n * 0.37) % 1, 0));
           const bs = 0.9 + Math.min(1.2, q.t * 0.5); _m.position.set(q.x, 0.04, q.z); _m.rotation.set(0, q.dir, 0); _m.scale.set(bs, 1, bs * 1.25); _m.updateMatrix(); SH.setMatrixAt(n, _m.matrix); SH.setColorAt(n, _c.setRGB(pet ? 1 : 0, (n * 0.37) % 1, 0)); n++; }
         M.count = GB.count = SH.count = n; if (n) for (const X of [M, GB, SH]) { X.instanceMatrix.needsUpdate = true; X.instanceColor.needsUpdate = true; } }
-      syncTele(S);
+      syncTele(S); syncFigure(S, b, t, dt);
       // the Enso stroke: telegraph wash, the brush sweeping round with the walls, then drying and fading after the cast
       if (S.ensoV) { const E = S.ensoV, el = t - E.t0, u = S.eU.uE.value;
         if (S.enso) E.al = Math.min(1, E.al + dt * 4); else { E.al -= dt * 1.4; E.dry = Math.min(1, E.dry + dt * 2); }
@@ -19221,6 +19491,21 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
     },
     bot(b, p) {
       const S = b.state, out = {};
+      // One Breath: level 3 starts on a joint that works and follows a full route; lower levels start at the nearest joint and take the
+      // nearest line they can ink, so they sometimes paint themselves into a corner
+      if (S.fig && S.fig.state !== 'done') { const F = S.fig, J = F.J, near = (js) => { let bj = -1, bd = 1e9; for (const j of js) { const d = Math.hypot(J[j].x - p.pos.x, J[j].z - p.pos.z); if (d < bd) { bd = d; bj = j; } } return bj; };
+        let tj = -1;
+        if (F.cur < 0) tj = near(Bot.level >= 3 ? F.starts : F.used);
+        else { if (Bot.level >= 3) { if (F.botKey !== F.cur * 1024 + F.mask) { F.botKey = F.cur * 1024 + F.mask; F.botR = figSolve(F, F.cur, F.mask, F.eye); } if (F.botR && F.botR.length) tj = F.botR[0]; }
+          if (tj < 0) tj = near(figMoves(F, F.cur, F.mask).map(([, j]) => j)); } // no full route left: ink what it still can
+        if (tj >= 0) { let x = J[tj].x, z = J[tj].z;
+          // level 3 walks round any other joint on the way, so the brush goes down (and lines are inked) only where it means to
+          if (Bot.level >= 3) for (const j of F.used) { if (j === tj || j === F.cur || figSegD(J[j].x, J[j].z, p.pos, J[tj]) > 2.2) continue;
+            const dx = x - p.pos.x, dz = z - p.pos.z, dl = Math.hypot(dx, dz) || 1, nx = -dz / dl, nz = dx / dl, sg = (p.pos.x - J[j].x) * nx + (p.pos.z - J[j].z) * nz < 0 ? -1 : 1;
+            x = J[j].x + nx * sg * 2.9; z = J[j].z + nz * sg * 2.9; break; }
+          out.x = x; out.z = z; out.w = 3; }
+        out.holdFire = !!p.cls.melee; // a blade cannot reach him from the figure; no gap-closer drags the brush off its line
+        return out; }
       if (S.enso) { const E = S.enso, r = Math.hypot(p.pos.x, p.pos.z), pa = Math.atan2(p.pos.x, p.pos.z), gd = angDiff(pa, E.gapA), gx = Math.sin(E.gapA), gz = Math.cos(E.gapA);
         // straight across the ring while the stretch in front is still unpainted, otherwise out through the gap where the brush lifted
         const rel = (((pa - E.gapA - E.gap / 2) % TAU) + TAU) % TAU, si = rel < TAU - E.gap ? Math.floor(rel / E.arc) : -1, left = si < 0 ? 99 : E.t0 + E.fire0 + E.step * si - G.now;

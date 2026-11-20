@@ -96,6 +96,7 @@ Doors XVI to XX use the ids `ballpark`, `clock`, `logic`, `atelier`, `sumi`.
 - `montage.js <out.png> <cols> <x,y,w,h | full> img...`: tiles (optionally cropped) screenshots into one contact sheet.
 - `diag.js <boss> <class> <expr> <seconds> [phase]`: autopilot run that prints `expr` (JS with `g, G, b, p, S` in scope) every half second, for tracing a mechanic.
 - `logicfuzz.js`: no browser; fuzzes the circuit generator of door `logic` (every circuit must be survivable).
+- `figfuzz.js [N]`: no browser; fuzzes the One Breath figure generator of door `sumi` (N figures per phase, default 20000). Every figure must be solvable in one stroke, have a start that fails, sit inside the terrace with no joint within 4 m of the player and leave the dragon a clear spot; phase 2 one-way lines must change which starts work. Prints the spread of route lengths and cast times.
 - `chessfuzz.js [N]`: no browser; fuzzes the Gambit board generator of door `chess` (N boards per act, default 10000). Every board must leave a reachable square that is safe and gives check. Prints good-square counts and how often each relaxation fired.
 - `chesssim.js <class> [runs] [mode]`: door `chess` autopilot fights with Gambit outcomes. Mode `mix` skips check on a quarter of Gambits, `nocheck` never gives check (that bot should die).
 - `chesslock.js`: door `chess` lock-in audit: every class presses every skill while locked; nobody may leave the square.
