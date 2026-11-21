@@ -71,9 +71,10 @@ nightmare: {
 - `G.nightmare` is set before `build()` runs. Use it to build the nightmare-only things in `build()` (and hide them): nothing should be created mid-fight. `NM(normal, nightmare)` picks a number by difficulty.
 - `Co.stopTag('phase')` skips a coroutine's cleanup. Every per-mechanic visual or flag a cut-off mechanic can leave behind (kneel, rings, a hidden or untargetable body, a grade, slow time) must be reset in the next phase's `enter` and in your overtime. `tools/nmphase.js` checks this.
 - `ent.hpOwner = boss` makes a second body share the boss's health (hits on it land on the boss). `ent.onImmuneHit(info, ent)` is called when an immune body is hit; return true to hide the "IMMUNE" text.
+- Give every nightmare phase after the first a `skipTo(b)` that puts the world in the look that phase starts from (its grade, its colour state), even when its `enter` plays the transition: `?phase=N`, the tools and the rehearsal start phases directly, and `skipTo` is all they get of the phases before.
 - Phase results (`b.phaseLog`) and the fuse need nothing from the boss file.
 
-Check it with `NM=1 node tools/smoke.js <id>`, `node tools/nmclock.js <id> all 6` (with `RAW=1` to tune), `node tools/nmphase.js <id>`, `NM=1 node tools/hitch.js <id>` and `NM=1 node tools/nanscan.js <id>`.
+Check it with `NM=1 node tools/smoke.js <id>`, `node tools/nmclock.js <id> all 6` (with `RAW=1` to tune), `node tools/nmphase.js <id>` (add a case for your mechanics), `NM=1 node tools/hitch.js <id>` and `NM=1 node tools/nanscan.js <id>`.
 
 ## Scripting
 
