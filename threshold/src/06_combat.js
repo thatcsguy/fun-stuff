@@ -212,6 +212,7 @@ class Ent {
     if (G.player) G.player.stats.dmg += amt;
     if (this.onDamaged) this.onDamaged(amt, info, this);
     if (!G.headless) { this.aim(_tv); _tv.x += (vrand() - 0.5) * this.radius; _tv.y += vrand() * 0.8; FX.num(_tv, String(amt), info.crit ? 'crit' : ''); }
+    if (amt > 0 && tgt.isBoss && info.src === 'player' && Settings.superDmg) tgt.superPush();
     if (tgt.hp <= 0) { tgt.hp = 0; tgt.die(); }
     return amt;
   }
@@ -266,13 +267,26 @@ class Boss extends Ent {
     const b = this, ph = this.def.phases[i];
     this.logPhase();
     if (this.overtime) { G.timeScale = 1; if (this.otMusic && this.def.music) Music.play(this.def.music, ph.music !== undefined ? ph.music : i); }
-    this.phaseT = 0; this.overtime = false; this.otMusic = false; this.phaseDmg0 = G.player ? G.player.stats.dmg : 0;
+    this.phaseT = 0; this.liveT = 0; this.overtime = false; this.otMusic = false; this.phaseDmg0 = G.player ? G.player.stats.dmg : 0;
     Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null; this.phase = i; this.nextPhase = i + 1; this.transitioning = true;
     Co.start(function* () {
       if (ph.enter) { b.immune = true; yield* ph.enter(b); b.immune = false; }
       b.transitioning = false; if (ph.music !== undefined) Music.intensity(ph.music); else Music.intensity(i);
       yield* ph.run(b);
     }, 'phase');
+  }
+  // Super damage (testing setting): a landed player hit drops health to just under the next phase threshold, and the
+  // normal threshold check in update() then runs goPhase, so enter hooks, transitions and nightmare clocks behave as usual.
+  // In the last phase the hit kills. Only once the current phase has been live for a moment, so a volley, a multi-hit
+  // attack or a hit during a transition never skips more than one phase.
+  superPush() {
+    const d = this.def, n = this.nextPhase;
+    if (G.rehearsing || G.state !== 'fight' || this.phase < 0 || this.transitioning || (this.liveT || 0) < 0.75) return;
+    G.testUsed = true;
+    if (n >= d.phases.length) { this.hp = 0; return; }
+    const lim = this.maxHp * d.phases[n].at;
+    if (this.hp > lim - 1) this.hp = Math.max(1, Math.floor(lim - 1));
+    this.liveT = 0; // and wait again (goPhase resets it too)
   }
   // ---- per-phase clocks (a phase with `budget` seconds). Only nightmare versions use them; a def without budgets keeps the flat enrage.
   get budgeted() { return this.def.phases.some((p) => p.budget); }
@@ -297,6 +311,7 @@ class Boss extends Ent {
     super.update(dt);
     if (!this.alive || G.state !== 'fight') return;
     const d = this.def;
+    if (!this.transitioning) this.liveT = (this.liveT || 0) + dt;
     if (!this.transitioning && this.nextPhase < d.phases.length && this.hp / this.maxHp <= d.phases[this.nextPhase].at) this.goPhase(this.nextPhase);
     if (this.budgeted) {
       const ph = d.phases[this.phase];

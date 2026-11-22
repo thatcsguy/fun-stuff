@@ -138,6 +138,7 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
 /* ---------- HUD ---------- */
 #hud{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:0;transition:opacity .5s}
 #hud.on{opacity:1}
+#testtag{position:absolute;top:10px;left:14px;font:600 11px/1 system-ui,sans-serif;letter-spacing:.12em;color:#ffcf6a;opacity:.75;text-shadow:0 1px 2px #000}
 #bossframe{position:absolute;top:22px;left:50%;transform:translateX(-50%);width:min(56vw,760px)}
 #bossframe .bn{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--serif);letter-spacing:.2em;font-size:17px;color:#fff;text-shadow:0 1px 6px #000,0 0 2px #000;margin-bottom:4px}
 #bossframe .bn small{font-family:"Segoe UI",system-ui,sans-serif;font-size:12px;letter-spacing:.06em;color:#ddd}
@@ -239,6 +240,7 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
 <div id="hurtv"></div>
 
 <div id="hud">
+  <div id="testtag"></div>
   <div id="bossframe">
     <div class="bn"><span id="bname"></span><small id="bhp"></small></div>
     <div class="bar" id="bbar"><div class="lag"></div><div class="fill"></div></div>
@@ -314,6 +316,9 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
       <div class="srow nav srow-peek" data-adj="camY"><label>Character height on screen</label><input type="range" id="set-camY" min="30" max="60" tabindex="-1"><span class="sv"></span></div>
       <div class="srow nav" data-adj="inv"><label>Invert camera Y</label><div class="seg" id="set-inv"><span data-v="0">Off</span><span data-v="1">On</span></div></div>
       <div class="srow nav" data-adj="q"><label>Graphics</label><div class="seg" id="set-q"><span data-v="low">Low</span><span data-v="med">Medium</span><span data-v="high">High</span></div></div>
+      <h2 class="h2b">Testing</h2>
+      <div class="srow nav" data-adj="godMode"><label>God mode (never below 1 HP)</label><div class="seg" id="set-godMode"><span data-v="0">Off</span><span data-v="1">On</span></div></div>
+      <div class="srow nav" data-adj="superDmg"><label>Super damage (hits skip a phase)</label><div class="seg" id="set-superDmg"><span data-v="0">Off</span><span data-v="1">On</span></div></div>
       <h2 class="h2b">Fixed controls</h2>
       <div class="fixed" id="bind-fixed"></div>
     </div>
@@ -392,7 +397,7 @@ const vrand = Math.random; // cosmetic-only randomness (never affects the sim)
 const NM = (normal, nightmare) => G.nightmare ? nightmare : normal; // pick a number by difficulty
 
 // ---------- settings ----------
-const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null, camY: 50, diff: 'normal' },
+const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null, camY: 50, diff: 'normal', godMode: false, superDmg: false },
   (() => { try { return JSON.parse(localStorage.getItem('th_settings') || '{}'); } catch (e) { return {}; } })());
 function saveSettings() { try { localStorage.setItem('th_settings', JSON.stringify(Settings)); } catch (e) { /* private mode */ } }
 if (QS.get('quality')) Settings.q = QS.get('quality');
@@ -1856,6 +1861,7 @@ class Ent {
     if (G.player) G.player.stats.dmg += amt;
     if (this.onDamaged) this.onDamaged(amt, info, this);
     if (!G.headless) { this.aim(_tv); _tv.x += (vrand() - 0.5) * this.radius; _tv.y += vrand() * 0.8; FX.num(_tv, String(amt), info.crit ? 'crit' : ''); }
+    if (amt > 0 && tgt.isBoss && info.src === 'player' && Settings.superDmg) tgt.superPush();
     if (tgt.hp <= 0) { tgt.hp = 0; tgt.die(); }
     return amt;
   }
@@ -1910,13 +1916,26 @@ class Boss extends Ent {
     const b = this, ph = this.def.phases[i];
     this.logPhase();
     if (this.overtime) { G.timeScale = 1; if (this.otMusic && this.def.music) Music.play(this.def.music, ph.music !== undefined ? ph.music : i); }
-    this.phaseT = 0; this.overtime = false; this.otMusic = false; this.phaseDmg0 = G.player ? G.player.stats.dmg : 0;
+    this.phaseT = 0; this.liveT = 0; this.overtime = false; this.otMusic = false; this.phaseDmg0 = G.player ? G.player.stats.dmg : 0;
     Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null; this.phase = i; this.nextPhase = i + 1; this.transitioning = true;
     Co.start(function* () {
       if (ph.enter) { b.immune = true; yield* ph.enter(b); b.immune = false; }
       b.transitioning = false; if (ph.music !== undefined) Music.intensity(ph.music); else Music.intensity(i);
       yield* ph.run(b);
     }, 'phase');
+  }
+  // Super damage (testing setting): a landed player hit drops health to just under the next phase threshold, and the
+  // normal threshold check in update() then runs goPhase, so enter hooks, transitions and nightmare clocks behave as usual.
+  // In the last phase the hit kills. Only once the current phase has been live for a moment, so a volley, a multi-hit
+  // attack or a hit during a transition never skips more than one phase.
+  superPush() {
+    const d = this.def, n = this.nextPhase;
+    if (G.rehearsing || G.state !== 'fight' || this.phase < 0 || this.transitioning || (this.liveT || 0) < 0.75) return;
+    G.testUsed = true;
+    if (n >= d.phases.length) { this.hp = 0; return; }
+    const lim = this.maxHp * d.phases[n].at;
+    if (this.hp > lim - 1) this.hp = Math.max(1, Math.floor(lim - 1));
+    this.liveT = 0; // and wait again (goPhase resets it too)
   }
   // ---- per-phase clocks (a phase with `budget` seconds). Only nightmare versions use them; a def without budgets keeps the flat enrage.
   get budgeted() { return this.def.phases.some((p) => p.budget); }
@@ -1941,6 +1960,7 @@ class Boss extends Ent {
     super.update(dt);
     if (!this.alive || G.state !== 'fight') return;
     const d = this.def;
+    if (!this.transitioning) this.liveT = (this.liveT || 0) + dt;
     if (!this.transitioning && this.nextPhase < d.phases.length && this.hp / this.maxHp <= d.phases[this.nextPhase].at) this.goPhase(this.nextPhase);
     if (this.budgeted) {
       const ph = d.phases[this.phase];
@@ -4113,8 +4133,15 @@ class Player {
     if (G.hitLog) G.hitLog.push(G.ft.toFixed(1) + ' ' + (o.src ? (o.src.name || (o.src.shape && o.src.shape.type) || (typeof o.src === 'string' ? o.src : 'bullet')) : '?') + ' ' + amt);
     if (!o.dot || amt > 40) { Sound.sfx('hurt', o.dot ? 0.5 : 1); FX.shake(Math.min(0.9, amt / 450)); if (typeof UI !== 'undefined') UI.hurtFlash(amt / this.maxHp); }
     FX.num(this.aim(), '-' + amt, 'hurt');
+    if (this.hp < 1 && Settings.godMode && !G.rehearsing) { this.hp = 1; G.testUsed = true; } // testing: take every hit, never die
     if (this.hp <= 0) { this.hp = 0; this.die(o.src); }
     return amt;
+  }
+  // god mode (testing): a fall puts the player back at the arena's spawn point instead of killing them
+  godRescue() {
+    const A = G.arena || {}, sp = A.spawn || { x: 0, z: 12 }; G.testUsed = true;
+    this.pos.set(sp.x, A.floorY || 0, sp.z); this.vy = 0; this.falling = false; this.grounded = true; this.offT = 0; this.dash = null; this.kb = null; this.invuln = Math.max(this.invuln, 1);
+    FX.num(this.aim(), 'RESCUED', 'note');
   }
   die(src) {
     if (!this.alive) return; this.alive = false; this.casting = null; this.deathT = 0; this.deathSrc = src;
@@ -4175,7 +4202,7 @@ class Player {
       this.vy -= 22 * dt; this.pos.y += this.vy * dt;
       const floor = A && A.floorY || 0;
       if (!this.falling && this.pos.y <= floor) { if (!A || A.edge !== 'fall' || A.contains(this.pos.x, this.pos.z)) { this.pos.y = floor; this.vy = 0; this.grounded = true; } else this.falling = true; }
-      if (this.falling) { this.casting = null; if (this.pos.y < -7) { this.hp = 0; this.die('fall'); } }
+      if (this.falling) { this.casting = null; if (this.pos.y < -7) { if (Settings.godMode && !G.rehearsing) this.godRescue(); else { this.hp = 0; this.die('fall'); } } }
     }
     this.moveSpeed = Math.min(Math.hypot(vx - pux, vz - puz), Math.hypot(this.pos.x - ox, this.pos.z - oz) / Math.max(dt, 1e-4)); // own motion only (being carried by a turning floor or wind is not walking), and none when blocked
     // casting
@@ -4562,7 +4589,10 @@ const UI = (() => {
   }
   function hideCard() { el.card.classList.remove('show'); }
 
+  // a small reminder on the HUD while a testing option is on (fights with one never set records)
+  function testTag() { const n = $('#testtag'); if (n) n.textContent = [Settings.godMode && 'GOD MODE', Settings.superDmg && 'SUPER DAMAGE'].filter(Boolean).join(' · '); }
   function buildHud() {
+    testTag();
     const p = G.player, c = p.cls, hb = $('#hotbar'); hb.innerHTML = ''; slots = [];
     document.documentElement.style.setProperty('--cls', c.color);
     for (const k of Object.keys(cache)) delete cache[k];
@@ -4681,7 +4711,7 @@ const UI = (() => {
   function openSettings(from) { settingsFrom = from; el.settings.classList.toggle('in-fight', from === 'pause'); show('settings'); }
   function refreshSettings() {
     for (const k in RANGE) { const n = $('#set-' + k); n.value = Settings[k]; n.nextElementSibling.textContent = Settings[k] + (k === 'camY' ? '%' : ''); }
-    segSet('inv', Settings.inv ? 1 : 0); segSet('q', Settings.q); segSet('pad', Settings.pad ? 1 : 0); segSet('glyphs', Settings.glyphs || 'auto');
+    segSet('inv', Settings.inv ? 1 : 0); segSet('q', Settings.q); segSet('pad', Settings.pad ? 1 : 0); segSet('glyphs', Settings.glyphs || 'auto'); segSet('godMode', Settings.godMode ? 1 : 0); segSet('superDmg', Settings.superDmg ? 1 : 0);
     buildBinds();
     const items = navItems(); if (focusI >= items.length) focusI = items.length - 1; if (focusI >= 0 && items[focusI]) items[focusI].classList.add('focus');
   }
@@ -4691,6 +4721,7 @@ const UI = (() => {
     else if (k === 'q') { Settings.q = v; Post.setQuality(v); }
     else if (k === 'pad') { Input.setPad(String(v) === '1'); refreshSettings(); return; }
     else if (k === 'glyphs') Settings.glyphs = v;
+    else if (k === 'godMode' || k === 'superDmg') { Settings[k] = String(v) === '1'; if (Settings[k] && G.state === 'fight') G.testUsed = true; testTag(); }
     else if (k === 'diff') {
       const nm = v === 'nightmare'; if ((Settings.diff === 'nightmare') === nm) return;
       const had = focusI >= 0; Settings.diff = nm ? 'nightmare' : 'normal'; saveSettings();
@@ -4908,7 +4939,7 @@ const Game = (() => {
       else { const a = angTo(b.pos.x, b.pos.z, p.pos.x, p.pos.z), r = b.radius * 2 + 9, h = b.aimY; yield* Cam.shot([b.pos.x + Math.sin(a + 0.9) * r, h + 2, b.pos.z + Math.cos(a + 0.9) * r], [b.pos.x, h, b.pos.z], [b.pos.x + Math.sin(a - 0.3) * r * 1.2, h + 4, b.pos.z + Math.cos(a - 0.3) * r * 1.2], [b.pos.x, h * 0.8, b.pos.z], 4.2); }
       UI.hideCard(); Cam.release(); yield 0.7;
     } else { UI.fade(false); Cam.release(); Cam.cineW = 0; }
-    UI.hud(true); G.state = 'fight'; G.ft = 0;
+    UI.hud(true); G.state = 'fight'; G.ft = 0; G.testUsed = !!(Settings.godMode || Settings.superDmg); // testing options on: no records
     const start = clamp(opts.phase || 0, 0, def.phases.length - 1);
     if (start > 0) { b.hp = Math.min(b.maxHp, b.maxHp * def.phases[start].at - 1); for (let i = 0; i < start; i++) if (def.phases[i + 1] && def.phases[i + 1].skipTo) def.phases[i + 1].skipTo(b); }
     b.goPhase(start);
@@ -4950,7 +4981,7 @@ const Game = (() => {
     Co.stopTag('phase'); for (const e of G.ents) if (e.isAdd && e.alive) e.die(); Co.stopTag('fight'); Hz.clear(); Bul.clear(); p.invuln = 999;
     const time = G.ft; b.logPhase();
     let prev, best, newSplit = [];
-    if (def.nm) { // nightmare records live apart from the normal kills: best total, best time per phase on its own, clears
+    if (G.testUsed) { /* god mode or super damage: a test run, nothing is recorded */ } else if (def.nm) { // nightmare records live apart from the normal kills: best total, best time per phase on its own, clears
       if (!Save.nm) Save.nm = {}; if (!Save.nm[def.id]) Save.nm[def.id] = {};
       const r = Save.nm[def.id][p.cls.id] || { best: 0, splits: [], clears: 0 }; prev = r.best; best = !prev || time < prev; if (best) r.best = Math.round(time * 10) / 10;
       (b.phaseLog || []).forEach((q, i) => { if (q && (!r.splits[i] || q.time < r.splits[i])) { if (r.splits[i]) newSplit[i] = true; r.splits[i] = q.time; } });
@@ -4969,7 +5000,7 @@ const Game = (() => {
       }
       G.timeScale = 1; let t = 0; while (t < 1.6) { t += G.rdt || 0.016; yield; }
       $('#vic-title').textContent = def.name + ' FALLS';
-      $('#vic-stats').innerHTML = `<b>${p.cls.name}</b> &nbsp; time <b>${UI.fmtT(time)}</b>${best && prev ? ' (new best)' : ''} &nbsp; attempts <b>${tries}</b> &nbsp; damage taken <b>${Math.round(p.stats.taken)}</b>`;
+      $('#vic-stats').innerHTML = `<b>${p.cls.name}</b> &nbsp; time <b>${UI.fmtT(time)}</b>${G.testUsed ? ' (test run, not recorded)' : best && prev ? ' (new best)' : ''} &nbsp; attempts <b>${tries}</b> &nbsp; damage taken <b>${Math.round(p.stats.taken)}</b>`;
       UI.phaseTable($('#vic-phases'), b, newSplit);
       UI.hud(false); UI.show('victory'); if (document.pointerLockElement) document.exitPointerLock();
     }, 'sys');
