@@ -113,7 +113,7 @@ const Game = (() => {
       else { const a = angTo(b.pos.x, b.pos.z, p.pos.x, p.pos.z), r = b.radius * 2 + 9, h = b.aimY; yield* Cam.shot([b.pos.x + Math.sin(a + 0.9) * r, h + 2, b.pos.z + Math.cos(a + 0.9) * r], [b.pos.x, h, b.pos.z], [b.pos.x + Math.sin(a - 0.3) * r * 1.2, h + 4, b.pos.z + Math.cos(a - 0.3) * r * 1.2], [b.pos.x, h * 0.8, b.pos.z], 4.2); }
       UI.hideCard(); Cam.release(); yield 0.7;
     } else { UI.fade(false); Cam.release(); Cam.cineW = 0; }
-    UI.hud(true); G.state = 'fight'; G.ft = 0;
+    UI.hud(true); G.state = 'fight'; G.ft = 0; G.testUsed = !!(Settings.godMode || Settings.superDmg); // testing options on: no records
     const start = clamp(opts.phase || 0, 0, def.phases.length - 1);
     if (start > 0) { b.hp = Math.min(b.maxHp, b.maxHp * def.phases[start].at - 1); for (let i = 0; i < start; i++) if (def.phases[i + 1] && def.phases[i + 1].skipTo) def.phases[i + 1].skipTo(b); }
     b.goPhase(start);
@@ -155,7 +155,7 @@ const Game = (() => {
     Co.stopTag('phase'); for (const e of G.ents) if (e.isAdd && e.alive) e.die(); Co.stopTag('fight'); Hz.clear(); Bul.clear(); p.invuln = 999;
     const time = G.ft; b.logPhase();
     let prev, best, newSplit = [];
-    if (def.nm) { // nightmare records live apart from the normal kills: best total, best time per phase on its own, clears
+    if (G.testUsed) { /* god mode or super damage: a test run, nothing is recorded */ } else if (def.nm) { // nightmare records live apart from the normal kills: best total, best time per phase on its own, clears
       if (!Save.nm) Save.nm = {}; if (!Save.nm[def.id]) Save.nm[def.id] = {};
       const r = Save.nm[def.id][p.cls.id] || { best: 0, splits: [], clears: 0 }; prev = r.best; best = !prev || time < prev; if (best) r.best = Math.round(time * 10) / 10;
       (b.phaseLog || []).forEach((q, i) => { if (q && (!r.splits[i] || q.time < r.splits[i])) { if (r.splits[i]) newSplit[i] = true; r.splits[i] = q.time; } });
@@ -174,7 +174,7 @@ const Game = (() => {
       }
       G.timeScale = 1; let t = 0; while (t < 1.6) { t += G.rdt || 0.016; yield; }
       $('#vic-title').textContent = def.name + ' FALLS';
-      $('#vic-stats').innerHTML = `<b>${p.cls.name}</b> &nbsp; time <b>${UI.fmtT(time)}</b>${best && prev ? ' (new best)' : ''} &nbsp; attempts <b>${tries}</b> &nbsp; damage taken <b>${Math.round(p.stats.taken)}</b>`;
+      $('#vic-stats').innerHTML = `<b>${p.cls.name}</b> &nbsp; time <b>${UI.fmtT(time)}</b>${G.testUsed ? ' (test run, not recorded)' : best && prev ? ' (new best)' : ''} &nbsp; attempts <b>${tries}</b> &nbsp; damage taken <b>${Math.round(p.stats.taken)}</b>`;
       UI.phaseTable($('#vic-phases'), b, newSplit);
       UI.hud(false); UI.show('victory'); if (document.pointerLockElement) document.exitPointerLock();
     }, 'sys');

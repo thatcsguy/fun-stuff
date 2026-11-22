@@ -38,7 +38,7 @@ These are the defaults. Settings (title menu or pause) has a Controller On/Off t
 bindings when the controller is off and pad buttons when it is on; click a binding (or A / ✕ on it) and press the new key or button.
 Taking a key another action uses swaps the two. Keyboard bindings can be any key, Shift + a key, or the middle and side mouse buttons;
 Esc cancels, Backspace clears. Fixed and not remappable: left/right mouse camera, wheel zoom, click to target, Esc pause, both sticks,
-Start / Options pause, and A / B (✕ / ○) plus the d-pad in menus. Everything is stored in `localStorage.th_settings`
+Start / Options pause, and A / B (✕ / ○) plus the d-pad in menus. Settings also has two **Testing** toggles: *God mode* (`godMode`: hits land and show as usual but health never drops below 1, and a fall puts you back at the spawn point) and *Super damage* (`superDmg`: a landed hit of yours drops the boss to just under its next phase threshold, so the normal phase change, transitions and nightmare clocks run; in the last phase it kills; one skip per phase, and only once the phase has been live 0.75 s). A fight with either on shows a HUD tag and records no kill time or nightmare split. Everything is stored in `localStorage.th_settings`
 (`pad`: true / false / unset, where unset means the first controller button press turns it on; `glyphs`: auto / xbox / ps; `binds`;
 `diff`: normal / nightmare, the Difficulty toggle on the door page).
 Button prompts follow the connected pad (PlayStation pads are detected by Sony's vendor id 054c) unless overridden.
@@ -99,6 +99,7 @@ Doors XVI to XX use the ids `ballpark`, `clock`, `portal`, `atelier`, `sumi`. Do
 
 `../tools/` has Playwright scripts built on those hooks (they serve the repo locally and swap the CDN for a local three.js package, so they work offline):
 
+- `superdmg.js [door ids]`: the Settings testing options (God mode + Super damage) on, level-3 autopilot clears every door, normal and nightmare; passes when each phase is entered once and in order, the player never dies and the boss falls.
 - `smoke.js <boss>`: every phase with every class in god mode, reports script errors.
 - `NM=1` before any of these tools adds `&nm=1` to every page they load, so `smoke`, `sim`, `matrix`, `hitch`, `nanscan`, `shot` and the rest run the nightmare version unchanged. The nightmare overtime blow pierces god mode on purpose, so god-mode runs still fail a clock.
 - `nmclock.js <boss> [classes|all] [runs]`: nightmare phase clocks. Starts each phase in god mode with the level-3 autopilot and reports the time it took against the budget (`OUT` = ran out). `RAW=1` lifts the budgets to measure raw phase times for tuning; `PASSIVE=1` never attacks (every clock must run out); `SWAPBLIND=1` ignores who is awake in door III's twin phase and always attacks Issen (must run out in phase IV); `SIDEBLIND=1` ignores the called half in door XIX's finale (wears the right paint, stands anywhere); `PHASES=2,3` limits the phases.

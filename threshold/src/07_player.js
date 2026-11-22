@@ -197,8 +197,15 @@ class Player {
     if (G.hitLog) G.hitLog.push(G.ft.toFixed(1) + ' ' + (o.src ? (o.src.name || (o.src.shape && o.src.shape.type) || (typeof o.src === 'string' ? o.src : 'bullet')) : '?') + ' ' + amt);
     if (!o.dot || amt > 40) { Sound.sfx('hurt', o.dot ? 0.5 : 1); FX.shake(Math.min(0.9, amt / 450)); if (typeof UI !== 'undefined') UI.hurtFlash(amt / this.maxHp); }
     FX.num(this.aim(), '-' + amt, 'hurt');
+    if (this.hp < 1 && Settings.godMode && !G.rehearsing) { this.hp = 1; G.testUsed = true; } // testing: take every hit, never die
     if (this.hp <= 0) { this.hp = 0; this.die(o.src); }
     return amt;
+  }
+  // god mode (testing): a fall puts the player back at the arena's spawn point instead of killing them
+  godRescue() {
+    const A = G.arena || {}, sp = A.spawn || { x: 0, z: 12 }; G.testUsed = true;
+    this.pos.set(sp.x, A.floorY || 0, sp.z); this.vy = 0; this.falling = false; this.grounded = true; this.offT = 0; this.dash = null; this.kb = null; this.invuln = Math.max(this.invuln, 1);
+    FX.num(this.aim(), 'RESCUED', 'note');
   }
   die(src) {
     if (!this.alive) return; this.alive = false; this.casting = null; this.deathT = 0; this.deathSrc = src;
@@ -259,7 +266,7 @@ class Player {
       this.vy -= 22 * dt; this.pos.y += this.vy * dt;
       const floor = A && A.floorY || 0;
       if (!this.falling && this.pos.y <= floor) { if (!A || A.edge !== 'fall' || A.contains(this.pos.x, this.pos.z)) { this.pos.y = floor; this.vy = 0; this.grounded = true; } else this.falling = true; }
-      if (this.falling) { this.casting = null; if (this.pos.y < -7) { this.hp = 0; this.die('fall'); } }
+      if (this.falling) { this.casting = null; if (this.pos.y < -7) { if (Settings.godMode && !G.rehearsing) this.godRescue(); else { this.hp = 0; this.die('fall'); } } }
     }
     this.moveSpeed = Math.min(Math.hypot(vx - pux, vz - puz), Math.hypot(this.pos.x - ox, this.pos.z - oz) / Math.max(dt, 1e-4)); // own motion only (being carried by a turning floor or wind is not walking), and none when blocked
     // casting

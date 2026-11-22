@@ -48,7 +48,10 @@ const UI = (() => {
   }
   function hideCard() { el.card.classList.remove('show'); }
 
+  // a small reminder on the HUD while a testing option is on (fights with one never set records)
+  function testTag() { const n = $('#testtag'); if (n) n.textContent = [Settings.godMode && 'GOD MODE', Settings.superDmg && 'SUPER DAMAGE'].filter(Boolean).join(' · '); }
   function buildHud() {
+    testTag();
     const p = G.player, c = p.cls, hb = $('#hotbar'); hb.innerHTML = ''; slots = [];
     document.documentElement.style.setProperty('--cls', c.color);
     for (const k of Object.keys(cache)) delete cache[k];
@@ -167,7 +170,7 @@ const UI = (() => {
   function openSettings(from) { settingsFrom = from; el.settings.classList.toggle('in-fight', from === 'pause'); show('settings'); }
   function refreshSettings() {
     for (const k in RANGE) { const n = $('#set-' + k); n.value = Settings[k]; n.nextElementSibling.textContent = Settings[k] + (k === 'camY' ? '%' : ''); }
-    segSet('inv', Settings.inv ? 1 : 0); segSet('q', Settings.q); segSet('pad', Settings.pad ? 1 : 0); segSet('glyphs', Settings.glyphs || 'auto');
+    segSet('inv', Settings.inv ? 1 : 0); segSet('q', Settings.q); segSet('pad', Settings.pad ? 1 : 0); segSet('glyphs', Settings.glyphs || 'auto'); segSet('godMode', Settings.godMode ? 1 : 0); segSet('superDmg', Settings.superDmg ? 1 : 0);
     buildBinds();
     const items = navItems(); if (focusI >= items.length) focusI = items.length - 1; if (focusI >= 0 && items[focusI]) items[focusI].classList.add('focus');
   }
@@ -177,6 +180,7 @@ const UI = (() => {
     else if (k === 'q') { Settings.q = v; Post.setQuality(v); }
     else if (k === 'pad') { Input.setPad(String(v) === '1'); refreshSettings(); return; }
     else if (k === 'glyphs') Settings.glyphs = v;
+    else if (k === 'godMode' || k === 'superDmg') { Settings[k] = String(v) === '1'; if (Settings[k] && G.state === 'fight') G.testUsed = true; testTag(); }
     else if (k === 'diff') {
       const nm = v === 'nightmare'; if ((Settings.diff === 'nightmare') === nm) return;
       const had = focusI >= 0; Settings.diff = nm ? 'nightmare' : 'normal'; saveSettings();

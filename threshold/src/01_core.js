@@ -53,7 +53,7 @@ const vrand = Math.random; // cosmetic-only randomness (never affects the sim)
 const NM = (normal, nightmare) => G.nightmare ? nightmare : normal; // pick a number by difficulty
 
 // ---------- settings ----------
-const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null, camY: 50, diff: 'normal' },
+const Settings = Object.assign({ vol: 70, mus: 60, sens: 100, psens: 100, inv: false, q: 'high', cls: null, camY: 50, diff: 'normal', godMode: false, superDmg: false },
   (() => { try { return JSON.parse(localStorage.getItem('th_settings') || '{}'); } catch (e) { return {}; } })());
 function saveSettings() { try { localStorage.setItem('th_settings', JSON.stringify(Settings)); } catch (e) { /* private mode */ } }
 if (QS.get('quality')) Settings.q = QS.get('quality');
