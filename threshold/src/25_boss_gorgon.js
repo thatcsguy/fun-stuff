@@ -608,7 +608,7 @@
     yield 0.4;
   }
   function* rouse(b, n) {
-    const r = yield* b.cast({ name: 'Rouse', time: 2.8, interruptible: true });
+    const r = yield* b.cast({ name: 'Rouse', time: 2.8 });
     if (r === 'done') { wake(b, n); FX.flash(VEN, 0.2, 3); yield 0.6; } else yield 1.0;
   }
   function* skyTo(b, o, dur) {

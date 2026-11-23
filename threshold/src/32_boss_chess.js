@@ -572,7 +572,7 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
   }
   function* stalemate(b) {
     const S = b.state; S.raise = 1;
-    const r = yield* b.cast({ name: 'Stalemate', time: 2.8, interruptible: true }); S.raise = 0;
+    const r = yield* b.cast({ name: 'Stalemate', time: 2.8 }); S.raise = 0;
     if (r === 'done') { b.hp = Math.min(b.maxHp * 0.33, b.hp + b.maxHp * 0.04); Sound.sfx('bell', 1, 0.4); FX.pillar(b.pos.x, b.pos.z, { r: 2.2, h: 20, color: 0x60ff90, dur: 0.9 }); }
     yield 0.6;
   }
@@ -664,7 +664,6 @@ float fb3(vec3 p){ float a=0.5,s=0.0; for(int i=0;i<4;i++){ s+=a*n3(p); p=p*2.07
             const res = yield* gambit(b, { types, T: 4.5, keep: true, pawns: true, movers: mover }); n++;
             if (res === 'check') yield 2;
             if (n % 2 === 0) { yield* edict(b); yield* march(b, 2); }
-            if (n % 4 === 3) yield* stalemate(b);
           }
         } },
     ],

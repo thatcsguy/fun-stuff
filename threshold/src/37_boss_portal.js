@@ -1239,7 +1239,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     if (!pairs.length) return;
     const pr = pick(pairs); let gi = -1, gd = 1e9; for (let i = 0; i < S.nOn; i++) { const g = S.gs[i]; if (g.pair !== pr) continue; const d = Math.hypot(g.x - b.pos.x, g.z - b.pos.z); if (d < gd) { gd = d; gi = i; } }
     const g = S.gs[gi]; S.pose.mode = 'reach'; S.pose.reachA = angTo(b.pos.x, b.pos.z, g.x, g.z); S.J.dkey.scale.setScalar(1);
-    const r = yield* b.cast({ name: 'Deadbolt', time: 3.0, interruptible: true, onTick: (k) => { if (!G.headless && Math.floor(k * 6) !== S.dbk) { S.dbk = Math.floor(k * 6); Sound.sfx('tick', 0.5, 0.6 + k * 0.4); } } });
+    const r = yield* b.cast({ name: 'Deadbolt', time: 3.0, onTick: (k) => { if (!G.headless && Math.floor(k * 6) !== S.dbk) { S.dbk = Math.floor(k * 6); Sound.sfx('tick', 0.5, 0.6 + k * 0.4); } } });
     S.J.dkey.scale.setScalar(0.001);
     if (r === 'done' && G.state === 'fight') { padlock(b, pr, gi); clunk(1); }
     else if (r === 'interrupted') { b.stagger = 2.5; S.pose.mode = 'stagger'; yield 2.5; }
@@ -1467,7 +1467,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
 
   G.bosses.push({
     id: 'portal', name: 'JANUS', title: 'The Space Between', hint: 'Mind the gap', color: '#ffd04a', telegraph: CRIMSON,
-    hp: 26000, radius: 1.9, aimY: 3.0, enrage: 420, botSaveInterrupt: true,
+    hp: 26000, radius: 1.9, aimY: 3.0, enrage: 420,
     post: PG[0],
     music: { bpm: 100, root: 41, scale: [0, 2, 3, 5, 7, 9, 10], prog: [0, 0, 3, 4, 0, 0, 5, 4],
       layers: [

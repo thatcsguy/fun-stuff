@@ -544,9 +544,9 @@
   }
   function* meteors(b, n, burn) { yield* b.cast({ name: 'Cinderfall', time: 0.7 }); for (let i = 0; i < n; i++) { const p = G.player; if (i % 2 === 0) meteor(p.pos.x, p.pos.z, burn); else { const a = playerAng() + rnd(-1.4, 1.4), r = rnd(R0 + 2, R1 - 2); meteor(Math.sin(a) * r, Math.cos(a) * r, burn); } yield 0.55; } yield 1.0; }
   function* stoke(b) {
-    const S = b.state; const r = yield* b.cast({ name: 'Stoke the Kiln', time: 3.4, interruptible: true, onTick: (k) => { S.stoke = k; } }); S.stoke = 0;
+    const S = b.state; const r = yield* b.cast({ name: 'Stoke the Kiln', time: 3.4, onTick: (k) => { S.stoke = k; } }); S.stoke = 0;
     if (r !== 'done') { yield 1.2; return; }
-    Sound.sfx('bigboom'); FX.flash(FIRE, 0.45, 2); FX.shake(1); FX.ring(0, 0, { r0: R0, r1: R1 + 4, color: FIRE, dur: 0.8, width: 0.3 }); G.player.hurt(300, { blockable: false, src: { name: 'Eruption' } });
+    Sound.sfx('bigboom'); FX.flash(FIRE, 0.45, 2); FX.shake(1); FX.ring(0, 0, { r0: R0, r1: R1 + 4, color: FIRE, dur: 0.8, width: 0.3 });
     for (let i = 0; i < 5; i++) { const a = rnd(TAU), rr = rnd(R0 + 2, R1 - 2); meteor(Math.sin(a) * rr, Math.cos(a) * rr, true); } yield 1.4;
   }
   function* erupt(b, lvl) {

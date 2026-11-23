@@ -669,7 +669,7 @@
   }
   function* lightning(b, n, puddle) { yield* b.cast({ name: 'Stormcall', time: 0.9 }); for (let i = 0; i < n; i++) { const p = G.player; strike(p.pos.x, p.pos.z, puddle && i % 2 === 0); yield 0.72; } yield 0.8; }
   function* deluge(b, dur = 6) {
-    const S = b.state; S.headTgt.set(0, 7.5, 3); const r = yield* b.cast({ name: 'Deluge', time: 3.2, interruptible: true, onTick: (k) => { S.jawOpen = k; S.maw.color.setHex(TEAL).multiplyScalar(k * 2.5); } });
+    const S = b.state; S.headTgt.set(0, 7.5, 3); const r = yield* b.cast({ name: 'Deluge', time: 3.2, onTick: (k) => { S.jawOpen = k; S.maw.color.setHex(TEAL).multiplyScalar(k * 2.5); } });
     S.maw.color.setHex(TEAL).multiplyScalar(0.2);
     if (r !== 'done') { S.jawOpen = 0; S.headTgt.set(0, 4.5, 4.2); yield 1.4; S.headTgt.set(0, 6.2, 4.2); return; }
     let t = 0, k = 0; S.maw.color.setHex(TEAL).multiplyScalar(2.2);

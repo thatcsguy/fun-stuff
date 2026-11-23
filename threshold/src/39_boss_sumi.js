@@ -1605,7 +1605,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
 
   function* grind(b) {
     const S = b.state; S.forceDry = false; S.rear = 1; S.grind = 0; b.autoFace = true;
-    const r = yield* b.cast({ name: 'Grind Ink', time: 3.0, interruptible: true, onTick: (k) => { S.grind = k; if (!G.headless && Math.floor(k * 8) !== S.gk) { S.gk = Math.floor(k * 8); Sound.sfx('tick', 0.6, 0.5); } } });
+    const r = yield* b.cast({ name: 'Grind Ink', time: 3.0, onTick: (k) => { S.grind = k; if (!G.headless && Math.floor(k * 8) !== S.gk) { S.gk = Math.floor(k * 8); Sound.sfx('tick', 0.6, 0.5); } } });
     S.rear = 0;
     if (r === 'dead') return;
     if (r === 'interrupted') {
@@ -1751,7 +1751,7 @@ float bayer(vec2 p){ vec2 q = mod(floor(p), 4.0); const float BM[16] = float[16]
 
   G.bosses.push({
     id: 'sumi', name: 'GARYO', title: 'The Final Stroke', hint: 'One breath', color: '#e0452c', telegraph: 0xe63a1e,
-    hp: 34000, radius: 2.0, aimY: 2.6, enrage: 345, botSaveInterrupt: true,
+    hp: 34000, radius: 2.0, aimY: 2.6, enrage: 345,
     post: PG[0],
     music: { bpm: 84, root: 38, scale: [0, 2, 3, 7, 9], prog: [0, 0, 3, 0, 0, 0, 4, 2],
       layers: [

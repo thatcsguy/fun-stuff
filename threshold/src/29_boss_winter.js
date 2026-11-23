@@ -485,7 +485,7 @@
   }
   function* howl(b) {
     const S = b.state; S.hornUp = 1; S.howl = 1;
-    const r = yield* b.cast({ name: 'The Long Howl', time: 2.8, interruptible: true }); S.hornUp = 0; S.howl = 0;
+    const r = yield* b.cast({ name: 'The Long Howl', time: 2.8 }); S.hornUp = 0; S.howl = 0;
     if (r === 'done') { Sound.sfx('roar', 1, 0.7); FX.flash(SCENT, 0.12, 2.5); S.rage = 12; loose(b, 2); if (!G.headless) { S.hr.forEach((h, i) => { h.t = -i * 0.22; h.x = b.pos.x; h.z = b.pos.z; h.k = 0; }); } }
     yield 0.8;
   }

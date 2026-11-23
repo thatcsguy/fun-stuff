@@ -407,7 +407,7 @@
     yield 0.6;
   }
   function* encore(b) {
-    const S = b.state, r = yield* b.cast({ name: 'Encore', time: 3.0, interruptible: true, onTick: () => { S.gesture = 1; } });
+    const S = b.state, r = yield* b.cast({ name: 'Encore', time: 3.0, onTick: () => { S.gesture = 1; } });
     if (r !== 'done') { yield 1.2; return; }
     Sound.sfx('clap', 1); FX.flash(ROSE, 0.2, 3);
     for (let i = 0; i < 12; i++) { const q = i % 3 === 2 ? { x: rnd(-13, S.split ? -3 : 13), z: rnd(-7, 7) } : tgtOf(S, i); const x = q.x + rnd(-1.2, 1.2), z = q.z + rnd(-1.2, 1.2); Hz.circle(x, z, 2.3, 1.15, 230, { name: 'Bouquet', color: ROSE, onFire() { FX.burst(x, 0.3, z, { n: 14, color: ROSE, color2: 0xffd0e0, speed: [1, 6], up: 4, grav: 6, life: [0.5, 1.1] }); } }); yield 0.42; }

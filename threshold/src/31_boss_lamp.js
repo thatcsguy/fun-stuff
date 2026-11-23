@@ -395,8 +395,10 @@
     Sound.sfx('roar', 0.6, 1.8); const alive = shuffle(S.cols.filter((c) => c.alive)); for (let k = 0; k < n && k < alive.length; k++) spawnShade(b, alive[k]); yield 0.6;
   }
   function* devour(b) {
-    const S = b.state; S.raise = 1; const r = yield* b.cast({ name: 'Devour Light', time: 3.0, interruptible: true }); S.raise = 0;
-    if (r === 'done') { Sound.sfx('roar', 1, 0.4); FX.flash(0x000000, 0.9, 1.2); S.out = 5.5; } yield 0.6;
+    // no interrupt any more, so Devour no longer puts the whole light out (that made the Black Sun after it unavoidable):
+    // it shrinks the light to its small pool for 5.5 s, like Snuff, so there is always a lit spot to stand in
+    const S = b.state; S.raise = 1; const r = yield* b.cast({ name: 'Devour Light', time: 3.0 }); S.raise = 0;
+    if (r === 'done') { Sound.sfx('roar', 1, 0.4); FX.flash(0x000000, 0.6, 1.2); S.poolT = Math.max(S.poolT || 0, 5.5); } yield 0.6;
   }
   function setAct(b, n) {
     const S = b.state; S.lvl = n; S.flareAt = S.sunAt = 0; S.flareK = S.sunK = 0; S.raise = 0; b.autoFace = true; S.walk = false;

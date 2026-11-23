@@ -546,7 +546,7 @@
   }
   const dronesAlive = () => G.ents.some((q) => q.isAdd && q.alive);
   function* overclock(b, arms = 3, dur = 7) {
-    const S = b.state; const r = yield* b.cast({ name: 'Overclock', time: 3.0, interruptible: true, onTick: (k) => { S.heat = k; } });
+    const S = b.state; const r = yield* b.cast({ name: 'Overclock', time: 3.0, onTick: (k) => { S.heat = k; } });
     if (r !== 'done') { S.heat = 0; yield 1.5; return; }
     Sound.sfx('roar', 0.7, 2.4); let t = 0, a0 = rnd(TAU); const sg = rnd() < 0.5 ? 1 : -1;
     while (t < dur) { for (let k = 0; k < arms; k++) { const a = a0 + k / arms * TAU; Bul.fire({ x: Math.sin(a) * 2.4, z: Math.cos(a) * 2.4, dir: a, speed: 7, dmg: 95, color: b.phase >= 2 ? 0x8a3ae0 : 0xe07a10, shell: b.phase >= 2 ? 0x7428ff : 0xff6000, r: 0.4, life: 4.5 }); } a0 += sg * 0.21; t += 0.13; S.heat = 1; yield 0.13; }
