@@ -80,7 +80,7 @@ Check it with `NM=1 node tools/smoke.js <id>`, `node tools/nmclock.js <id> all 6
 
 Phases are generator coroutines. `yield 1.5` waits seconds, `yield` waits a frame, `yield () => cond` waits for a condition, `yield*` calls another generator. When health crosses the next phase's `at`, the running `run` is cancelled, hazards tagged `'phase'` are cleared, and `enter` then `run` of the next phase start. Use `Co.start(gen, 'fight')` for things that must survive a phase change.
 
-Boss helpers: `yield* b.cast({ name, time, interruptible, onTick })` returns `'done'`, `'interrupted'` or `'dead'`; `yield* b.turnTo(angle)`, `yield* b.moveTo(x, z, speed)`, `b.angToPlayer()`, `b.distToPlayer()`, `b.spawnAdd({ name, hp, x, z, radius, mesh, update, *run, onDeath })`, `b.immune`, `b.targetable`, `b.dmgTaken` (damage multiplier, for armour or vulnerable windows), `b.exposed`.
+Boss helpers: `yield* b.cast({ name, time, onTick })` returns `'done'` or `'dead'` (interrupts were removed: do not pass `interruptible`); `yield* b.turnTo(angle)`, `yield* b.moveTo(x, z, speed)`, `b.angToPlayer()`, `b.distToPlayer()`, `b.spawnAdd({ name, hp, x, z, radius, mesh, update, *run, onDeath })`, `b.immune`, `b.targetable`, `b.dmgTaken` (damage multiplier, for armour or vulnerable windows), `b.exposed`.
 
 ## Hazards (`Hz`)
 

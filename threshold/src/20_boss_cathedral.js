@@ -652,7 +652,7 @@
     for (let k = 0; k < n; k++) { let gap; do { gap = rndi(0, 4); } while (Math.abs(gap - last) < 1 || Math.abs(gap - last) > 3); last = gap; glassWall(b, bothWays && k % 2 === 1, gap); yield gapT; }
   }
   function* dissonance(b, waves = 3) {
-    const r = yield* b.cast({ name: 'Dissonance', time: 3.2, interruptible: true });
+    const r = yield* b.cast({ name: 'Dissonance', time: 3.2 });
     if (r !== 'done') { yield 1.2; return; }
     Sound.sfx('bell', 0.8, 0.7);
     for (let k = 0; k < waves; k++) {
@@ -699,9 +699,8 @@
       *run(a) {
         yield wait;
         while (a.alive) {
-          const r = yield* a.cast({ name: 'Hymn', time: 11, interruptible: true });
+          const r = yield* a.cast({ name: 'Hymn', time: 11 });
           if (r === 'done') { b.hp = Math.min(b.maxHp, b.hp + b.maxHp * 0.035); FX.beam(a.aim(new V3()), b.aim(new V3()), { color: 0xffe0a0, width: 0.5, dur: 0.6 }); FX.flash(0xffe0a0, 0.3, 2.5); Sound.sfx('bell', 1, 1.5); FX.ring(a.pos.x, a.pos.z, { r1: 30, color: 0xffe0a0, dur: 0.8, width: 0.2 }); G.player.hurt(240, { blockable: false, src: { name: 'Hymn' } }); yield 1.5; }
-          else if (r === 'interrupted') { a.dmgTaken = 2; yield 5; a.dmgTaken = 1; }
         }
       },
     });
@@ -864,7 +863,7 @@
     danger(b, x, z) { let best = Infinity; for (const w of b.state.walls) { if (laneOf(x) === w.gap) continue; const tt = (z - w.z) / w.v, th = tt + Math.max(0, w.hold || 0); if (tt > -0.1 && th < best) best = Math.max(0, th); } return best; },
     bot(b, p) {
       const add = G.ents.find((e) => e.isAdd && e.alive); const h = {};
-      if (add) { h.target = add; h.saveInterrupt = true; if (p.cls.melee) { const d = Math.hypot(p.pos.x - add.pos.x, p.pos.z - add.pos.z) || 1; h.x = add.pos.x + (p.pos.x - add.pos.x) / d * 2.2; h.z = add.pos.z + (p.pos.z - add.pos.z) / d * 2.2; } } else h.target = b;
+      if (add) { h.target = add; if (p.cls.melee) { const d = Math.hypot(p.pos.x - add.pos.x, p.pos.z - add.pos.z) || 1; h.x = add.pos.x + (p.pos.x - add.pos.x) / d * 2.2; h.z = add.pos.z + (p.pos.z - add.pos.z) / d * 2.2; } } else h.target = b;
       return h;
     },
   });

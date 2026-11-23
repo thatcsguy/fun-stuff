@@ -618,7 +618,7 @@
   }
   // Rekindle: relights the spark the player stamped and lifts the white-hot lock, so they must stamp again.
   function* roar(b) {
-    const S = b.state; yield* stunned(b); S.jawOpen = 1; const r = yield* b.cast({ name: 'Rekindle', time: 2.4, interruptible: true }); S.jawOpen = 0;
+    const S = b.state; yield* stunned(b); S.jawOpen = 1; const r = yield* b.cast({ name: 'Rekindle', time: 2.4 }); S.jawOpen = 0;
     if (r === 'done') { Sound.sfx('roar', 1, 0.8); const V = S.vol, sp = V && V.lock;
       if (sp && G.now < V.arrive - 0.5) { sp.alive = true; sp.speed = (sp.P.len - sp.s) / Math.max(0.6, (sp.big ? V.land + 0.3 : V.arrive) - G.now); sp.m = S.sparkPool.find((q) => !q.visible); if (sp.m) sp.m.visible = true; if (sp.to >= 0) S.mortars[sp.to].armed = true;
         V.lock = null; for (const o of V.sparks) if (o.alive) { o.locked = false; sparkLook(o); }
@@ -635,7 +635,7 @@
     const S = b.state; if (!pl) { yield 1; return; }
     const V = startVolley(b, pl, o);
     if (pl.arch === 'B') yield* feast(b, V);
-    else { if (!o.calm) { if (!S.obag || !S.obag.length) S.obag = shuffle([0, 1]); yield* OPEN[S.obag.pop()](b); } if (o.rekindle) yield* rekindleWatch(b, V); }
+    else { if (!o.calm) { if (!S.obag || !S.obag.length) S.obag = shuffle([0, 1]); yield* OPEN[S.obag.pop()](b); } }
     yield* waitVolley(b, V, 0.2); yield* pounce(b);
   }
   // Nian's own moves between volleys, drawn from a shuffled bag so the order changes every run

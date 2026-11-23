@@ -601,7 +601,7 @@
   }
   function* cranes(b) {
     const S = b.state; S.wing = -1;
-    const r = yield* b.cast({ name: 'Thousand Cranes', time: 2.6, interruptible: true }); S.wing = 0;
+    const r = yield* b.cast({ name: 'Thousand Cranes', time: 2.6 }); S.wing = 0;
     if (r === 'done') { for (let w = 0; w < 3; w++) { const a = rnd(TAU), sx = Math.sin(a), sz = Math.cos(a), gap = rndi(-3, 3), gap2 = gap + pick([-4, 4, 5]); for (let i = -8; i <= 8; i++) { if (Math.abs(i - gap) <= 1 || i === gap2) continue; const q = Bul.fire({ x: -sx * 22 + sz * i * 1.9, z: -sz * 22 - sx * i * 1.9, dir: a, speed: 10.5, r: 0.42, dmg: 150, color: 0xffffff, life: 4.6 }); if (q) q.pf = 2; } Sound.sfx('wave', 0.6, 2); yield 1.1; } }
     yield 0.6;
   }

@@ -44,7 +44,7 @@ Start / Options pause, and A / B (✕ / ○) plus the d-pad in menus. Settings a
 Button prompts follow the connected pad (PlayStation pads are detected by Sony's vendor id 054c) unless overridden.
 Pad buttons use the W3C standard mapping that Chrome gives Xbox, DualShock 4 and DualSense pads.
 
-Every class has up to seven skills in hotbar slots 0-6 (a slot can be empty). Duskblade and Stormcaller fill all seven the same way: filler, spender, ultimate, mobility, defensive, interrupt, heal. Ashwarden and Hexslinger do not follow that template.
+Every class has up to seven skills in hotbar slots 0-6 (a slot can be empty). Duskblade and Stormcaller fill all seven the same way: filler, spender, ultimate, mobility, defensive, slot 5, heal. Slot 5 (Sunder, Null Pulse) used to be the interrupt and is greyed out until it is redesigned. Ashwarden and Hexslinger do not follow that template.
 
 ## Classes
 
@@ -52,14 +52,14 @@ Every class has up to seven skills in hotbar slots 0-6 (a slot can be empty). Du
 | --- | --- | --- |
 | Duskblade | melee, 7 skills | Builds Momentum with a combo, spends it; Lunge, a parry that counters, three instant heals. |
 | Stormcaller | ranged, 7 skills | Stands still to cast Bolt, spends Static on the move; Blink, a barrier, three cast-time heals. |
-| Ashwarden | melee, 5 skills | No cooldowns. One stamina bar pays for Strike, the Overhead (a wind-up leap that is also the interrupt) and the Roll (passes through blockable hits; a dodged hit makes the next Overhead instant and free). Overdrawing stamina leaves you Winded. Four flasks, which can be drunk or poured on the blade (Kindle) for damage. |
-| Hexslinger | ranged, 5 skills | No cooldowns, no resource, fully mobile. A six-chamber cylinder loaded one round at a time and fired in order: lead (damage, stronger up close), silver (the interrupt, plus Exposed), salve (the heal, six per fight). The sixth shot of a full cylinder emptied without reloading hits double. Spin sends the next round to the back. |
+| Ashwarden | melee, 5 skills | No cooldowns. One stamina bar pays for Strike, the Overhead (a wind-up leap) and the Roll (passes through blockable hits; a dodged hit makes the next Overhead instant and free). Overdrawing stamina leaves you Winded. Four flasks, which can be drunk or poured on the blade (Kindle) for damage. |
+| Hexslinger | ranged, 5 skills | No cooldowns, no resource, fully mobile. A six-chamber cylinder loaded one round at a time and fired in order: lead (damage, stronger up close), silver (weak, leaves the target Exposed), salve (the heal, six per fight). The sixth shot of a full cylinder emptied without reloading hits double. Spin sends the next round to the back. |
 
 ### What a class must be able to do
 
 The twenty fights assume these, so any new class has to provide them in some form (they do not have to be buttons of their own):
 
-- **Stop a cast.** Every door has an interruptible cast about once per rotation (2.4 to 3.4 s long, one of 9 s). The interrupt has to work on adds as well as the boss and has to reach: give it range or a gap closer. Roughly one every 14 s is enough.
+- **No interrupt.** Interrupts were removed (2026-11): no boss cast is interruptible, so every mechanic either always happens or is gone. Do not add `interruptible: true` to a new cast. The engine hook (`Ent.interrupt`, `castState.int`) is still there but unused.
 - **Heal about 1100 over a fight.** 1000 health, no regeneration, hits of 230 to 520. A cast-time or delayed heal is fine: every fight leaves 2 s gaps.
 - **About 110 to 140 damage per second on one target, and be able to point it at adds.** Enrage timers only need about half of that. No area damage is needed.
 - **Be clearly melee (reach 3.4) or clearly ranged (about 34).** Set `melee: true` on a melee class: boss autopilot hints and the autopilot's positioning read that flag.

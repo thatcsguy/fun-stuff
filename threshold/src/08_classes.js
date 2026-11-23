@@ -73,7 +73,7 @@ G.classes.push({
       } },
     { id: 'riposte', name: 'Riposte', icon: 'riposte', cd: 10, gcd: false, act: (p) => p.parryT > 0, desc: 'Parry for a moment. A blocked hit deals no damage, fills Momentum and strikes back hard.',
       fire(p) { p.parryT = 0.85; Sound.sfx('sword', 0.7); FX.ring(p.pos.x, p.pos.z, { r0: 1.6, r1: 0.6, color: 0xffffff, dur: 0.25 }); } },
-    { id: 'sunder', name: 'Sunder', icon: 'sunder', cd: 14, gcd: false, range: MELEE, melee: true, interrupt: true, desc: 'Interrupts a cast. Always leaves the target Exposed (takes more damage).',
+    { id: 'sunder', name: 'Sunder', icon: 'sunder', cd: 14, gcd: false, range: MELEE, melee: true, usable: () => 'no', desc: 'Being redesigned: unavailable for now.', // greyed out until the redesign (interrupts were removed)
       fire(p, t) {
         p.model.swing(3, 0.3); Sound.sfx('hit', 1, 0.6); if (!t || !t.alive) return;
         t.damage(70, { src: 'player' }); t.exposed = 6; hitPoint(p, t, _hp); FX.impact(_hp.x, _hp.y, _hp.z, 0xffd070, 1.1);
@@ -137,7 +137,7 @@ G.classes.push({
       } },
     { id: 'aegis', name: 'Aegis', icon: 'aegis', cd: 20, gcd: false, act: (p) => p.shield > 0, desc: 'A 5 s barrier. If it absorbs a hit, you are filled with Static and your next Bolt is instant.',
       fire(p) { p.shield = p.shieldMax = 450; p.shieldT = 5; p.addBuff('aegis', 5, 'aegis'); Sound.sfx('shield'); FX.dome(p.pos.x, 1.1, p.pos.z, { r: 1.6, r0: 2.6, color: 0x9fe6ff, dur: 0.4 }); } },
-    { id: 'pulse', name: 'Null Pulse', icon: 'pulse', cd: 15, gcd: false, range: 34, interrupt: true, desc: 'Interrupts a cast. Also erases every projectile near you.',
+    { id: 'pulse', name: 'Null Pulse', icon: 'pulse', cd: 15, gcd: false, range: 34, usable: () => 'no', desc: 'Being redesigned: unavailable for now.', // greyed out until the redesign (interrupts were removed)
       fire(p, t) {
         Sound.sfx('zap', 0.8, 0.6); const n = Bul.clearNear(p.pos.x, p.pos.z, 8); FX.ring(p.pos.x, p.pos.z, { r0: 0.5, r1: 8, color: 0xd0a0ff, dur: 0.4, width: 0.2 }); FX.dome(p.pos.x, 1, p.pos.z, { r: 8, color: 0xc090ff, dur: 0.35 });
         if (!t || !t.alive) return; t.aim(_hp); FX.beam(p.hand(_h2), _hp, { color: 0xd0a0ff, width: 0.22, dur: 0.3 }); t.damage(60, { src: 'player' });
@@ -189,7 +189,7 @@ G.classes.push({
         FX.slash(p.pos.x + fx * 0.9, 1.3, p.pos.z + fz * 0.9, p.facing, { r: 3.3, color: hot ? 0xffc040 : 0xff8a3a, tilt: k ? -0.3 : 0.4, flip: !!k, dur: 0.24 });
         if (t && t.alive) { t.damage(48, { src: 'player' }); hitPoint(p, t, _hp); FX.burst(_hp.x, _hp.y, _hp.z, { n: hot ? 16 : 9, color: 0xffb060, color2: 0xff5a20, speed: [2, 9], life: [0.2, 0.55], size: [0.12, 0.36], grav: 6 }); Sound.sfx('hit', 0.7, 0.8); }
       } },
-    { id: 'heavy', name: 'Overhead', icon: 'heavy', moves: true, range: MELEE + AW.REACH, interrupt: true, desc: 'Wind up, leap to the target, bring the blade down. Stops a cast, which refunds the stamina.',
+    { id: 'heavy', name: 'Overhead', icon: 'heavy', moves: true, range: MELEE + AW.REACH, desc: 'Wind up, leap to the target, bring the blade down.',
       usable: awReady, rdy: (p) => p.opening > 0,
       cast: (p) => p.opening > 0 ? 0 : 0.5, moveCast: (p) => !p.dash && !p.kb,
       start(p) { p.model.swing(2, 0.5); if (!G.headless) FX.ring(p.pos.x, p.pos.z, { r0: 2.2, r1: 0.5, color: 0xff8a3a, dur: 0.45, y: p.pos.y + 0.08 }); },
@@ -290,7 +290,7 @@ G.classes.push({
         if (last) { FX.shake(0.3); FX.impact(_hp.x, _hp.y, _hp.z, 0xffffff, 1.2); FX.num(_hp, 'LAST WORD', 'note'); }
       } },
     { id: 'lead', name: 'Load Lead', icon: 'lead', desc: 'Chamber a lead round: plain damage. Hold to keep loading.', usable: hxRoom, fire: hxLoad('L') },
-    { id: 'silver', name: 'Load Silver', icon: 'silver', desc: 'Chamber a silver round: weak, but it stops a cast and leaves the target Exposed.', usable: hxRoom, fire: hxLoad('S'),
+    { id: 'silver', name: 'Load Silver', icon: 'silver', desc: 'Chamber a silver round: weak, but it leaves the target Exposed.', usable: hxRoom, fire: hxLoad('S'),
       rdy: (p) => p.cyl.length < 6 && p.cyl.indexOf('S') < 0 && p.target && p.target.castState && p.target.castState.int },
     { id: 'spin', name: 'Spin', icon: 'spin', desc: 'Send the next round to the back, unfired.',
       usable: (p) => p.cyl.length > 1 || 'no',

@@ -355,8 +355,9 @@
     yield 0.5;
   }
   function* tempest(b) {
-    const S = b.state; S.flapAmp = 1.8; const r = yield* b.cast({ name: 'Tempest Call', time: 2.6, interruptible: true }); S.flapAmp = 1;
-    if (r === 'done') { S.shut = 10; Sound.sfx('roar', 1, 1.4); FX.flash(0x8090b0, 0.25, 2); }
+    // no interrupt any more, so Tempest closes only one of the two thermals (S.shutI) for 10 s instead of both
+    const S = b.state; S.flapAmp = 1.8; const r = yield* b.cast({ name: 'Tempest Call', time: 2.6 }); S.flapAmp = 1;
+    if (r === 'done') { S.shut = 10; S.shutI = rndi(0, 1); Sound.sfx('roar', 1, 1.4); FX.flash(0x8090b0, 0.25, 2); }
     yield 0.4;
   }
 
@@ -460,7 +461,7 @@
       for (const sp of S.spires) { if (!sp.on) continue; const dtf = t - sp.fire; sp.m.position.set(sp.x, dtf * 30 - 15, sp.z); if (dtf > 2.2) { sp.on = false; sp.m.visible = false; } }
       // thermals
       if (S.shut > 0) S.shut -= dt; let inT = false;
-      for (const T of S.therm) { T.a += dt * 0.1; T.x = Math.sin(T.a) * T.r; T.z = Math.cos(T.a) * T.r; T.k = damp(T.k, S.shut > 0 ? 0 : 1, 5, dt); T.grp.position.set(T.x, 0, T.z); T.grp.scale.set(Math.max(0.01, T.k), 1, Math.max(0.01, T.k)); T.grp.visible = T.k > 0.03; if (p && S.shut <= 0 && Math.hypot(p.pos.x - T.x, p.pos.z - T.z) < 2.7) inT = true; }
+      for (const T of S.therm) { T.a += dt * 0.1; T.x = Math.sin(T.a) * T.r; T.z = Math.cos(T.a) * T.r; const shutT = S.shut > 0 && T === S.therm[S.shutI || 0]; T.k = damp(T.k, shutT ? 0 : 1, 5, dt); T.grp.position.set(T.x, 0, T.z); T.grp.scale.set(Math.max(0.01, T.k), 1, Math.max(0.01, T.k)); T.grp.visible = T.k > 0.03; if (p && !shutT && Math.hypot(p.pos.x - T.x, p.pos.z - T.z) < 2.7) inT = true; }
       S.lift = damp(S.lift, inT && p.alive ? 1 : 0, inT ? 4.5 : 3, dt);
       if (p && p.alive && p.grounded) p.pos.y = S.lift * LIFT;
       // signals
@@ -500,7 +501,7 @@
     bot(b, p) {
       const S = b.state;
       if (S.holes.length) { const h = S.holes[0]; return { x: h.x, z: h.z, w: 7 }; }
-      if (S.shear > 0 && S.shut <= 0) { let best = null, bd = 1e9; for (const T of S.therm) { const d = Math.hypot(T.x - p.pos.x, T.z - p.pos.z); if (d < bd) { bd = d; best = T; } } if (best) return { x: best.x + Math.cos(best.a) * 0.6, z: best.z - Math.sin(best.a) * 0.6, w: 7 }; }
+      if (S.shear > 0) { let best = null, bd = 1e9; for (const T of S.therm) { if (S.shut > 0 && T === S.therm[S.shutI || 0]) continue; const d = Math.hypot(T.x - p.pos.x, T.z - p.pos.z); if (d < bd) { bd = d; best = T; } } if (best) return { x: best.x + Math.cos(best.a) * 0.6, z: best.z - Math.sin(best.a) * 0.6, w: 7 }; }
       return {};
     },
   });

@@ -573,13 +573,13 @@
     const cl = Math.hypot(tx - ox, tz - oz); if (cl > 0.5) vCut(b, ox, oz, Math.atan2(tx - ox, tz - oz), cl, 0xffffff); Sound.sfx('crit'); FX.slash(p.pos.x, 1.2, p.pos.z, b.facing, { r: 3.5, color: 0xffffff, dur: 0.3, mult: 1.6 });
     p.hurt(520, { blockable: true, src: { name: 'Counter' } });
   }
+  // Haste is tied to the phase now (no Focus cast to stop): Normal phases 1-3 give 0, 1, 2 stacks; Nightmare (whose first phase is
+  // today's phase 2) gives 1, 2, 3, 3. Each stack shortens his telegraphs by 14% (see tele). Focus is where the new stack shows.
+  const hasteFor = (b) => Math.min(3, Math.max(0, b.phase) + (G.nightmare ? 1 : 0));
   function* focus(b) {
-    const S = b.state; S.walk = false; S.kneel = 0.4;
-    const r = yield* b.cast({ name: 'Thousand-Petal Focus', time: 3.0, interruptible: true, onTick: () => { if (!G.headless && vrand() < 0.5) { const a = vrand() * TAU; FX.burst(b.pos.x + Math.sin(a) * 4, 0.3 + vrand() * 2, b.pos.z + Math.cos(a) * 4, { n: 1, color: ROSE, dir: [-Math.sin(a), 0.1, -Math.cos(a)], spread: 0.1, speed: [5, 8], life: [0.4, 0.6] }); } } });
-    S.kneel = 0;
-    if (r === 'interrupted' && !G.headless) { FX.ring(b.pos.x, b.pos.z, { r0: 0.5, r1: 7, color: PALE, dur: 0.5, width: 0.22, mult: 1.6 }); FX.ring(b.pos.x, b.pos.z, { r0: 0.3, r1: 4, color: ROSE, dur: 0.35, width: 0.3, mult: 1.4 }); petals(b.pos.x, b.pos.z, 60); FX.shake(0.25); }
-    if (r === 'done') { S.haste = Math.min(3, S.haste + 1); FX.dome(b.pos.x, 1, b.pos.z, { r: 6, color: ROSE, dur: 0.6 }); Sound.sfx('roar', 0.6, 2.2); FX.flash(ROSE, 0.25, 3); }
-    yield 0.8;
+    const S = b.state, h = hasteFor(b);
+    if (h > S.haste) { S.haste = h; FX.dome(b.pos.x, 1, b.pos.z, { r: 6, color: ROSE, dur: 0.6 }); Sound.sfx('roar', 0.6, 2.2); FX.flash(ROSE, 0.25, 3); petals(b.pos.x, b.pos.z, 30); }
+    yield 0.3;
   }
   function* petalStorm(b, dur = 6.5, arms = 4) {
     const S = b.state; S.walk = false; petals(b.pos.x, b.pos.z, 20); b.pos.set(0, 0, 0); petals(0, 0, 40);
@@ -754,15 +754,11 @@
     }
     const e = S.lead.ent; e.facing = angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z); yield 0.5;
   }
-  // Focus is cast by the awake one (interruptible, so the interrupt never has to touch the still one); the still one throws one Crescent
+  // Twin Focus: no cast any more; the phase's haste stack shows on both (see hasteFor)
   function* twinFocus(b) {
-    const S = b.state, L = S.lead, F = other(S, L), e = L.ent; S.walk = false; L.kneel = 0.4;
-    Co.start((function* () { yield 1.1; const f = F.ent, p = G.player; moonAt(b, F, 'c', tele(b, 0.95)); })(), 'phase');
-    const r = yield* e.cast({ name: 'Thousand-Petal Focus', time: 3.0, interruptible: true, onTick: () => { if (!G.headless && vrand() < 0.5) { const a = vrand() * TAU; FX.burst(e.pos.x + Math.sin(a) * 4, 0.3 + vrand() * 2, e.pos.z + Math.cos(a) * 4, { n: 1, color: L.col, dir: [-Math.sin(a), 0.1, -Math.cos(a)], spread: 0.1, speed: [5, 8], life: [0.4, 0.6] }); } } });
-    L.kneel = 0;
-    if (r === 'interrupted' && !G.headless) { FX.ring(e.pos.x, e.pos.z, { r0: 0.5, r1: 7, color: L.ice, dur: 0.5, width: 0.22, mult: 1.6 }); petals(e.pos.x, e.pos.z, 60, L.ice); FX.shake(0.25); }
-    if (r === 'done') { S.haste = Math.min(3, S.haste + 1); for (const act of [L, F]) FX.dome(act.ent.pos.x, 1, act.ent.pos.z, { r: 6, color: act.col, dur: 0.6 }); Sound.sfx('roar', 0.6, 2.2); FX.flash(ROSE, 0.25, 3); }
-    yield 0.8;
+    const S = b.state, L = S.lead, F = other(S, L), h = hasteFor(b);
+    if (h > S.haste) { S.haste = h; for (const act of [L, F]) FX.dome(act.ent.pos.x, 1, act.ent.pos.z, { r: 6, color: act.col, dur: 0.6 }); Sound.sfx('roar', 0.6, 2.2); FX.flash(ROSE, 0.25, 3); }
+    yield 0.3;
   }
   // Twin Final Verse: both vanish; seven rose lines and their seven blue mirrors 0.45 s late; both come back at mirrored spots near the player
   function* twinFinalVerse(b, n = 7) {

@@ -375,13 +375,16 @@
     yield D; Sound.sfx('roar', 0.5, 1.5); yield 1.0;
   }
   const myCar = (S) => { const p = G.player, c = carAt(S, p.pos.x, p.pos.z); if (c) return c; let best = null; for (const q of live(S)) if (!best || Math.abs(q.zc - p.pos.z) < Math.abs(best.zc - p.pos.z)) best = q; return best; };
+  // Chain Hook is a dodge now (no interrupt): a chain-wide line follows the player during the cast, locks 0.9 s before the throw,
+  // and only drags and roots you if you are still in it when it fires.
   function* hook(b) {
     const S = b.state, p = G.player; S.hookUp = 1;
-    const r = yield* b.cast({ name: 'Chain Hook', time: 2.8, interruptible: true }); S.hookUp = 0;
-    if (r !== 'done') { yield 1.0; return; }
-    if (!G.headless) FX.beam(new V3(b.pos.x - 2, 3, b.pos.z + 1), p.aim(new V3()), { color: 0xffd080, width: 0.2, dur: 0.4 }); Sound.sfx('sword', 1, 0.5);
-    const tx = b.pos.x, tz = b.pos.z + 5.2, dx = tx - p.pos.x, dz = tz - p.pos.z;
-    if (p.hurt(240, { blockable: true, src: { name: 'Chain Hook' } }) > 0 && p.alive) { p.dash = { vx: dx / 0.4, vz: dz / 0.4, t: 0.4 }; p.casting = null; p.rooted = 1.3; }
+    const ox = b.pos.x, oz = b.pos.z, aimL = (s) => { s.dir = angTo(ox, oz, p.pos.x, p.pos.z); s.len = Math.min(60, Math.hypot(p.pos.x - ox, p.pos.z - oz) + 6); };
+    const sh = { dir: 0, len: 10 }; aimL(sh);
+    Hz.rect(ox, oz, sh.dir, sh.len, 2.4, 2.8, 240, { name: 'Chain Hook', color: 0xffd080, quiet: true, lock: 0.9, track: aimL,
+      onFire(h) { const s = h.shape; if (!G.headless) FX.beam(new V3(ox, 3, oz), new V3(ox + Math.sin(s.dir) * s.len, 1.2, oz + Math.cos(s.dir) * s.len), { color: 0xffd080, width: 0.2, dur: 0.4 }); Sound.sfx('sword', 1, 0.5); },
+      onHit(h, taken) { if (taken > 0 && p.alive) { const tx = b.pos.x, tz = b.pos.z + 5.2, dx = tx - p.pos.x, dz = tz - p.pos.z; p.dash = { vx: dx / 0.4, vz: dz / 0.4, t: 0.4 }; p.casting = null; p.rooted = 1.3; } } });
+    yield* b.cast({ name: 'Chain Hook', time: 2.8 }); S.hookUp = 0;
     yield 0.5; yield* piston(b, true);
   }
   function* lean(b, side, dur = 3.4, withSweep) {

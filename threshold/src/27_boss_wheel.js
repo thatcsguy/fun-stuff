@@ -382,11 +382,11 @@
     S.rakeOn = 0; b.autoFace = true; yield 0.5;
   }
   function* houseEdge(b) {
-    const S = b.state, r = yield* b.cast({ name: 'House Edge', time: 3.0, interruptible: true, onTick: () => { S.gest = 1; } });
-    if (r === 'interrupted') { b.dmgTaken = 1.3; FX.burst(0, 6, 0, { n: 90, color: GOLD, color2: 0xfff0c0, speed: [4, 14], grav: 14, life: [0.8, 1.8], size: [0.15, 0.4] }); Sound.sfx('bell', 0.8, 2.5); Co.start(function* () { yield 6; b.dmgTaken = 1; }, 'fight'); yield 1.0; return; }
+    const S = b.state, r = yield* b.cast({ name: 'House Edge', time: 3.0, onTick: () => { S.gest = 1; } });
     if (r !== 'done') return;
     S.frenzy = 7.5; Sound.sfx('roar', 0.6, 1.8); FX.flash(GOLD, 0.25, 2);
     for (let i = 0; i < 26; i++) { const a = i * 0.55; for (const o of [0, PI]) Bul.fire({ x: Math.sin(a + o) * 3.2, z: Math.cos(a + o) * 3.2, dir: a + o, speed: 6, r: 0.4, dmg: 110, color: 0xd06a08, life: 2.5 }); if (i % 4 === 0) Sound.sfx('tick', 1.5, 2); yield 0.26; }
+    b.dmgTaken = 1.3; FX.burst(0, 6, 0, { n: 90, color: GOLD, color2: 0xfff0c0, speed: [4, 14], grav: 14, life: [0.8, 1.8], size: [0.15, 0.4] }); Sound.sfx('bell', 0.8, 2.5); Co.start(function* () { yield 6; b.dmgTaken = 1; }, 'fight'); // the house pays out: open for 6 s
     yield 1.0;
   }
   const turn = (S) => { S.wT = -S.wT; Sound.sfx('steam', 0.8, 0.5); };
