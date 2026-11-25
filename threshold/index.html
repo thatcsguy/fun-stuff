@@ -353,11 +353,6 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const QS = new URLSearchParams(location.search);
-// Every 2D canvas in the game (procedural textures, painted floors, HUD bits) is drawn on the CPU. Left alone, the browser
-// draws canvases with the graphics card: its own shaders get compiled the first time each kind of stroke, gradient or blend
-// is used, and handing the result to WebGL as a texture stalls the frame. Both showed up as freezes in fights that repaint
-// a canvas while you play (see 12_hitch.js). ?warm=old leaves canvases as the browser likes, for before/after measurements.
-if (QS.get('warm') !== 'old') { const gc = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (type, o) { return gc.call(this, type, type === '2d' ? Object.assign({ willReadFrequently: true }, o) : o); }; }
 const TAU = Math.PI * 2, PI = Math.PI;
 const V3 = THREE.Vector3;
 const $ = (s) => document.querySelector(s);
@@ -18489,7 +18484,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
   function lay(S, sh) { // sh.m = pigment, or 0 to scrape the floor clean
     sh.t0 = G.ft; sh.dry = false; sh.seed = (S.seed = (S.seed + 7919) % 100003);
     cells(S, sh, (k) => { S.pig[k] = sh.m; S.dryAt[k] = sh.m ? G.ft + WET : 0; });
-    S.strokes.push(sh); if (G.headless) { S.fresh.length = 0; S.full = true; } else S.fresh.push(sh); if (S.strokes.length > 110) { S.baked.push(S.strokes.shift()); if (S.baked.length > 400) S.baked.shift(); S.full = true; }
+    S.strokes.push(sh); if (G.headless) { S.fresh.length = 0; S.full = true; S.now = true; } else S.fresh.push(sh); if (S.strokes.length > 110) { S.baked.push(S.strokes.shift()); if (S.baked.length > 400) S.baked.shift(); S.full = true; }
   }
   const wetAt = (S, x, z) => { const i = Math.floor((x + R) / CELL), j = Math.floor((z + R) / CELL); if (i < 0 || j < 0 || i >= GN || j >= GN) return 0; const k = j * GN + i; return S.dryAt[k] > G.ft ? S.pig[k] : 0; };
   // x: colour canvas, s: surface canvas (red = height for the bump, green = roughness). Hue, extent, opacity and marks are
@@ -18542,8 +18537,8 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     x.restore(); s.restore();
   }
   // bare canvas (weave, mottling, a falloff toward the edge, the charcoal edge line) into the bitmaps that old dry paint bakes into
-  function baseInto(S) {
-    const x = S.bctx, s = S.bsctx, neg = S.neg, r = mulberry(77); x.globalAlpha = 1; x.fillStyle = neg ? '#07070c' : '#d9d2c2'; x.fillRect(0, 0, N, N);
+  function baseInto(x, s, neg) {
+    const r = mulberry(77); x.globalAlpha = 1; x.fillStyle = neg ? '#07070c' : '#d9d2c2'; x.fillRect(0, 0, N, N);
     if (!neg) {
       for (let i = 0; i < 46; i++) { const cx = r() * N, cy = r() * N, rad = 40 + r() * 170, g = x.createRadialGradient(cx, cy, 0, cx, cy, rad), dk = r() < 0.55; g.addColorStop(0, dk ? 'rgba(120,98,66,0.06)' : 'rgba(255,252,244,0.07)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(cx - rad, cy - rad, 2 * rad, 2 * rad); }
       x.lineWidth = 1; for (let i = 0; i < N; i += 3) { x.strokeStyle = 'rgba(120,110,95,' + (0.03 + r() * 0.05).toFixed(3) + ')'; x.beginPath(); x.moveTo(i + r() * 0.8, 0); x.lineTo(i + r() * 0.8, N); x.stroke(); x.strokeStyle = 'rgba(120,110,95,' + (0.03 + r() * 0.05).toFixed(3) + ')'; x.beginPath(); x.moveTo(0, i + r() * 0.8); x.lineTo(N, i + r() * 0.8); x.stroke(); }
@@ -18553,15 +18548,32 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     s.globalAlpha = 1; s.fillStyle = 'rgb(128,235,0)'; s.fillRect(0, 0, N, N); s.strokeStyle = 'rgba(92,242,0,0.75)'; s.lineWidth = 1.5; s.beginPath(); for (let i = 0; i < N; i += 4) { s.moveTo(i, 0); s.lineTo(i, N); s.moveTo(0, i); s.lineTo(N, i); } s.stroke();
   }
   const clipC = (k) => { k.save(); k.beginPath(); k.arc(N / 2, N / 2, CLIP * U, 0, TAU); k.clip(); };
+  // The floor is repainted in two ways. A new stroke is stamped straight onto the canvases the floor shows (cheap). Anything
+  // that changes strokes already down (paint drying, old strokes baking into the bitmap, the world turning negative) needs
+  // the whole stack laid again in order, up to 110 strokes on two canvases: far too much for one frame (it used to be done
+  // in one, about twice a second in a busy phase, and each was a visible stall). So a rebuild is a job spread over frames
+  // on CPU work canvases under a time budget, and the finished picture is copied to the visible canvases in one go.
+  // Strokes that land while a job runs are stamped on the visible floor at once and added to the job before it finishes.
+  const BUDGET = 2.5, BUDGET_FAST = 7; // ms of stamping per frame; fast = a look change (phase transition), which should not linger
   function paint(S) {
-    const x = S.ctx, s = S.sctx;
-    if (S.reset) { S.reset = false; baseInto(S); for (const sh of S.baked) sh.inBmp = false; S.full = true; }
-    if (S.full) {
-      S.full = false; clipC(S.bctx); clipC(S.bsctx); for (const sh of S.baked) if (!sh.inBmp && (sh.dry || !sh.m)) { stamp(S, S.bctx, S.bsctx, sh); sh.inBmp = true; } S.bctx.restore(); S.bsctx.restore();
-      x.globalAlpha = 1; s.globalAlpha = 1; x.drawImage(S.bmp, 0, 0); s.drawImage(S.sbmp, 0, 0);
-      clipC(x); clipC(s); for (const sh of S.baked) if (!sh.inBmp) stamp(S, x, s, sh); for (const sh of S.strokes) stamp(S, x, s, sh); x.restore(); s.restore();
-    } else { clipC(x); clipC(s); for (const sh of S.fresh) stamp(S, x, s, sh); x.restore(); s.restore(); }
-    S.fresh.length = 0; S.tex.needsUpdate = true; S.stex.needsUpdate = true;
+    const x = S.ctx, s = S.sctx; let up = false, J = S.job;
+    if (S.reset) { S.reset = false; const B = S.base[S.neg ? 1 : 0]; S.bctx.drawImage(B[0], 0, 0); S.bsctx.drawImage(B[1], 0, 0); for (const sh of S.baked) sh.inBmp = false; S.full = true; S.fast = true; J = S.job = null; }
+    if (S.full) { S.full = false; if (J) J.again = true; else { J = S.job = { st: 0, i: 0, list: S.baked.filter((sh) => !sh.inBmp && (sh.dry || !sh.m)), late: [], fast: S.fast, now: S.now }; S.fast = S.now = false; } }
+    if (S.fresh.length) { clipC(x); clipC(s); for (const sh of S.fresh) { stamp(S, x, s, sh); if (J) J.late.push(sh); } x.restore(); s.restore(); S.fresh.length = 0; up = true; }
+    if (J) {
+      const t0 = performance.now(), lim = J.now ? 1e9 : J.fast ? BUDGET_FAST : BUDGET, over = () => performance.now() - t0 > lim;
+      if (J.st === 0) { // old dry paint goes into the bitmap for good
+        clipC(S.bctx); clipC(S.bsctx); while (J.i < J.list.length) { const sh = J.list[J.i++]; if (!sh.inBmp) { stamp(S, S.bctx, S.bsctx, sh); sh.inBmp = true; } if (over()) break; } S.bctx.restore(); S.bsctx.restore();
+        if (J.i >= J.list.length) { J.st = 1; J.i = 0; S.wctx.globalAlpha = 1; S.wsctx.globalAlpha = 1; S.wctx.drawImage(S.bmp, 0, 0); S.wsctx.drawImage(S.sbmp, 0, 0); J.list = S.baked.filter((sh) => !sh.inBmp).concat(S.strokes.filter((sh) => !J.late.includes(sh))); }
+      }
+      if (J.st === 1 && !over()) { // then everything still on top of it, oldest first
+        clipC(S.wctx); clipC(S.wsctx); while (J.i < J.list.length) { stamp(S, S.wctx, S.wsctx, J.list[J.i++]); if (over()) break; }
+        if (J.i >= J.list.length) { for (const sh of J.late) stamp(S, S.wctx, S.wsctx, sh); J.st = 2; }
+        S.wctx.restore(); S.wsctx.restore();
+      }
+      if (J.st === 2) { x.globalAlpha = 1; s.globalAlpha = 1; x.drawImage(S.wcv, 0, 0); s.drawImage(S.wscv, 0, 0); up = true; S.job = null; if (J.again) S.full = true; }
+    }
+    if (up) { S.tex.needsUpdate = true; S.stex.needsUpdate = true; }
   }
 
   // ---- materials and props ----
@@ -18784,7 +18796,10 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     S.fill = W.sun(g, { dir: [0.6, 0.55, -0.6], color: 0xb4c4ff, intensity: 0.4, shadow: false });
     S.negK = { value: 0 }; S.hueU = { value: new THREE.Color(1, 1, 1) }; S.hueMax = { value: 1 }; S.pK1 = { value: 0 }; S.pK2 = { value: 0 }; S.pT = { value: 0 }; S.propRim = { value: new THREE.Color(0) }; S.woodRim = { value: new THREE.Color(0) }; S.chalk = { value: 0 };
     S.cv = cv(N); S.ctx = S.cv.getContext('2d'); S.tex = ctex(S.cv); S.scv = cv(N); S.sctx = S.scv.getContext('2d'); S.stex = ctex(S.scv, false);
-    S.bmp = cv(N); S.bctx = S.bmp.getContext('2d'); S.sbmp = cv(N); S.bsctx = S.sbmp.getContext('2d');
+    // the bitmap, the work canvases and both bare-canvas bases are CPU canvases: stamping into them costs what the clock says it costs
+    { const cpu = (c) => c.getContext('2d', { willReadFrequently: true });
+      S.bmp = cv(N); S.bctx = cpu(S.bmp); S.sbmp = cv(N); S.bsctx = cpu(S.sbmp); S.wcv = cv(N); S.wctx = cpu(S.wcv); S.wscv = cv(N); S.wsctx = cpu(S.wscv);
+      S.base = [false, true].map((neg) => { const a = cv(N), b = cv(N); baseInto(cpu(a), cpu(b), neg); return [a, b]; }); }
     S.floorM = new THREE.MeshStandardMaterial({ map: S.tex, emissiveMap: S.tex, emissive: 0x000000, roughness: 1, roughnessMap: S.stex, bumpMap: S.stex, bumpScale: 1.4, metalness: 0, envMapIntensity: 0.16 });
     const NMB = !!G.nightmare; // the nightmare version builds its finale (split floor, seam, wall, body tone, varnish ring) up front
     if (NMB) S.splitU = { uSplit: { value: 0 }, uLine: { value: new THREE.Vector2(1, 0) }, uVarn: { value: 99 }, uVarnOn: { value: 0 } };
@@ -18864,7 +18879,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     S.plight = new THREE.PointLight(0xc0d0ff, 0, 14, 1.5); g.add(S.plight);
     S.shBM = shadowMat(); S.shB = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 5.4), S.shBM); S.shB.rotation.x = -PI / 2; S.shB.renderOrder = 2; g.add(S.shB);
     S.shTM = shadowMat(); S.shT = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.8), S.shTM); S.shT.rotation.x = -PI / 2; S.shT.renderOrder = 2; g.add(S.shT);
-    Object.assign(S, { pig: new Uint8Array(GN * GN), dryAt: new Float32Array(GN * GN), strokes: [], baked: [], fresh: [], full: true, reset: true, seed: 11, neg: false, col: RED, wear: 0, wearK: 0, lvl: 0, wash: { x: 0, z: 16.2, r: 2.5 }, roll: null, down: 0, swing: 0, look: 0, lookT: 0, bag: [], dryT: 0, scanT: 0, goal: null, flood: 0, blots: 0, blotList: [], match: 0, dr: { t: 1, on: false, v: 0 }, vr: mulberry(5) });
+    Object.assign(S, { pig: new Uint8Array(GN * GN), dryAt: new Float32Array(GN * GN), strokes: [], baked: [], fresh: [], full: true, reset: true, job: null, now: true, seed: 11, neg: false, col: RED, wear: 0, wearK: 0, lvl: 0, wash: { x: 0, z: 16.2, r: 2.5 }, roll: null, down: 0, swing: 0, look: 0, lookT: 0, bag: [], dryT: 0, scanT: 0, goal: null, flood: 0, blots: 0, blotList: [], match: 0, dr: { t: 1, on: false, v: 0 }, vr: mulberry(5) });
     if (NMB) nmBuild(b, S, g);
     return {
       edge: 'wall', radius: R, spawn: { x: 0, z: 12 }, bossStart: { x: 0, z: -3, face: 0 }, camDist: 17, camPitch: 0.55,
@@ -19306,7 +19321,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
       }
       S.dryT -= dt; if (S.dryT <= 0) { S.dryT = 0.5; for (const L of [S.strokes, S.baked]) for (const sh of L) if (!sh.dry && sh.m && G.ft - sh.t0 > WET) { sh.dry = true; S.full = true; } }
       if (G.headless) return;
-      if (S.full || S.fresh.length || S.reset) paint(S);
+      if (S.full || S.fresh.length || S.reset || S.job) paint(S);
       S.look = damp(S.look, S.lookT, 0.7, dt); const k1 = sat(S.look), k2 = sat(S.look - 1); S.pK1.value = k1; S.pK2.value = k2; S.pT.value = t;
       for (const [m, c0, cw] of S.stM) { m.color.copy(c0); if (cw) m.color.multiply(_c.setRGB(1, 1, 1).lerp(cw, k1)); m.color.multiplyScalar(1 - 0.93 * k2); }
       S.wallM.emissive.setHex(0x58534a).multiplyScalar(1 - k2); S.propRim.value.setHex(0x2a8cb0).multiplyScalar(k2 * 0.9); S.woodRim.value.setHex(0x3a4660).multiplyScalar(0.5 + k2 * 0.6); S.chalk.value = k2; S.varnU.uC.value.setScalar(S.neg ? 0.75 : 0.32);
