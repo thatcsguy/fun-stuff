@@ -129,6 +129,10 @@ Starting a fight builds the arena, then plays every phase once, invisibly and he
 
 - Show and hide lights freely, but build them all in `build()`. Lights made mid-fight (on adds) share a spare pool of 6 point lights; a shadow-casting light created mid-fight will recompile everything once.
 - Anything a phase creates (adds, props, swapped materials) is picked up by the rehearsal, as long as the phase reaches it within about 24 s of autopilot play. Make rare one-off objects in `build()` and hide them instead.
+- The warm-up frame gives empty pools one instance to draw (an instanced mesh with count 0, an empty draw range, a hidden material), so nothing needs a "keep one instance alive" trick any more.
+- Effects that outlive a fight (anything under `FX.root`) are re-keyed to each fight's lights during the warm-up. Unlit materials you create mid-fight are fine as long as one material with the same shader existed at load.
+- Never repaint a whole 2D canvas in one frame mid-fight. Stamp new marks only; if old marks must change, rebuild on a CPU canvas a few milliseconds per frame and copy the result over (see `paint` in `38_boss_atelier.js`: flush each stroke with a 1-pixel read so the budget is real, and clip once at the copy, not per stroke).
+- Check a whole fight with `node tools/hitchscan.js <other id>,<id>` (second in the session on purpose): it should list nothing compiled or first drawn after loading.
 - Check with `node tools/hitch.js <id>`: it plays each phase in real frames and lists every shader compiled after the fight started. Aim for none.
 
 ## Before shipping a boss

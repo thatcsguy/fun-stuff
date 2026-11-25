@@ -23,6 +23,7 @@ A PC-first 3D raid game: unrelated boss fights, one behind each door, four class
 | `09_groups.js` | `GROUPS`: which fights the main screen shows under Nightmare / Ready / Almost / Concept (edit it to move a fight; unlisted bosses land in the last group). The toggle buttons above the fights show or hide each group (`Settings.groups`) |
 | `09_ui.js`, `10_game.js` | HUD/menus (including the Difficulty toggle and the per-phase results), fight lifecycle (including the hidden rehearsal at load and nightmare versions), the hall-of-doors menu scene |
 | `11_warm.js` | Warm-up frame and light keeper that stop shader compiles mid-fight |
+| `12_hitch.js` | Freeze log: every late frame during a fight with its cause (Settings > Testing > Freeze log copies it; `?hitch=1` adds first-draw tracking) |
 | `2x_boss_*.js`, `3x_boss_*.js` | One file per boss. Adding a file here adds a fight (add its id to a group in `09_groups.js`, or it lands in the last group). Bosses are shown by name only, with no door numbers. See `BOSS_AUTHORING.md` |
 | `90_bot.js` | Autopilot and the `window.__game` test hooks |
 | `99_tail.js` | Boot and URL parameters |
@@ -112,6 +113,7 @@ Later fights use the ids `clock`, `portal`, `atelier`, `sumi`. `portal` also tak
 - `sim.js <boss> <class> <botLevel> [runs] [maxSec] [phase]`: full autopilot attempts.
 - `tank.js <boss> <class> <botLevel> [hpMult]`: one attempt with extra health, totals damage taken per mechanic.
 - `hits.js <boss> <class> <botLevel>`: one attempt, prints every hit taken.
+- `hitchscan.js [boss,boss|all] [class]`: the freeze hunt. Normal entry with the full intro, then the level-3 autopilot plays the whole fight in god mode in real frames; prints every late frame the freeze log (`12_hitch.js`) recorded with what happened just before it (shader compiled, program drawn for the first time, textures or geometry uploaded, slow step, main thread blocked, memory cleanup, cast, phase). Several ids play in one browser session on purpose: some stalls only happen from the second fight on. `TH_GPU=1` on a real graphics card for timings; `VIRT=1` in a GPU-less sandbox lists causes only; `NM=1`, `MAXSEC`, `SYNC=1` (wait for the GPU each frame), `OLD=1` (warm-up without its 2026-11 additions), `OUT=file.json`. Run one at a time: parallel runs stall each other.
 - `hitch.js <boss>`: plays each phase in real frames and lists every shader compiled after the fight started (should be none). `FRAMES=n` watches each phase longer (default 300 frames); with `NM=1` it also jumps to the last blow and watches it play through.
 - `warmcheck.js [boss...]`: loads fights through the real loading path and prints rehearsal and warm-up times.
 - `shot.js <query> <out.png> [evalJS] [frames]`: screenshot.

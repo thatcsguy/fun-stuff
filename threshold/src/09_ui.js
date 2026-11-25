@@ -236,6 +236,8 @@ const UI = (() => {
     if (c && c.id === id && c.idx === i) { Input.endCapture(); return; }
     Input.beginCapture(dev, id, i); Sound.sfx('uiok'); buildBinds(); focusCell(id, i);
   });
+  // Settings > Testing > Freeze log: everything the freeze log holds (12_hitch.js) goes to the clipboard as text
+  $('#hitch-copy').onclick = () => { const n = $('#hitch-copy'), t = Hitch.text(), done = (ok) => { n.textContent = ok ? 'Copied' : 'Failed'; Sound.sfx('uiok'); setTimeout(() => { n.textContent = 'Copy'; }, 1500); }; try { navigator.clipboard.writeText(t).then(() => done(true), () => done(false)); } catch (e) { done(false); } };
   $('#bind-reset').onclick = () => { Binds.reset(Input.device); Sound.sfx('uiok'); deviceChanged(); };
   function focusCell(id, i) { const items = navItems(), j = items.findIndex((n) => n.dataset.id === id && +n.dataset.i === i); if (j >= 0 && (focusI >= 0 || Input.device === 'pad')) setFocus(j, true); }
   Input.onCapture = (c, value, swapped) => {
