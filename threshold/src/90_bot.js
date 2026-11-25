@@ -1,6 +1,6 @@
 // Autopilot + test hooks (window.__game). Used for balance sims in Playwright; never active for players unless ?bot=N.
 const Bot = {
-  level: 0, timer: 0, goal: null, pressT: 0, passive: false, swapBlind: false,
+  level: 0, timer: 0, goal: null, pressT: 0, passive: false, swapBlind: false, pocketBlind: false,
   update(dt) {
     const p = G.player, b = G.boss;
     if (!this.level || !p || !b || G.state !== 'fight' || !p.alive) { Input.bot = this.level && p ? { moveX: 0, moveZ: 0 } : null; return; }
@@ -49,7 +49,9 @@ const Bot = {
       threat: (x, z) => (Hz.persist(x, z) || (hint.avoid && hint.avoid(x, z))) ? 0 : danger(x, z) };
     if (hint.target && p.target !== hint.target) p.target = hint.target;
     if (ctx.holdFire) p.queue = -1; // a player told to stop does not let a buffered press go through
-    p.cls.bot(p, ctx);
+    // hint.noCast (seconds): a boss says the next hit arrives in that time, so the class does not start a planted cast it cannot finish
+    if (hint.noCast !== undefined) { const pr = p.press; p.press = (i) => { const st = p.sk[i]; if (st && p.castTime(st.def) > hint.noCast) return; return pr.call(p, i); }; try { p.cls.bot(p, ctx); } finally { delete p.press; } }
+    else p.cls.bot(p, ctx);
   },
 };
 
@@ -62,9 +64,10 @@ window.__game = {
   god(on = true) { G.god = on; },
   state() { const p = G.player, b = G.boss; return { state: G.state, t: +G.ft.toFixed(1), phase: b ? b.phase : -1, boss: b ? +(b.hp / b.maxHp * 100).toFixed(1) : 0, hp: p ? Math.round(p.hp) : 0, dps: p ? Math.round(p.stats.dmg / Math.max(1, G.ft)) : 0, taken: p ? Math.round(p.stats.taken) : 0, src: p && p.deathSrc && (typeof p.deathSrc === 'string' ? p.deathSrc : (p.deathSrc.name || (p.deathSrc.shape && p.deathSrc.shape.type) || 'bullet')), errors: G.errors.slice(0, 5) }; },
   // Run the sim headless for `sec` seconds (stops early on death/victory). Returns state().
-  fastForward(sec, stopOnEnd = true) {
+  // onStep (tests): called after every simulated frame with dt, e.g. to sample the player's casting (tools/nmpace.js).
+  fastForward(sec, stopOnEnd = true, onStep = null) {
     G.headless = true; const dt = 1 / 60; let n = Math.round(sec * 60), tail = 30;
-    try { while (n-- > 0) { Bot.update(dt); G.step(dt * G.timeScale); if (stopOnEnd && (G.state === 'dead' || G.state === 'win') && tail-- <= 0) break; } } finally { G.headless = false; }
+    try { while (n-- > 0) { Bot.update(dt); G.step(dt * G.timeScale); if (onStep) onStep(dt * G.timeScale); if (stopOnEnd && (G.state === 'dead' || G.state === 'win') && tail-- <= 0) break; } } finally { G.headless = false; }
     return this.state();
   },
   // Run `sec` seconds of frames with effects on but without rendering, so a screenshot taken next shows live particles and telegraphs.

@@ -58,7 +58,8 @@ const { launch } = require('./harness.js');
       cut(ph, 'during Final Verse', (b) => !b.group.visible || b.state.verse);
     }
     // the last phase has no next phase: its mechanics are cut off by the last blow instead (Issen: Niten's swap, a Counter by the
-    // still body, the twin Final Verse, paired Moons). After the last blow's first beat, no mechanic state may remain.
+    // still body, the twin Final Verse, a Moon and its Eye, the Lighthouse Storm and its lanes, Echo from the still one, Twin Petal Storm).
+    // After the last blow's first beat, no mechanic state may remain.
     // FK / NT: force Pentimento's sitting count or Niten's ramp clock first, so the late-ramp mechanics are in play.
     const last = n - 1, LP = def.phases[last];
     const over = (label, cond, bad2, force) => {
@@ -70,7 +71,8 @@ const { launch } = require('./harness.js');
       if (!b.lastBlowing) { out.push('FAIL last blow ' + label + ': did not start'); return; }
       const S = b.state, bad = bad2 ? bad2(b) : [];
       if (!bad2) for (const act of [S.A, S.R].filter(Boolean)) { if (act.warn > 0) bad.push(act.name + '.warn'); if (act.hold) bad.push(act.name + '.hold'); if (act.open > 0) bad.push(act.name + '.open'); if (act.ent.dmgTaken !== 1) bad.push(act.name + '.dmgTaken'); }
-      if (!bad2) { if (!b.group.visible) bad.push('hidden'); if (!b.targetable) bad.push('untargetable'); } if (S.R && S.niten && (!S.R.root.visible || !S.R.ent.targetable)) bad.push('reflection hidden'); if (S.verse) bad.push('verse'); if (S.cine) bad.push('cinematic'); if (S.moonHint) bad.push('moonHint');
+      if (!bad2) { if (!b.group.visible) bad.push('hidden'); if (!b.targetable) bad.push('untargetable'); } if (S.R && S.niten && (!S.R.root.visible || !S.R.ent.targetable)) bad.push('reflection hidden'); if (S.verse) bad.push('verse'); if (S.cine) bad.push('cinematic');
+      if (boss === 'duelist') { if (S.calmHint) bad.push('calmHint'); if (S.lanes && S.lanes.length) bad.push('lanes'); if (S.eye) bad.push('eye'); if (S.storm) bad.push('storm ' + S.storm); if (S.unison) bad.push('unison'); if (S.echoing) bad.push('echoing'); if (S.stormHold) bad.push('stormHold'); if (S.R && S.R.ent.castState) bad.push('reflection cast ' + S.R.ent.castState.name); if (g.Bul.list.some((q) => q.storm)) bad.push('storm petals'); }
       out.push((bad.length ? 'FAIL ' : 'ok   ') + 'last blow ' + label + ` (phase ${last + 1})` + (bad.length ? ': ' + bad.join(', ') : ''));
     };
     const overA = (label, cond, force) => over(label, cond, (b) => { const S = b.state, bad = atelierBad(b).filter((q) => q !== 'varnish ring'); if (S.varnR > 25) bad.push('no varnish ring'); return bad; }, force);
@@ -85,11 +87,14 @@ const { launch } = require('./harness.js');
     }
     if (boss === 'duelist') {
     over('during a swap tell', (b) => b.state.niten && b.state.lead && b.state.lead.warn > 0);
-    over('during a Counter by the still body', (b) => { const S = b.state; if (!S.niten || !S.lead) return false; const F = S.lead === S.A ? S.R : S.A; if (F.still && G.now >= F.graceT && !S.countered) F.ent.damage(10, { src: 'player' }); return F.hold; });
+    over('during a Counter by the still body', (b) => { const S = b.state; if (!S.niten || !S.lead) return false; const F = S.lead === S.A ? S.R : S.A; if (F.still && G.now >= F.graceT && !S.countered) { G.player.target = F.ent; F.ent.damage(10, { src: 'player' }); } return F.hold; });
     over('during the twin Final Verse', (b) => b.state.niten && !b.group.visible);
-    over('during paired Moons', (b) => !!b.state.moonHint);
+    over('during a Full Moon (the Eye)', (b) => !!b.state.eye, null, (S) => { S.nitenT = 2 * def.nmTest.RAMP + 20; });
+    over('during the Lighthouse Storm with a cut lane', (b) => b.state.storm === 'on' && b.state.lanes.length > 0);
+    over('during the storm tell', (b) => b.state.storm === 'tell');
+    over('during Echo from the still one', (b) => b.state.echoing, null, (S) => { S.nitenT = 1 * def.nmTest.RAMP; });
     over('during a swap at step 5 (0.9 s tell)', (b) => b.state.niten && b.state.nitenStep === 5 && b.state.lead && b.state.lead.warn > 0, null, (S) => { S.nitenT = 5 * def.nmTest.RAMP; });
-    over('during twin Petal Storm (step 4)', (b) => b.state.niten && b.state.nitenStep >= 4 && g.Bul.list.length > 0, null, (S) => { S.nitenT = 4 * def.nmTest.RAMP; });
+    over('during twin Petal Storm (step 4)', (b) => b.state.niten && b.state.nitenStep >= 4 && b.state.unison && g.Bul.list.some((q) => q.petal && !q.storm), null, (S) => { S.nitenT = 4 * def.nmTest.RAMP; });
     }
     // a restart after a late, ramped fight: the ramp state is back at its start values
     {

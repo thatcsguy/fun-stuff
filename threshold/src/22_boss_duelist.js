@@ -434,6 +434,7 @@
       fragmentShader: 'uniform float uTime; varying float vF; varying vec3 vL; void main(){ float k=clamp(vF,0.0,1.0); float lob=0.5+0.5*cos(atan(vL.z,vL.x+1e-4)*5.0+uTime*2.0); vec3 rim=vec3(1.0,0.34,0.58), body=vec3(0.82,0.1,0.3)*(0.85+0.15*lob), core=vec3(1.15,0.78,0.88);\n vec3 c=mix(rim,body,smoothstep(0.0,0.5,k)); c=mix(c,core,smoothstep(0.955,0.995,k)); gl_FragColor=vec4(clamp(c,vec3(0.0),vec3(1.3)),1.0); }' }), 320);
     S.orb.count = 0; S.orb.frustumCulled = false; g.add(S.orb); S.M4 = new THREE.Matrix4();
     S.orbHalo = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), haloMat(new THREE.Color(0xff3a78).multiplyScalar(0.22)), 320); S.orbHalo.count = 0; S.orbHalo.frustumCulled = false; S.orbHalo.renderOrder = 14; g.add(S.orbHalo);
+    S.lanes = []; S.eye = null; S.stormUntil = 0;
     S.cuts = []; S.haste = 0; S.nitenT = 0; S.nitenStep = 0; S.stepAt = []; S.tellT = 1.2; S.still = false; S.warn = 0; S.graceT = 0; S.walk = false; S.kneel = 0; S.night = 0; S.open = 0; S.torn = false; S.tv = new V3();
     // ---------------------------------------------------------------- nightmare: everything is built here and hidden (nothing is made mid-fight)
     S.A = { name: 'A', ent: b, root: b.group, model: S.model, D, fake: S.fake, aura: S.aura, col: ROSE, ice: PALE, drainU: S.drainA, clipU: S.clipA, mats: S.matsA, drain: 0, still: false, warn: 0, open: 0, graceT: 0, hold: false,
@@ -468,8 +469,18 @@
       S.orbHaloB = new THREE.InstancedMesh(S.orbHalo.geometry, haloMat(new THREE.Color(0x3a78ff).multiplyScalar(0.22)), 200); S.orbHaloB.frustumCulled = false; S.orbHaloB.renderOrder = 14; S.orbHaloB.setMatrixAt(0, new THREE.Matrix4().makeScale(0, 0, 0)); S.orbHaloB.count = 1; g.add(S.orbHaloB);
       // a hit on the still body: no damage, a ripple instead of IMMUNE, and (once per cycle, after the grace) the Counter
       const still = (act) => (info, ent) => { if (!S.niten || !act.still) return false; if (!G.headless) { FX.ring(ent.pos.x, ent.pos.z, { r0: 0.6, r1: 2.4, color: ICE, dur: 0.45, width: 0.12, mult: 1.2 }); }
-        if (info.src === 'player' && G.now >= act.graceT && !S.countered) { S.countered = true; S.cycleClean = false; Co.start(counterN(b, act), 'phase'); } return true; };
+        // only a hit on the still one while he is the selected target counters (a cleave or a stray bolt that catches him does not)
+        if (info.src === 'player' && G.now >= act.graceT && !S.countered && G.player && G.player.target === ent) { S.countered = true; S.cycleClean = false; Co.start(counterN(b, act), 'phase'); } return true; };
       b.onImmuneHit = still(S.A); e.onImmuneHit = still(Rr);
+      // the calm places: a pale streak of still air on the deck for each cut lane, a pale disc for the Eye of the Moon
+      const calmMat = (disc) => new THREE.ShaderMaterial({ uniforms: { uA: { value: 0 }, uLen: { value: 10 }, uC: { value: new THREE.Color(0xffe0ea) }, uT: EU.uTime }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -3,
+        vertexShader: 'varying vec2 vU; void main(){ vU=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+        fragmentShader: disc
+          ? 'uniform float uA,uT; uniform vec3 uC; varying vec2 vU; void main(){ float r=clamp(length(vU*2.0-1.0),0.0,1.0); float rim=smoothstep(0.84,0.95,r)*(1.0-smoothstep(0.95,1.0,r)); float fill=0.16*(1.0-smoothstep(0.7,1.0,r))*(0.85+0.15*sin(r*26.0-uT*3.0)); gl_FragColor=vec4(uC*uA*(fill+0.75*rim),1.0); }'
+          : 'uniform float uA,uLen,uT; uniform vec3 uC; varying vec2 vU; void main(){ float x=abs(vU.x*2.0-1.0); float ends=smoothstep(0.0,0.05,vU.y)*(1.0-smoothstep(0.95,1.0,vU.y)); float edge=smoothstep(0.8,0.94,x)*(1.0-smoothstep(0.94,1.0,x)); float core=0.2*(1.0-smoothstep(0.55,0.95,x)); float sh=0.8+0.2*sin(vU.y*uLen*2.2+uT*3.5); gl_FragColor=vec4(uC*uA*ends*(core*sh+0.7*edge),1.0); }' });
+      S.laneM = []; S.laneI = 0;
+      for (let i = 0; i < 4; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-PI / 2), calmMat(false)); m.visible = false; m.renderOrder = 5; m.frustumCulled = false; g.add(m); S.laneM.push(m); }
+      S.eyeM = new THREE.Mesh(new THREE.PlaneGeometry(2 * CALM.eyeR, 2 * CALM.eyeR).rotateX(-PI / 2), calmMat(true)); S.eyeM.visible = false; S.eyeM.renderOrder = 5; S.eyeM.frustumCulled = false; g.add(S.eyeM);
     }
     b.onDamaged = (amt, info) => { if (S.still && !S.countered && G.now >= S.graceT && info.src === 'player') { S.countered = true; Co.start(counter(b), 'phase'); } };
     if (G.nightmare) deepenFn(b)(1); // nightmare opens at sunset (its grade comes through nightmare.post), torn haori from the first frame
@@ -529,7 +540,7 @@
     const S = b.state, list = S.ghosts.filter((q) => q.cut && !q.cut.blue), blues = S.ghosts.filter((q) => q.cut && q.cut.blue); if (!list.length && !blues.length) return;
     yield* caster.cast({ name: 'Echo', time: 0.9 });
     const t = tele(b, mode === 2 ? 1.3 : 0.8), late = blues.length ? 0.45 : 0;
-    const fire = (gh, tt, silent) => { const c = gh.cut; Hz.cancel(gh.mark);
+    const fire = (gh, tt, silent) => { const c = gh.cut; Hz.cancel(gh.mark); laneLeave(S, c, tt);
       if (c.blue) vTele(b, c.x, c.z, c.dir, c.len, tt, BLUE_T); else vTele(b, c.x, c.z, c.dir, c.len, tt);
       Hz.rect(c.x, c.z, c.dir, c.len, 2.3, tt, 270, { name: 'Echo', color: c.blue ? BLUE : ROSE, quiet: true, silent, onFire: () => { cutFx(b, c.x, c.z, c.dir, c.len, c.blue ? BLUE : PALE); gh.g.visible = false; gh.cut = null; } }); };
     for (let i = 0; i < list.length; i++) {
@@ -660,12 +671,13 @@
   const other = (S, act) => act === S.A ? S.R : S.A;
   function resetMech(b) {
     const S = b.state; S.walk = false; S.warn = 0; S.still = false; S.kneel = 0; S.open = 0; S.countered = false; b.dmgTaken = 1; S.fake.parryT = 0; S.tellT = STILL_TELL;
-    b.group.visible = true; b.targetable = true; if (S.weapon) S.weapon.visible = true; G.timeScale = 1; S.moonHint = null;
+    b.group.visible = true; b.targetable = true; if (S.weapon) S.weapon.visible = true; G.timeScale = 1;
+    S.lanes = []; S.eye = null; S.calmHint = null; S.storm = null; S.stormHold = false; S.unison = false; S.echoing = false; S.moonK = null; S.stormUntil = 0;
     if (S.verse) { S.verse = false; Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.4), 'fight'); }
     if (S.cine) { S.cine = false; Cam.release(); UI.hud(true); }
     const Rr = S.R; if (!Rr) return;
     for (const act of [S.A, Rr]) { act.warn = 0; act.hold = false; act.open = 0; act.ent.dmgTaken = 1; act.fake.parryT = 0; }
-    Rr.kneel = 0; Rr.D.weapon.visible = true; Rr.root.visible = !!S.niten; Rr.ent.targetable = !!S.niten; Rr.root.rotation.x = 0;
+    Rr.kneel = 0; Rr.D.weapon.visible = true; Rr.root.visible = !!S.niten; Rr.ent.targetable = !!S.niten; Rr.root.rotation.x = 0; Rr.ent.castState = null;
   }
   // Out of time (the last blow, 24 s into the enrage, in whatever phase): the music stops dead, he sheathes the sword (in phase IV both do), one petal falls past
   // the camera in silence, the whole deck fills, and a single white cut crosses it (two crossing cuts in phase IV).
@@ -730,28 +742,43 @@
   }
 
   // ---------------------------------------------------------------- phase IV, Niten: two bodies, one health, exactly one can be hurt
-  // The awake one leads (walks, aims at the player); the still one stands at his mirror image across the seam every frame
-  // (x -> -x, angle -> -angle; the leader keeps |x| >= 1.6, so they are never closer than 3.2 m). Both attack: the still one's
-  // version is the mirror image. The swap is Stillness: the awake one gives the old tell, kneels and goes still, the other wakes.
+  // "Blade and Storm". The awake one is the blade: he walks at the player, Draw Cuts and Moons. The still one is the storm: he
+  // kneels where he gave the swap tell (blinking in to KNEEL_R from the centre if he was further out), channels the Lighthouse
+  // Storm and casts Echo. The swap (Stillness) flips the roles. Each body owns its position; the blade never ends a walk or a
+  // dash within KEEP of the still one. Every overlap opens a calm place to stand: a Draw Cut leaves a petal-free lane for
+  // LANE_LIFE s, a Full Moon's safe hole is petal-free (the Eye of the Moon), and the swap and its opening are always petal-free.
+  // Levers (indexed by ramp step where it is an array): the storm, then the calm places. The plan's starting values were 3 arms from
+  // step 3, rest 1.2 s (0 from step 4), lanes 3.0 s and two cuts everywhere; the cast-budget check in tools/nmpace.js (Stormcaller
+  // must not lose planted-cast time to the old phase) pulled the levers in the plan's order: longer rest, 2 arms, 4 s lanes, one cut
+  // at steps 3-5. row: seconds between an arm's 3-petal rows (0.4 leaves a gap you can step through as the arm passes).
+  const STORM = { arms: [2, 2, 2, 2, 2, 2], width: 3, spread: 0.12, row: 0.4, speed: 5.0, turn: 0.9, rest: [2.6, 2.6, 2.6, 3.4, 1.2, 1.2], dmg: 85, life: 3.6, tell: 1.2 };
+  const CALM = { laneLife: 4.0, laneW: 2.6, eyeR: 3.8, eyeAfter: 1.5, cuts: [2, 2, 2, 1, 1, 1] };
+  const KEEP = 3, KNEEL_R = 9, STILL_KNEEL = 0.6;
   const lead = (S) => S.lead;
+  const stillOf = (S) => other(S, S.lead);
   function wake(b, act, first) {
     const S = b.state, o = other(S, act); S.lead = act;
-    act.still = false; act.ent.immune = false; o.still = true; o.ent.immune = true;
+    act.still = false; act.ent.immune = false; o.still = true; o.ent.immune = true; act.kneel = 0;
     if (!first && !G.headless) { const e = act.ent; FX.ring(e.pos.x, e.pos.z, { r0: 0.8, r1: 5.5, color: act.col, dur: 0.6, width: 0.3, mult: 1.6 }); FX.light(e.pos.x, 2.5, e.pos.z, act.col, 40, 0.6, 14); petals(e.pos.x, e.pos.z, 26, act.ice); }
     if (!first) Sound.sfx('bell', 0.55, act === S.A ? 0.5 : 0.62);
   }
+  // the storm stops from the start of the tell until the opening ends (STORM.rest later still), so the swap is always petal-free
   function* swap(b) {
-    const S = b.state, A = S.lead, B = other(S, A), e = A.ent, p = G.player; S.walk = false;
+    const S = b.state, A = S.lead, B = other(S, A), e = A.ent, p = G.player; S.walk = false; S.stormHold = true;
     e.facing = angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z); A.warn = 0.001;
     Sound.sfx('glint', 0.9); FX.flash(0xfff4e0, 0.16, 2.2);
     const T = S.tellT || STILL_TELL; // 1.2 s, 0.9 s at Niten's last ramp step
     if (!G.headless) { FX.ring(e.pos.x, e.pos.z, { r0: 7.5, r1: 1.3, color: 0xfff4e0, dur: T, width: 0.24, mult: 1.7 }); FX.light(e.pos.x, 3, e.pos.z, 0xfff0d0, 45, T, 18); }
     yield T;
-    A.warn = 0; A.graceT = G.now + STILL_GRACE; A.kneel = 1; wake(b, B);
+    A.warn = 0; A.graceT = G.now + STILL_GRACE; A.kneel = 1;
+    // he kneels where he gave the tell; from further out than KNEEL_R he petal-blinks in on the same bearing, so the storm has room
+    { const d = Math.hypot(e.pos.x, e.pos.z); if (d > KNEEL_R) { petals(e.pos.x, e.pos.z, 18, A.ice); e.pos.x *= KNEEL_R / d; e.pos.z *= KNEEL_R / d; petals(e.pos.x, e.pos.z, 24, A.ice); } }
+    wake(b, B);
     // burn check: a whole cycle with no hit on the still one opens the one who wakes (3.2 s at 1.6x, the old green ring)
     if (S.cycleClean) { B.open = 3.2; B.ent.dmgTaken = 1.6; petals(B.ent.pos.x, B.ent.pos.z, 24); }
     S.cycleClean = true; S.countered = false;
-    yield 1.0; A.kneel = 0;
+    S.stormUntil = G.now + Math.max(0, B.open) + STORM.rest[S.nitenStep]; S.stormHold = false;
+    yield 1.0; if (A.still) A.kneel = STILL_KNEEL;
   }
   function* counterN(b, act) {
     const S = b.state, p = G.player, e = act.ent; act.hold = true; FX.flash(0xffffff, 0.3, 4); Sound.sfx('parry', 0.8, 0.7); petals(e.pos.x, e.pos.z, 30, act.ice);
@@ -761,19 +788,116 @@
     p.hurt(380, { blockable: true, src: { name: 'Counter' } });
     yield 0.55; petals(e.pos.x, e.pos.z, 18, act.ice); act.hold = false;
   }
-  // Twin Draw Cut: the leader cuts at the player, the still one cuts the mirror line at the same instant; both leave ghosts
-  function* twinDrawCut(b, n) {
+  // ---- calm places: petal-free lanes (Draw Cut) and the Eye of the Moon (Full Moon). Only this boss's petals are removed.
+  function inLane(L, x, z) { const dx = x - L.x, dz = z - L.z, s = Math.sin(L.dir), c = Math.cos(L.dir), u = dx * s + dz * c, v = dx * c - dz * s; return u > -0.6 && u < L.len + 0.6 && Math.abs(v) < L.w / 2; }
+  function addLane(b, cut) {
+    const S = b.state, L = { x: cut.x, z: cut.z, dir: cut.dir, len: cut.len, w: CALM.laneW, t0: G.now, until: G.now + CALM.laneLife, cut, leave: false };
+    S.lanes.push(L); S.calmV = (S.calmV || 0) + 1; if (S.laneM) { const m = S.laneM[S.laneI = (S.laneI + 1) % S.laneM.length]; m.userData.L = L; m.position.set(L.x + Math.sin(L.dir) * L.len / 2, 0.022, L.z + Math.cos(L.dir) * L.len / 2); m.rotation.y = L.dir; m.scale.set(L.w, 1, L.len + 1.2); m.material.uniforms.uLen.value = L.len; m.material.uniforms.uC.value.set(cut.blue ? 0xb8ccff : 0xffe0ea); }
+    return L;
+  }
+  // an Echo on a ghost turns its lane back into a blade: the lane stops being offered as calm and ends when the echo lands
+  function laneLeave(S, cut, t) { if (S.lanes) for (const L of S.lanes) if (L.cut === cut) { L.leave = true; L.until = Math.min(L.until, G.now + t); S.calmV = (S.calmV || 0) + 1; } }
+  // when (seconds from now) does a petal flying from (x, z) along dir at speed enter a live calm place? (it dies there; Infinity if never)
+  function calmEntry(S, x, z, dir, speed) {
+    let best = Infinity; const vx = Math.sin(dir) * speed, vz = Math.cos(dir) * speed;
+    for (const L of S.lanes) { const s = Math.sin(L.dir), c = Math.cos(L.dir), dx = x - L.x, dz = z - L.z, u = dx * s + dz * c, v = dx * c - dz * s, du = vx * s + vz * c, dv = vx * c - vz * s;
+      let t0 = 0, t1 = L.until - G.now; for (const [p0, d0, lo, hi] of [[u, du, -0.6, L.len + 0.6], [v, dv, -L.w / 2, L.w / 2]]) { if (Math.abs(d0) < 1e-6) { if (p0 <= lo || p0 >= hi) t1 = -1; } else { let a = (lo - p0) / d0, b2 = (hi - p0) / d0; if (a > b2) [a, b2] = [b2, a]; t0 = Math.max(t0, a); t1 = Math.min(t1, b2); } }
+      if (t0 < t1 && t0 < best) best = t0; }
+    const E = S.eye; if (E) { const dx = x - E.x, dz = z - E.z, bb = dx * vx + dz * vz, vv = vx * vx + vz * vz, cc = dx * dx + dz * dz - E.r * E.r, disc = bb * bb - vv * cc;
+      if (disc >= 0 && vv > 1e-9) { const t = Math.max(0, (-bb - Math.sqrt(disc)) / vv); if ((-bb + Math.sqrt(disc)) / vv > 0 && t < E.until - G.now && t < best) best = t; } }
+    return best;
+  }
+  function calmSim(b) {
+    const S = b.state; if (S.lanes.length) { const n = S.lanes.length; S.lanes = S.lanes.filter((L) => G.now < L.until); if (S.lanes.length !== n) S.calmV = (S.calmV || 0) + 1; } if (S.eye && G.now >= S.eye.until) { S.eye = null; S.calmV = (S.calmV || 0) + 1; }
+    // every petal knows where it will die (stopAt, its own clock): the autopilot's bullet forecast then sees a calm place as calm
+    for (const q of Bul.list) if (q.petal && q.cv !== S.calmV) { q.cv = S.calmV; const t = calmEntry(S, q.x, q.z, q.dir, q.speed); if (t < Infinity) q.stopAt = q.t + t; else delete q.stopAt; }
+    if (!S.lanes.length && !S.eye) return;
+    let fx = 0;
+    for (const q of Bul.list) { if (!q.petal || q.dead) continue; let kill = !!(S.eye && Math.hypot(q.x - S.eye.x, q.z - S.eye.z) < S.eye.r);
+      if (!kill) for (const L of S.lanes) if (inLane(L, q.x, q.z)) { kill = true; break; }
+      if (kill) { q.dead = true; if (!G.headless && fx++ < 6) FX.burst(q.x, q.y, q.z, { n: 4, color: 0xffffff, color2: q.petal === 2 ? ICE : PALE, speed: [0.5, 2.2], life: [0.25, 0.55], size: [0.08, 0.18], grav: 1.5, drag: 1.5 }); } }
+  }
+  // the calm spot the autopilot is told about (tests: a pocket-blind autopilot ignores it): next to the duelist inside the Eye, or
+  // the nearest point of a live lane while the storm blows (ranged only; melee stays on the blade, who stands at the lane's end)
+  function calmHintOf(b) {
+    const S = b.state, p = G.player; if (!p) return null;
+    if (S.eye) { const dx = p.pos.x - S.eye.x, dz = p.pos.z - S.eye.z, d = Math.hypot(dx, dz) || 1; return { x: S.eye.x + dx / d * 2.3, z: S.eye.z + dz / d * 2.3 }; }
+    if (S.storm !== 'on' || p.cls.melee) return null;
+    // a point on a live lane near the player, preferably 7 m or more from the blade (who stands at the lane's far end, Moons ready)
+    let best = null, bs = 9; const e = S.lead.ent;
+    for (const L of S.lanes) { if (L.leave || L.until - G.now < 0.8) continue; const s = Math.sin(L.dir), c = Math.cos(L.dir), lo = Math.min(1.5, L.len / 2);
+      for (let u = lo; u <= L.len - lo + 1e-6; u += 1) { const x = L.x + s * u, z = L.z + c * u, de = Math.hypot(x - e.pos.x, z - e.pos.z), sc = Math.hypot(p.pos.x - x, p.pos.z - z) + Math.max(0, 7 - de) * 1.5; if (sc < bs) { bs = sc; best = { x, z }; } } }
+    return best;
+  }
+  // is a storm petal about to pass the player within t seconds? (a Draw Cut tell waits for the arm to pass)
+  function armSoon(p, t) { for (const q of Bul.list) { if (!q.storm) continue; const vx = Math.sin(q.dir) * q.speed, vz = Math.cos(q.dir) * q.speed, rx = p.pos.x - q.x, rz = p.pos.z - q.z, vv = vx * vx + vz * vz || 1e-6, k = clamp((rx * vx + rz * vz) / vv, 0, t); if (Math.hypot(rx - vx * k, rz - vz * k) < q.r + 1.1) return true; } return false; }
+  // when will a storm arm next reach (x, z)? (autopilot only, through def.danger: a player reads the arm and plants just after it
+  // has passed). Infinity in a calm place or with no storm; the pocket-blind autopilot does not know the calm places.
+  function armAt(b, x, z) {
+    const S = b.state; if (!S.niten || !S.storm || !S.lead) return Infinity;
+    if (!Bot.pocketBlind) { if (S.eye && Math.hypot(x - S.eye.x, z - S.eye.z) < S.eye.r - 0.6) return Infinity; for (const L of S.lanes) if (!L.leave && inLane({ x: L.x, z: L.z, dir: L.dir, len: L.len - 0.8, w: L.w - 1.0 }, x, z)) return Infinity; }
+    const F = stillOf(S), e = F.ent, dx = x - e.pos.x, dz = z - e.pos.z, d = Math.hypot(dx, dz), fly = Math.max(0, d - 1.1) / STORM.speed;
+    // the arm points at stA when the breath starts (rem s from now during the tell) and turns stSg * STORM.turn; a petal reaches d after fly
+    const cs = S.storm === 'tell' && e.castState, rem = cs ? Math.max(0, cs.time - cs.t) : 0;
+    const n = STORM.arms[S.nitenStep], per = TAU / n, hw = (STORM.width - 1) / 2 * STORM.spread + 0.95 / Math.max(d, 1), w = STORM.turn;
+    const rel = ((S.stSg * (Math.atan2(dx, dz) - S.stA)) % per + per) % per, x0 = cs ? 0 : -w * Math.min(fly, S.stT || 0);
+    const m = Math.ceil((x0 - rel - hw) / per), v = Math.max(x0, rel + m * per - hw);
+    return Math.max(0, rem + v / w + fly);
+  }
+  // ---- the Lighthouse Storm: the still one's channel, its own coroutine beside nitenRun. A 1.2 s tell each time it starts, then
+  // STORM.arms thick arms (STORM.width petals across) turning slowly from his kneel spot. Held during the swap and its opening,
+  // the unison brackets (Final Verse, Twin Petal Storm) and his own Echo; live petals fly out. From step 4 it turns back mid-breath.
+  const stormFree = (S) => S.niten && S.lead && !S.stormHold && !S.unison && !S.echoing && G.now >= S.stormUntil && !stillOf(S).hold;
+  function* stormLoop(b) {
+    const S = b.state;
+    while (true) {
+      while (!stormFree(S)) yield 0.05;
+      const F = stillOf(S), e = F.ent, bl = F === S.R;
+      // the tell: his cast bar and petals gathering; cancelled if a hold starts
+      S.storm = 'tell'; petals(e.pos.x, e.pos.z, 20, F.ice); S.stA = rnd(TAU); S.stSg = rnd() < 0.5 ? 1 : -1; S.stT = 0; // the breath's start angle and turn are set at the tell
+      const cs = e.castState = { name: 'Petal Storm', t: 0, time: STORM.tell, int: false, result: null };
+      while (cs.t < cs.time && stormFree(S) && stillOf(S) === F) { cs.t += G.dt; yield; }
+      if (e.castState === cs) e.castState = null;
+      if (cs.t < cs.time) { S.storm = null; continue; }
+      S.storm = 'on'; let a0 = S.stA, sg = S.stSg, t = 0, rowT = 0, sw = 0; const flip = S.nitenStep >= 4 ? rnd(2, 3.5) : Infinity;
+      while (stormFree(S) && stillOf(S) === F) {
+        const dt = G.dt; t += dt; a0 += sg * STORM.turn * dt; rowT -= dt; if (t > flip && t - dt <= flip) sg = -sg;
+        S.stA = a0; S.stSg = sg; S.stT = t;
+        if (rowT <= 0) { rowT += STORM.row; const n = STORM.arms[S.nitenStep], w = STORM.width, ex = e.pos.x, ez = e.pos.z;
+          for (let k = 0; k < n; k++) for (let j = 0; j < w; j++) { const a = a0 + k / n * TAU + (j - (w - 1) / 2) * STORM.spread;
+            Bul.fire({ x: ex + Math.sin(a) * 1.1, z: ez + Math.cos(a) * 1.1, dir: a, speed: STORM.speed, dmg: STORM.dmg, color: bl ? 0x4a7ae0 : 0xd8467a, r: 0.36, life: STORM.life, petal: bl ? 2 : 1, storm: 1 }); } }
+        e.facing = a0; if ((sw -= dt) <= 0) { sw = 0.6; F.model.swing(1, 0.3); }
+        yield;
+      }
+      S.storm = null;
+    }
+  }
+  // Niten Draw Cut: the blade alone (no mirror cut). Each cut leaves a ghost and a petal-free lane. A tell never starts just before a
+  // storm arm reaches the player; the dash stops short rather than end within KEEP of the still one.
+  function* nitenCut(b, n) {
     const S = b.state, p = G.player; S.walk = false;
+    // the lanes are for the storm: the blade walks until the still one's storm is about to blow (the swap's opening stays his own window)
+    { let w = 0; const soon = () => S.storm === 'on' || (S.storm === 'tell' && stillOf(S).ent.castState && stillOf(S).ent.castState.time - stillOf(S).ent.castState.t < 0.9);
+      while (w < 4.5 && !soon()) { S.walk = true; w += 0.1; yield 0.1; } S.walk = false; }
     for (let i = 0; i < n; i++) {
+      { let w = 0; while (w < 1.5 && S.storm === 'on' && armSoon(p, 0.4)) { w += 0.05; yield 0.05; } }
       const L = S.lead, F = other(S, L), e = L.ent, a = angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z); e.facing = a;
-      const len = Math.max(6, edgeLen(e.pos.x, e.pos.z, a)), cut = { x: e.pos.x, z: e.pos.z, dir: a, len, blue: L === S.R }, mc = { x: -cut.x, z: cut.z, dir: -a, len, blue: F === S.R, pair: cut }; cut.pair = mc;
-      L.fake.parryT = F.fake.parryT = 1; const t = tele(b, i === 0 ? 0.95 : 0.72);
-      for (const [c, act, q] of [[cut, L, i > 0], [mc, F, true]]) { Hz.rect(c.x, c.z, c.dir, c.len, 2.3, t, 310, { name: 'Draw Cut', color: act.col, quiet: true, silent: q }); vTele(b, c.x, c.z, c.dir, c.len, t, c.blue ? BLUE_T : 0xff6a88); }
-      yield t; L.fake.parryT = F.fake.parryT = 0; L.model.swing(1, 0.25); F.model.swing(1, 0.25);
-      cutFx(b, cut.x, cut.z, cut.dir, len, cut.blue ? BLUE : 0xffffff); cutFx(b, mc.x, mc.z, mc.dir, len, mc.blue ? BLUE : 0xffffff); addGhost(b, cut); addGhost(b, mc);
+      const full = Math.max(6, edgeLen(e.pos.x, e.pos.z, a)); let len = full;
+      for (let q = full; q >= 3; q -= 0.5) { if (Math.hypot(e.pos.x + Math.sin(a) * q - F.ent.pos.x, e.pos.z + Math.cos(a) * q - F.ent.pos.z) >= KEEP) { len = q; break; } }
+      const cut = { x: e.pos.x, z: e.pos.z, dir: a, len, blue: L === S.R };
+      L.fake.parryT = 1; const t = tele(b, i === 0 ? 0.95 : 0.72);
+      Hz.rect(cut.x, cut.z, a, len, 2.3, t, 310, { name: 'Draw Cut', color: L.col, quiet: true, silent: i > 0 }); vTele(b, cut.x, cut.z, a, len, t, cut.blue ? BLUE_T : 0xff6a88);
+      yield t; L.fake.parryT = 0; L.model.swing(1, 0.25);
+      cutFx(b, cut.x, cut.z, a, len, cut.blue ? BLUE : 0xffffff); addGhost(b, cut); addLane(b, cut);
       e.pos.x += Math.sin(a) * len; e.pos.z += Math.cos(a) * len; petals(e.pos.x, e.pos.z, 14, L.ice); yield 0.3;
     }
     const e = S.lead.ent; e.facing = angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z); yield 0.5;
+  }
+  // Echo, cast by the still one: he stops his own storm to set off the lanes the blade cut (one at a time early, in pairs from step 3)
+  function* nitenEcho(b) {
+    const S = b.state, F = stillOf(S); S.echoing = true;
+    yield* echo(b, S.nitenStep >= 3 ? 1 : 0, F.ent);
+    S.echoing = false;
   }
   // Twin Focus is Niten's ramp bell: it plays at the start of every ramp step (both bodies: dome, roar, flash, petals), the
   // wordless signal that something new is coming. A new haste stack (step 5) shows with it.
@@ -783,7 +907,8 @@
     Sound.sfx('roar', 0.6, 2.2); FX.flash(ROSE, 0.25, 3); S.bells = (S.bells || 0) + 1;
     yield 0.6;
   }
-  // Twin Final Verse: both vanish; seven rose lines and their seven blue mirrors 0.45 s late; both come back at mirrored spots near the player
+  // Twin Final Verse (unison, storm held): both vanish; seven rose lines and their seven blue mirrors 0.45 s late; they come back at
+  // their own spots: the blade near the player, the still one at least 6 m from him and within KNEEL_R of the centre
   function* twinFinalVerse(b, n = 7) {
     const S = b.state, Rr = S.R; S.walk = false; yield* S.lead.ent.cast({ name: 'Final Verse', time: 1.1 });
     for (const act of [S.A, Rr]) petals(act.ent.pos.x, act.ent.pos.z, 40, act.ice);
@@ -794,9 +919,10 @@
       yield tele(b, 0.27);
     }
     yield tele(b, 1.2) + 0.45; S.verse = false; Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.5), 'fight');
-    const p = G.player, a = rnd(TAU), L = S.lead; let tx = p.pos.x + Math.sin(a) * 4, tz = p.pos.z + Math.cos(a) * 4; const d = Math.hypot(tx, tz); if (d > 13) { tx *= 13 / d; tz *= 13 / d; }
-    if (Math.abs(tx) < 1.6) tx = tx < 0 ? -1.6 : 1.6;
-    L.ent.pos.set(tx, 0, tz); const F = other(S, L); F.ent.pos.set(-tx, 0, tz);
+    const p = G.player, a = rnd(TAU), L = S.lead, F = other(S, L); let tx = p.pos.x + Math.sin(a) * 4, tz = p.pos.z + Math.cos(a) * 4; const d = Math.hypot(tx, tz); if (d > 13) { tx *= 13 / d; tz *= 13 / d; }
+    L.ent.pos.set(tx, 0, tz);
+    let fx = -tx, fz = -tz; for (let k = 0; k < 24; k++) { const fa = rnd(TAU), fr = rnd(3, KNEEL_R), x = Math.sin(fa) * fr, z = Math.cos(fa) * fr; if (Math.hypot(x - tx, z - tz) >= 6) { fx = x; fz = z; break; } }
+    { const fd = Math.hypot(fx, fz); if (fd > KNEEL_R) { fx *= KNEEL_R / fd; fz *= KNEEL_R / fd; } } F.ent.pos.set(fx, 0, fz);
     b.group.visible = true; b.targetable = true; Rr.root.visible = true; Rr.ent.targetable = true; for (const act of [S.A, Rr]) { petals(act.ent.pos.x, act.ent.pos.z, 40, act.ice); act.ent.facing = angTo(act.ent.pos.x, act.ent.pos.z, p.pos.x, p.pos.z); }
     yield 0.4;
   }
@@ -807,25 +933,25 @@
     else if (k === 'o') Hz.donut(x, z, 4.2, 14, t, 320, { name: 'Full Moon', color: act.col, quiet: true, onFire: () => { fx(); vArcs(b, 'o', x, z, vrand() * TAU, blue); petals(x, z, 40, act.ice); } });
     else Hz.circle(x, z, 6.6, t, 320, { name: 'New Moon', color: act.col, quiet: true, onFire: () => { fx(); FX.dome(x, 0.5, z, { r: 6.6, color: act.col, dur: 0.4, mult: 1.1 }); vArcs(b, 'n', x, z, vrand() * TAU, blue); } });
   }
-  // Paired Moons, opposite shapes. First: the awake one's New Moon (get away) with the still one's Full Moon (get close): the one
-  // place the fight asks you to hug the duelist you must not hit. Then the reverse, then both Crescent (the still one 0.45 s late).
-  // Tell 1.15 s before haste (survival check: at 0.95 they caused most autopilot deaths in Niten).
-  function* pairedMoons(b) {
-    const S = b.state, p = G.player; S.walk = false;
-    { const L = S.lead, e = L.ent, sx = e.pos.x < 0 ? -1 : 1, tz = clamp(p.pos.z, -7, 7); petals(e.pos.x, e.pos.z, 16, L.ice); e.pos.set(sx * 5, 0, tz); petals(e.pos.x, tz, 16, L.ice); yield 0.35; }
-    for (const [ka, ks] of [['n', 'o'], ['o', 'n'], ['c', 'c']]) {
-      const L = S.lead, F = other(S, L), t = tele(b, 1.15), late = ks === 'c' ? 0.45 : 0, lx = L.ent.pos.x, lz = L.ent.pos.z, fx = F.ent.pos.x, fz = F.ent.pos.z, sx = Math.sign(lx) || 1;
-      // autopilot hint: next to the safe one, on his far side from the seam
-      S.moonHint = ka === 'n' ? { x: fx - sx * 2.3, z: fz } : ka === 'o' ? { x: lx + sx * 2.3, z: lz } : { x: lx + sx * 2.6, z: lz };
-      moonAt(b, L, ka, t); moonAt(b, F, ks, t + late);
-      yield t + late + 0.3;
+  // Moons from the blade, one at a time (step 2, Full Moon first so the Eye is taught) or in sets of two (step 3 on), 1.15 s tell
+  // before haste (at 0.95 they caused most autopilot deaths in Niten). Full Moon: its safe hole is also petal-free, from the start of
+  // the tell until CALM.eyeAfter s after it lands (the Eye of the Moon). New Moon pushes you out into the petals; Crescent is a sidestep.
+  const MOON1 = ['o', 'n', 'c', 'o', 'c', 'n'], MOON2 = [['o', 'c'], ['n', 'o'], ['c', 'n'], ['o', 'n']];
+  function* nitenMoons(b, kinds) {
+    const S = b.state; S.walk = false;
+    for (const k of kinds) {
+      const L = S.lead, e = L.ent, t = tele(b, 1.15); S.moonK = k;
+      if (k === 'o') { S.calmV = (S.calmV || 0) + 1; S.eye = { x: e.pos.x, z: e.pos.z, r: CALM.eyeR, t0: G.now, until: G.now + t + CALM.eyeAfter, blue: L === S.R }; if (S.eyeM) { S.eyeM.position.set(e.pos.x, 0.024, e.pos.z); S.eyeM.material.uniforms.uC.value.set(L === S.R ? 0xb8ccff : 0xffe0ea); } }
+      moonAt(b, L, k, t); yield t + 0.3; S.moonK = null;
     }
-    S.moonHint = null; yield 0.6;
+    yield 0.4;
   }
-  // Twin Petal Storm: two 3-arm spirals from (-4, 0) and (4, 0) turning opposite ways, rose and blue petals
+  // Twin Petal Storm (unison, the lighthouse held): both stand at (-4, 0) and (4, 0), two 3-arm spirals turning opposite ways for 5 s.
+  // Afterwards the still one kneels where he is and the lighthouse comes back.
   function* twinStorm(b, dur = 5, arms = 3) {
-    const S = b.state, L = S.lead, e = L.ent; S.walk = false; const sx = e.pos.x < 0 ? -1 : 1;
-    petals(e.pos.x, e.pos.z, 20, L.ice); e.pos.set(sx * 4, 0, 0); for (const act of [S.A, S.R]) petals(act === L ? sx * 4 : -sx * 4, 0, 40, act.ice);
+    const S = b.state, L = S.lead, F = other(S, L), e = L.ent; S.walk = false; const sx = e.pos.x < 0 ? -1 : 1;
+    for (const act of [L, F]) petals(act.ent.pos.x, act.ent.pos.z, 20, act.ice);
+    e.pos.set(sx * 4, 0, 0); F.ent.pos.set(-sx * 4, 0, 0); for (const act of [L, F]) petals(act.ent.pos.x, act.ent.pos.z, 40, act.ice);
     yield* e.cast({ name: 'Petal Storm', time: 1.2 });
     let t = 0, a0 = rnd(TAU); const dirSign = rnd() < 0.5 ? 1 : -1;
     while (t < dur) {
@@ -836,14 +962,17 @@
     }
     for (const act of [S.A, S.R]) act.ent.facing = angTo(act.ent.pos.x, act.ent.pos.z, G.player.pos.x, G.player.pos.z); yield 0.7;
   }
-  // every frame, headless too: openings run out, the awake one walks, the still one is placed at his mirror image
+  // every frame, headless too: openings run out, the awake one walks and keeps KEEP from the still one, the calm places cull petals
   function nitenSim(b, dt) {
     const S = b.state, p = G.player, L = S.lead, F = other(S, L), e = L.ent;
     if (G.state === 'fight' && !b.transitioning) S.nitenT += dt;
     for (const act of [S.A, S.R]) if (act.open > 0) { act.open -= dt; if (act.open <= 0) act.ent.dmgTaken = 1; }
     if (S.walk && b.alive && G.state === 'fight' && !e.castState && p) { const d = Math.hypot(p.pos.x - e.pos.x, p.pos.z - e.pos.z); e.facing = dampAng(e.facing, angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z), 8, dt); if (d > 3.2) { const st = Math.min(d - 3.2, 4.6 * dt); e.pos.x += Math.sin(e.facing) * st; e.pos.z += Math.cos(e.facing) * st; } }
-    if (Math.abs(e.pos.x) < 1.6) e.pos.x = e.pos.x < 0 ? -1.6 : 1.6;
-    if (!F.hold) { F.ent.pos.set(-e.pos.x, 0, e.pos.z); F.ent.facing = -e.facing; }
+    // steer around the still one: never closer than KEEP (slides round him), never off the deck
+    if (S.niten && !S.verse && b.alive && !L.hold && !F.hold) { const dx = e.pos.x - F.ent.pos.x, dz = e.pos.z - F.ent.pos.z, d = Math.hypot(dx, dz);
+      if (d < KEEP) { const ux = d > 1e-3 ? dx / d : 1, uz = d > 1e-3 ? dz / d : 0; e.pos.x = F.ent.pos.x + ux * KEEP; e.pos.z = F.ent.pos.z + uz * KEEP; }
+      const r = Math.hypot(e.pos.x, e.pos.z); if (r > R - 0.8) { e.pos.x *= (R - 0.8) / r; e.pos.z *= (R - 0.8) / r; } }
+    calmSim(b); S.calmHint = calmHintOf(b);
     b.group.position.copy(b.pos); b.group.rotation.y = b.facing;
   }
   // the reflection's body, and both bodies' still look (drained grey-blue, white ring, water veil) and rings
@@ -899,49 +1028,70 @@
     { const a0 = b.pos.clone(), r0 = ra.clone(); let t = 0; while (t < 1.3) { t += G.dt; const k = smooth(t / 1.3); b.pos.lerpVectors(a0, new V3(-4, 0, -6), k); ra.lerpVectors(r0, new V3(4, 0, -6), k); b.facing = dampAng(b.facing, angTo(b.pos.x, b.pos.z, -4, -6), 10, G.dt); Rr.ent.facing = dampAng(Rr.ent.facing, angTo(ra.x, ra.z, 4, -6), 10, G.dt); S.duoL[0].intensity = 46 * k; S.duoL[1].intensity = 70 * k; yield; } }
     const p = G.player; b.facing = b.angToPlayer(); Rr.ent.facing = -b.facing;
     if (!G.ents.includes(Rr.ent)) { G.ents.push(Rr.ent); G.world.add(Rr.ent.group); }
-    Rr.ent.targetable = true; S.niten = true; wake(b, A, true); S.cycleClean = true; S.countered = false;
+    Rr.ent.targetable = true; S.niten = true; wake(b, A, true); S.cycleClean = true; S.countered = false; Rr.kneel = STILL_KNEEL;
+    S.low12 = false; S.lastStorm = false; S.moonN = S.moonN2 = 0; S.stormUntil = G.now + 1.5; Co.start(stormLoop(b), 'phase');
     yield 0.3;
   }
   // Niten ramps every RAMP seconds of live phase time (S.nitenT), six steps. A swap follows every bracket and keeps its
   // cadence (one about every 12 s, BRACKET) through the whole phase; what grows is what happens between swaps:
-  //   0: [Draw Cut x4] [Draw Cut x3]                 1: + twin Echo in both brackets
-  //   2: [Draw Cut x4, Echo] [Final Verse]           3: + paired Moons after the Verse
-  //   4: + [Petal Storm]                             5: step 4 tightened (swap tell 0.9 s, gaps 0.3 s, third haste stack)
+  //   0: [Draw Cut] [Draw Cut]                             1: + Echo from the still one in both brackets
+  //   2: opens with [Twin Petal Storm] (the mid-fight one), then [Draw Cut, one Moon] [Draw Cut, Echo]
+  //   3: [Draw Cut, two Moons] [Final Verse] [Draw Cut, Echo]
+  //   4: + [Twin Petal Storm] every loop; the storm comes back sooner after the opening and turns back mid-breath
+  // (a Draw Cut is CALM.cuts cuts: two early, one from step 3. Each waits for the storm, so its lane is used while petals fly.)
+  //   5: step 4 tightened (swap tell 0.9 s, gaps 0.3 s, third haste stack)
   // A step never starts mid-bracket: after the swap that follows the step's time, a fresh loop opens with the Focus flare and
   // the new mechanic's bracket, so a new layer first appears right after a swap, with the full tell.
+  // The double storm at the end is guaranteed: the first time health drops below 12% the next bracket is Twin Petal Storm, and
+  // from the soft enrage on it comes every other bracket until The Last Petal.
   const RAMP = 35, BRACKET = 12;
   const nitenStepOf = (S) => Math.min(5, Math.floor(S.nitenT / RAMP));
   const NITEN_LOOP = [
-    [['cut4'], ['cut3']],
-    [['cut4', 'echo'], ['cut3', 'echo']],
-    [['cut4', 'echo'], ['verse']],
-    [['cut4', 'echo'], ['verse', 'moons']],
-    [['cut4', 'echo'], ['verse', 'moons'], ['storm']],
-    [['cut4', 'echo'], ['verse', 'moons'], ['storm']],
+    [['cut'], ['cut']],
+    [['cut', 'echo'], ['cut', 'echo']],
+    [['cut', 'moon1'], ['cut', 'echo']],
+    [['cut', 'moon2'], ['verse'], ['cut', 'echo']],
+    [['cut', 'moon2'], ['verse'], ['cut', 'echo'], ['storm']],
+    [['cut', 'moon2'], ['verse'], ['cut', 'echo'], ['storm']],
   ];
-  const NITEN_NEW = [0, 0, 1, 1, 2, 0]; // the bracket that holds each step's new mechanic
+  const NITEN_OPEN = [null, null, ['storm'], null, null, null]; // a one-off bracket that opens the step
+  const NITEN_NEW = [0, 0, 0, 0, 3, 0]; // the bracket that holds each step's new mechanic
   function* nitenMech(b, k) {
     const S = b.state;
-    if (k === 'cut4') yield* twinDrawCut(b, 4); else if (k === 'cut3') yield* twinDrawCut(b, 3);
-    else if (k === 'echo') yield* echo(b, 1, S.lead.ent); else if (k === 'verse') yield* twinFinalVerse(b);
-    else if (k === 'moons') yield* pairedMoons(b); else if (k === 'storm') yield* twinStorm(b);
+    if (k === 'cut') yield* nitenCut(b, CALM.cuts[S.nitenStep]);
+    else if (k === 'echo') yield* nitenEcho(b);
+    else if (k === 'moon1') { S.moonN = (S.moonN || 0) + 1; yield* nitenMoons(b, [MOON1[(S.moonN - 1) % MOON1.length]]); }
+    else if (k === 'moon2') { S.moonN2 = (S.moonN2 || 0) + 1; yield* nitenMoons(b, MOON2[(S.moonN2 - 1) % MOON2.length]); }
+    else if (k === 'verse' || k === 'storm') { S.unison = true; S.storm = null; if (k === 'verse') yield* twinFinalVerse(b); else yield* twinStorm(b); S.unison = false; S.stormUntil = Math.max(S.stormUntil, G.now + 1.0); }
+  }
+  function* bracket(b, list, gap) {
+    const S = b.state, t0 = G.ft; S.lastStorm = list.length === 1 && list[0] === 'storm';
+    for (const k of list) { yield* nitenMech(b, k); S.walk = true; yield gap; }
+    // keep the swap cadence: walk until the bracket has run BRACKET seconds less the swap itself
+    while (G.ft - t0 < BRACKET - (S.tellT || STILL_TELL) - 1.0) { S.walk = true; yield 0.1; }
+    yield* swap(b);
+  }
+  // a forced Twin Petal Storm: once when health first drops below 12%, then every other bracket from the soft enrage on
+  function forcedStorm(b) {
+    const S = b.state;
+    if (b.enraged) return !S.lastStorm;
+    if (!S.low12 && b.hp < b.maxHp * 0.12) { S.low12 = true; return !S.lastStorm; }
+    return false;
   }
   function* nitenRun(b) {
     const S = b.state; yield 0.6;
     while (true) {
-      const st = nitenStepOf(S); let order = NITEN_LOOP[st].map((_, i) => i);
+      const st = nitenStepOf(S); let order = NITEN_LOOP[st].map((_, i) => i), fresh = false;
       if (st > S.nitenStep || (st === 0 && !S.stepAt.length)) {
-        S.nitenStep = st; S.stepAt[st] = Math.round(G.ft * 10) / 10;
+        S.nitenStep = st; S.stepAt[st] = Math.round(G.ft * 10) / 10; fresh = true;
         if (st >= 5) S.tellT = 0.9;
         if (st > 0) { yield* twinFocus(b); const f = NITEN_NEW[st]; order = [f, ...order.filter((i) => i !== f)]; }
       }
       const gap = st >= 5 ? 0.3 : 0.6;
+      if (fresh && NITEN_OPEN[st]) { yield* bracket(b, NITEN_OPEN[st], gap); if (forcedStorm(b)) yield* bracket(b, ['storm'], gap); }
       for (const i of order) {
-        const t0 = G.ft;
-        for (const k of NITEN_LOOP[st][i]) { yield* nitenMech(b, k); S.walk = true; yield gap; }
-        // keep the swap cadence: walk until the bracket has run BRACKET seconds less the swap itself
-        while (G.ft - t0 < BRACKET - (S.tellT || STILL_TELL) - 1.0) { S.walk = true; yield 0.1; }
-        yield* swap(b);
+        yield* bracket(b, NITEN_LOOP[st][i], gap);
+        if (forcedStorm(b)) yield* bracket(b, ['storm'], gap);
         if (nitenStepOf(S) > st) break; // a new step starts right after this swap, as a fresh loop
       }
     }
@@ -950,7 +1100,7 @@
   function* nitenDeath(b) {
     const S = b.state, Rr = S.R, twin = !!(S.niten && Rr && Rr.root.visible); S.walk = false; S.warn = 0; S.still = false; S.open = 0;
     b.group.visible = true; if (S.weapon) S.weapon.visible = true;
-    const mx = twin ? (b.pos.x + Rr.ent.pos.x) / 2 : b.pos.x, mz = twin ? (b.pos.z + Rr.ent.pos.z) / 2 : b.pos.z, ca = Cam.yaw + 0.5, cr = twin ? 13 : 9;
+    const mx = twin ? (b.pos.x + Rr.ent.pos.x) / 2 : b.pos.x, mz = twin ? (b.pos.z + Rr.ent.pos.z) / 2 : b.pos.z, ca = Cam.yaw + 0.5, cr = twin ? clamp(Math.hypot(b.pos.x - Rr.ent.pos.x, b.pos.z - Rr.ent.pos.z) * 1.15 + 5, 13, 22) : 9;
     Cam.cine = { pos: new V3(mx - Math.sin(ca) * cr, 3.4, mz - Math.cos(ca) * cr), look: new V3(mx, 1.4, mz), fov: 44 };
     if (twin) {
       const e = Rr.ent.pos; Rr.hold = true; Rr.live = false; Rr.root.visible = true; FX.slash(e.x, 1.4, e.z, Rr.ent.facing, { r: 3.5, color: 0xffffff, dur: 0.35, mult: 1.8 }); cutFx(b, e.x - 3, e.z, PI / 2, 6, BLUE); Sound.sfx('crit'); petals(e.x, e.z, 50, ICE);
@@ -975,13 +1125,12 @@
     return Object.assign({}, base, { layers });
   }
   // Nightmare health (the tuning lever; class numbers and the ramp stay). Tuned with tools/nmpace.js (god-mode level-3 autopilot,
-  // whole fights from phase 1, six runs per class) at 28,000 and enrage 355 s:
-  //   stormcaller 6/6 kills, median 4:47 (best 4:23, worst 4:56), Niten 60-64% of the time, best run reaches step 4
-  //   hexslinger  6/6 kills, median 4:25 (best 4:16, worst 4:28), Niten 62-65%, best run reaches step 4
-  //   ashwarden   6/6 kills, median 5:53 (best 5:45, worst 6:00), Niten 61-65% (its autopilot loses ~30% dps chasing Draw Cuts)
-  //   duskblade   0/6 at enrage 330 (about 72 dps in Niten): the slow melee outlier, not a target
-  // Phase times (storm / hex): Sunset 21-39 / 29-31 s, Nightfall 39-53 / 25-37 s, the lake 22-35 / 27-32 s, Niten 156-177 / 153-165 s.
-  const NM_HP = 28000;
+  // whole fights from phase 1, seeds 7/8/9) at 30,500 and enrage 355 s, after Blade and Storm (fewer Draw Cuts, so more uptime):
+  //   stormcaller 18/18 kills, medians 4:42-5:17 per seed (best 4:13, worst 5:35), Niten 54-65% of the time
+  //   hexslinger  6/6 kills, 4:47-4:51, Niten 56-61%
+  //   ashwarden   6/6 kills, 5:30-5:36, Niten 55-61% (was 5:53 at 28,000: the melee loses far less to the dash now)
+  //   duskblade   6/6 kills, 5:50-5:56, right at the enrage (was 0/6): still the slow melee outlier, not a target
+  const NM_HP = 30500;
   const MUSIC = { bpm: 92, root: 45, scale: [0, 2, 3, 7, 8], prog: [0, 0, 3, 2, 0, 0, 4, 2],
     layers: [
       { v: 'koto', pat: ['0...2...4..3....', '0...4...3..2....'], oct: 1, len: 4, vol: 0.14 }, { v: 'flute', pat: ['........4.......', '7.......5.......'], oct: 2, len: 7, vol: 0.07 },
@@ -1027,7 +1176,9 @@
         { at: 0.78, music: 3, enter: lakeEnter, skipTo: lakeSkip, run: lakeRun },
         { at: 0.66, music: 5, enter: nitenEnter, run: nitenRun },
       ],
-      nmTest: { RAMP, stepOf: nitenStepOf },
+      nmTest: { RAMP, stepOf: nitenStepOf, STORM, CALM },
+      // the autopilot reads the Lighthouse Storm's arms like a telegraph (see armAt). Nightmare only: Normal's autopilot is untouched.
+      danger(b, x, z) { return b.state.niten ? armAt(b, x, z) : Infinity; },
     },
     update(b, dt) {
       const S = b.state, p = G.player, ox = b.pos.x, oz = b.pos.z;
@@ -1057,6 +1208,8 @@
         S.fadeU.value = damp(S.fadeU.value, near ? 0.5 : 0, 8, dt); }
       for (const gh of S.ghosts) if (gh.g.visible) gh.g.position.y = Math.sin(G.now * 2 + gh.g.position.x) * 0.06;
       { const ga = 0.32 + 0.14 * Math.sin(G.now * 5); for (const gh of S.ghosts) if (gh.g.visible) { const d = camera.position.distanceTo(gh.g.position); gh.g.userData.mat.uniforms.uA.value = ga * smooth((d - 4) / 6); gh.g.userData.mat.uniforms.uTg.value = G.now % 100; } }
+      if (S.laneM) { for (const m of S.laneM) { const L = m.userData.L, on = !!(L && S.lanes.includes(L)); m.visible = on; if (on) m.material.uniforms.uA.value = Math.min(1, (G.now - L.t0) / 0.15) * Math.min(1, (L.until - G.now) / 0.5) * (L.leave ? 0.55 : 1); else m.userData.L = null; }
+        const E = S.eye; S.eyeM.visible = !!E; if (E) S.eyeM.material.uniforms.uA.value = Math.min(1, (G.now - E.t0) / 0.25) * Math.min(1, (E.until - G.now) / 0.4); }
       for (const it of S.vfx.list) { if (!it.m.visible) continue; it.t += dt; const k = it.t / it.dur; if (k >= 1) { it.m.visible = false; continue; } it.m.material.uniforms.uT.value = Math.max(0, k); }
       { let n = 0, nb = 0; const M = S.M4; for (const q of Bul.list) { if (!q.petal) continue;
           if (q.petal === 2) { if (S.orbB && nb < 200) { const s = q.r * (q.t < 0.15 ? q.t / 0.15 : 1) * 1.08; M.makeScale(s, s, s); M.setPosition(q.x, q.y, q.z); S.orbB.setMatrixAt(nb, M); M.makeScale(s * 2.1, s * 2.1, s * 2.1); M.setPosition(q.x, q.y, q.z); S.orbHaloB.setMatrixAt(nb, M); nb++; } continue; }
@@ -1067,9 +1220,12 @@
     },
     bot(b) {
       const S = b.state;
-      // Niten: attack the awake one, never the still one; hold during the tell and the grace; paired Moons: stand where it is safe.
+      // Niten: attack the awake one, never the still one; hold during the tell and the grace; stand in the calm place when there is
+      // one (a cut lane while the storm blows, the Eye of the Moon). Bot.pocketBlind (tests only) ignores the calm places.
       // Bot.swapBlind (tests only) ignores swaps and always attacks Issen: that autopilot must fail phase IV.
-      if (S.niten && S.lead) { if (Bot.swapBlind) return { target: b }; const L = S.lead, Fo = other(S, L), h = { target: L.ent, holdFire: L.warn > 0 || G.now < Fo.graceT || !L.ent.targetable }; if (S.moonHint) Object.assign(h, S.moonHint); return h; }
+      if (S.niten && S.lead) { if (Bot.swapBlind) return { target: b }; const L = S.lead, Fo = other(S, L), h = { target: L.ent, holdFire: L.warn > 0 || G.now < Fo.graceT || !L.ent.targetable }; if (S.calmHint && !Bot.pocketBlind) Object.assign(h, S.calmHint);
+        // a planted cast is only started when it will finish before the next storm arm arrives
+        if (S.storm && G.player) { const t = armAt(b, G.player.pos.x, G.player.pos.z); if (t < 3) h.noCast = t - 0.25; } return h; }
       return { holdFire: S.still || S.warn > 0 };
     },
   });
