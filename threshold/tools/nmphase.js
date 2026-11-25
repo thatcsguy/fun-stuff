@@ -72,7 +72,7 @@ const { launch } = require('./harness.js');
       const S = b.state, bad = bad2 ? bad2(b) : [];
       if (!bad2) for (const act of [S.A, S.R].filter(Boolean)) { if (act.warn > 0) bad.push(act.name + '.warn'); if (act.hold) bad.push(act.name + '.hold'); if (act.open > 0) bad.push(act.name + '.open'); if (act.ent.dmgTaken !== 1) bad.push(act.name + '.dmgTaken'); }
       if (!bad2) { if (!b.group.visible) bad.push('hidden'); if (!b.targetable) bad.push('untargetable'); } if (S.R && S.niten && (!S.R.root.visible || !S.R.ent.targetable)) bad.push('reflection hidden'); if (S.verse) bad.push('verse'); if (S.cine) bad.push('cinematic');
-      if (boss === 'duelist') { if (S.calmHint) bad.push('calmHint'); if (S.lanes && S.lanes.length) bad.push('lanes'); if (S.eye) bad.push('eye'); if (S.storm) bad.push('storm ' + S.storm); if (S.unison) bad.push('unison'); if (S.echoing) bad.push('echoing'); if (S.stormHold) bad.push('stormHold'); if (S.R && S.R.ent.castState) bad.push('reflection cast ' + S.R.ent.castState.name); if (g.Bul.list.some((q) => q.storm)) bad.push('storm petals'); }
+      if (boss === 'duelist') { if (S.calmHint) bad.push('calmHint'); if (S.lanes && S.lanes.length) bad.push('lanes'); if (S.eye) bad.push('eye'); if (S.storm) bad.push('storm ' + S.storm); if (S.unison) bad.push('unison'); if (S.echoing) bad.push('echoing'); if (S.stormHold) bad.push('stormHold'); if (S.waking) bad.push('waking'); if (S.cycleCuts) bad.push('cycleCuts ' + S.cycleCuts); if (S.cycleMirror) bad.push('cycleMirror'); if (S.ghosts.some((q) => q.cut)) bad.push('standing ghosts'); if (S.R && S.R.ent.castState) bad.push('reflection cast ' + S.R.ent.castState.name); if (g.Bul.list.some((q) => q.storm)) bad.push('storm petals'); }
       out.push((bad.length ? 'FAIL ' : 'ok   ') + 'last blow ' + label + ` (phase ${last + 1})` + (bad.length ? ': ' + bad.join(', ') : ''));
     };
     const overA = (label, cond, force) => over(label, cond, (b) => { const S = b.state, bad = atelierBad(b).filter((q) => q !== 'varnish ring'); if (S.varnR > 25) bad.push('no varnish ring'); return bad; }, force);
@@ -92,7 +92,8 @@ const { launch } = require('./harness.js');
     over('during a Full Moon (the Eye)', (b) => !!b.state.eye, null, (S) => { S.nitenT = 2 * def.nmTest.RAMP + 20; });
     over('during the Lighthouse Storm with a cut lane', (b) => b.state.storm === 'on' && b.state.lanes.length > 0);
     over('during the storm tell', (b) => b.state.storm === 'tell');
-    over('during Echo from the still one', (b) => b.state.echoing, null, (S) => { S.nitenT = 1 * def.nmTest.RAMP; });
+    over('during a Waking Cut (two waves, mirror ghost)', (b) => !!b.state.waking && b.state.waking.n >= 3, null, (S) => { S.nitenT = 4 * def.nmTest.RAMP; });
+    over('during a Final Verse still moment', (b) => b.state.niten && b.state.verse && b.state.lead && b.state.lead.ent.targetable, null, (S) => { S.nitenT = 3 * def.nmTest.RAMP; });
     over('during a swap at step 5 (0.9 s tell)', (b) => b.state.niten && b.state.nitenStep === 5 && b.state.lead && b.state.lead.warn > 0, null, (S) => { S.nitenT = 5 * def.nmTest.RAMP; });
     over('during twin Petal Storm (step 4)', (b) => b.state.niten && b.state.nitenStep >= 4 && b.state.unison && g.Bul.list.some((q) => q.petal && !q.storm), null, (S) => { S.nitenT = 4 * def.nmTest.RAMP; });
     }
