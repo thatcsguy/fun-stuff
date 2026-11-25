@@ -157,7 +157,7 @@ const Game = (() => {
     let prev, best, newSplit = [];
     if (G.testUsed) { /* god mode or super damage: a test run, nothing is recorded */ } else if (def.nm) { // nightmare records live apart from the normal kills: best total, best time per phase on its own, clears
       if (!Save.nm) Save.nm = {}; if (!Save.nm[def.id]) Save.nm[def.id] = {};
-      const r = Save.nm[def.id][p.cls.id] || { best: 0, splits: [], clears: 0 }; prev = r.best; best = !prev || time < prev; if (best) r.best = Math.round(time * 10) / 10;
+      const r0 = Save.nm[def.id][p.cls.id], r = r0 && r0.v === 2 ? r0 : { v: 2, best: 0, splits: [], clears: 0 }; // v 2: no phase clocks (records without it are from the old fights) prev = r.best; best = !prev || time < prev; if (best) r.best = Math.round(time * 10) / 10;
       (b.phaseLog || []).forEach((q, i) => { if (q && (!r.splits[i] || q.time < r.splits[i])) { if (r.splits[i]) newSplit[i] = true; r.splits[i] = q.time; } });
       r.clears++; Save.nm[def.id][p.cls.id] = r; saveSave();
     } else {

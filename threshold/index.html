@@ -162,24 +162,13 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
 #tgtframe.on{opacity:1}
 #tgtframe .bn{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#fff;text-shadow:0 1px 4px #000;margin-bottom:3px;text-align:center}
 #tgtframe .bar{height:10px}
-/* the fuse: one strip per phase clock under the boss bar */
-#bfuse{position:relative;height:4px;margin-top:2px;display:none;background:rgba(0,0,0,.6);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
-#bfuse.on{display:block}
-#bfuse .fz{position:absolute;top:0;bottom:0;padding:0 1px;box-sizing:border-box}
-#bfuse .fz b{display:block;height:100%;transform-origin:left;background:#c9a24a;opacity:.35}
-#bfuse .fz.live b{background:linear-gradient(90deg,#ffcf6a,#fff2c0);opacity:1;box-shadow:0 0 6px rgba(255,200,90,.8)}
-#bfuse .fz.live.hot b{animation:fzp .5s ease-in-out infinite alternate;background:linear-gradient(90deg,#ff7a3a,#ffd27a)}
-#bfuse .fz.done b{background:#b8913f;opacity:.55}
-#bfuse .fz.out b{background:#ff2a2a;opacity:1;transform:none!important;box-shadow:0 0 8px rgba(255,40,40,.9)}
-@keyframes fzp{from{opacity:.55}to{opacity:1}}
 #bname.nm::before{content:"\25C6";color:#ff3a58;font-size:.82em;margin-right:.5em;vertical-align:.08em;text-shadow:0 0 2px #000,0 0 3px #000,0 0 10px #ff2040}
 /* per-phase results on the death and victory screens */
 .ptable{display:none;font:13px ui-monospace,Consolas,monospace;color:#c9c5ba;letter-spacing:.04em;margin-top:-6px}
 .ptable.on{display:grid;gap:3px}
-.ptable .pr{display:grid;grid-template-columns:44px 120px 80px 40px;gap:10px;text-align:right}
+.ptable .pr{display:grid;grid-template-columns:44px 70px 80px 40px;gap:10px;text-align:right}
 .ptable .pr span:first-child{text-align:left;font-family:var(--serif);color:var(--accent)}
 .ptable .pr span:last-child{color:#ffd76a;text-align:left;font-size:11px}
-.ptable .pr.out{color:#ff6a5a}
 .ptable .pr.na{color:#5a5850}
 #enrage{position:absolute;top:22px;right:24px;font:13px ui-monospace,Consolas,monospace;color:#ddd;text-shadow:0 1px 4px #000;letter-spacing:.08em}
 #enrage.hot{color:#ff6a5a}
@@ -257,7 +246,6 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
   <div id="bossframe">
     <div class="bn"><span id="bname"></span><small id="bhp"></small></div>
     <div class="bar" id="bbar"><div class="lag"></div><div class="fill"></div></div>
-    <div id="bfuse"></div>
     <div class="bar cast" id="bcast"><div class="fill"></div><div class="cn"></div></div>
   </div>
   <div id="tgtframe">
@@ -1929,8 +1917,7 @@ class Boss extends Ent {
   goPhase(i) {
     const b = this, ph = this.def.phases[i];
     this.logPhase();
-    if (this.overtime) { G.timeScale = 1; if (this.otMusic && this.def.music) Music.play(this.def.music, ph.music !== undefined ? ph.music : i); }
-    this.phaseT = 0; this.liveT = 0; this.overtime = false; this.otMusic = false; this.phaseDmg0 = G.player ? G.player.stats.dmg : 0;
+    this.phaseT = 0; this.liveT = 0; this.phaseDmg0 = G.player ? G.player.stats.dmg : 0;
     Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null; this.phase = i; this.nextPhase = i + 1; this.transitioning = true;
     Co.start(function* () {
       if (ph.enter) { b.immune = true; yield* ph.enter(b); b.immune = false; }
@@ -1939,7 +1926,7 @@ class Boss extends Ent {
     }, 'phase');
   }
   // Super damage (testing setting): a landed player hit drops health to just under the next phase threshold, and the
-  // normal threshold check in update() then runs goPhase, so enter hooks, transitions and nightmare clocks behave as usual.
+  // normal threshold check in update() then runs goPhase, so enter hooks and transitions behave as usual.
   // In the last phase the hit kills. Only once the current phase has been live for a moment, so a volley, a multi-hit
   // attack or a hit during a transition never skips more than one phase.
   superPush() {
@@ -1951,37 +1938,31 @@ class Boss extends Ent {
     if (this.hp > lim - 1) this.hp = Math.max(1, Math.floor(lim - 1));
     this.liveT = 0; // and wait again (goPhase resets it too)
   }
-  // ---- per-phase clocks (a phase with `budget` seconds). Only nightmare versions use them; a def without budgets keeps the flat enrage.
-  get budgeted() { return this.def.phases.some((p) => p.budget); }
-  // record how the phase that is ending went: time on its clock, budget, damage dealt, whether it ran out
+  // ---- the nightmare split log: how long each phase was live and the damage dealt in it (end-screen table, Save.nm splits)
   logPhase() {
-    if (!this.budgeted || this.phase < 0) return; const L = this.phaseLog || (this.phaseLog = []); if (L[this.phase]) return;
-    const ph = this.def.phases[this.phase];
-    L[this.phase] = { time: Math.round((this.phaseT || 0) * 10) / 10, budget: ph.budget || 0, dmg: Math.round((G.player ? G.player.stats.dmg : 0) - (this.phaseDmg0 || 0)), over: !!this.overtime };
+    if (!this.def.nm || this.phase < 0) return; const L = this.phaseLog || (this.phaseLog = []); if (L[this.phase]) return;
+    L[this.phase] = { time: Math.round((this.phaseT || 0) * 10) / 10, dmg: Math.round((G.player ? G.player.stats.dmg : 0) - (this.phaseDmg0 || 0)) };
   }
-  startOvertime() {
-    const d = this.def, ph = d.phases[this.phase];
-    this.overtime = true; Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null;
-    Co.start((ph.overtime || d.overtime || Boss.defaultOvertime)(this), 'phase');
-  }
-  // generic "out of time": a whole-arena unblockable telegraph, then a blow nothing survives (src 'enrage' -> "Out of time")
-  static *defaultOvertime(b) {
-    FX.flash(0xff2010, 0.5, 1.5); Sound.sfx('roar');
-    Hz.circle(b.pos.x, b.pos.z, 80, 6, 0, { blockable: false, name: 'Out of time', color: 0xff3010, quiet: true, onFire: () => { const p = G.player; FX.flash(0xff2010, 0.6, 2); FX.ring(b.pos.x, b.pos.z, { r1: 40, color: 0xff3010, dur: 0.8 }); if (p && p.alive) p.hurt(9999, { blockable: false, src: 'enrage', pierce: true }); } });
-    yield 6.5; while (true) yield 1;
+  // the last blow (def.lastBlow, a coroutine): lastBlowAt seconds after the enrage, the phase stops (its coroutine, hazards,
+  // bullets and cast) and the blow plays out. The boss stays hittable until it lands; the enrage pulses keep going.
+  startLastBlow() {
+    this.lastBlowing = true; this.transitioning = false; this.immune = false; Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null;
+    Co.start(this.def.lastBlow(this), 'phase');
   }
   update(dt) {
     super.update(dt);
     if (!this.alive || G.state !== 'fight') return;
     const d = this.def;
     if (!this.transitioning) this.liveT = (this.liveT || 0) + dt;
-    if (!this.transitioning && this.nextPhase < d.phases.length && this.hp / this.maxHp <= d.phases[this.nextPhase].at) this.goPhase(this.nextPhase);
-    if (this.budgeted) {
-      const ph = d.phases[this.phase];
-      if (ph && ph.budget && !this.transitioning && !G.rehearsing) { this.phaseT += dt; if (!this.overtime && this.phaseT >= ph.budget) this.startOvertime(); }
-    } else if (d.enrage && G.ft > d.enrage) {
+    if (!this.transitioning && !this.lastBlowing && this.nextPhase < d.phases.length && this.hp / this.maxHp <= d.phases[this.nextPhase].at) this.goPhase(this.nextPhase);
+    if (d.nm && !this.transitioning && !G.rehearsing) this.phaseT += dt;
+    // the enrage: from d.enrage on, an unblockable pulse every 2 s of enrageBase + enrageGrow per second over (120 + 14 by
+    // default). Nightmare blocks set a softer creep and a themed lastBlow that ends the fight lastBlowAt seconds in.
+    if (d.enrage && G.ft > d.enrage && !G.rehearsing) {
       if (!this.enraged) { this.enraged = true; this.enrageT = 0; FX.flash(0xff2010, 0.5, 1.5); Sound.sfx('roar'); }
-      this.enrageT -= dt; if (this.enrageT <= 0) { this.enrageT = 2; const p = G.player; if (p && p.alive) { p.hurt(120 + (G.ft - d.enrage) * 14, { blockable: false, src: 'enrage' }); FX.flash(0xff2010, 0.3, 3); FX.ring(this.pos.x, this.pos.z, { r1: 40, color: 0xff3010, dur: 0.8 }); } }
+      const base = d.enrageBase !== undefined ? d.enrageBase : 120, grow = d.enrageGrow !== undefined ? d.enrageGrow : 14;
+      this.enrageT -= dt; if (this.enrageT <= 0) { this.enrageT = 2; const p = G.player; if (p && p.alive) { p.hurt(base + (G.ft - d.enrage) * grow, { blockable: false, src: 'enrage' }); FX.flash(0xff2010, 0.3, 3); FX.ring(this.pos.x, this.pos.z, { r1: 40, color: 0xff3010, dur: 0.8 }); } }
+      if (d.lastBlow && !this.lastBlowing && G.ft >= d.enrage + (d.lastBlowAt !== undefined ? d.lastBlowAt : 24)) this.startLastBlow();
     }
   }
 }
@@ -4606,7 +4587,7 @@ const UI = (() => {
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']; // phase numbers in the nightmare phase table
   const svg = (name, color) => `<svg viewBox="0 0 24 24"><path d="${ICON[name]}" fill="${color}" fill-rule="evenodd"/></svg>`;
   const fmtT = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
-  let fuse = [], tickS = -1, slots = [], cur = null, settingsFrom = 'menu', focusI = -1, hurtA = 0;
+  let slots = [], cur = null, settingsFrom = 'menu', focusI = -1, hurtA = 0;
   const cache = {};
   const setTxt = (key, node, v) => { if (cache[key] !== v) { cache[key] = v; node.textContent = v; } };
   const setCls = (key, node, cls, on) => { if (cache[key] !== on) { cache[key] = on; node.classList.toggle(cls, on); } };
@@ -4638,7 +4619,7 @@ const UI = (() => {
       const row = document.createElement('div'); row.className = 'gd'; sec.appendChild(row);
       for (const d of list) {
         const ok = !nm || Game.nmAvailable(d), b = document.createElement('button'); b.className = 'door' + (ok ? ' nav' : ' na') + (nm && ok ? ' nmok' : ''); b.dataset.door = d.id; b.style.setProperty('--c', d.color || '#e8c77a');
-        const kills = nm ? Object.fromEntries(Object.entries((Save.nm && Save.nm[d.id]) || {}).map(([k, v]) => [k, v.best])) : (Save.kills && Save.kills[d.id]) || {};
+        const kills = nm ? Object.fromEntries(Object.entries((Save.nm && Save.nm[d.id]) || {}).filter(([k, v]) => v && v.v === 2).map(([k, v]) => [k, v.best])) : (Save.kills && Save.kills[d.id]) || {};
         const best = Object.values(kills).length ? Math.min(...Object.values(kills)) : 0;
         b.innerHTML = `${best ? `<div class="dk">✓ ${fmtT(best)}</div>` : ''}<div class="dn">${d.name}</div><div class="dh">${d.title || ''}</div>`;
         if (ok) b.onclick = () => { Sound.resume(); Sound.sfx('uiok'); Game.start(d.id, { nm }); }; else b.disabled = true;
@@ -4687,10 +4668,6 @@ const UI = (() => {
     const b = G.boss, bar = $('#bbar'); bar.querySelectorAll('.tick').forEach((t) => t.remove());
     for (const ph of b.def.phases) if (ph.at < 1) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (ph.at * 100) + '%'; bar.appendChild(t); }
     $('#bname').textContent = b.def.name; $('#bname').classList.toggle('nm', !!b.def.nm);
-    // the fuse: one segment per phase clock, each under its own slice of the health bar, burning right to left
-    const fz = $('#bfuse'); fz.innerHTML = ''; fuse = []; tickS = -1;
-    if (b.budgeted) b.def.phases.forEach((ph, i) => { const lo = b.def.phases[i + 1] ? b.def.phases[i + 1].at : 0, sg = document.createElement('div'); sg.className = 'fz wait'; sg.style.left = (lo * 100) + '%'; sg.style.width = ((ph.at - lo) * 100) + '%'; sg.innerHTML = '<b></b>'; fz.appendChild(sg); fuse.push({ sg, b: sg.firstChild }); });
-    fz.classList.toggle('on', fuse.length > 0);
   }
   // Called whenever the controller toggle, prompt style, connected pad or a binding changes: every on-screen button label follows.
   function deviceChanged() {
@@ -4715,7 +4692,6 @@ const UI = (() => {
     setSx('bhp', $('#bbar .fill'), b.hp / b.maxHp); setSx('bhpl', $('#bbar .lag'), b.hp / b.maxHp);
     setTxt('bhpt', $('#bhp'), (b.hp / b.maxHp * 100).toFixed(1) + '%');
     castBar('bc', $('#bcast'), b.castState);
-    if (fuse.length) updFuse(b);
     const t = p.target, showT = t && t !== b && t.alive; setCls('tf', $('#tgtframe'), 'on', !!showT);
     if (showT) { const th = t.hpOwner || t; setTxt('tn', $('#tname'), t.name); setSx('thp', $('#tbar .fill'), th.hp / th.maxHp); castBar('tc', $('#tcast'), t.castState); }
     if (b.def.enrage) { const left = Math.max(0, b.def.enrage - G.ft); setTxt('enr', $('#enrage'), fmtT(G.ft)); setCls('enrh', $('#enrage'), 'hot', left < 30); }
@@ -4749,23 +4725,10 @@ const UI = (() => {
     setCls('hint', el.hint, 'on', p.hintT > 0); if (p.hintT > 0) setTxt('hintt', el.hint, p.hint);
     if (G.debug) el.dbg.textContent = `t ${G.ft.toFixed(1)}  phase ${b.phase}  boss ${Math.round(b.hp)}  dps ${(p.stats.dmg / Math.max(1, G.ft)).toFixed(0)}  hz ${Hz.list.length} bul ${Bul.list.length} co ${Co.list.length}\n${G.errors.slice(-3).join('\n')}`;
   }
-  // fuse states: done (frozen where it stopped, dim gold), live (burning; pulses and ticks in its last 15 s), wait (full, dim), out (ran out: red)
-  function updFuse(b) {
-    const L = b.phaseLog || [];
-    for (let i = 0; i < fuse.length; i++) {
-      const f = fuse[i], bud = b.def.phases[i].budget || 1, cur = i === b.phase && !L[i];
-      const st = L[i] ? (L[i].over ? 'out' : 'done') : cur ? (b.overtime ? 'out' : 'live') : i < b.phase ? 'done' : 'wait';
-      const left = L[i] ? 1 - L[i].time / bud : cur ? 1 - (b.phaseT || 0) / bud : 1;
-      if (cache['fz' + i] !== st) { cache['fz' + i] = st; f.sg.className = 'fz ' + st; }
-      setSx('fzs' + i, f.b, sat(left));
-      const hot = st === 'live' && G.state === 'fight' && (b.phaseT || 0) > bud - 15; setCls('fzh' + i, f.sg, 'hot', hot);
-      if (hot && !b.transitioning && !G.paused) { const s = Math.floor(b.phaseT); if (s !== tickS) { tickS = s; Sound.sfx('tick', 0.9, 0.8 + (15 - (bud - b.phaseT)) * 0.06); } }
-    }
-  }
-  // per-phase results under the death / victory stat line: time on the clock / budget, damage per second; red = ran out
+  // per-phase results under the death / victory stat line (nightmare): time each phase was live, damage per second
   function phaseTable(node, b, best = []) {
-    const L = b.phaseLog; if (!L || !b.budgeted) { node.innerHTML = ''; node.classList.remove('on'); return; }
-    node.innerHTML = b.def.phases.map((ph, i) => { const q = L[i]; return q ? `<div class="pr${q.over ? ' out' : ''}"><span>${ROMAN[i]}</span><span>${fmtT(q.time)} / ${fmtT(q.budget)}</span><span>${Math.round(q.dmg / Math.max(1, q.time))} dps</span><span>${best[i] ? 'best' : ''}</span></div>` : `<div class="pr na"><span>${ROMAN[i]}</span><span>– / ${fmtT(ph.budget || 0)}</span><span>–</span><span></span></div>`; }).join('');
+    const L = b.phaseLog; if (!L || !b.def.nm) { node.innerHTML = ''; node.classList.remove('on'); return; }
+    node.innerHTML = b.def.phases.map((ph, i) => { const q = L[i]; return q ? `<div class="pr"><span>${ROMAN[i]}</span><span>${fmtT(q.time)}</span><span>${Math.round(q.dmg / Math.max(1, q.time))} dps</span><span>${best[i] ? 'best' : ''}</span></div>` : `<div class="pr na"><span>${ROMAN[i]}</span><span>–</span><span>–</span><span></span></div>`; }).join('');
     node.classList.add('on');
   }
   function slotFlash(i) { const s = slots[i]; if (s) { s.flash = 0.1; s.d.classList.add('press'); } }
@@ -5058,7 +5021,7 @@ const Game = (() => {
     let prev, best, newSplit = [];
     if (G.testUsed) { /* god mode or super damage: a test run, nothing is recorded */ } else if (def.nm) { // nightmare records live apart from the normal kills: best total, best time per phase on its own, clears
       if (!Save.nm) Save.nm = {}; if (!Save.nm[def.id]) Save.nm[def.id] = {};
-      const r = Save.nm[def.id][p.cls.id] || { best: 0, splits: [], clears: 0 }; prev = r.best; best = !prev || time < prev; if (best) r.best = Math.round(time * 10) / 10;
+      const r0 = Save.nm[def.id][p.cls.id], r = r0 && r0.v === 2 ? r0 : { v: 2, best: 0, splits: [], clears: 0 }; // v 2: no phase clocks (records without it are from the old fights) prev = r.best; best = !prev || time < prev; if (best) r.best = Math.round(time * 10) / 10;
       (b.phaseLog || []).forEach((q, i) => { if (q && (!r.splits[i] || q.time < r.splits[i])) { if (r.splits[i]) newSplit[i] = true; r.splits[i] = q.time; } });
       r.clears++; Save.nm[def.id][p.cls.id] = r; saveSave();
     } else {
@@ -7369,7 +7332,7 @@ const Warm = (() => {
       fragmentShader: 'uniform float uTime; varying float vF; varying vec3 vL; void main(){ float k=clamp(vF,0.0,1.0); float lob=0.5+0.5*cos(atan(vL.z,vL.x+1e-4)*5.0+uTime*2.0); vec3 rim=vec3(1.0,0.34,0.58), body=vec3(0.82,0.1,0.3)*(0.85+0.15*lob), core=vec3(1.15,0.78,0.88);\n vec3 c=mix(rim,body,smoothstep(0.0,0.5,k)); c=mix(c,core,smoothstep(0.955,0.995,k)); gl_FragColor=vec4(clamp(c,vec3(0.0),vec3(1.3)),1.0); }' }), 320);
     S.orb.count = 0; S.orb.frustumCulled = false; g.add(S.orb); S.M4 = new THREE.Matrix4();
     S.orbHalo = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), haloMat(new THREE.Color(0xff3a78).multiplyScalar(0.22)), 320); S.orbHalo.count = 0; S.orbHalo.frustumCulled = false; S.orbHalo.renderOrder = 14; g.add(S.orbHalo);
-    S.cuts = []; S.haste = 0; S.still = false; S.warn = 0; S.graceT = 0; S.walk = false; S.kneel = 0; S.night = 0; S.open = 0; S.torn = false; S.tv = new V3();
+    S.cuts = []; S.haste = 0; S.nitenT = 0; S.nitenStep = 0; S.stepAt = []; S.tellT = 1.2; S.still = false; S.warn = 0; S.graceT = 0; S.walk = false; S.kneel = 0; S.night = 0; S.open = 0; S.torn = false; S.tv = new V3();
     // ---------------------------------------------------------------- nightmare: everything is built here and hidden (nothing is made mid-fight)
     S.A = { name: 'A', ent: b, root: b.group, model: S.model, D, fake: S.fake, aura: S.aura, col: ROSE, ice: PALE, drainU: S.drainA, clipU: S.clipA, mats: S.matsA, drain: 0, still: false, warn: 0, open: 0, graceT: 0, hold: false,
       get kneel() { return S.kneel; }, set kneel(v) { S.kneel = v; } };
@@ -7506,11 +7469,11 @@ const Warm = (() => {
     const a = p.facing + PI, ox = b.pos.x, oz = b.pos.z; let tx = p.pos.x + Math.sin(a) * 2.2, tz = p.pos.z + Math.cos(a) * 2.2; const d = Math.hypot(tx, tz); if (d > 14) { tx *= 14 / d; tz *= 14 / d; }
     yield 0.22; b.pos.x = tx; b.pos.z = tz; b.facing = b.angToPlayer(); S.model.swing(1, 0.2);
     const cl = Math.hypot(tx - ox, tz - oz); if (cl > 0.5) vCut(b, ox, oz, Math.atan2(tx - ox, tz - oz), cl, 0xffffff); Sound.sfx('crit'); FX.slash(p.pos.x, 1.2, p.pos.z, b.facing, { r: 3.5, color: 0xffffff, dur: 0.3, mult: 1.6 });
-    p.hurt(520, { blockable: true, src: { name: 'Counter' } });
+    p.hurt(NM(520, 380), { blockable: true, src: { name: 'Counter' } });
   }
-  // Haste is tied to the phase now (no Focus cast to stop): Normal phases 1-3 give 0, 1, 2 stacks; Nightmare (whose first phase is
-  // today's phase 2) gives 1, 2, 3, 3. Each stack shortens his telegraphs by 14% (see tele). Focus is where the new stack shows.
-  const hasteFor = (b) => Math.min(3, Math.max(0, b.phase) + (G.nightmare ? 1 : 0));
+  // Haste is tied to the phase (no Focus cast to stop): Normal phases 1-3 give 0, 1, 2 stacks; Nightmare gives 1, 1, 2, 2, and
+  // the third stack comes with Niten's last ramp step. Each stack shortens his telegraphs by 14% (see tele). Focus is where a new stack shows.
+  const hasteFor = (b) => G.nightmare ? [1, 1, 2, 2][Math.max(0, Math.min(3, b.phase))] + (b.state.nitenStep >= 5 ? 1 : 0) : Math.min(3, Math.max(0, b.phase));
   function* focus(b) {
     const S = b.state, h = hasteFor(b);
     if (h > S.haste) { S.haste = h; FX.dome(b.pos.x, 1, b.pos.z, { r: 6, color: ROSE, dur: 0.6 }); Sound.sfx('roar', 0.6, 2.2); FX.flash(ROSE, 0.25, 3); petals(b.pos.x, b.pos.z, 30); }
@@ -7591,10 +7554,10 @@ const Warm = (() => {
   // ================================================================ NIGHTMARE ("Niten")
   // Co.stopTag('phase') skips a coroutine's cleanup, so every per-mechanic state a cut-off mechanic can leave behind (kneel,
   // stillness ring, hidden or untargetable body, verse grade, sheathed blade, slow time, a held mirror, a cinematic camera) is
-  // reset here: in every nightmare phase's enter and in the overtime. Who is awake and who is still is not per-mechanic: it stays.
+  // reset here: in every nightmare phase's enter and in the last blow. Who is awake and who is still is not per-mechanic: it stays.
   const other = (S, act) => act === S.A ? S.R : S.A;
   function resetMech(b) {
-    const S = b.state; S.walk = false; S.warn = 0; S.still = false; S.kneel = 0; S.open = 0; S.countered = false; b.dmgTaken = 1; S.fake.parryT = 0;
+    const S = b.state; S.walk = false; S.warn = 0; S.still = false; S.kneel = 0; S.open = 0; S.countered = false; b.dmgTaken = 1; S.fake.parryT = 0; S.tellT = STILL_TELL;
     b.group.visible = true; b.targetable = true; if (S.weapon) S.weapon.visible = true; G.timeScale = 1; S.moonHint = null;
     if (S.verse) { S.verse = false; Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.4), 'fight'); }
     if (S.cine) { S.cine = false; Cam.release(); UI.hud(true); }
@@ -7602,12 +7565,12 @@ const Warm = (() => {
     for (const act of [S.A, Rr]) { act.warn = 0; act.hold = false; act.open = 0; act.ent.dmgTaken = 1; act.fake.parryT = 0; }
     Rr.kneel = 0; Rr.D.weapon.visible = true; Rr.root.visible = !!S.niten; Rr.ent.targetable = !!S.niten; Rr.root.rotation.x = 0;
   }
-  // Out of time (every nightmare phase): the music stops dead, he sheathes the sword (in phase IV both do), one petal falls past
+  // Out of time (the last blow, 24 s into the enrage, in whatever phase): the music stops dead, he sheathes the sword (in phase IV both do), one petal falls past
   // the camera in silence, the whole deck fills, and a single white cut crosses it (two crossing cuts in phase IV).
   // He can still be cut down while it winds up.
   function* lastPetal(b) {
     const S = b.state, twin = !!S.niten; resetMech(b); clearGhosts(S); b.facing = b.angToPlayer();
-    Music.stop(0.08); b.otMusic = true; G.timeScale = 0.6; S.model.swing(0, 0.6); if (twin) S.R.model.swing(0, 0.6); Sound.sfx('sword', 0.5, 0.45);
+    Music.stop(0.08); G.timeScale = 0.6; S.model.swing(0, 0.6); if (twin) S.R.model.swing(0, 0.6); Sound.sfx('sword', 0.5, 0.45);
     yield 0.55; if (S.weapon) S.weapon.visible = false; if (twin) S.R.D.weapon.visible = false; Sound.sfx('parry', 0.5, 0.5); S.kneel = 0.25; if (twin) S.R.kneel = 0.25;
     if (!G.headless) { const c = camera.position, f = camera.getWorldDirection(S.tv); FX.burst(c.x + f.x * 2.4, c.y + 0.9, c.z + f.z * 2.4, { n: 1, color: PALE, color2: ROSE, speed: [0.05, 0.2], life: [3.2, 3.4], size: [0.16, 0.18], grav: 0.35, drag: 2.5 }); }
     yield 0.75; G.timeScale = 1;
@@ -7636,11 +7599,31 @@ const Warm = (() => {
   }
   function lakeSkip(b) { const S = b.state; S.seam.visible = true; S.seamP.value = 1; S.EU.uCalm.value = 1; S.lake = true; S.windU.value = 0.08; }
   function nightSkip(b) { nightfallFn(b)(1); Object.assign(Post.cur, { bloom: 0.5, threshold: 1.0, tint: [0.96, 0.98, 1.06], exposure: 1.1, sat: 1.05, vig: 0.78, lift: [0.012, 0.012, 0.024] }); Post.apply(); }
+  // the mirrored cut and the blue echo come first, so the mirror is seen at least twice before the reflection exists
   function* lakeRun(b) {
     const S = b.state; yield 0.4;
     while (true) {
-      yield* drawCut(b, 5); yield* moon(b, ['c', 'o']); yield* echo(b, 1); S.walk = true; yield 0.8;
-      yield* focus(b); yield* stillness(b, 3.0); yield* finalVerse(b, 7, true); yield* moon(b, ['n', 'o', 'c']); yield* drawCut(b, 4); yield* echo(b, 2); S.walk = true; yield 0.8;
+      yield* focus(b); yield* drawCut(b, 5); yield* echo(b, 1); S.walk = true; yield 0.8;
+      yield* finalVerse(b, 7, true); yield* moon(b, ['n', 'o']); S.walk = true; yield 0.6;
+      yield* stillness(b, 3.0); S.walk = true; yield 0.8;
+    }
+  }
+  // Nightmare's teaching phases are about 30 s each with one idea each, so the idea comes early in a short loop.
+  // Sunset: Stillness and its Counter (what Niten is built on) inside the first 10 s.
+  function* sunsetNM(b) {
+    const S = b.state; yield 0.8;
+    while (true) {
+      yield* focus(b); yield* drawCut(b, 4); S.walk = true; yield 0.5;
+      yield* stillness(b); yield* echo(b, 1); S.walk = true; yield 0.8;
+      yield* moon(b, ['c', 'n', 'o']); yield* petalStorm(b); S.walk = true; yield 1.0;
+    }
+  }
+  // Nightfall: Final Verse first
+  function* nightNM(b) {
+    const S = b.state;
+    while (true) {
+      yield* focus(b); yield* finalVerse(b, 9); yield* moon(b, ['c', 'o']); S.walk = true; yield 0.6;
+      yield* stillness(b, 3.0); yield* drawCut(b, 5); yield* echo(b, 2); S.walk = true; yield 0.8;
     }
   }
 
@@ -7659,8 +7642,9 @@ const Warm = (() => {
     const S = b.state, A = S.lead, B = other(S, A), e = A.ent, p = G.player; S.walk = false;
     e.facing = angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z); A.warn = 0.001;
     Sound.sfx('glint', 0.9); FX.flash(0xfff4e0, 0.16, 2.2);
-    if (!G.headless) { FX.ring(e.pos.x, e.pos.z, { r0: 7.5, r1: 1.3, color: 0xfff4e0, dur: STILL_TELL, width: 0.24, mult: 1.7 }); FX.light(e.pos.x, 3, e.pos.z, 0xfff0d0, 45, STILL_TELL, 18); }
-    yield STILL_TELL;
+    const T = S.tellT || STILL_TELL; // 1.2 s, 0.9 s at Niten's last ramp step
+    if (!G.headless) { FX.ring(e.pos.x, e.pos.z, { r0: 7.5, r1: 1.3, color: 0xfff4e0, dur: T, width: 0.24, mult: 1.7 }); FX.light(e.pos.x, 3, e.pos.z, 0xfff0d0, 45, T, 18); }
+    yield T;
     A.warn = 0; A.graceT = G.now + STILL_GRACE; A.kneel = 1; wake(b, B);
     // burn check: a whole cycle with no hit on the still one opens the one who wakes (3.2 s at 1.6x, the old green ring)
     if (S.cycleClean) { B.open = 3.2; B.ent.dmgTaken = 1.6; petals(B.ent.pos.x, B.ent.pos.z, 24); }
@@ -7672,7 +7656,7 @@ const Warm = (() => {
     const a = p.facing + PI, ox = e.pos.x, oz = e.pos.z; let tx = p.pos.x + Math.sin(a) * 2.2, tz = p.pos.z + Math.cos(a) * 2.2; const d = Math.hypot(tx, tz); if (d > 14) { tx *= 14 / d; tz *= 14 / d; }
     yield 0.22; e.pos.x = tx; e.pos.z = tz; e.facing = angTo(tx, tz, p.pos.x, p.pos.z); act.model.swing(1, 0.2);
     const cl = Math.hypot(tx - ox, tz - oz); if (cl > 0.5) vCut(b, ox, oz, Math.atan2(tx - ox, tz - oz), cl, act === S.R ? ICE : 0xffffff); Sound.sfx('crit'); FX.slash(p.pos.x, 1.2, p.pos.z, e.facing, { r: 3.5, color: 0xffffff, dur: 0.3, mult: 1.6 });
-    p.hurt(520, { blockable: true, src: { name: 'Counter' } });
+    p.hurt(380, { blockable: true, src: { name: 'Counter' } });
     yield 0.55; petals(e.pos.x, e.pos.z, 18, act.ice); act.hold = false;
   }
   // Twin Draw Cut: the leader cuts at the player, the still one cuts the mirror line at the same instant; both leave ghosts
@@ -7689,11 +7673,13 @@ const Warm = (() => {
     }
     const e = S.lead.ent; e.facing = angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z); yield 0.5;
   }
-  // Twin Focus: no cast any more; the phase's haste stack shows on both (see hasteFor)
+  // Twin Focus is Niten's ramp bell: it plays at the start of every ramp step (both bodies: dome, roar, flash, petals), the
+  // wordless signal that something new is coming. A new haste stack (step 5) shows with it.
   function* twinFocus(b) {
-    const S = b.state, L = S.lead, F = other(S, L), h = hasteFor(b);
-    if (h > S.haste) { S.haste = h; for (const act of [L, F]) FX.dome(act.ent.pos.x, 1, act.ent.pos.z, { r: 6, color: act.col, dur: 0.6 }); Sound.sfx('roar', 0.6, 2.2); FX.flash(ROSE, 0.25, 3); }
-    yield 0.3;
+    const S = b.state, L = S.lead, F = other(S, L); S.haste = Math.max(S.haste, hasteFor(b));
+    for (const act of [L, F]) { FX.dome(act.ent.pos.x, 1, act.ent.pos.z, { r: 6, color: act.col, dur: 0.6 }); petals(act.ent.pos.x, act.ent.pos.z, 30, act.ice); }
+    Sound.sfx('roar', 0.6, 2.2); FX.flash(ROSE, 0.25, 3); S.bells = (S.bells || 0) + 1;
+    yield 0.6;
   }
   // Twin Final Verse: both vanish; seven rose lines and their seven blue mirrors 0.45 s late; both come back at mirrored spots near the player
   function* twinFinalVerse(b, n = 7) {
@@ -7721,11 +7707,12 @@ const Warm = (() => {
   }
   // Paired Moons, opposite shapes. First: the awake one's New Moon (get away) with the still one's Full Moon (get close): the one
   // place the fight asks you to hug the duelist you must not hit. Then the reverse, then both Crescent (the still one 0.45 s late).
+  // Tell 1.15 s before haste (survival check: at 0.95 they caused most autopilot deaths in Niten).
   function* pairedMoons(b) {
     const S = b.state, p = G.player; S.walk = false;
     { const L = S.lead, e = L.ent, sx = e.pos.x < 0 ? -1 : 1, tz = clamp(p.pos.z, -7, 7); petals(e.pos.x, e.pos.z, 16, L.ice); e.pos.set(sx * 5, 0, tz); petals(e.pos.x, tz, 16, L.ice); yield 0.35; }
     for (const [ka, ks] of [['n', 'o'], ['o', 'n'], ['c', 'c']]) {
-      const L = S.lead, F = other(S, L), t = tele(b, 0.95), late = ks === 'c' ? 0.45 : 0, lx = L.ent.pos.x, lz = L.ent.pos.z, fx = F.ent.pos.x, fz = F.ent.pos.z, sx = Math.sign(lx) || 1;
+      const L = S.lead, F = other(S, L), t = tele(b, 1.15), late = ks === 'c' ? 0.45 : 0, lx = L.ent.pos.x, lz = L.ent.pos.z, fx = F.ent.pos.x, fz = F.ent.pos.z, sx = Math.sign(lx) || 1;
       // autopilot hint: next to the safe one, on his far side from the seam
       S.moonHint = ka === 'n' ? { x: fx - sx * 2.3, z: fz } : ka === 'o' ? { x: lx + sx * 2.3, z: lz } : { x: lx + sx * 2.6, z: lz };
       moonAt(b, L, ka, t); moonAt(b, F, ks, t + late);
@@ -7750,6 +7737,7 @@ const Warm = (() => {
   // every frame, headless too: openings run out, the awake one walks, the still one is placed at his mirror image
   function nitenSim(b, dt) {
     const S = b.state, p = G.player, L = S.lead, F = other(S, L), e = L.ent;
+    if (G.state === 'fight' && !b.transitioning) S.nitenT += dt;
     for (const act of [S.A, S.R]) if (act.open > 0) { act.open -= dt; if (act.open <= 0) act.ent.dmgTaken = 1; }
     if (S.walk && b.alive && G.state === 'fight' && !e.castState && p) { const d = Math.hypot(p.pos.x - e.pos.x, p.pos.z - e.pos.z); e.facing = dampAng(e.facing, angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z), 8, dt); if (d > 3.2) { const st = Math.min(d - 3.2, 4.6 * dt); e.pos.x += Math.sin(e.facing) * st; e.pos.z += Math.cos(e.facing) * st; } }
     if (Math.abs(e.pos.x) < 1.6) e.pos.x = e.pos.x < 0 ? -1.6 : 1.6;
@@ -7776,7 +7764,7 @@ const Warm = (() => {
       const tgt = S.niten && act.still ? 1 : act === Rr ? Rr.img : 0; act.drain = damp(act.drain, tgt, 7, dt); act.drainU.value = act.drain;
       const shown = act === S.A ? b.group.visible : rt.visible; act.veil.visible = !!(shown && S.niten && act.drain > 0.02); act.veil.material.uniforms.uA.value = act.drain;
       if (S.niten) {
-        if (act.warn > 0) act.warn = Math.min(1, act.warn + dt / STILL_TELL);
+        if (act.warn > 0) act.warn = Math.min(1, act.warn + dt / (S.tellT || STILL_TELL));
         const au = act.aura; au.material.opacity = act.still ? 0.45 + 0.35 * Math.sin(G.now * 12) : act.warn > 0 ? 0.25 + 0.55 * act.warn : act.open > 0 ? 0.3 : 0;
         au.material.color.setHex(act.still ? 0xffffff : act.warn > 0 ? 0xffe6b0 : 0x70ff90); au.scale.setScalar(act.still ? 1 + 0.15 * Math.sin(G.now * 6) : act.warn > 0 ? 2.6 - 1.6 * act.warn : 1.2);
       }
@@ -7784,7 +7772,7 @@ const Warm = (() => {
   }
   // the shot of the fight: he kneels at the water, his image in the lake stands up without him and climbs out
   function* nitenEnter(b) {
-    const S = b.state, Rr = S.R, A = S.A, rt = Rr.root; resetMech(b); clearGhosts(S); S.walk = false; S.niten = false; Music.intensity(4);
+    const S = b.state, Rr = S.R, A = S.A, rt = Rr.root; resetMech(b); clearGhosts(S); S.walk = false; S.niten = false; Music.intensity(4); S.nitenT = 0; S.nitenStep = 0; S.stepAt = [];
     petals(b.pos.x, b.pos.z, 30); b.pos.set(0, 0, -12.6); b.facing = PI; b.group.position.copy(b.pos); petals(0, -12.6, 30); S.kneel = 1;
     if (!G.headless) { S.cine = true; UI.hud(false); Co.start(Cam.shot([1.5, 0.78, -27.8], [0, 0.05, -13.8], [-0.6, 0.98, -25.6], [0, 0.3, -14.0], 5.4, 42), 'phase'); }
     // the image: upside down under the surface (drawn over the water, clipped at the water line), kneeling with him
@@ -7812,18 +7800,48 @@ const Warm = (() => {
     Rr.ent.targetable = true; S.niten = true; wake(b, A, true); S.cycleClean = true; S.countered = false;
     yield 0.3;
   }
+  // Niten ramps every RAMP seconds of live phase time (S.nitenT), six steps. A swap follows every bracket and keeps its
+  // cadence (one about every 12 s, BRACKET) through the whole phase; what grows is what happens between swaps:
+  //   0: [Draw Cut x4] [Draw Cut x3]                 1: + twin Echo in both brackets
+  //   2: [Draw Cut x4, Echo] [Final Verse]           3: + paired Moons after the Verse
+  //   4: + [Petal Storm]                             5: step 4 tightened (swap tell 0.9 s, gaps 0.3 s, third haste stack)
+  // A step never starts mid-bracket: after the swap that follows the step's time, a fresh loop opens with the Focus flare and
+  // the new mechanic's bracket, so a new layer first appears right after a swap, with the full tell.
+  const RAMP = 35, BRACKET = 12;
+  const nitenStepOf = (S) => Math.min(5, Math.floor(S.nitenT / RAMP));
+  const NITEN_LOOP = [
+    [['cut4'], ['cut3']],
+    [['cut4', 'echo'], ['cut3', 'echo']],
+    [['cut4', 'echo'], ['verse']],
+    [['cut4', 'echo'], ['verse', 'moons']],
+    [['cut4', 'echo'], ['verse', 'moons'], ['storm']],
+    [['cut4', 'echo'], ['verse', 'moons'], ['storm']],
+  ];
+  const NITEN_NEW = [0, 0, 1, 1, 2, 0]; // the bracket that holds each step's new mechanic
+  function* nitenMech(b, k) {
+    const S = b.state;
+    if (k === 'cut4') yield* twinDrawCut(b, 4); else if (k === 'cut3') yield* twinDrawCut(b, 3);
+    else if (k === 'echo') yield* echo(b, 1, S.lead.ent); else if (k === 'verse') yield* twinFinalVerse(b);
+    else if (k === 'moons') yield* pairedMoons(b); else if (k === 'storm') yield* twinStorm(b);
+  }
   function* nitenRun(b) {
     const S = b.state; yield 0.6;
     while (true) {
-      yield* twinDrawCut(b, 4); S.walk = true; yield 0.6;
-      yield* swap(b);
-      yield* echo(b, 1, S.lead.ent); S.walk = true; yield 0.6;
-      yield* twinFocus(b);
-      yield* swap(b);
-      yield* twinFinalVerse(b);
-      yield* pairedMoons(b); S.walk = true; yield 0.6;
-      yield* swap(b);
-      yield* twinStorm(b); S.walk = true; yield 0.8;
+      const st = nitenStepOf(S); let order = NITEN_LOOP[st].map((_, i) => i);
+      if (st > S.nitenStep || (st === 0 && !S.stepAt.length)) {
+        S.nitenStep = st; S.stepAt[st] = Math.round(G.ft * 10) / 10;
+        if (st >= 5) S.tellT = 0.9;
+        if (st > 0) { yield* twinFocus(b); const f = NITEN_NEW[st]; order = [f, ...order.filter((i) => i !== f)]; }
+      }
+      const gap = st >= 5 ? 0.3 : 0.6;
+      for (const i of order) {
+        const t0 = G.ft;
+        for (const k of NITEN_LOOP[st][i]) { yield* nitenMech(b, k); S.walk = true; yield gap; }
+        // keep the swap cadence: walk until the bracket has run BRACKET seconds less the swap itself
+        while (G.ft - t0 < BRACKET - (S.tellT || STILL_TELL) - 1.0) { S.walk = true; yield 0.1; }
+        yield* swap(b);
+        if (nitenStepOf(S) > st) break; // a new step starts right after this swap, as a fresh loop
+      }
     }
   }
   // the kill: time slows, the reflection is cut first and falls backward into the lake, the wind comes back, he kneels, the last petal drops
@@ -7854,12 +7872,14 @@ const Warm = (() => {
     layers.push({ v: 'koto', from: 3, pat: ['......4.2.......', '......5.4...2...'], oct: 3, len: 2, vol: 0.06 }, { v: 'koto', from: 5, pat: '....4.2.....5.4.', oct: 3, len: 2, vol: 0.055 });
     return Object.assign({}, base, { layers });
   }
-  // Nightmare phase clocks in seconds (strict, no carry-over), tuned with tools/nmclock.js (RAW=1: god-mode level-3 autopilot, six runs
-  // per class and phase). Rule: the slowest worst run of Stormcaller, Ashwarden and Hexslinger keeps at least 5% of the clock, and the
-  // Duskblade autopilot (the slowest by far: its melee chase loses time whenever he dashes) still clears every phase in some runs.
-  // Measured worst runs (storm / ash / hex / dusk): I 49 / 60 / 57 / 68, II 74 / 63 / 64 / 69, III 58 / 60 / 61 / 84, IV 53 / 50 / 60 / 82.
-  // With these clocks (six runs each): storm, ash and hex clear every run with 6-29% left; the Duskblade bot clears some runs of each phase.
-  const NM_CLOCK = [66, 78, 72, 74];
+  // Nightmare health (the tuning lever; class numbers and the ramp stay). Tuned with tools/nmpace.js (god-mode level-3 autopilot,
+  // whole fights from phase 1, six runs per class) at 28,000 and enrage 355 s:
+  //   stormcaller 6/6 kills, median 4:47 (best 4:23, worst 4:56), Niten 60-64% of the time, best run reaches step 4
+  //   hexslinger  6/6 kills, median 4:25 (best 4:16, worst 4:28), Niten 62-65%, best run reaches step 4
+  //   ashwarden   6/6 kills, median 5:53 (best 5:45, worst 6:00), Niten 61-65% (its autopilot loses ~30% dps chasing Draw Cuts)
+  //   duskblade   0/6 at enrage 330 (about 72 dps in Niten): the slow melee outlier, not a target
+  // Phase times (storm / hex): Sunset 21-39 / 29-31 s, Nightfall 39-53 / 25-37 s, the lake 22-35 / 27-32 s, Niten 156-177 / 153-165 s.
+  const NM_HP = 28000;
   const MUSIC = { bpm: 92, root: 45, scale: [0, 2, 3, 7, 8], prog: [0, 0, 3, 2, 0, 0, 4, 2],
     layers: [
       { v: 'koto', pat: ['0...2...4..3....', '0...4...3..2....'], oct: 1, len: 4, vol: 0.14 }, { v: 'flute', pat: ['........4.......', '7.......5.......'], oct: 2, len: 7, vol: 0.07 },
@@ -7892,18 +7912,20 @@ const Warm = (() => {
         run: sunsetRun },
       { at: 0.33, enter: nightEnter, run: nightRun },
     ],
-    // ---- Nightmare ("Niten"). Per-phase clocks (strict, no carry-over); the look starts at sunset.
+    // ---- Nightmare ("Niten"). Short teaching phases, then Niten is two thirds of the fight and ramps every 35 s. One creeping
+    // enrage (40 + 4 per second over, every 2 s) and The Last Petal 24 s into it. The look starts at sunset.
     nightmare: {
-      hp: 23000,
+      hp: NM_HP, enrage: 355, enrageBase: 40, enrageGrow: 4,
       post: Object.assign({}, POST, { bloom: 0.46, sat: 1.14 }),
       music: nmMusic(MUSIC),
-      overtime: lastPetal, death: nitenDeath,
+      lastBlow: lastPetal, death: nitenDeath,
       phases: [
-        { at: 1, budget: NM_CLOCK[0], music: 1, *run(b) { yield 0.8; yield* sunsetRun(b); } },
-        { at: 0.75, budget: NM_CLOCK[1], music: 2, *enter(b) { resetMech(b); yield* nightEnter(b); }, skipTo: nightSkip, run: nightRun },
-        { at: 0.5, budget: NM_CLOCK[2], music: 3, enter: lakeEnter, skipTo: lakeSkip, run: lakeRun },
-        { at: 0.25, budget: NM_CLOCK[3], music: 5, enter: nitenEnter, run: nitenRun },
+        { at: 1, music: 1, run: sunsetNM },
+        { at: 0.88, music: 2, *enter(b) { resetMech(b); yield* nightEnter(b); }, skipTo: nightSkip, run: nightNM },
+        { at: 0.78, music: 3, enter: lakeEnter, skipTo: lakeSkip, run: lakeRun },
+        { at: 0.66, music: 5, enter: nitenEnter, run: nitenRun },
       ],
+      nmTest: { RAMP, stepOf: nitenStepOf },
     },
     update(b, dt) {
       const S = b.state, p = G.player, ox = b.pos.x, oz = b.pos.z;
@@ -18345,7 +18367,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
   }
   // nightmare floor: the canvas stays painted in the positive look; on the black side of the seam the shader builds the negative
   // per pixel (bare canvas near black, paint as pure emission in its own hue, unmixed from the canvas with the coverage in the
-  // surface canvas's blue channel), with a 2 cm feathered edge. The closing varnish ring of the overtime lives here too.
+  // surface canvas's blue channel), with a 2 cm feathered edge. The closing varnish ring of the last blow lives here too.
   const FLOOR_NM_MAP = `
     vec2 nmW = vec2(vMapUv.x * 2.0 - 1.0, 1.0 - vMapUv.y * 2.0) * ${R}.0;
     float nmK = uSplit * (1.0 - smoothstep(-0.02, 0.02, dot(nmW, uLine)));
@@ -18693,17 +18715,14 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
       { v: 'kick', from: 3, pat: '..x.......x...x.', vol: 0.16 },
     ]) });
   }
-  // Nightmare phase clocks in seconds (strict, no carry-over) on 24,000 health, tuned with tools/nmclock.js (RAW=1: god-mode level-3
-  // autopilot, eight runs per class and phase, measured at 27,000 and checked at 24,000). At the plan's 31,000 the clocks would have needed far more than the 300 s cap, so the
-  // health came down instead (the plan's lever). Rule: the worst run of Stormcaller and Hexslinger keeps at least 5% of each clock.
-  // The Ashwarden and Duskblade autopilots are the slow outliers on this door (on Normal too): paint fetching pulls their melee away
-  // from him, and their times spread by 2x from run to run; they get the rest of the 300 s and clear most runs of each phase.
-  // Measured at 27,000 (storm / ash / hex / dusk, worst; best in brackets; at 24,000 these times shrink by about 11%):
-  //   I   87 (69) / 200 (91) / 81 (70) / 123 (76)    II  69 (43) / 140 (53) / 76 (49) / 119 (53)    III  94 (54) / 93 (40) / 87 (49) / 85 (50)
-  // Checked at 24,000 with [105, 90, 105], eight runs: storm and hex clear every run (worst I 88 / 73, II 61 / 53, III 87 / 89); the
-  // time then moved toward phase I, where the slow autopilots lose most. With these clocks (eight runs): storm and hex clear every run
-  // with 18-32% left (worst I 88 / 87, II 64 / 64, III 82 / 68); dusk clears 7/8, 6/8, 7/8 of I-III; ash 2/8, 6/8, 8/8.
-  const NM_CLOCK = [115, 85, 100];
+  // Nightmare health (the tuning lever; class numbers and the ramp stay). Tuned with tools/nmpace.js (god-mode level-3 autopilot,
+  // whole fights from phase 1, eight runs per class). Paint luck spreads kill times a lot. At 34,000 and enrage 360 s:
+  //   stormcaller 7/8 kills, median 5:10 (best 4:23, worst 5:47)
+  //   hexslinger  8/8 kills, median 3:45 (best 3:34, worst 4:48): fastest; its best runs reach step 3 or 4
+  //   ashwarden   3/8 kills, median 5:50 (best 5:22, worst 6:08)
+  // At 32,000 and 340 s: duskblade 7/8 (median 5:02). Colour and the Negative go much faster than planned (180-250 dps matched),
+  // so Chiaroscuro is 63-84% of the time rather than 60-70%; the thresholds were left as planned.
+  const NM_HP = 34000;
   const SEAM_FS = `uniform float uT, uP, uW, uPulse, uSide; uniform vec3 uPC; varying vec2 vUv;
     void main(){
       float c = (vUv.x - 0.5) * 1.2, zl = (0.5 - vUv.y) * ${2 * R}.0;
@@ -18725,7 +18744,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
   // everything the finale shows is built here, hidden (nothing is made mid-fight)
   function nmBuild(b, S, g) {
     Object.assign(S, { nm: true, cov: true, split: 0, lineA: 0, lineW: TAU / 40, call: null, fin: 0, finK: 0, toneK: 0, top: 7.5, varnR: 99, seamOn: false, seamP: 1, seamW: 1, pulse: 0,
-      tones: [], cbag: [], fk: 0, sigDone: false, sig: 0, holdWash: 0, faceSide: false, routeFail: 0, critLog: [], look: 1, lookT: 1 }); // the fight opens in colour
+      tones: [], cbag: [], fk: 0, stepAt: [], finStep: 0, sigDone: false, sig: 0, holdWash: 0, faceSide: false, routeFail: 0, critLog: [], look: 1, lookT: 1 }); // the fight opens in colour
     S.bodyU = { uToneK: { value: 0 }, uFinK: { value: 0 }, uBand: { value: 0 }, uTop: { value: 7.5 }, uBT: S.pT, uCallC: { value: new THREE.Color(1, 1, 1) }, uKeyV: { value: new V3(0, 1, 0) }, uRigInv: { value: new THREE.Matrix4() } };
     const bm = new Set(); S.rig.traverse((o) => { if (o.isMesh) bm.add(o.material); }); bm.delete(S.tipM); for (const m of bm) toneify(S, m);
     S.seamU = { uT: S.pT, uP: { value: 1 }, uW: { value: 1 }, uPulse: { value: 0 }, uSide: { value: 1 }, uPC: { value: new THREE.Color(1, 1, 1) } };
@@ -18738,7 +18757,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
   // stagger, a Critique cast, the flood, a half-drawn swirl, the brush pointing at a half, the varnish ring, a cinematic camera, slow
   // time) is reset here, in every nightmare phase's enter. The look of the world (colour, Negative, the split) is not per-mechanic.
   function resetMech(b) {
-    const S = b.state; S.down = 0; S.roll = null; S.crit = 0; S.flood = 0; S.faceSide = false; S.top = 7.5; S.sig = 0; S.varnR = 99; S.holdWash = 0;
+    const S = b.state; S.down = 0; S.roll = null; S.crit = 0; S.flood = 0; S.faceSide = false; S.top = 7.5; S.sig = 0; S.varnR = 99; S.holdWash = 0; S.lineW = SEAM_W[0];
     for (const e of S.blotList.slice()) if (e.alive) e.die(); S.blotList = []; S.blots = 0;
     if (S.cine) { S.cine = false; Cam.release(); } G.timeScale = 1;
   }
@@ -18852,13 +18871,38 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     if (p && p.alive) ext = repair(b, call, T);
     S.faceSide = true; yield* critique(b, T + ext, o); S.faceSide = false;
   }
-  // one sitting: Fresh Coat with the call, three strokes (what the answer needs first), one pressure mechanic, the route check, Critique
+  // Chiaroscuro ramps by sitting count, two sittings per step (a sitting is about 20 s with its stagger, so a step is about 40 s):
+  //   0: Splatter only            1: one Blot and Drips          2: a Blot, and the Roller (odd sittings) or the Knife (even)
+  //   3: as 2, the seam turns faster (one turn in 40 s -> 28 s)  4: as 3, Critiques in pairs (same half, new colour)
+  // Past step 4 nothing more is added; the enrage is the remaining pressure.
+  const SEAM_W = [TAU / 40, TAU / 28], SIT_PER_STEP = 2;
+  const finStepOf = (S) => Math.min(4, Math.floor(S.fk / SIT_PER_STEP));
+  // the second call of a pair: the same tone (same half), another colour, never one you already answer where you stand
+  function pairCall(b, call) {
+    const S = b.state, p = G.player, list = shuffle([0, 1, 2, 3, 4, 5, 6].filter((c) => c !== call.col)).map((col) => ({ tone: call.tone, col }));
+    return list.find((q) => !(p && S.wear === wantWear(q) && sideOf(S, p.pos.x, p.pos.z) === wantSide(q))) || list[0];
+  }
+  // one sitting: Fresh Coat with the call, three strokes (what the answer needs first), the step's pressure, the route check, Critique
   function* sitting(b, call, T, k) {
-    const S = b.state, nd = wantWear(call), nb = bitsOf(nd), others = [RED, YEL, BLU].filter((m) => nb.indexOf(m) < 0);
+    const S = b.state, nd = wantWear(call), nb = bitsOf(nd), others = [RED, YEL, BLU].filter((m) => nb.indexOf(m) < 0), st = S.nm ? finStepOf(S) : 0;
+    if (S.nm && S.stepAt[st] === undefined) S.stepAt[st] = Math.round(G.ft * 10) / 10;
+    S.finStep = st;
+    // step 3 on: the seam speeds up, eased over 1.5 s during the Fresh Coat, so it is steady again before the route check projects it
+    const wT = SEAM_W[st >= 3 ? 1 : 0];
+    if (S.lineW !== wT) { const w0 = S.lineW; Co.start(function* () { let t = 0; while (t < 1.5) { t += G.dt; S.lineW = lerp(w0, wT, smooth(Math.min(1, t / 1.5))); yield; } S.lineW = wT; }, 'phase'); }
     yield* freshCoat(b, call); S.faceSide = false;
     yield* strokes(b, shuffle(nb.concat(others).slice(0, 3)));
-    const r = k % 4; if (r === 0) yield* splatter(b, 4); else if (r === 1) yield* roller(b); else if (r === 2) yield* knife(b); else { blot(b, pick(others.length ? others : nb)); yield* drips(b, 4); }
-    yield* judge(b, call, T);
+    const bl = () => blot(b, pick(others.length ? others : nb));
+    if (st === 0) yield* splatter(b, 3);
+    else if (st === 1) { bl(); yield* drips(b, 4); }
+    else { bl(); if (k % 2 === 1) yield* roller(b); else yield* knife(b); }
+    if (st < 4) { yield* judge(b, call, T); return; }
+    // step 4: a pair. The first verdict does not knock him down; a quick coat, two strokes, and the second Critique at 4.0 s.
+    yield* judge(b, call, T, { stagger: false });
+    const c2 = pairCall(b, call), n2 = bitsOf(wantWear(c2)), o2 = [RED, YEL, BLU].filter((m) => n2.indexOf(m) < 0);
+    yield 0.4; yield* freshCoat(b, c2, true); S.faceSide = false;
+    yield* strokes(b, shuffle(n2.concat(o2)).slice(0, 2));
+    yield* judge(b, c2, 4.0);
   }
   // the signature, once, under 10%: three fast Critiques with the same answer paint (the one you wear, if it is a colour), the half
   // flipping each time. What he shows changes completely (white + red, black + green, white + red); what you do is keep your red and step.
@@ -18885,7 +18929,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
   // Chiaroscuro: he walks to the centre, the camera rises over the rim, and he drags the palette knife once across the whole canvas.
   // White flash: the world tears along the cut, one half snaps back to white, the other stays black, and the line starts to turn.
   function* finEnter(b) {
-    const S = b.state; resetMech(b); Object.assign(S, { call: null, fk: 0, tones: [], cbag: [], used: null, sigDone: false }); Music.intensity(0);
+    const S = b.state; resetMech(b); Object.assign(S, { call: null, fk: 0, tones: [], cbag: [], used: null, sigDone: false, stepAt: [], finStep: 0, lineW: SEAM_W[0] }); Music.intensity(0);
     yield* b.moveTo(0, 0, 7);
     const p = G.player, a = (p ? Math.atan2(p.pos.x, p.pos.z) : 0) + PI / 2, fx = Math.sin(a), fz = Math.cos(a);
     S.cine = true; Co.start(Cam.shot([-fx * 25, 15, -fz * 25], [fx * 6, 0, fz * 6], [-fx * 22 + fz * 4, 20, -fz * 22 - fx * 4], [fx * 2, 0, fz * 2], 3.6, 50), 'phase');
@@ -18900,10 +18944,10 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     Co.start(Post.lerpTo({ bloom: 0.28, threshold: 0.92, contrast: 1.08, exposure: 0.95, tint: [1.0, 1.0, 1.0], sat: 1.1 }, 1.0), 'fight');
     yield 0.5; Sound.sfx('bell', 0.7, 0.5); yield 0.6; S.cine = false; Cam.release();
   }
-  // Out of time (every nightmare phase): the music stops, and he varnishes the unfinished work: amber varnish floods the canvas from
+  // Out of time (the last blow, 24 s into the enrage, in whatever phase): the music stops, and he varnishes the unfinished work: amber varnish floods the canvas from
   // the rim inward as a closing ring, sealing the paint (and you) under it. He can still be killed while it closes.
   function* varnishOver(b) {
-    const S = b.state; resetMech(b); Music.stop(0.1); b.otMusic = true; Sound.sfx('wave', 0.9, 0.35); FX.flash(VARN, 0.25, 1.5);
+    const S = b.state; resetMech(b); Music.stop(0.1); Sound.sfx('wave', 0.9, 0.35); FX.flash(VARN, 0.25, 1.5);
     const T = 6;
     Hz.circle(0, 0, 80, T, 0, { blockable: false, name: 'Varnish', color: VARN, quiet: true, alpha: 0.35, onFire: () => {
       const p = G.player; FX.flash(VARN, 0.6, 2); Sound.sfx('bigboom', 0.8); if (p && p.alive) p.hurt(9999, { blockable: false, src: 'enrage', pierce: true });
@@ -18965,19 +19009,20 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
       }, run: colourRun },
       { at: 0.33, skipTo(b) { b.state.look = 2; }, enter: negEnter, run: negRun },
     ],
-    // ---- Nightmare ("Chiaroscuro"). Opens in colour (today's phase 2), then the Negative, then the split canvas. Per-phase clocks.
+    // ---- Nightmare ("Chiaroscuro"). Opens in colour (today's phase 2), then the Negative, then the split canvas, which is two
+    // thirds of the fight and ramps every two sittings. One creeping enrage (40 + 4 per second over) and the varnish 24 s into it.
     nightmare: {
-      hp: 24000,
+      hp: NM_HP, enrage: 360, enrageBase: 40, enrageGrow: 4,
       post: Object.assign({}, POST, { tint: [1.02, 1.0, 0.98], sat: 1.12 }),
       music: nmMusic(MUSIC),
-      overtime: varnishOver, death: paintingDeath,
+      lastBlow: varnishOver, death: paintingDeath,
       phases: [
-        { at: 1, budget: NM_CLOCK[0], music: 1, *run(b) { resetMech(b); yield 0.6; yield* colourRun(b); } },
-        { at: 0.62, budget: NM_CLOCK[1], music: 2, skipTo(b) { b.state.look = 2; Object.assign(Post.cur, NEG_POST); Post.apply(); }, *enter(b) { resetMech(b); yield* negEnter(b); }, run: negRun },
-        { at: 0.30, budget: NM_CLOCK[2], music: 3, skipTo(b) { setLvl(b, 2); b.state.look = 2; }, enter: finEnter, run: finRun },
+        { at: 1, music: 1, *run(b) { resetMech(b); yield 0.6; yield* colourRun(b); } },
+        { at: 0.85, music: 2, skipTo(b) { b.state.look = 2; Object.assign(Post.cur, NEG_POST); Post.apply(); }, *enter(b) { resetMech(b); yield* negEnter(b); }, run: negRun },
+        { at: 0.68, music: 3, skipTo(b) { setLvl(b, 2); b.state.look = 2; }, enter: finEnter, run: finRun },
       ],
     },
-    nmTest: { wantWear, wantSide, sideAt, route: (S, ...a) => route(S, ...a) },
+    nmTest: { wantWear, wantSide, sideAt, route: (S, ...a) => route(S, ...a), SEAM_W, SIT_PER_STEP, stepOf: finStepOf },
     update(b, dt) {
       const S = b.state, p = G.player, t = G.now, fight = G.state === 'fight' && p && p.alive;
       if (S.down > 0) S.down -= dt; S.washT = (S.washT || 0) + dt; if (S.washT > 18 && !(S.split && S.holdWash > G.ft)) { S.washT = 0; moveWash(S); } // finale: the dish holds still while a Critique it answers is cast

@@ -162,24 +162,13 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
 #tgtframe.on{opacity:1}
 #tgtframe .bn{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#fff;text-shadow:0 1px 4px #000;margin-bottom:3px;text-align:center}
 #tgtframe .bar{height:10px}
-/* the fuse: one strip per phase clock under the boss bar */
-#bfuse{position:relative;height:4px;margin-top:2px;display:none;background:rgba(0,0,0,.6);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
-#bfuse.on{display:block}
-#bfuse .fz{position:absolute;top:0;bottom:0;padding:0 1px;box-sizing:border-box}
-#bfuse .fz b{display:block;height:100%;transform-origin:left;background:#c9a24a;opacity:.35}
-#bfuse .fz.live b{background:linear-gradient(90deg,#ffcf6a,#fff2c0);opacity:1;box-shadow:0 0 6px rgba(255,200,90,.8)}
-#bfuse .fz.live.hot b{animation:fzp .5s ease-in-out infinite alternate;background:linear-gradient(90deg,#ff7a3a,#ffd27a)}
-#bfuse .fz.done b{background:#b8913f;opacity:.55}
-#bfuse .fz.out b{background:#ff2a2a;opacity:1;transform:none!important;box-shadow:0 0 8px rgba(255,40,40,.9)}
-@keyframes fzp{from{opacity:.55}to{opacity:1}}
 #bname.nm::before{content:"\25C6";color:#ff3a58;font-size:.82em;margin-right:.5em;vertical-align:.08em;text-shadow:0 0 2px #000,0 0 3px #000,0 0 10px #ff2040}
 /* per-phase results on the death and victory screens */
 .ptable{display:none;font:13px ui-monospace,Consolas,monospace;color:#c9c5ba;letter-spacing:.04em;margin-top:-6px}
 .ptable.on{display:grid;gap:3px}
-.ptable .pr{display:grid;grid-template-columns:44px 120px 80px 40px;gap:10px;text-align:right}
+.ptable .pr{display:grid;grid-template-columns:44px 70px 80px 40px;gap:10px;text-align:right}
 .ptable .pr span:first-child{text-align:left;font-family:var(--serif);color:var(--accent)}
 .ptable .pr span:last-child{color:#ffd76a;text-align:left;font-size:11px}
-.ptable .pr.out{color:#ff6a5a}
 .ptable .pr.na{color:#5a5850}
 #enrage{position:absolute;top:22px;right:24px;font:13px ui-monospace,Consolas,monospace;color:#ddd;text-shadow:0 1px 4px #000;letter-spacing:.08em}
 #enrage.hot{color:#ff6a5a}
