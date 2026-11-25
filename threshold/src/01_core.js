@@ -299,14 +299,18 @@ G.step = function (dt) {
 let lastFrame = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
-  const rdt = Math.min((now - lastFrame) / 1000, 0.05); lastFrame = now;
+  const gap = now - lastFrame, rdt = Math.min(gap / 1000, 0.05); lastFrame = now;
   if (rdt <= 0) return;
   G.rt += rdt; G.rdt = rdt;
   try {
+    const t0 = performance.now();
     for (const f of Hooks.frame) f(rdt, 0);
     if (!G.paused && G.state !== 'boot') G.step(rdt * G.timeScale);
     for (const f of Hooks.frame) f(rdt, 1);
+    const t1 = performance.now();
     Post.update(rdt);
     Post.composer.render();
+    if (Hitch.sync) renderer.getContext().finish();
+    Hitch.frame(gap, t1 - t0, performance.now() - t1); // the freeze log (12_hitch.js)
   } catch (e) { reportError(e); }
 }

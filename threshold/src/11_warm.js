@@ -10,6 +10,7 @@
 // lights each frame so the per-kind light counts never change during the fight, whatever the boss shows or hides.
 const Warm = (() => {
   const FAR = -5000, SPARE_POINT = 6; let need = {}; const dummies = {};
+  const matsOf = (o) => o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
   const kindOf = (L) => L.type + (L.castShadow ? '+s' : '') + (L.map ? '+m' : '');
   function count(all) {
     const c = {};
@@ -49,7 +50,6 @@ const Warm = (() => {
     }
   }
   let retained = [];
-  const matsOf = (o) => o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
   function freeMaterial(m) {
     delete m.userData.warmKeep; if (m.userData.shared) return;
     for (const k in m) { const v = m[k]; if (v && v.isTexture && !v.userData.shared) v.dispose(); }
@@ -72,6 +72,25 @@ const Warm = (() => {
       if (!o.visible) { o.visible = true; shown.push(o); }
       if (o.frustumCulled && (o.isMesh || o.isPoints || o.isLine || o.isSprite)) { o.frustumCulled = false; unculled.push(o); }
     });
+    // A draw call with nothing in it is skipped, and a shader that was built but never used in a real draw still stalls
+    // on its first one (Windows browsers finish compiling at that moment). Pools that start empty (instanced bullets,
+    // petals, shards, trails with an empty draw range) and materials switched off would all slip through: give each one
+    // something to draw for this frame.
+    const forced = [], force = (o, k, v) => { forced.push([o, k, o[k]]); o[k] = v; };
+    if (QS.get('warm') !== 'old') scene.traverse((o) => { // ?warm=old: the warm-up as it was, for before/after measurements
+      if (!(o.isMesh || o.isPoints || o.isLine || o.isSprite)) return;
+      if (o.isInstancedMesh && o.count === 0 && o.instanceMatrix.count > 0) force(o, 'count', 1);
+      const g = o.geometry;
+      if (g) { if (g.drawRange.count === 0) force(g.drawRange, 'count', Infinity); if (g.isInstancedBufferGeometry && g.instanceCount === 0) force(g, 'instanceCount', 1); }
+      for (const m of matsOf(o)) if (!m.visible) force(m, 'visible', true);
+      if (!o.layers.test(camera.layers)) force(o.layers, 'mask', camera.layers.mask);
+    });
+    // Effects that outlive a fight (telegraph decals, rings, beams, bullets) are unlit, and three.js leaves an unlit
+    // material on the shader it already has when the lights change. But the number of lights is still part of every
+    // shader's identity, so the next decal or bullet made mid-fight (a pool growing for a bigger mechanic than this
+    // session had seen) would compile a fresh copy on the spot. Ask every material to look its shader up again in this
+    // frame, under this fight's lights: the ones that are current just find it, the stale ones compile now.
+    if (QS.get('warm') !== 'old') scene.traverse((o) => { for (const m of matsOf(o)) m.needsUpdate = true; });
     keep();
     // three.js only compiles and uploads when it draws, so draw a real frame (scene, shadows, bloom, grade) under the loading fade
     const was = renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate = true; renderer.shadowMap.needsUpdate = true;
@@ -84,10 +103,12 @@ const Warm = (() => {
         const dw = new Map(); for (const m of fm) { dw.set(m, m.depthWrite); m.transparent = true; m.depthWrite = false; m.needsUpdate = true; }
         try { Post.composer.render(); } finally { for (const m of fm) { m.transparent = false; m.depthWrite = dw.get(m); m.needsUpdate = true; } }
       }
+      Hitch.scanDrawn(); // what this frame really drew, so the freeze log can tell a first draw mid-fight
     } catch (e) { reportError(e); }
     finally {
       renderer.shadowMap.autoUpdate = was;
       for (const o of shown) o.visible = false; for (const o of unculled) o.frustumCulled = true;
+      for (let i = forced.length - 1; i >= 0; i--) forced[i][0][forced[i][1]] = forced[i][2];
       scene.remove(holder);
       // the rehearsal's materials hold the compiled shaders until the next fight is warmed; everything else it made goes now
       const old = retained; retained = [];
