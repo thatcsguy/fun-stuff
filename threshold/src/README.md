@@ -45,14 +45,14 @@ Start / Options pause, and A / B (✕ / ○) plus the d-pad in menus. Settings a
 Button prompts follow the connected pad (PlayStation pads are detected by Sony's vendor id 054c) unless overridden.
 Pad buttons use the W3C standard mapping that Chrome gives Xbox, DualShock 4 and DualSense pads.
 
-Every class has up to seven skills in hotbar slots 0-6 (a slot can be empty). Duskblade and Stormcaller fill all seven the same way: filler, spender, ultimate, mobility, defensive, slot 5, heal. Slot 5 (Sunder, Null Pulse) used to be the interrupt and is greyed out until it is redesigned. Ashwarden and Hexslinger do not follow that template.
+Every class has up to seven skills in hotbar slots 0-6 (a slot can be empty). Duskblade and Stormcaller fill all seven the same way: filler, spender, ultimate, mobility, defensive, slot 5, heal. Slot 5 used to be the interrupt: Duskblade's Sunder is greyed out until it is redesigned; Stormcaller's is now Overcharge (see below). Ashwarden and Hexslinger do not follow that template.
 
 ## Classes
 
 | Class | Shape | How it plays |
 | --- | --- | --- |
 | Duskblade | melee, 7 skills | Builds Momentum with a combo, spends it; Lunge, a parry that counters, three instant heals. |
-| Stormcaller | ranged, 7 skills | Stands still to cast Bolt, spends Static on the move; Blink, a barrier, three cast-time heals. |
+| Stormcaller | ranged, 7 skills | Stands still to cast Bolt, spends Static on the move; Blink, a barrier, three cast-time heals. One Static pip glows each cycle: when it is the next pip to fill, Overcharge (R, 1.5x Bolt's cast) fills it, and a full Discharge holding it adds 250 damage. Bolt can still fill it, at base value. Each Discharge moves the glow to a different slot, picked a cycle ahead and shown under the pips (a gold underline) once the current glow is filled. Levers: `SC` in `08_classes.js`. |
 | Ashwarden | melee, 5 skills | No cooldowns. One stamina bar pays for Strike, the Overhead (a wind-up leap) and the Roll (passes through blockable hits; a dodged hit makes the next Overhead instant and free). Overdrawing stamina leaves you Winded. Four flasks, which can be drunk or poured on the blade (Kindle) for damage. |
 | Hexslinger | ranged, 5 skills | No cooldowns, no resource, fully mobile. A six-chamber cylinder loaded one round at a time and fired in order: lead (damage, stronger up close), silver (weak, leaves the target Exposed), salve (the heal, six per fight). The sixth shot of a full cylinder emptied without reloading hits double. Spin sends the next round to the back. |
 

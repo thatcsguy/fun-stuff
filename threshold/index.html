@@ -191,6 +191,13 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
 #pips{display:flex;gap:5px;justify-content:center;height:12px}
 #pips i{flex:1;max-width:64px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.55);transform:skewX(-18deg);transition:all .12s}
 #pips i.on{background:var(--cls);box-shadow:0 0 10px var(--cls);border-color:#fff}
+#pips i{position:relative}
+#pips i.gl{border:2px solid #fff0a0;background:rgba(255,200,60,.55);animation:scgl .5s ease-in-out infinite alternate,scin .45s ease-out}
+#pips i.gl.on.ch{background:linear-gradient(180deg,#fffbe0,#ffd040);border-color:#fff;animation:scch .3s ease-in-out infinite alternate}
+#pips i.gn::after{content:'';position:absolute;left:12%;right:12%;top:-8px;height:3px;background:#ffe070;box-shadow:0 0 8px #ffc840;animation:scgl .5s ease-in-out infinite alternate}
+@keyframes scgl{from{box-shadow:0 0 6px #ffc840}to{box-shadow:0 0 18px 3px #ffd860}}
+@keyframes scch{from{box-shadow:0 0 12px 2px #ffd860}to{box-shadow:0 0 24px 6px #fff0a0}}
+@keyframes scin{from{transform:skewX(-18deg) scale(1.7);background:#fff8d0}to{transform:skewX(-18deg) scale(1)}}
 #pips.bar{height:10px}
 #pips .stam{flex:1;position:relative;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.55);overflow:hidden}
 #pips .stam b{position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--cls) 70%,#000),var(--cls));transform-origin:left;box-shadow:0 0 10px var(--cls)}
@@ -4247,6 +4254,7 @@ const ICON = {
   sunder: 'M12 1 14.5 8.5 22 6 16.5 12 22 18 14.5 15.5 12 23 9.5 15.5 2 18 7.5 12 2 6 9.5 8.5Z',
   heal: 'M12 21C5 15.5 3 12 3 8.5A4.5 4.5 0 0 1 12 6.5 4.5 4.5 0 0 1 21 8.5C21 12 19 15.5 12 21Z',
   bolt: 'M14 1 4 13H11L9 23 20 10H13Z',
+  overcharge: 'M14 1 6 12.5H11.5L10 23 18 10.5H13ZM4.5 3 6 4.5C3.2 7.300 3.2 16.7 6 19.5L4.5 21C0.9 17.4 0.9 6.600 4.5 3ZM19.5 3C23.1 6.600 23.1 17.4 19.5 21L18 19.5C20.8 16.7 20.8 7.300 18 4.5Z',
   discharge: 'M12 7A5 5 0 1 0 12 17 5 5 0 1 0 12 7ZM11 1H13V5H11ZM11 19H13V23H11ZM1 11H5V13H1ZM19 11H23V13H19ZM4 5.5 5.5 4 8 6.5 6.5 8ZM16 17.5 17.5 16 20 18.5 18.5 20ZM18.5 4 20 5.5 17.5 8 16 6.5ZM5.5 20 4 18.5 6.5 16 8 17.5Z',
   tempest: 'M7 9A5 5 0 0 1 17 8 4 4 0 0 1 18 16H6A3.5 3.5 0 0 1 7 9ZM11 17 8 22H11L10 24 14 19H11L12 17Z',
   blink: 'M2 11H5V13H2ZM7 11H10V13H7ZM12 11H15V7L22 12 15 17V13H12Z',
@@ -4336,10 +4344,28 @@ G.classes.push({
 });
 
 // ============================== STORMCALLER ==============================
+// The glowing Static slot: one of the four pips glows each cycle. Overcharge (slot 5, R) fills it when it is the next pip to fill;
+// a full Discharge that holds the overcharge adds SC.BONUS. Bolt can still fill it, at base value. Every Discharge moves the glow
+// to the slot picked one cycle ahead (p.sc.next, never the same slot twice in a row), and the HUD shows that pick as soon as the
+// current glow has been filled, so a glow on the first pip is visible during the last Bolt, not only after Discharge.
+// Overcharge: 1.5x Bolt's cast for 148 damage (about 100 damage of lost time); the bonus nets about +150 per cycle (~14% more damage).
+const SC = { R_CAST: 1.5, R_DMG: 148, BONUS: 250 };
+const scRoll = (not) => { const r = Math.floor(rnd(3)); return r >= not ? r + 1 : r; };
+const scGlowNext = (p) => !!p.sc && p.res === p.sc.glow && p.res < p.resMax;
+// HUD: 'gl' marks this cycle's glowing slot until it is filled ('ch' once Overcharge filled it); 'gn' marks next cycle's glow once this one is behind you
+function scPipCls(p, i) {
+  const S = p.sc, on = i < p.res, k = [];
+  if (on) k.push('on');
+  if (i === S.glow && (!on || S.charged)) k.push('gl'), S.charged && k.push('ch');
+  if (i === S.next && p.res > S.glow) k.push('gn');
+  return k.join(' ');
+}
+function scReroll(p) { p.sc.glow = p.sc.next; p.sc.next = scRoll(p.sc.glow); p.sc.charged = false; }
 G.classes.push({
   id: 'stormcaller', name: 'STORMCALLER', role: 'Ranged caster. Plants its feet to cast, spends Static on the move.', color: '#6fd8ff', hp: 1000, gcd: 1.5,
   gcdOf: (p, s) => (p.hasBuff('tempest') ? 0.75 : 1.5) * (s.id === 'discharge' ? 0.8 : 1),
-  resource: { name: 'Static', max: 4 },
+  resource: { name: 'Static', max: 4, pipCls: scPipCls },
+  init(p) { const g = Math.floor(rnd(4)); p.sc = { glow: g, next: scRoll(g), charged: false }; },
   look: { armor: 0x2a3a4c, cloth: 0x12344a, glow: 0x50d0ff, hood: true, inner: 0xd8d0bc, metal: 0xc0844a, leather: 0x4a3222, lining: 0x0b3c6e, mantle: 0x262a33 },
   skills: [
     { id: 'bolt', name: 'Bolt', icon: 'bolt', range: 34, rdy: (p) => p.hasBuff('surge'), desc: 'Cast time. Heavy lightning that builds Static. You must stand still.',
@@ -4353,9 +4379,10 @@ G.classes.push({
     { id: 'discharge', name: 'Discharge', icon: 'discharge', range: 34, rdy: (p) => p.res >= p.resMax, desc: 'Instant. Releases all Static at once. Usable on the move.',
       usable: (p) => p.res >= 1 || 'res',
       fire(p, t) {
-        const m = p.res, dmg = 70 * m + (m >= 4 ? 55 : 0); p.res = 0; p.model.swing(0, 0.3); Sound.sfx('zap'); if (!t || !t.alive) return;
-        const a = p.hand(_h2); for (let i = 0; i < 1 + m; i++) { t.aim(_hp); _hp.x += (vrand() - 0.5) * t.radius; _hp.y += (vrand() - 0.5) * 2; _hp.z += (vrand() - 0.5) * t.radius; FX.lightning(a, _hp, { color: i % 2 ? 0xfff0a0 : 0x9fe6ff, width: 0.1 + m * 0.03, jag: 1.4 }); }
-        t.aim(_hp); FX.dome(_hp.x, _hp.y, _hp.z, { r: 1.5 + m * 0.6, color: 0x9fe6ff, dur: 0.35 }); t.damage(dmg, { src: 'player', crit: m >= 4 }); if (m >= 4) FX.shake(0.25);
+        const m = p.res, over = m >= 4 && p.sc.charged, dmg = 70 * m + (m >= 4 ? 55 : 0) + (over ? SC.BONUS : 0); p.res = 0; scReroll(p); p.model.swing(0, 0.3); Sound.sfx('zap'); if (over) Sound.sfx('thunder', 0.5, 1.3); if (!t || !t.alive) return;
+        const a = p.hand(_h2); for (let i = 0; i < 1 + m + (over ? 3 : 0); i++) { t.aim(_hp); _hp.x += (vrand() - 0.5) * t.radius; _hp.y += (vrand() - 0.5) * 2; _hp.z += (vrand() - 0.5) * t.radius; FX.lightning(a, _hp, { color: over ? (i % 2 ? 0xffe070 : 0xffffff) : i % 2 ? 0xfff0a0 : 0x9fe6ff, width: 0.1 + m * 0.03 + (over ? 0.06 : 0), jag: 1.4 }); }
+        t.aim(_hp); FX.dome(_hp.x, _hp.y, _hp.z, { r: 1.5 + m * 0.6 + (over ? 1.4 : 0), color: over ? 0xffd860 : 0x9fe6ff, dur: over ? 0.5 : 0.35 }); t.damage(dmg, { src: 'player', crit: m >= 4 }); if (m >= 4) FX.shake(over ? 0.4 : 0.25);
+        if (over) FX.light(_hp.x, _hp.y, _hp.z, 0xffd060, 80, 0.4);
       } },
     { id: 'tempest', name: 'Tempest', icon: 'tempest', cd: 80, gcd: false, act: (p) => p.hasBuff('tempest'), desc: '10 s of storm: Bolt casts in half the time and while moving.',
       fire(p) { p.addBuff('tempest', 10, 'tempest'); Sound.sfx('thunder', 0.6); FX.pillar(p.pos.x, p.pos.z, { r: 0.9, h: 26, color: 0x70d0ff, dur: 0.7 }); FX.burst(p.pos.x, 1, p.pos.z, { n: 60, color: 0x9fe6ff, color2: 0xfff0a0, speed: [4, 12], life: [0.4, 1] }); } },
@@ -4371,11 +4398,16 @@ G.classes.push({
       } },
     { id: 'aegis', name: 'Aegis', icon: 'aegis', cd: 20, gcd: false, act: (p) => p.shield > 0, desc: 'A 5 s barrier. If it absorbs a hit, you are filled with Static and your next Bolt is instant.',
       fire(p) { p.shield = p.shieldMax = 450; p.shieldT = 5; p.addBuff('aegis', 5, 'aegis'); Sound.sfx('shield'); FX.dome(p.pos.x, 1.1, p.pos.z, { r: 1.6, r0: 2.6, color: 0x9fe6ff, dur: 0.4 }); } },
-    { id: 'pulse', name: 'Null Pulse', icon: 'pulse', cd: 15, gcd: false, range: 34, usable: () => 'no', desc: 'Being redesigned: unavailable for now.', // greyed out until the redesign (interrupts were removed)
+    { id: 'overcharge', name: 'Overcharge', icon: 'overcharge', range: 34, rdy: (p) => scGlowNext(p), desc: 'Longer cast than Bolt. Only when the glowing Static slot is next: fills it with an overcharge. A full Discharge with it hits far harder. You must stand still.',
+      cast: (p) => SC.R_CAST * (p.hasBuff('tempest') ? 0.7 : 1.5), moveCast: (p) => p.hasBuff('tempest'),
+      usable: (p) => scGlowNext(p) || 'res',
       fire(p, t) {
-        Sound.sfx('zap', 0.8, 0.6); const n = Bul.clearNear(p.pos.x, p.pos.z, 8); FX.ring(p.pos.x, p.pos.z, { r0: 0.5, r1: 8, color: 0xd0a0ff, dur: 0.4, width: 0.2 }); FX.dome(p.pos.x, 1, p.pos.z, { r: 8, color: 0xc090ff, dur: 0.35 });
-        if (!t || !t.alive) return; t.aim(_hp); FX.beam(p.hand(_h2), _hp, { color: 0xd0a0ff, width: 0.22, dur: 0.3 }); t.damage(60, { src: 'player' });
-        if (t.interrupt()) p.gain(2);
+        p.model.swing(3, 0.3); Sound.sfx('bolt', 1, 0.8);
+        if (scGlowNext(p)) { p.sc.charged = true; p.gain(1); } // the slot was filled some other way mid-cast (a barrier absorb): just the hit
+        if (!t || !t.alive) return;
+        const a = p.hand(_h2); t.aim(_hp); _hp.x += (vrand() - 0.5) * t.radius * 0.5; _hp.y += (vrand() - 0.5) * 1.2;
+        FX.lightning(a, _hp, { color: 0xffe070, width: 0.18 }); FX.lightning(a, _hp, { color: 0x9fe6ff, width: 0.08, jag: 1.6 }); FX.light(_hp.x, _hp.y, _hp.z, 0xffd060, 50, 0.3);
+        t.damage(SC.R_DMG, { src: 'player' });
       } },
     { id: 'mend', name: 'Mend', icon: 'mend', limited: 3, cast: 2.0, gcd: true, desc: '2 s cast. Heal 40% of your health. Three uses per fight.',
       fire(p) { p.heal(400); } },
@@ -4391,13 +4423,13 @@ G.classes.push({
   },
   bot(p, c) {
     const t = p.target; if (!t) return;
-    if (c.wantInterrupt && p.block(5) === '') return p.press(5);
     if (c.danger && p.block(4) === '') return p.press(4);
     if (c.hp < 0.45 && c.calm > 2.3 && p.block(6) === '' && !p.casting) return p.press(6);
     if (c.holdFire) return;
     if (t.isBoss && !t.immune && p.block(2) === '' && c.calm > 1) p.press(2);
     if (p.casting) return;
     if (p.res >= 4 || (p.moving && p.res >= 1 && !p.hasBuff('tempest') && !p.hasBuff('surge'))) return p.press(1);
+    if (scGlowNext(p) && !p.hasBuff('surge') && (!p.moving || p.hasBuff('tempest')) && c.calm > 2.4) return p.press(5);
     if (!p.moving || p.hasBuff('tempest') || p.hasBuff('surge')) p.press(0);
   },
 });
@@ -4693,6 +4725,7 @@ const UI = (() => {
     const pw = $('#pips'), pips = pw.children, rk = p.cls.resource.kind || 'pips';
     if (rk === 'bar') { const st = pips[0]; setSx('stam', st.firstElementChild, sat(p.res / p.resMax)); setCls('wind', st, 'wind', !!p.winded); setCls('open', st, 'open', p.opening > 0); }
     else if (rk === 'cylinder') { const lw = p.armed ? 5 - p.streak : -1; for (let i = 0; i < pips.length; i++) { const v = (p.cyl[i] || '') + (i === 0 && p.cyl.length ? ' next' : '') + (i === lw ? ' lw' : ''); if (cache['ch' + i + 'c'] !== v) { cache['ch' + i + 'c'] = v; pips[i].className = v; } } }
+    else if (p.cls.resource.pipCls) { for (let i = 0; i < pips.length; i++) { const v = p.cls.resource.pipCls(p, i); if (cache['pc' + i] !== v) { cache['pc' + i] = v; pips[i].className = v; } } } // e.g. Stormcaller's glowing slot
     else for (let i = 0; i < pips.length; i++) setCls('pip' + i, pips[i], 'on', i < p.res);
     const pc = $('#pcast'), c = p.casting; if (cache.pcon !== !!c) { cache.pcon = !!c; pc.style.opacity = c ? 1 : 0; }
     if (c) { setSx('pcf', pc.firstElementChild, sat(c.t / c.time)); setTxt('pcn', pc.lastElementChild, c.name); }
