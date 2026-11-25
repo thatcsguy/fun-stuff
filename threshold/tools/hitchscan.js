@@ -4,13 +4,15 @@
 // the first time, textures and geometry uploaded, slow simulation steps, casts and phase changes.
 // NM=1 runs the nightmare versions. MAXSEC caps a fight (default 420). LIM = ms a frame may be late in the summary (default 50).
 // VIRT=1 (GPU-less sandboxes): frames are far too slow there to time, so only causes are listed (compiles, first draws, uploads, slow steps).
+// SYNC=1 waits for the graphics card every frame, so GPU-side work (driver compiles, uploads) shows up in `draw` next to its cause.
+// OLD=1 runs the warm-up without its newer steps (before/after comparisons).
 // OUT=file.json also writes everything as JSON. Use TH_GPU=1 on a machine with a graphics card: only that shows real stalls.
 const { launch } = require('./harness.js');
 const fs = require('fs');
 (async () => {
   const cls = process.argv[3] || 'stormcaller', maxSec = +(process.env.MAXSEC || 420), virt = !!process.env.VIRT, lim = +(process.env.LIM || 50);
   const { browser, page } = await launch(virt ? { w: 320, h: 180 } : { w: 1280, h: 720 });
-  await page.goto('http://game.local/threshold/?mute=1&hitch=1&quality=' + (process.env.Q || 'high') + '&seed=3');
+  await page.goto('http://game.local/threshold/?mute=1&hitch=' + (process.env.SYNC ? 2 : 1) + (process.env.OLD ? '&warm=old' : '') + '&quality=' + (process.env.Q || 'high') + '&seed=3');
   await page.waitForFunction('window.__game && window.__game.G.state === "menu"', null, { timeout: 90000 });
   const all = await page.evaluate(() => window.__game.G.bosses.map((d) => d.id));
   const ids = (process.argv[2] && process.argv[2] !== 'all') ? process.argv[2].split(',') : all, out = [];
@@ -38,7 +40,7 @@ const fs = require('fs');
     const late = r.late.filter((e) => e.gap >= lim), worst = late.reduce((m, e) => Math.max(m, e.gap), 0);
     console.log('\n== ' + r.id + (r.nm ? ' NM' : '') + ' ' + cls + ': ' + r.ended + ' at ' + r.ft + 's, phases ' + r.phases.join(' ') + ', load ' + JSON.stringify(r.warm) + (r.errors.length ? ' ERRORS ' + r.errors.join(' / ') : ''));
     if (virt) { const by = {}; for (const c of r.causes) { const k = c.what.replace(/\d+ms$/, '').replace(/\+\d+$/, '+'); (by[k] = by[k] || []).push(c.st[0] + (c.ph + 1) + '@' + c.ft + (c.what.match(/\d+ms$|\+\d+$/) || [''])[0]); } const ks = Object.keys(by); console.log(ks.length ? ks.map((k) => '  ' + k + '  [' + by[k].slice(0, 8).join(', ') + (by[k].length > 8 ? ', ... x' + by[k].length : '') + ']').join('\n') : '  nothing created or compiled after loading'); }
-    else { console.log('  ' + late.length + ' late frames of ' + r.frames + (late.length ? ', worst ' + worst + ' ms' : '')); for (const e of late) console.log('  ' + e.st + ' phase ' + (e.ph + 1) + ' at ' + e.ft + 's: ' + e.gap + ' ms (step ' + e.sim + ', draw ' + e.draw + ')' + (e.ev.length ? ' <- ' + e.ev.join('; ') : '')); }
+    else { console.log('  ' + late.length + ' late frames of ' + r.frames + (late.length ? ', worst ' + worst + ' ms' : '')); for (const e of late) console.log('  ' + e.clock + ' ' + e.st + ' phase ' + (e.ph + 1) + ' at ' + e.ft + 's: ' + e.gap + ' ms (step ' + e.sim + ', draw ' + e.draw + ')' + (e.ev.length ? ' <- ' + e.ev.join('; ') : '')); }
   }
   if (process.env.OUT) fs.writeFileSync(process.env.OUT, JSON.stringify(out, null, 1));
   await browser.close();

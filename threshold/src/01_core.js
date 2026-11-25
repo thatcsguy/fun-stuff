@@ -310,6 +310,7 @@ function frame(now) {
     const t1 = performance.now();
     Post.update(rdt);
     Post.composer.render();
+    if (Hitch.sync) renderer.getContext().finish();
     Hitch.frame(gap, t1 - t0, performance.now() - t1); // the freeze log (12_hitch.js)
   } catch (e) { reportError(e); }
 }
