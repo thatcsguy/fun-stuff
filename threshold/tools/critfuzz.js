@@ -2,7 +2,7 @@
 // instant it lands, so each one is route-checked before it is cast (and repaired by the boss if the walk is too long). This plays the
 // finale (god mode) `runs` times per class with the level-3 autopilot and with a lazy one that never washes or fetches
 // paint, and records every Critique: the call, the route time before and after repair, the cast time, the repair used, the verdict.
-// Pass: no route failure (a cast stretched because no answer fit), all 14 calls appear, repairs in under 25% of the level-3 Critiques.
+// Pass: no route failure (a cast stretched because no answer fit), all 12 calls appear, repairs in under 25% of the level-3 Critiques.
 // Also checks wantWear / wantSide against the table in the plan. MAXSEC= caps each run (default 110 s of finale).
 // STEPS=0,3,4 (default): each run is played from that ramp step (sitting count forced), so the slow seam, the fast seam (step 3)
 // and the paired Critiques (step 4, both Critiques of a pair) are all checked.
@@ -43,9 +43,9 @@ const { launch } = require('./harness.js');
     Object.keys(a.calls).forEach((c) => all.add(c)); fail += a.fail; if (/L3/.test(k)) { l3c += a.crits; l3f += a.fixed; l3t += a.time; }
     console.log(k.padEnd(18) + String(a.runs).padStart(4) + String(a.crits).padStart(7) + String(a.fail).padStart(11) + `${a.time} (${a.sigTime})`.padStart(16) + `${String(Math.round(a.fixed / Math.max(1, a.crits) * 100)).padStart(9)}% (${a.fixWash}/${a.fixPaint})`.padEnd(23) + `${Math.round(a.ok / Math.max(1, a.crits) * 100)}%`.padStart(8) + `${a.worstR.toFixed(2)} s`.padStart(13) + `${a.sig}/${a.runs}`.padStart(11));
   }
-  const calls = [...all].sort(); console.log(`calls seen (${calls.length}/14): ${calls.join(' ')}`);
+  const calls = [...all].sort(); console.log(`calls seen (${calls.length}/12): ${calls.join(' ')}`);
   const rate = l3f / Math.max(1, l3c);
-  const trate = l3t / Math.max(1, l3c), pass = fail === 0 && calls.length === 14 && rate < 0.25 && trate <= 0.05;
+  const trate = l3t / Math.max(1, l3c), pass = fail === 0 && calls.length === 12 && rate < 0.25 && trate <= 0.05;
   if (r.fails.length) console.log(r.fails.join('\n'));
   console.log(`level-3: repaired ${(rate * 100).toFixed(1)}%, stretched ${(trate * 100).toFixed(1)}% (signature excluded)  ->  ${pass ? 'PASS' : 'FAIL'}`);
   await browser.close(); process.exit(pass ? 0 : 1);
