@@ -108,7 +108,7 @@ const Game = (() => {
     if (def.music) Music.play(def.music, 0);
     if (!opts.skipIntro) {
       UI.fade(false); yield 0.3;
-      UI.titleCard('DOOR ' + UI.ROMAN[G.bosses.indexOf(def.base || def)] + (def.nm ? ' · NIGHTMARE' : ''), def.name, def.title, def.color);
+      UI.titleCard(def.nm ? 'NIGHTMARE' : '', def.name, def.title, def.color);
       if (def.intro) yield* def.intro(b);
       else { const a = angTo(b.pos.x, b.pos.z, p.pos.x, p.pos.z), r = b.radius * 2 + 9, h = b.aimY; yield* Cam.shot([b.pos.x + Math.sin(a + 0.9) * r, h + 2, b.pos.z + Math.cos(a + 0.9) * r], [b.pos.x, h, b.pos.z], [b.pos.x + Math.sin(a - 0.3) * r * 1.2, h + 4, b.pos.z + Math.cos(a - 0.3) * r * 1.2], [b.pos.x, h * 0.8, b.pos.z], 4.2); }
       UI.hideCard(); Cam.release(); yield 0.7;
