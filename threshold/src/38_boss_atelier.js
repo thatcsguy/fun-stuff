@@ -114,6 +114,10 @@
   // in one, about twice a second in a busy phase, and each was a visible stall). So a rebuild is a job spread over frames
   // on CPU work canvases under a time budget, and the finished picture is copied to the visible canvases in one go.
   // Strokes that land while a job runs are stamped on the visible floor at once and added to the job before it finishes.
+  // Two things made a rebuild slow, both measured: a canvas only records drawing and does it later in one lump (so each
+  // stroke is flushed inside the budget), and clipping every stroke to the floor's circle cost about ten times the stroke
+  // itself (so the job paints unclipped and the circle is applied once, when the finished picture is copied over).
+  const flush = (k) => k.getImageData(0, 0, 1, 1); // a canvas only records what it is asked to draw; reading a pixel makes it do the work now, inside the budget
   const BUDGET = 2.5, BUDGET_FAST = 7; // ms of stamping per frame; fast = a look change (phase transition), which should not linger
   function paint(S) {
     const x = S.ctx, s = S.sctx; let up = false, J = S.job;
@@ -123,15 +127,15 @@
     if (J) {
       const t0 = performance.now(), lim = J.now ? 1e9 : J.fast ? BUDGET_FAST : BUDGET, over = () => performance.now() - t0 > lim;
       if (J.st === 0) { // old dry paint goes into the bitmap for good
-        clipC(S.bctx); clipC(S.bsctx); while (J.i < J.list.length) { const sh = J.list[J.i++]; if (!sh.inBmp) { stamp(S, S.bctx, S.bsctx, sh); sh.inBmp = true; } if (over()) break; } S.bctx.restore(); S.bsctx.restore();
+        S.bctx.save(); S.bsctx.save(); while (J.i < J.list.length) { const sh = J.list[J.i++]; if (!sh.inBmp) { stamp(S, S.bctx, S.bsctx, sh); sh.inBmp = true; flush(S.bctx); flush(S.bsctx); } if (over()) break; } S.bctx.restore(); S.bsctx.restore();
         if (J.i >= J.list.length) { J.st = 1; J.i = 0; S.wctx.globalAlpha = 1; S.wsctx.globalAlpha = 1; S.wctx.drawImage(S.bmp, 0, 0); S.wsctx.drawImage(S.sbmp, 0, 0); J.list = S.baked.filter((sh) => !sh.inBmp).concat(S.strokes.filter((sh) => !J.late.includes(sh))); }
       }
       if (J.st === 1 && !over()) { // then everything still on top of it, oldest first
-        clipC(S.wctx); clipC(S.wsctx); while (J.i < J.list.length) { stamp(S, S.wctx, S.wsctx, J.list[J.i++]); if (over()) break; }
+        S.wctx.save(); S.wsctx.save(); while (J.i < J.list.length) { stamp(S, S.wctx, S.wsctx, J.list[J.i++]); flush(S.wctx); flush(S.wsctx); if (over()) break; }
         if (J.i >= J.list.length) { for (const sh of J.late) stamp(S, S.wctx, S.wsctx, sh); J.st = 2; }
         S.wctx.restore(); S.wsctx.restore();
       }
-      if (J.st === 2) { x.globalAlpha = 1; s.globalAlpha = 1; x.drawImage(S.wcv, 0, 0); s.drawImage(S.wscv, 0, 0); up = true; S.job = null; if (J.again) S.full = true; }
+      if (J.st === 2) { const B = S.base[S.neg ? 1 : 0]; x.globalAlpha = 1; s.globalAlpha = 1; x.drawImage(B[0], 0, 0); s.drawImage(B[1], 0, 0); clipC(x); clipC(s); x.drawImage(S.wcv, 0, 0); s.drawImage(S.wscv, 0, 0); x.restore(); s.restore(); up = true; S.job = null; if (J.again) S.full = true; }
     }
     if (up) { S.tex.needsUpdate = true; S.stex.needsUpdate = true; }
   }
