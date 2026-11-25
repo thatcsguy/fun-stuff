@@ -1,7 +1,7 @@
 // UI: menu, HUD, screens, settings, gamepad/keyboard menu navigation.
 const UI = (() => {
   const el = { hud: $('#hud'), menu: $('#menu'), pause: $('#pause'), death: $('#death'), victory: $('#victory'), settings: $('#settings'), fade: $('#fade'), card: $('#title-card'), hurt: $('#hurtv'), hint: $('#hint'), dbg: $('#dbg') };
-  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX'];
+  const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']; // phase numbers in the nightmare phase table
   const svg = (name, color) => `<svg viewBox="0 0 24 24"><path d="${ICON[name]}" fill="${color}" fill-rule="evenodd"/></svg>`;
   const fmtT = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
   let fuse = [], tickS = -1, slots = [], cur = null, settingsFrom = 'menu', focusI = -1, hurtA = 0;
@@ -22,15 +22,28 @@ const UI = (() => {
     }
     // Difficulty: on Nightmare, doors with no nightmare version are greyed out, skipped by focus and cannot be clicked
     const nm = Settings.diff === 'nightmare'; segSet('diff', nm ? 'nightmare' : 'normal'); el.menu.classList.toggle('nm', nm);
+    // group toggles (placeholder): one button per group in GROUPS (09_groups.js); each shows or hides that group's fights
+    const gt = $('#grouptog'); gt.innerHTML = '';
+    for (const g of GROUPS) {
+      const b = document.createElement('button'); b.className = 'gtog nav' + (groupShown(g.id) ? ' on' : ''); b.id = 'grp-' + g.id; b.textContent = g.name;
+      b.onclick = () => { Settings.groups = Object.assign({}, Settings.groups, { [g.id]: !groupShown(g.id) }); saveSettings(); Sound.sfx('uiok'); const k = focusKey(), f = focusI; buildMenu(); if (f >= 0) focusByKey(k, f); };
+      gt.appendChild(b);
+    }
     const dw = $('#doors'); dw.innerHTML = '';
-    G.bosses.forEach((d, i) => {
-      const ok = !nm || Game.nmAvailable(d), b = document.createElement('button'); b.className = 'door' + (ok ? ' nav' : ' na') + (nm && ok ? ' nmok' : ''); b.dataset.door = d.id; b.style.setProperty('--c', d.color || '#e8c77a');
-      const seen = Save.seen && Save.seen[d.id], kills = nm ? Object.fromEntries(Object.entries((Save.nm && Save.nm[d.id]) || {}).map(([k, v]) => [k, v.best])) : (Save.kills && Save.kills[d.id]) || {};
-      const best = Object.values(kills).length ? Math.min(...Object.values(kills)) : 0;
-      b.innerHTML = `<div class="rn">${ROMAN[i]}</div>${best ? `<div class="dk">✓ ${fmtT(best)}</div>` : ''}<div class="dn">${seen ? d.name : '? ? ?'}</div><div class="dh">${seen ? d.title : (d.hint || '')}</div>`;
-      if (ok) b.onclick = () => { Sound.resume(); Sound.sfx('uiok'); Game.start(d.id, { nm }); }; else b.disabled = true;
-      dw.appendChild(b);
-    });
+    for (const { g, list } of groupedBosses()) {
+      if (!groupShown(g.id) || !list.length) continue;
+      const sec = document.createElement('div'); sec.className = 'grp'; sec.innerHTML = `<div class="gl">${g.name}</div>`;
+      const row = document.createElement('div'); row.className = 'gd'; sec.appendChild(row);
+      for (const d of list) {
+        const ok = !nm || Game.nmAvailable(d), b = document.createElement('button'); b.className = 'door' + (ok ? ' nav' : ' na') + (nm && ok ? ' nmok' : ''); b.dataset.door = d.id; b.style.setProperty('--c', d.color || '#e8c77a');
+        const kills = nm ? Object.fromEntries(Object.entries((Save.nm && Save.nm[d.id]) || {}).map(([k, v]) => [k, v.best])) : (Save.kills && Save.kills[d.id]) || {};
+        const best = Object.values(kills).length ? Math.min(...Object.values(kills)) : 0;
+        b.innerHTML = `${best ? `<div class="dk">✓ ${fmtT(best)}</div>` : ''}<div class="dn">${d.name}</div><div class="dh">${d.title || ''}</div>`;
+        if (ok) b.onclick = () => { Sound.resume(); Sound.sfx('uiok'); Game.start(d.id, { nm }); }; else b.disabled = true;
+        row.appendChild(b);
+      }
+      dw.appendChild(sec);
+    }
     focusI = -1;
   }
   function show(name) {

@@ -20,9 +20,10 @@ A PC-first 3D raid game: unrelated boss fights, one behind each door, four class
 | `07_model_duskblade.js` | The Duskblade's model on `HeroKit` (registers `HERO_MODELS.duskblade`): helm, kit, half-cape, blade with Momentum runes and a swing trail, keyframed swings (kinds 0-2 Slash, 3 Sunder, 5 Sever, 6 thrust, 7 parry counter) |
 | `07_player.js` | Generic procedural hero model (used by classes without their own, and by any `look` with `generic: true`, like Issen in door III), `Player` (movement, casting, GCD, buffs, dashes, damage) |
 | `08_classes.js` | The four classes and their autopilot rotations (see "Classes" below) |
+| `09_groups.js` | `GROUPS`: which fights the main screen shows under Nightmare / Ready / Almost / Concept (edit it to move a fight; unlisted bosses land in the last group). The toggle buttons above the fights show or hide each group (`Settings.groups`) |
 | `09_ui.js`, `10_game.js` | HUD/menus (including the Difficulty toggle, the phase-clock fuse and the per-phase results), fight lifecycle (including the hidden rehearsal at load and nightmare versions), the hall-of-doors menu scene |
 | `11_warm.js` | Warm-up frame and light keeper that stop shader compiles mid-fight |
-| `2x_boss_*.js`, `3x_boss_*.js` | One file per boss. Adding a file here adds a door. See `BOSS_AUTHORING.md` |
+| `2x_boss_*.js`, `3x_boss_*.js` | One file per boss. Adding a file here adds a fight (add its id to a group in `09_groups.js`, or it lands in the last group). Bosses are shown by name only, with no door numbers. See `BOSS_AUTHORING.md` |
 | `90_bot.js` | Autopilot and the `window.__game` test hooks |
 | `99_tail.js` | Boot and URL parameters |
 
@@ -91,7 +92,7 @@ best time per phase on its own, clears); `Save.kills` is Normal only.
 
 `?boss=cathedral|leviathan|duelist|engine|titan|gorgon|theatre|wheel|express|winter|origami|lamp|chess|festival|fall`, `&class=duskblade|stormcaller|ashwarden|hexslinger`, `&phase=N` (0-based), `&skipintro`, `&god`, `&bot=1..3` (autopilot), `&debug`, `&mute`, `&seed=N`, `&quality=low|medium|high|ultra`, `&strictmath` (testing only: out-of-domain shader math returns NaN and NaN pixels show bright magenta), `&nm=1` (the nightmare version of `boss`, if it has one; does not change the saved difficulty).
 
-Doors XVI to XX use the ids `ballpark`, `clock`, `portal`, `atelier`, `sumi`. Door XVIII also takes `&gate=walk|dwell|jump`, the rule for entering a gate (default `walk`).
+Later fights use the ids `clock`, `portal`, `atelier`, `sumi`. `portal` also takes `&gate=walk|dwell|jump`, the rule for entering a gate (default `walk`).
 
 ## Test hooks
 

@@ -111,7 +111,7 @@ const Input = {
   onSlot: null, onAction: null, onNav: null, onCapture: null,   // set by the game/UI
   bot: null,                                    // when set, {moveX, moveZ} world-space override from the autopilot
   active() { return (G.state === 'fight' || G.state === 'intro') && !G.paused; },
-  syncDevice() { const d = Settings.pad === true ? 'pad' : 'kbm'; if (this.device !== d) { this.device = d; if (typeof UI !== 'undefined') UI.deviceChanged(); } },
+  syncDevice() { const d = Settings.pad === true ? 'pad' : 'kbm'; if (this.device !== d) { this.device = d; try { UI.deviceChanged(); } catch (e) { if (!(e instanceof ReferenceError)) throw e; } } }, // at boot UI does not exist yet (const TDZ: typeof throws too)
   setPad(on) { Settings.pad = !!on; saveSettings(); this.padPrev = []; this.syncDevice(); },
   fire(name, arg) { if (this.onAction) this.onAction(name, arg); },
   press(id) {

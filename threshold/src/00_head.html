@@ -58,7 +58,13 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .cls .sk .ic svg{width:20px;height:20px}
 .cls .sk b{color:#fff;font-weight:600}
 .cls .sk kbd{font:11px ui-monospace,Consolas,monospace;border:1px solid var(--line);padding:0 4px;margin-right:5px;color:var(--c);border-radius:3px}
-#doors{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+#doors{display:flex;flex-direction:column;gap:10px;align-items:center;width:100%}
+#doors .grp{width:100%}#doors .gl{text-align:center;font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:#8f8b80;margin:2px 0 6px}
+#doors .gd{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+#doors .gd .door{height:96px;min-height:96px;width:170px;min-width:150px;padding:8px 6px}
+#grouptog{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.gtog{background:rgba(5,6,10,.5);border:1px solid var(--line);color:#8f8b80;font-size:12px;letter-spacing:.2em;text-transform:uppercase;padding:5px 12px;cursor:pointer}
+.gtog.on{color:#fff;border-color:rgba(255,255,255,.45);background:rgba(255,255,255,.08)}.gtog.focus,.gtog:hover{border-color:#fff}
 .door{width:min(17vw,200px);min-width:150px;height:min(25vh,230px);min-height:150px;border:1px solid var(--line);position:relative;overflow:hidden;
   background:linear-gradient(180deg,color-mix(in srgb,var(--c) 22%,#05060a),#05060a 78%);transition:all .2s;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:12px 8px}
 .door::before{content:"";position:absolute;left:50%;top:-30%;width:2px;height:160%;background:var(--c);box-shadow:0 0 30px 6px var(--c);opacity:.55;transform:translateX(-50%);transition:all .25s}
