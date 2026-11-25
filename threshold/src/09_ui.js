@@ -123,6 +123,7 @@ const UI = (() => {
     const pw = $('#pips'), pips = pw.children, rk = p.cls.resource.kind || 'pips';
     if (rk === 'bar') { const st = pips[0]; setSx('stam', st.firstElementChild, sat(p.res / p.resMax)); setCls('wind', st, 'wind', !!p.winded); setCls('open', st, 'open', p.opening > 0); }
     else if (rk === 'cylinder') { const lw = p.armed ? 5 - p.streak : -1; for (let i = 0; i < pips.length; i++) { const v = (p.cyl[i] || '') + (i === 0 && p.cyl.length ? ' next' : '') + (i === lw ? ' lw' : ''); if (cache['ch' + i + 'c'] !== v) { cache['ch' + i + 'c'] = v; pips[i].className = v; } } }
+    else if (p.cls.resource.pipCls) { for (let i = 0; i < pips.length; i++) { const v = p.cls.resource.pipCls(p, i); if (cache['pc' + i] !== v) { cache['pc' + i] = v; pips[i].className = v; } } } // e.g. Stormcaller's glowing slot
     else for (let i = 0; i < pips.length; i++) setCls('pip' + i, pips[i], 'on', i < p.res);
     const pc = $('#pcast'), c = p.casting; if (cache.pcon !== !!c) { cache.pcon = !!c; pc.style.opacity = c ? 1 : 0; }
     if (c) { setSx('pcf', pc.firstElementChild, sat(c.t / c.time)); setTxt('pcn', pc.lastElementChild, c.name); }

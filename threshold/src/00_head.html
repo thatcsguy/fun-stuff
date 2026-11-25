@@ -191,6 +191,13 @@ body.dev-pad .kbm-only,body:not(.dev-pad) .pad-only{display:none!important}
 #pips{display:flex;gap:5px;justify-content:center;height:12px}
 #pips i{flex:1;max-width:64px;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.55);transform:skewX(-18deg);transition:all .12s}
 #pips i.on{background:var(--cls);box-shadow:0 0 10px var(--cls);border-color:#fff}
+#pips i{position:relative}
+#pips i.gl{border:2px solid #fff0a0;background:rgba(255,200,60,.55);animation:scgl .5s ease-in-out infinite alternate,scin .45s ease-out}
+#pips i.gl.on.ch{background:linear-gradient(180deg,#fffbe0,#ffd040);border-color:#fff;animation:scch .3s ease-in-out infinite alternate}
+#pips i.gn::after{content:'';position:absolute;left:12%;right:12%;top:-8px;height:3px;background:#ffe070;box-shadow:0 0 8px #ffc840;animation:scgl .5s ease-in-out infinite alternate}
+@keyframes scgl{from{box-shadow:0 0 6px #ffc840}to{box-shadow:0 0 18px 3px #ffd860}}
+@keyframes scch{from{box-shadow:0 0 12px 2px #ffd860}to{box-shadow:0 0 24px 6px #fff0a0}}
+@keyframes scin{from{transform:skewX(-18deg) scale(1.7);background:#fff8d0}to{transform:skewX(-18deg) scale(1)}}
 #pips.bar{height:10px}
 #pips .stam{flex:1;position:relative;border:1px solid rgba(255,255,255,.3);background:rgba(0,0,0,.55);overflow:hidden}
 #pips .stam b{position:absolute;inset:0;background:linear-gradient(90deg,color-mix(in srgb,var(--cls) 70%,#000),var(--cls));transform-origin:left;box-shadow:0 0 10px var(--cls)}
