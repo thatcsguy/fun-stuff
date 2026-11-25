@@ -21,7 +21,7 @@ A PC-first 3D raid game: unrelated boss fights, one behind each door, four class
 | `07_player.js` | Generic procedural hero model (used by classes without their own, and by any `look` with `generic: true`, like Issen in door III), `Player` (movement, casting, GCD, buffs, dashes, damage) |
 | `08_classes.js` | The four classes and their autopilot rotations (see "Classes" below) |
 | `09_groups.js` | `GROUPS`: which fights the main screen shows under Nightmare / Ready / Almost / Concept (edit it to move a fight; unlisted bosses land in the last group). The toggle buttons above the fights show or hide each group (`Settings.groups`) |
-| `09_ui.js`, `10_game.js` | HUD/menus (including the Difficulty toggle, the phase-clock fuse and the per-phase results), fight lifecycle (including the hidden rehearsal at load and nightmare versions), the hall-of-doors menu scene |
+| `09_ui.js`, `10_game.js` | HUD/menus (including the Difficulty toggle and the per-phase results), fight lifecycle (including the hidden rehearsal at load and nightmare versions), the hall-of-doors menu scene |
 | `11_warm.js` | Warm-up frame and light keeper that stop shader compiles mid-fight |
 | `2x_boss_*.js`, `3x_boss_*.js` | One file per boss. Adding a file here adds a fight (add its id to a group in `09_groups.js`, or it lands in the last group). Bosses are shown by name only, with no door numbers. See `BOSS_AUTHORING.md` |
 | `90_bot.js` | Autopilot and the `window.__game` test hooks |
@@ -81,12 +81,12 @@ three phases on 24,000 health (Normal: 31,000) (the fight opens in colour, then 
 half and a black half, and every Critique names a half and a colour, shown as his whole body white or black with the colour as a swirl of
 paint winding up him; under 10% three fast Critiques keep the same answer paint while the half flips). Normal play is untouched by any of this.
 
-A nightmare version is a `nightmare` block on the boss def (see `BOSS_AUTHORING.md`). It has per-phase clocks: each phase has a
-`budget` in seconds, shown as a fuse under the boss bar (one segment under each phase's slice of health, burning right to left, ticking
-in its last 15 s). Running out starts that phase's overtime (a themed blow nothing survives, src `enrage`, so the death screen says
-"Out of time"). Clocks are strict: leftover time is not carried over. The death and victory screens list each phase (time / budget, dps,
-red when it ran out). Nightmare records live in `localStorage.th_save` as `Save.nm[doorId][classId] = { best, splits, clears }` (best total,
-best time per phase on its own, clears); `Save.kills` is Normal only.
+A nightmare version is a `nightmare` block on the boss def (see `BOSS_AUTHORING.md`). It has short teaching phases and a long last
+phase that ramps on its own, and one overall enrage: from `enrage` seconds a soft creeping pulse (`enrageBase` 40 + `enrageGrow` 4 per
+second over, every 2 s), and `lastBlowAt` (24) seconds later a themed last blow nothing survives (src `enrage`, so the death screen says
+"Out of time"). No per-phase clocks. The death and victory screens list each phase (live time, dps). Nightmare records live in
+`localStorage.th_save` as `Save.nm[doorId][classId] = { v: 2, best, splits, clears }` (best total, best time per phase on its own,
+clears; records without `v: 2` are from the old clocked fights and are ignored); `Save.kills` is Normal only.
 
 ## URL parameters
 
@@ -102,17 +102,17 @@ Later fights use the ids `clock`, `portal`, `atelier`, `sumi`. `portal` also tak
 
 - `superdmg.js [door ids]`: the Settings testing options (God mode + Super damage) on, level-3 autopilot clears every door, normal and nightmare; passes when each phase is entered once and in order, the player never dies and the boss falls.
 - `smoke.js <boss>`: every phase with every class in god mode, reports script errors.
-- `NM=1` before any of these tools adds `&nm=1` to every page they load, so `smoke`, `sim`, `matrix`, `hitch`, `nanscan`, `shot` and the rest run the nightmare version unchanged. The nightmare overtime blow pierces god mode on purpose, so god-mode runs still fail a clock.
-- `nmclock.js <boss> [classes|all] [runs]`: nightmare phase clocks. Starts each phase in god mode with the level-3 autopilot and reports the time it took against the budget (`OUT` = ran out). `RAW=1` lifts the budgets to measure raw phase times for tuning; `PASSIVE=1` never attacks (every clock must run out); `SWAPBLIND=1` ignores who is awake in door III's twin phase and always attacks Issen (must run out in phase IV); `SIDEBLIND=1` ignores the called half in door XIX's finale (wears the right paint, stands anywhere); `PHASES=2,3` limits the phases.
-- `nmphase.js [boss]`: forces each nightmare phase change in the middle of a mechanic (door III: Stillness, a Counter, Final Verse, overtime; door XIX: a Roller, a live Blot, a Critique, the varnish, and in the finale a Fresh Coat, a repair drop and the signature cut off by the overtime) and checks the next phase's `enter` left no per-mechanic state behind.
-- `critfuzz.js [runs] [classes|all]`: door XIX's finale, where every Critique asks for a half and a paint at the instant it lands. Plays it (god mode, clocks lifted) with the level-3 autopilot and with a lazy one that never washes or fetches paint, and lists every Critique's route check (how long the walk to an answer takes, and the repair the boss made: moving the dish, dropping the missing paint, or stretching the cast). Passes when every Critique has an answer, all 14 calls appear, the level-3 bot needs a repair in under 25% of them and a stretched cast in at most 5% (the signature's stretched gaps are by design and counted apart).
-- `nmshots.js <outDir> [class]`: screenshots of the nightmare flow through the real menu and the full intro (door page on both settings, title card, fuse, last 15 s, overtime, death and victory tables). `MODE=late` takes the same entry on to the later phases instead: each phase's enter, door III's seam and blue ghosts, the reflection rising, both bodies with a swap and paired Moons, the twin overtime, and the kill. `BOSS=atelier` does door XIX (with `MODE=late`: the Negative, the knife cut, each kind of call with close shots of the swirl, a Fresh Coat rising, a matched Critique in the black half, the signature, the varnish, the kill painting).
+- `NM=1` before any of these tools adds `&nm=1` to every page they load, so `smoke`, `sim`, `matrix`, `hitch`, `nanscan`, `shot` and the rest run the nightmare version unchanged. The nightmare last blow pierces god mode on purpose, so god-mode runs still run out of time.
+- `nmpace.js <boss> [classes|all] [runs]`: Nightmare pace. Plays whole fights from phase 1 with the level-3 autopilot in god mode and prints per run the kill time (or `OUT` when the last blow lands), each phase's time and dps, the last phase's share of the time, and the fight time each ramp step started; then kills, median, best and worst per class. `REAL=1` turns god mode off (survival, deaths with their source); `PASSIVE=1` never attacks; `SWAPBLIND=1` ignores who is awake in Niten; `SIDEBLIND=1` ignores the called half in Chiaroscuro (both must never kill).
+- `nmphase.js [boss]`: forces each nightmare phase change in the middle of a mechanic (Issen: Stillness, a Counter, Final Verse; Pentimento: a Roller, a live Blot, a Critique, a matched Critique), then in the last phase starts the last blow mid-mechanic (Issen: a swap, a Counter, the twin Verse, paired Moons, a step-5 swap, the twin Petal Storm; Pentimento: a Fresh Coat, a Critique, a Roller, a repair drop, a Roller on the fast seam, a pair, the signature), and checks nothing is left behind; then that a restart resets the ramp state.
+- `critfuzz.js [runs] [classes|all]`: door XIX's finale, where every Critique asks for a half and a paint at the instant it lands. Plays it (god mode; `STEPS=0,3,4` by default, forcing the ramp step so the fast seam and both Critiques of a pair are covered) with the level-3 autopilot and with a lazy one that never washes or fetches paint, and lists every Critique's route check (how long the walk to an answer takes, and the repair the boss made: moving the dish, dropping the missing paint, or stretching the cast). Passes when every Critique has an answer, all 14 calls appear, the level-3 bot needs a repair in under 25% of them and a stretched cast in at most 5% (the signature's stretched gaps are by design and counted apart).
+- `nmshots.js <outDir> [class]`: screenshots of a Nightmare fight through the real menu and the full intro (door page on both settings, title card), then the last phase with one shot per ramp step, the enrage pulse, the last blow, the death table, the kill and the victory table. `BOSS=atelier` for Pentimento.
 - `menunav.js`: the Difficulty toggle with mouse, keyboard and a simulated controller (values, greyed doors skipped, focus, persistence, Restart keeps Nightmare, Normal still starts Normal). Must print `ALL PASS`.
 - `matrix.js <class,class|all> [runs] [boss,boss]`: autopilot attempts for every door and class, one summary line each (wins, boss health left, dps). `GOD=1` checks instead that each class can finish every fight before the enrage.
 - `sim.js <boss> <class> <botLevel> [runs] [maxSec] [phase]`: full autopilot attempts.
 - `tank.js <boss> <class> <botLevel> [hpMult]`: one attempt with extra health, totals damage taken per mechanic.
 - `hits.js <boss> <class> <botLevel>`: one attempt, prints every hit taken.
-- `hitch.js <boss>`: plays each phase in real frames and lists every shader compiled after the fight started (should be none). `FRAMES=n` watches each phase longer (default 300 frames); with `NM=1` it also runs the last phase's clock out and watches the overtime.
+- `hitch.js <boss>`: plays each phase in real frames and lists every shader compiled after the fight started (should be none). `FRAMES=n` watches each phase longer (default 300 frames); with `NM=1` it also jumps to the last blow and watches it play through.
 - `warmcheck.js [boss...]`: loads fights through the real loading path and prints rehearsal and warm-up times.
 - `shot.js <query> <out.png> [evalJS] [frames]`: screenshot.
 - `hexcap.js <outDir> [boss,boss] [groups]`: herocap.js for the Hexslinger: idle, walk, fire and recoil, Load, Spin, Salve twirl, Silver, the Last Word, airborne, plus gun close-ups and the same perf line. `groups` (play,idle,walk,fire,load,spin,salve,last,air) keeps a review loop short.
@@ -138,7 +138,7 @@ Run them with `NODE_PATH=<global node_modules with playwright> THREE_DIR=<unpack
 - Mechanic damage and telegraph time: the `delay` and `dmg` arguments of each `Hz.*` call in the boss file.
 - Player health and speed: `Player` in `07_player.js` (1000 hp, speed 7). Class numbers: `08_classes.js`.
 - Look per fight: the `post` block of each boss (bloom, exposure, tint) and its `build()`.
-- Nightmare clocks: the `budget` of each phase in the boss's `nightmare` block (`NM_CLOCK` in `22_boss_duelist.js` for door III and in `38_boss_atelier.js` for door XIX, with the measured times next to it). Tune them with `tools/nmclock.js` (`RAW=1`): the slowest class should keep at least 5% of each clock. If a class cannot make a phase, lengthen that phase rather than touching class numbers.
+- Nightmare pace: `NM_HP` in `22_boss_duelist.js` (Issen) and `38_boss_atelier.js` (Pentimento), with the measured table next to it, then the `enrage` time (330 to 360 s), then the ramp (`RAMP` for Niten, `SIT_PER_STEP` for Chiaroscuro). Tune with `tools/nmpace.js`; never touch class numbers or Normal for it.
 
 The autopilot is a rough stand-in for a player who already knows the fight. At the time of writing it clears the cathedral and the engine, gets the leviathan and titan into their last phase, and dies in phase two of the duelist. Nothing has been tuned against a human yet.
 

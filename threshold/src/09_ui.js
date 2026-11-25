@@ -4,7 +4,7 @@ const UI = (() => {
   const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']; // phase numbers in the nightmare phase table
   const svg = (name, color) => `<svg viewBox="0 0 24 24"><path d="${ICON[name]}" fill="${color}" fill-rule="evenodd"/></svg>`;
   const fmtT = (s) => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
-  let fuse = [], tickS = -1, slots = [], cur = null, settingsFrom = 'menu', focusI = -1, hurtA = 0;
+  let slots = [], cur = null, settingsFrom = 'menu', focusI = -1, hurtA = 0;
   const cache = {};
   const setTxt = (key, node, v) => { if (cache[key] !== v) { cache[key] = v; node.textContent = v; } };
   const setCls = (key, node, cls, on) => { if (cache[key] !== on) { cache[key] = on; node.classList.toggle(cls, on); } };
@@ -36,7 +36,7 @@ const UI = (() => {
       const row = document.createElement('div'); row.className = 'gd'; sec.appendChild(row);
       for (const d of list) {
         const ok = !nm || Game.nmAvailable(d), b = document.createElement('button'); b.className = 'door' + (ok ? ' nav' : ' na') + (nm && ok ? ' nmok' : ''); b.dataset.door = d.id; b.style.setProperty('--c', d.color || '#e8c77a');
-        const kills = nm ? Object.fromEntries(Object.entries((Save.nm && Save.nm[d.id]) || {}).map(([k, v]) => [k, v.best])) : (Save.kills && Save.kills[d.id]) || {};
+        const kills = nm ? Object.fromEntries(Object.entries((Save.nm && Save.nm[d.id]) || {}).filter(([k, v]) => v && v.v === 2).map(([k, v]) => [k, v.best])) : (Save.kills && Save.kills[d.id]) || {};
         const best = Object.values(kills).length ? Math.min(...Object.values(kills)) : 0;
         b.innerHTML = `${best ? `<div class="dk">✓ ${fmtT(best)}</div>` : ''}<div class="dn">${d.name}</div><div class="dh">${d.title || ''}</div>`;
         if (ok) b.onclick = () => { Sound.resume(); Sound.sfx('uiok'); Game.start(d.id, { nm }); }; else b.disabled = true;
@@ -85,10 +85,6 @@ const UI = (() => {
     const b = G.boss, bar = $('#bbar'); bar.querySelectorAll('.tick').forEach((t) => t.remove());
     for (const ph of b.def.phases) if (ph.at < 1) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = (ph.at * 100) + '%'; bar.appendChild(t); }
     $('#bname').textContent = b.def.name; $('#bname').classList.toggle('nm', !!b.def.nm);
-    // the fuse: one segment per phase clock, each under its own slice of the health bar, burning right to left
-    const fz = $('#bfuse'); fz.innerHTML = ''; fuse = []; tickS = -1;
-    if (b.budgeted) b.def.phases.forEach((ph, i) => { const lo = b.def.phases[i + 1] ? b.def.phases[i + 1].at : 0, sg = document.createElement('div'); sg.className = 'fz wait'; sg.style.left = (lo * 100) + '%'; sg.style.width = ((ph.at - lo) * 100) + '%'; sg.innerHTML = '<b></b>'; fz.appendChild(sg); fuse.push({ sg, b: sg.firstChild }); });
-    fz.classList.toggle('on', fuse.length > 0);
   }
   // Called whenever the controller toggle, prompt style, connected pad or a binding changes: every on-screen button label follows.
   function deviceChanged() {
@@ -113,7 +109,6 @@ const UI = (() => {
     setSx('bhp', $('#bbar .fill'), b.hp / b.maxHp); setSx('bhpl', $('#bbar .lag'), b.hp / b.maxHp);
     setTxt('bhpt', $('#bhp'), (b.hp / b.maxHp * 100).toFixed(1) + '%');
     castBar('bc', $('#bcast'), b.castState);
-    if (fuse.length) updFuse(b);
     const t = p.target, showT = t && t !== b && t.alive; setCls('tf', $('#tgtframe'), 'on', !!showT);
     if (showT) { const th = t.hpOwner || t; setTxt('tn', $('#tname'), t.name); setSx('thp', $('#tbar .fill'), th.hp / th.maxHp); castBar('tc', $('#tcast'), t.castState); }
     if (b.def.enrage) { const left = Math.max(0, b.def.enrage - G.ft); setTxt('enr', $('#enrage'), fmtT(G.ft)); setCls('enrh', $('#enrage'), 'hot', left < 30); }
@@ -146,23 +141,10 @@ const UI = (() => {
     setCls('hint', el.hint, 'on', p.hintT > 0); if (p.hintT > 0) setTxt('hintt', el.hint, p.hint);
     if (G.debug) el.dbg.textContent = `t ${G.ft.toFixed(1)}  phase ${b.phase}  boss ${Math.round(b.hp)}  dps ${(p.stats.dmg / Math.max(1, G.ft)).toFixed(0)}  hz ${Hz.list.length} bul ${Bul.list.length} co ${Co.list.length}\n${G.errors.slice(-3).join('\n')}`;
   }
-  // fuse states: done (frozen where it stopped, dim gold), live (burning; pulses and ticks in its last 15 s), wait (full, dim), out (ran out: red)
-  function updFuse(b) {
-    const L = b.phaseLog || [];
-    for (let i = 0; i < fuse.length; i++) {
-      const f = fuse[i], bud = b.def.phases[i].budget || 1, cur = i === b.phase && !L[i];
-      const st = L[i] ? (L[i].over ? 'out' : 'done') : cur ? (b.overtime ? 'out' : 'live') : i < b.phase ? 'done' : 'wait';
-      const left = L[i] ? 1 - L[i].time / bud : cur ? 1 - (b.phaseT || 0) / bud : 1;
-      if (cache['fz' + i] !== st) { cache['fz' + i] = st; f.sg.className = 'fz ' + st; }
-      setSx('fzs' + i, f.b, sat(left));
-      const hot = st === 'live' && G.state === 'fight' && (b.phaseT || 0) > bud - 15; setCls('fzh' + i, f.sg, 'hot', hot);
-      if (hot && !b.transitioning && !G.paused) { const s = Math.floor(b.phaseT); if (s !== tickS) { tickS = s; Sound.sfx('tick', 0.9, 0.8 + (15 - (bud - b.phaseT)) * 0.06); } }
-    }
-  }
-  // per-phase results under the death / victory stat line: time on the clock / budget, damage per second; red = ran out
+  // per-phase results under the death / victory stat line (nightmare): time each phase was live, damage per second
   function phaseTable(node, b, best = []) {
-    const L = b.phaseLog; if (!L || !b.budgeted) { node.innerHTML = ''; node.classList.remove('on'); return; }
-    node.innerHTML = b.def.phases.map((ph, i) => { const q = L[i]; return q ? `<div class="pr${q.over ? ' out' : ''}"><span>${ROMAN[i]}</span><span>${fmtT(q.time)} / ${fmtT(q.budget)}</span><span>${Math.round(q.dmg / Math.max(1, q.time))} dps</span><span>${best[i] ? 'best' : ''}</span></div>` : `<div class="pr na"><span>${ROMAN[i]}</span><span>– / ${fmtT(ph.budget || 0)}</span><span>–</span><span></span></div>`; }).join('');
+    const L = b.phaseLog; if (!L || !b.def.nm) { node.innerHTML = ''; node.classList.remove('on'); return; }
+    node.innerHTML = b.def.phases.map((ph, i) => { const q = L[i]; return q ? `<div class="pr"><span>${ROMAN[i]}</span><span>${fmtT(q.time)}</span><span>${Math.round(q.dmg / Math.max(1, q.time))} dps</span><span>${best[i] ? 'best' : ''}</span></div>` : `<div class="pr na"><span>${ROMAN[i]}</span><span>–</span><span>–</span><span></span></div>`; }).join('');
     node.classList.add('on');
   }
   function slotFlash(i) { const s = slots[i]; if (s) { s.flash = 0.1; s.d.classList.add('press'); } }

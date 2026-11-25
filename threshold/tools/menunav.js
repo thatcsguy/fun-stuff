@@ -55,7 +55,7 @@ const fails = []; const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') +
   ok(s.gnm === true && await page.evaluate(() => !!window.__game.G.boss.def.nm), 'pad: A on duelist starts the nightmare version');
   await page.evaluate(() => { window.__padOn = false; });
   await page.evaluate(() => window.__game.Game.restart()); await page.waitForFunction('window.__game.G.state === "loading"', null, { timeout: 20000 }).catch(() => {}); await fight();
-  ok(await page.evaluate(() => window.__game.G.nightmare && window.__game.G.boss.def.nm && window.__game.G.boss.def.phases.some((p) => p.budget)), 'restart keeps Nightmare');
+  ok(await page.evaluate(() => window.__game.G.nightmare && window.__game.G.boss.def.nm && window.__game.G.boss.def.enrageBase === 40), 'restart keeps Nightmare');
   await page.evaluate(() => window.__game.Game.quit()); await menu();
   await page.click('#set-diff span[data-v="normal"]'); await frames();
   await page.click('#doors .door[data-door="cathedral"]'); await fight(); s = await st();
@@ -63,10 +63,10 @@ const fails = []; const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') +
   await page.evaluate(() => window.__game.Game.quit()); await menu();
   // atelier on Nightmare starts its nightmare version; on Normal, the normal fight
   await page.click('#set-diff span[data-v="nightmare"]'); await frames(); await page.click('#doors .door[data-door="atelier"]'); await fight();
-  ok(await page.evaluate(() => window.__game.G.nightmare && window.__game.G.boss.def.nm && window.__game.G.boss.def.id === 'atelier' && window.__game.G.boss.def.phases.length === 3 && window.__game.G.boss.def.phases[2].budget > 0), 'Nightmare atelier click starts the nightmare version');
+  ok(await page.evaluate(() => window.__game.G.nightmare && window.__game.G.boss.def.nm && window.__game.G.boss.def.id === 'atelier' && window.__game.G.boss.def.phases.length === 3 && window.__game.G.boss.def.phases[2].at === 0.68), 'Nightmare atelier click starts the nightmare version');
   await page.evaluate(() => window.__game.Game.quit()); await menu(); await page.click('#set-diff span[data-v="normal"]'); await frames();
   await page.click('#doors .door[data-door="atelier"]'); await fight();
-  ok(await page.evaluate(() => !window.__game.G.nightmare && !window.__game.G.boss.def.nm && window.__game.G.boss.def.id === 'atelier' && window.__game.G.boss.def.enrage === 450 && !window.__game.G.boss.def.phases.some((p) => p.budget)), 'Normal atelier click starts Normal');
+  ok(await page.evaluate(() => !window.__game.G.nightmare && !window.__game.G.boss.def.nm && window.__game.G.boss.def.id === 'atelier' && window.__game.G.boss.def.enrage === 450 && window.__game.G.boss.def.enrageBase === undefined), 'Normal atelier click starts Normal');
   await page.evaluate(() => window.__game.Game.quit()); await menu();
   // a fight with a nightmare version clicked on Normal stays Normal
   await page.click('#doors .door[data-door="duelist"]'); await fight();

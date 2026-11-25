@@ -1,7 +1,8 @@
 // node nmphase.js [boss] : forces each nightmare phase change in the middle of a mechanic and checks that the next phase's enter
-// leaves no per-mechanic state behind. Door III (duelist): Stillness tell, Stillness, a Counter, Final Verse, the overtime blow.
-// Door XIX (atelier): a Roller, a live Blot, a Critique cast, the overtime varnish; in the finale a Fresh Coat, a repair drop, the
-// signature, and the overtime cutting them off.
+// leaves no per-mechanic state behind. Issen (duelist): Stillness tell, Stillness, a Counter, Final Verse.
+// Pentimento (atelier): a Roller, a live Blot, a Critique cast, a matched Critique. In the last phase the last blow (the enrage's
+// themed end) cuts off a swap, a Counter, the Verse, paired Moons (Issen) or a Fresh Coat, a Critique, a Roller, a repair, a pair,
+// the signature (Pentimento), and nothing may remain after its first beat. Then a restart must reset the ramp state.
 // Co.stopTag('phase') skips a coroutine's cleanup, so anything a cut-off mechanic set must be reset by the next enter.
 const { launch } = require('./harness.js');
 (async () => {
@@ -18,7 +19,7 @@ const { launch } = require('./harness.js');
       if (S.still) bad.push('still'); if (S.warn > 0) bad.push('warn'); if (S.kneel > 0) bad.push('kneel=' + S.kneel); if (S.open > 0) bad.push('open');
       if (boss === 'duelist' && b.dmgTaken !== 1) bad.push('dmgTaken=' + b.dmgTaken); if (!b.group.visible) bad.push('hidden'); if (!b.targetable) bad.push('untargetable');
       if (S.weapon && !S.weapon.visible) bad.push('sheathed'); if (G.timeScale !== 1) bad.push('timeScale=' + G.timeScale); if (S.verse) bad.push('verse');
-      if (b.overtime) bad.push('overtime'); if (b.immune) bad.push('immune');
+      if (b.lastBlowing) bad.push('lastBlow'); if (b.immune) bad.push('immune');
       if (S.extraCheck) bad.push(...S.extraCheck(b));
       if (boss === 'atelier') bad.push(...atelierBad(b));
       out.push((bad.length ? 'FAIL ' : 'ok   ') + label + (bad.length ? ': ' + bad.join(', ') : ''));
@@ -44,44 +45,42 @@ const { launch } = require('./harness.js');
       if (boss === 'atelier') { out.push((snap && snap.length ? 'FAIL ' : snap ? 'ok   ' : 'FAIL ') + label + ` (phase ${ph + 1} -> ${ph + 2})` + (snap ? (snap.length ? ': ' + snap.join(', ') : '') : ': next run never started')); return; }
       step(0.1); check(label + ` (phase ${ph + 1} -> ${ph + 2})`);
     };
-    const tele = (P) => (b) => { if (!b.overtime) b.phaseT = Math.max(b.phaseT, P.budget - 0.01); return b.overtime && G.timeScale === 1 && g.Hz.list.length > 0; };
     for (let ph = 0; ph < n - 1 && boss === 'atelier'; ph++) {
-      const P = def.phases[ph];
       cut(ph, 'during a Roller', (b) => !!b.state.roll);
       cut(ph, 'with a live Blot', (b) => b.state.blotList.length > 0);
       cut(ph, 'during a Critique cast', (b) => b.state.crit > 0);
       cut(ph, 'during a matched Critique (he is down)', (b) => b.state.down > 0);
-      cut(ph, 'during the overtime varnish', (b) => { if (!b.overtime) b.phaseT = Math.max(b.phaseT, P.budget - 0.01); return b.overtime && b.state.varnR < 15; });
     }
     for (let ph = 0; ph < n - 1 && boss === 'duelist'; ph++) {
-      const P = def.phases[ph];
       cut(ph, 'during the Stillness tell', (b) => b.state.warn > 0);
       cut(ph, 'during Stillness', (b) => b.state.still);
       cut(ph, 'during a Counter', (b) => { const S = b.state; if (S.still && G.now >= S.graceT && !S.countered) b.damage(10, { src: 'player' }); return S.countered && b.state.still; });
       cut(ph, 'during Final Verse', (b) => !b.group.visible || b.state.verse);
-      cut(ph, 'during overtime (sheathed, slow time)', (b) => { if (!b.overtime) b.phaseT = Math.max(b.phaseT, P.budget - 0.01); return b.overtime && G.timeScale < 1; });
-      cut(ph, 'during the overtime telegraph', (b) => { if (!b.overtime) b.phaseT = Math.max(b.phaseT, P.budget - 0.01); return b.overtime && G.timeScale === 1 && g.Hz.list.length > 0; });
     }
-    // the last phase has no next phase: its mechanics are cut off by the overtime instead (door III: Niten's swap, a Counter by the
-    // still body, the twin Final Verse, paired Moons). After the overtime's first beat, no mechanic state may remain.
+    // the last phase has no next phase: its mechanics are cut off by the last blow instead (Issen: Niten's swap, a Counter by the
+    // still body, the twin Final Verse, paired Moons). After the last blow's first beat, no mechanic state may remain.
+    // FK / NT: force Pentimento's sitting count or Niten's ramp clock first, so the late-ramp mechanics are in play.
     const last = n - 1, LP = def.phases[last];
-    const over = (label, cond, bad2) => {
+    const over = (label, cond, bad2, force) => {
       g.start(boss, { cls: 'stormcaller', phase: last }); G.headless = true; g.bot(3); g.god(true);
-      const b = G.boss; let t = 0;
-      while (t < 150 && !(b.phase === last && !b.transitioning && cond(b))) { step(0.05); b.hp = Math.max(b.hp, b.maxHp * (boss !== 'atelier' ? 0.1 : b.state.sigDone ? 0.02 : 0.08)); t += 0.05; }
-      if (t >= 150) { out.push('n/a  overtime ' + label); return; }
-      b.phaseT = LP.budget; step(0.05); step(1.0);
+      const b = G.boss; let t = 0, forced = !force;
+      while (t < 150 && !(b.phase === last && !b.transitioning && forced && cond(b))) { step(0.05); if (!forced && b.phase === last && !b.transitioning) { force(b.state); forced = true; } b.hp = Math.max(b.hp, b.maxHp * (boss !== 'atelier' ? 0.1 : b.state.sigDone ? 0.02 : 0.08)); t += 0.05; }
+      if (t >= 150) { out.push('n/a  last blow ' + label); return; }
+      G.ft = Math.max(G.ft, def.enrage + (def.lastBlowAt || 24)); step(0.05); step(1.0);
+      if (!b.lastBlowing) { out.push('FAIL last blow ' + label + ': did not start'); return; }
       const S = b.state, bad = bad2 ? bad2(b) : [];
       if (!bad2) for (const act of [S.A, S.R].filter(Boolean)) { if (act.warn > 0) bad.push(act.name + '.warn'); if (act.hold) bad.push(act.name + '.hold'); if (act.open > 0) bad.push(act.name + '.open'); if (act.ent.dmgTaken !== 1) bad.push(act.name + '.dmgTaken'); }
       if (!bad2) { if (!b.group.visible) bad.push('hidden'); if (!b.targetable) bad.push('untargetable'); } if (S.R && S.niten && (!S.R.root.visible || !S.R.ent.targetable)) bad.push('reflection hidden'); if (S.verse) bad.push('verse'); if (S.cine) bad.push('cinematic'); if (S.moonHint) bad.push('moonHint');
-      out.push((bad.length ? 'FAIL ' : 'ok   ') + 'overtime ' + label + ` (phase ${last + 1})` + (bad.length ? ': ' + bad.join(', ') : ''));
+      out.push((bad.length ? 'FAIL ' : 'ok   ') + 'last blow ' + label + ` (phase ${last + 1})` + (bad.length ? ': ' + bad.join(', ') : ''));
     };
-    const overA = (label, cond) => over(label, cond, (b) => { const S = b.state, bad = atelierBad(b).filter((q) => q !== 'varnish ring'); if (S.varnR > 25) bad.push('no varnish ring'); return bad; });
+    const overA = (label, cond, force) => over(label, cond, (b) => { const S = b.state, bad = atelierBad(b).filter((q) => q !== 'varnish ring'); if (S.varnR > 25) bad.push('no varnish ring'); return bad; }, force);
     if (boss === 'atelier') {
       overA('during a Fresh Coat (the swirl rising)', (b) => b.state.call && b.state.top < 7 && b.state.top > 0);
       overA('during a finale Critique cast', (b) => b.state.split && b.state.crit > 0);
       overA('during a Roller in the finale', (b) => b.state.split && !!b.state.roll);
       overA('right after a repair drop (lazy autopilot)', (b) => { g.Bot.lazy = true; const L = b.state.critLog; return b.state.crit > 0 && L.length && /paint|wash/.test(L[L.length - 1].fix); });
+      overA('during a Roller at seam speed (step 3)', (b) => b.state.split && !!b.state.roll && b.state.lineW > 0.2, (S) => { S.fk = 6; });
+      overA('between the Critiques of a pair (step 4)', (b) => b.state.split && b.state.finStep === 4 && b.state.crit > 0 && b.state.crit < 3.9 && b.state.critLog.length >= 2 && b.state.critLog[b.state.critLog.length - 1].T === 4, (S) => { S.fk = 8; });
       overA('during the signature', (b) => { if (!b.state.sigDone) b.hp = Math.min(b.hp, b.maxHp * 0.095); return b.state.sig > 0; });
     }
     if (boss === 'duelist') {
@@ -89,6 +88,19 @@ const { launch } = require('./harness.js');
     over('during a Counter by the still body', (b) => { const S = b.state; if (!S.niten || !S.lead) return false; const F = S.lead === S.A ? S.R : S.A; if (F.still && G.now >= F.graceT && !S.countered) F.ent.damage(10, { src: 'player' }); return F.hold; });
     over('during the twin Final Verse', (b) => b.state.niten && !b.group.visible);
     over('during paired Moons', (b) => !!b.state.moonHint);
+    over('during a swap at step 5 (0.9 s tell)', (b) => b.state.niten && b.state.nitenStep === 5 && b.state.lead && b.state.lead.warn > 0, null, (S) => { S.nitenT = 5 * def.nmTest.RAMP; });
+    over('during twin Petal Storm (step 4)', (b) => b.state.niten && b.state.nitenStep >= 4 && g.Bul.list.length > 0, null, (S) => { S.nitenT = 4 * def.nmTest.RAMP; });
+    }
+    // a restart after a late, ramped fight: the ramp state is back at its start values
+    {
+      g.start(boss, { cls: 'stormcaller', phase: last }); G.headless = true; g.bot(3); g.god(true); const b = G.boss; let t = 0;
+      while (t < 60 && (b.phase !== last || b.transitioning)) { step(0.1); t += 0.1; }
+      if (boss === 'duelist') b.state.nitenT = 5 * def.nmTest.RAMP; else b.state.fk = 8; step(40);
+      g.start(boss, { cls: 'stormcaller' }); step(0.1); const S = G.boss.state, bad = [];
+      if (boss === 'duelist') { if (S.nitenT > 0.2 || S.nitenStep || S.tellT !== 1.2 || S.haste > 1) bad.push(`nitenT ${S.nitenT} step ${S.nitenStep} tell ${S.tellT} haste ${S.haste}`); }
+      else if (S.fk || Math.abs(S.lineW - def.nmTest.SEAM_W[0]) > 1e-9 || S.finStep) bad.push(`fk ${S.fk} lineW ${S.lineW} step ${S.finStep}`);
+      if (G.boss.lastBlowing || G.boss.enraged) bad.push('enrage state');
+      out.push((bad.length ? 'FAIL ' : 'ok   ') + 'restart resets the ramp' + (bad.length ? ': ' + bad.join(', ') : ''));
     }
     g.Bot.lazy = false; g.god(false); return out;
   }, boss);

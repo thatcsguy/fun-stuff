@@ -266,8 +266,7 @@ class Boss extends Ent {
   goPhase(i) {
     const b = this, ph = this.def.phases[i];
     this.logPhase();
-    if (this.overtime) { G.timeScale = 1; if (this.otMusic && this.def.music) Music.play(this.def.music, ph.music !== undefined ? ph.music : i); }
-    this.phaseT = 0; this.liveT = 0; this.overtime = false; this.otMusic = false; this.phaseDmg0 = G.player ? G.player.stats.dmg : 0;
+    this.phaseT = 0; this.liveT = 0; this.phaseDmg0 = G.player ? G.player.stats.dmg : 0;
     Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null; this.phase = i; this.nextPhase = i + 1; this.transitioning = true;
     Co.start(function* () {
       if (ph.enter) { b.immune = true; yield* ph.enter(b); b.immune = false; }
@@ -276,7 +275,7 @@ class Boss extends Ent {
     }, 'phase');
   }
   // Super damage (testing setting): a landed player hit drops health to just under the next phase threshold, and the
-  // normal threshold check in update() then runs goPhase, so enter hooks, transitions and nightmare clocks behave as usual.
+  // normal threshold check in update() then runs goPhase, so enter hooks and transitions behave as usual.
   // In the last phase the hit kills. Only once the current phase has been live for a moment, so a volley, a multi-hit
   // attack or a hit during a transition never skips more than one phase.
   superPush() {
@@ -288,37 +287,31 @@ class Boss extends Ent {
     if (this.hp > lim - 1) this.hp = Math.max(1, Math.floor(lim - 1));
     this.liveT = 0; // and wait again (goPhase resets it too)
   }
-  // ---- per-phase clocks (a phase with `budget` seconds). Only nightmare versions use them; a def without budgets keeps the flat enrage.
-  get budgeted() { return this.def.phases.some((p) => p.budget); }
-  // record how the phase that is ending went: time on its clock, budget, damage dealt, whether it ran out
+  // ---- the nightmare split log: how long each phase was live and the damage dealt in it (end-screen table, Save.nm splits)
   logPhase() {
-    if (!this.budgeted || this.phase < 0) return; const L = this.phaseLog || (this.phaseLog = []); if (L[this.phase]) return;
-    const ph = this.def.phases[this.phase];
-    L[this.phase] = { time: Math.round((this.phaseT || 0) * 10) / 10, budget: ph.budget || 0, dmg: Math.round((G.player ? G.player.stats.dmg : 0) - (this.phaseDmg0 || 0)), over: !!this.overtime };
+    if (!this.def.nm || this.phase < 0) return; const L = this.phaseLog || (this.phaseLog = []); if (L[this.phase]) return;
+    L[this.phase] = { time: Math.round((this.phaseT || 0) * 10) / 10, dmg: Math.round((G.player ? G.player.stats.dmg : 0) - (this.phaseDmg0 || 0)) };
   }
-  startOvertime() {
-    const d = this.def, ph = d.phases[this.phase];
-    this.overtime = true; Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null;
-    Co.start((ph.overtime || d.overtime || Boss.defaultOvertime)(this), 'phase');
-  }
-  // generic "out of time": a whole-arena unblockable telegraph, then a blow nothing survives (src 'enrage' -> "Out of time")
-  static *defaultOvertime(b) {
-    FX.flash(0xff2010, 0.5, 1.5); Sound.sfx('roar');
-    Hz.circle(b.pos.x, b.pos.z, 80, 6, 0, { blockable: false, name: 'Out of time', color: 0xff3010, quiet: true, onFire: () => { const p = G.player; FX.flash(0xff2010, 0.6, 2); FX.ring(b.pos.x, b.pos.z, { r1: 40, color: 0xff3010, dur: 0.8 }); if (p && p.alive) p.hurt(9999, { blockable: false, src: 'enrage', pierce: true }); } });
-    yield 6.5; while (true) yield 1;
+  // the last blow (def.lastBlow, a coroutine): lastBlowAt seconds after the enrage, the phase stops (its coroutine, hazards,
+  // bullets and cast) and the blow plays out. The boss stays hittable until it lands; the enrage pulses keep going.
+  startLastBlow() {
+    this.lastBlowing = true; this.transitioning = false; this.immune = false; Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null;
+    Co.start(this.def.lastBlow(this), 'phase');
   }
   update(dt) {
     super.update(dt);
     if (!this.alive || G.state !== 'fight') return;
     const d = this.def;
     if (!this.transitioning) this.liveT = (this.liveT || 0) + dt;
-    if (!this.transitioning && this.nextPhase < d.phases.length && this.hp / this.maxHp <= d.phases[this.nextPhase].at) this.goPhase(this.nextPhase);
-    if (this.budgeted) {
-      const ph = d.phases[this.phase];
-      if (ph && ph.budget && !this.transitioning && !G.rehearsing) { this.phaseT += dt; if (!this.overtime && this.phaseT >= ph.budget) this.startOvertime(); }
-    } else if (d.enrage && G.ft > d.enrage) {
+    if (!this.transitioning && !this.lastBlowing && this.nextPhase < d.phases.length && this.hp / this.maxHp <= d.phases[this.nextPhase].at) this.goPhase(this.nextPhase);
+    if (d.nm && !this.transitioning && !G.rehearsing) this.phaseT += dt;
+    // the enrage: from d.enrage on, an unblockable pulse every 2 s of enrageBase + enrageGrow per second over (120 + 14 by
+    // default). Nightmare blocks set a softer creep and a themed lastBlow that ends the fight lastBlowAt seconds in.
+    if (d.enrage && G.ft > d.enrage && !G.rehearsing) {
       if (!this.enraged) { this.enraged = true; this.enrageT = 0; FX.flash(0xff2010, 0.5, 1.5); Sound.sfx('roar'); }
-      this.enrageT -= dt; if (this.enrageT <= 0) { this.enrageT = 2; const p = G.player; if (p && p.alive) { p.hurt(120 + (G.ft - d.enrage) * 14, { blockable: false, src: 'enrage' }); FX.flash(0xff2010, 0.3, 3); FX.ring(this.pos.x, this.pos.z, { r1: 40, color: 0xff3010, dur: 0.8 }); } }
+      const base = d.enrageBase !== undefined ? d.enrageBase : 120, grow = d.enrageGrow !== undefined ? d.enrageGrow : 14;
+      this.enrageT -= dt; if (this.enrageT <= 0) { this.enrageT = 2; const p = G.player; if (p && p.alive) { p.hurt(base + (G.ft - d.enrage) * grow, { blockable: false, src: 'enrage' }); FX.flash(0xff2010, 0.3, 3); FX.ring(this.pos.x, this.pos.z, { r1: 40, color: 0xff3010, dur: 0.8 }); } }
+      if (d.lastBlow && !this.lastBlowing && G.ft >= d.enrage + (d.lastBlowAt !== undefined ? d.lastBlowAt : 24)) this.startLastBlow();
     }
   }
 }

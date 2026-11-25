@@ -186,7 +186,7 @@
   }
   // nightmare floor: the canvas stays painted in the positive look; on the black side of the seam the shader builds the negative
   // per pixel (bare canvas near black, paint as pure emission in its own hue, unmixed from the canvas with the coverage in the
-  // surface canvas's blue channel), with a 2 cm feathered edge. The closing varnish ring of the overtime lives here too.
+  // surface canvas's blue channel), with a 2 cm feathered edge. The closing varnish ring of the last blow lives here too.
   const FLOOR_NM_MAP = `
     vec2 nmW = vec2(vMapUv.x * 2.0 - 1.0, 1.0 - vMapUv.y * 2.0) * ${R}.0;
     float nmK = uSplit * (1.0 - smoothstep(-0.02, 0.02, dot(nmW, uLine)));
@@ -534,17 +534,14 @@
       { v: 'kick', from: 3, pat: '..x.......x...x.', vol: 0.16 },
     ]) });
   }
-  // Nightmare phase clocks in seconds (strict, no carry-over) on 24,000 health, tuned with tools/nmclock.js (RAW=1: god-mode level-3
-  // autopilot, eight runs per class and phase, measured at 27,000 and checked at 24,000). At the plan's 31,000 the clocks would have needed far more than the 300 s cap, so the
-  // health came down instead (the plan's lever). Rule: the worst run of Stormcaller and Hexslinger keeps at least 5% of each clock.
-  // The Ashwarden and Duskblade autopilots are the slow outliers on this door (on Normal too): paint fetching pulls their melee away
-  // from him, and their times spread by 2x from run to run; they get the rest of the 300 s and clear most runs of each phase.
-  // Measured at 27,000 (storm / ash / hex / dusk, worst; best in brackets; at 24,000 these times shrink by about 11%):
-  //   I   87 (69) / 200 (91) / 81 (70) / 123 (76)    II  69 (43) / 140 (53) / 76 (49) / 119 (53)    III  94 (54) / 93 (40) / 87 (49) / 85 (50)
-  // Checked at 24,000 with [105, 90, 105], eight runs: storm and hex clear every run (worst I 88 / 73, II 61 / 53, III 87 / 89); the
-  // time then moved toward phase I, where the slow autopilots lose most. With these clocks (eight runs): storm and hex clear every run
-  // with 18-32% left (worst I 88 / 87, II 64 / 64, III 82 / 68); dusk clears 7/8, 6/8, 7/8 of I-III; ash 2/8, 6/8, 8/8.
-  const NM_CLOCK = [115, 85, 100];
+  // Nightmare health (the tuning lever; class numbers and the ramp stay). Tuned with tools/nmpace.js (god-mode level-3 autopilot,
+  // whole fights from phase 1, eight runs per class). Paint luck spreads kill times a lot. At 34,000 and enrage 360 s:
+  //   stormcaller 7/8 kills, median 5:10 (best 4:23, worst 5:47)
+  //   hexslinger  8/8 kills, median 3:45 (best 3:34, worst 4:48): fastest; its best runs reach step 3 or 4
+  //   ashwarden   3/8 kills, median 5:50 (best 5:22, worst 6:08)
+  // At 32,000 and 340 s: duskblade 7/8 (median 5:02). Colour and the Negative go much faster than planned (180-250 dps matched),
+  // so Chiaroscuro is 63-84% of the time rather than 60-70%; the thresholds were left as planned.
+  const NM_HP = 34000;
   const SEAM_FS = `uniform float uT, uP, uW, uPulse, uSide; uniform vec3 uPC; varying vec2 vUv;
     void main(){
       float c = (vUv.x - 0.5) * 1.2, zl = (0.5 - vUv.y) * ${2 * R}.0;
@@ -566,7 +563,7 @@
   // everything the finale shows is built here, hidden (nothing is made mid-fight)
   function nmBuild(b, S, g) {
     Object.assign(S, { nm: true, cov: true, split: 0, lineA: 0, lineW: TAU / 40, call: null, fin: 0, finK: 0, toneK: 0, top: 7.5, varnR: 99, seamOn: false, seamP: 1, seamW: 1, pulse: 0,
-      tones: [], cbag: [], fk: 0, sigDone: false, sig: 0, holdWash: 0, faceSide: false, routeFail: 0, critLog: [], look: 1, lookT: 1 }); // the fight opens in colour
+      tones: [], cbag: [], fk: 0, stepAt: [], finStep: 0, sigDone: false, sig: 0, holdWash: 0, faceSide: false, routeFail: 0, critLog: [], look: 1, lookT: 1 }); // the fight opens in colour
     S.bodyU = { uToneK: { value: 0 }, uFinK: { value: 0 }, uBand: { value: 0 }, uTop: { value: 7.5 }, uBT: S.pT, uCallC: { value: new THREE.Color(1, 1, 1) }, uKeyV: { value: new V3(0, 1, 0) }, uRigInv: { value: new THREE.Matrix4() } };
     const bm = new Set(); S.rig.traverse((o) => { if (o.isMesh) bm.add(o.material); }); bm.delete(S.tipM); for (const m of bm) toneify(S, m);
     S.seamU = { uT: S.pT, uP: { value: 1 }, uW: { value: 1 }, uPulse: { value: 0 }, uSide: { value: 1 }, uPC: { value: new THREE.Color(1, 1, 1) } };
@@ -579,7 +576,7 @@
   // stagger, a Critique cast, the flood, a half-drawn swirl, the brush pointing at a half, the varnish ring, a cinematic camera, slow
   // time) is reset here, in every nightmare phase's enter. The look of the world (colour, Negative, the split) is not per-mechanic.
   function resetMech(b) {
-    const S = b.state; S.down = 0; S.roll = null; S.crit = 0; S.flood = 0; S.faceSide = false; S.top = 7.5; S.sig = 0; S.varnR = 99; S.holdWash = 0;
+    const S = b.state; S.down = 0; S.roll = null; S.crit = 0; S.flood = 0; S.faceSide = false; S.top = 7.5; S.sig = 0; S.varnR = 99; S.holdWash = 0; S.lineW = SEAM_W[0];
     for (const e of S.blotList.slice()) if (e.alive) e.die(); S.blotList = []; S.blots = 0;
     if (S.cine) { S.cine = false; Cam.release(); } G.timeScale = 1;
   }
@@ -693,13 +690,38 @@
     if (p && p.alive) ext = repair(b, call, T);
     S.faceSide = true; yield* critique(b, T + ext, o); S.faceSide = false;
   }
-  // one sitting: Fresh Coat with the call, three strokes (what the answer needs first), one pressure mechanic, the route check, Critique
+  // Chiaroscuro ramps by sitting count, two sittings per step (a sitting is about 20 s with its stagger, so a step is about 40 s):
+  //   0: Splatter only            1: one Blot and Drips          2: a Blot, and the Roller (odd sittings) or the Knife (even)
+  //   3: as 2, the seam turns faster (one turn in 40 s -> 28 s)  4: as 3, Critiques in pairs (same half, new colour)
+  // Past step 4 nothing more is added; the enrage is the remaining pressure.
+  const SEAM_W = [TAU / 40, TAU / 28], SIT_PER_STEP = 2;
+  const finStepOf = (S) => Math.min(4, Math.floor(S.fk / SIT_PER_STEP));
+  // the second call of a pair: the same tone (same half), another colour, never one you already answer where you stand
+  function pairCall(b, call) {
+    const S = b.state, p = G.player, list = shuffle([0, 1, 2, 3, 4, 5, 6].filter((c) => c !== call.col)).map((col) => ({ tone: call.tone, col }));
+    return list.find((q) => !(p && S.wear === wantWear(q) && sideOf(S, p.pos.x, p.pos.z) === wantSide(q))) || list[0];
+  }
+  // one sitting: Fresh Coat with the call, three strokes (what the answer needs first), the step's pressure, the route check, Critique
   function* sitting(b, call, T, k) {
-    const S = b.state, nd = wantWear(call), nb = bitsOf(nd), others = [RED, YEL, BLU].filter((m) => nb.indexOf(m) < 0);
+    const S = b.state, nd = wantWear(call), nb = bitsOf(nd), others = [RED, YEL, BLU].filter((m) => nb.indexOf(m) < 0), st = S.nm ? finStepOf(S) : 0;
+    if (S.nm && S.stepAt[st] === undefined) S.stepAt[st] = Math.round(G.ft * 10) / 10;
+    S.finStep = st;
+    // step 3 on: the seam speeds up, eased over 1.5 s during the Fresh Coat, so it is steady again before the route check projects it
+    const wT = SEAM_W[st >= 3 ? 1 : 0];
+    if (S.lineW !== wT) { const w0 = S.lineW; Co.start(function* () { let t = 0; while (t < 1.5) { t += G.dt; S.lineW = lerp(w0, wT, smooth(Math.min(1, t / 1.5))); yield; } S.lineW = wT; }, 'phase'); }
     yield* freshCoat(b, call); S.faceSide = false;
     yield* strokes(b, shuffle(nb.concat(others).slice(0, 3)));
-    const r = k % 4; if (r === 0) yield* splatter(b, 4); else if (r === 1) yield* roller(b); else if (r === 2) yield* knife(b); else { blot(b, pick(others.length ? others : nb)); yield* drips(b, 4); }
-    yield* judge(b, call, T);
+    const bl = () => blot(b, pick(others.length ? others : nb));
+    if (st === 0) yield* splatter(b, 3);
+    else if (st === 1) { bl(); yield* drips(b, 4); }
+    else { bl(); if (k % 2 === 1) yield* roller(b); else yield* knife(b); }
+    if (st < 4) { yield* judge(b, call, T); return; }
+    // step 4: a pair. The first verdict does not knock him down; a quick coat, two strokes, and the second Critique at 4.0 s.
+    yield* judge(b, call, T, { stagger: false });
+    const c2 = pairCall(b, call), n2 = bitsOf(wantWear(c2)), o2 = [RED, YEL, BLU].filter((m) => n2.indexOf(m) < 0);
+    yield 0.4; yield* freshCoat(b, c2, true); S.faceSide = false;
+    yield* strokes(b, shuffle(n2.concat(o2)).slice(0, 2));
+    yield* judge(b, c2, 4.0);
   }
   // the signature, once, under 10%: three fast Critiques with the same answer paint (the one you wear, if it is a colour), the half
   // flipping each time. What he shows changes completely (white + red, black + green, white + red); what you do is keep your red and step.
@@ -726,7 +748,7 @@
   // Chiaroscuro: he walks to the centre, the camera rises over the rim, and he drags the palette knife once across the whole canvas.
   // White flash: the world tears along the cut, one half snaps back to white, the other stays black, and the line starts to turn.
   function* finEnter(b) {
-    const S = b.state; resetMech(b); Object.assign(S, { call: null, fk: 0, tones: [], cbag: [], used: null, sigDone: false }); Music.intensity(0);
+    const S = b.state; resetMech(b); Object.assign(S, { call: null, fk: 0, tones: [], cbag: [], used: null, sigDone: false, stepAt: [], finStep: 0, lineW: SEAM_W[0] }); Music.intensity(0);
     yield* b.moveTo(0, 0, 7);
     const p = G.player, a = (p ? Math.atan2(p.pos.x, p.pos.z) : 0) + PI / 2, fx = Math.sin(a), fz = Math.cos(a);
     S.cine = true; Co.start(Cam.shot([-fx * 25, 15, -fz * 25], [fx * 6, 0, fz * 6], [-fx * 22 + fz * 4, 20, -fz * 22 - fx * 4], [fx * 2, 0, fz * 2], 3.6, 50), 'phase');
@@ -741,10 +763,10 @@
     Co.start(Post.lerpTo({ bloom: 0.28, threshold: 0.92, contrast: 1.08, exposure: 0.95, tint: [1.0, 1.0, 1.0], sat: 1.1 }, 1.0), 'fight');
     yield 0.5; Sound.sfx('bell', 0.7, 0.5); yield 0.6; S.cine = false; Cam.release();
   }
-  // Out of time (every nightmare phase): the music stops, and he varnishes the unfinished work: amber varnish floods the canvas from
+  // Out of time (the last blow, 24 s into the enrage, in whatever phase): the music stops, and he varnishes the unfinished work: amber varnish floods the canvas from
   // the rim inward as a closing ring, sealing the paint (and you) under it. He can still be killed while it closes.
   function* varnishOver(b) {
-    const S = b.state; resetMech(b); Music.stop(0.1); b.otMusic = true; Sound.sfx('wave', 0.9, 0.35); FX.flash(VARN, 0.25, 1.5);
+    const S = b.state; resetMech(b); Music.stop(0.1); Sound.sfx('wave', 0.9, 0.35); FX.flash(VARN, 0.25, 1.5);
     const T = 6;
     Hz.circle(0, 0, 80, T, 0, { blockable: false, name: 'Varnish', color: VARN, quiet: true, alpha: 0.35, onFire: () => {
       const p = G.player; FX.flash(VARN, 0.6, 2); Sound.sfx('bigboom', 0.8); if (p && p.alive) p.hurt(9999, { blockable: false, src: 'enrage', pierce: true });
@@ -806,19 +828,20 @@
       }, run: colourRun },
       { at: 0.33, skipTo(b) { b.state.look = 2; }, enter: negEnter, run: negRun },
     ],
-    // ---- Nightmare ("Chiaroscuro"). Opens in colour (today's phase 2), then the Negative, then the split canvas. Per-phase clocks.
+    // ---- Nightmare ("Chiaroscuro"). Opens in colour (today's phase 2), then the Negative, then the split canvas, which is two
+    // thirds of the fight and ramps every two sittings. One creeping enrage (40 + 4 per second over) and the varnish 24 s into it.
     nightmare: {
-      hp: 24000,
+      hp: NM_HP, enrage: 360, enrageBase: 40, enrageGrow: 4,
       post: Object.assign({}, POST, { tint: [1.02, 1.0, 0.98], sat: 1.12 }),
       music: nmMusic(MUSIC),
-      overtime: varnishOver, death: paintingDeath,
+      lastBlow: varnishOver, death: paintingDeath,
       phases: [
-        { at: 1, budget: NM_CLOCK[0], music: 1, *run(b) { resetMech(b); yield 0.6; yield* colourRun(b); } },
-        { at: 0.62, budget: NM_CLOCK[1], music: 2, skipTo(b) { b.state.look = 2; Object.assign(Post.cur, NEG_POST); Post.apply(); }, *enter(b) { resetMech(b); yield* negEnter(b); }, run: negRun },
-        { at: 0.30, budget: NM_CLOCK[2], music: 3, skipTo(b) { setLvl(b, 2); b.state.look = 2; }, enter: finEnter, run: finRun },
+        { at: 1, music: 1, *run(b) { resetMech(b); yield 0.6; yield* colourRun(b); } },
+        { at: 0.85, music: 2, skipTo(b) { b.state.look = 2; Object.assign(Post.cur, NEG_POST); Post.apply(); }, *enter(b) { resetMech(b); yield* negEnter(b); }, run: negRun },
+        { at: 0.68, music: 3, skipTo(b) { setLvl(b, 2); b.state.look = 2; }, enter: finEnter, run: finRun },
       ],
     },
-    nmTest: { wantWear, wantSide, sideAt, route: (S, ...a) => route(S, ...a) },
+    nmTest: { wantWear, wantSide, sideAt, route: (S, ...a) => route(S, ...a), SEAM_W, SIT_PER_STEP, stepOf: finStepOf },
     update(b, dt) {
       const S = b.state, p = G.player, t = G.now, fight = G.state === 'fight' && p && p.alive;
       if (S.down > 0) S.down -= dt; S.washT = (S.washT || 0) + dt; if (S.washT > 18 && !(S.split && S.holdWash > G.ft)) { S.washT = 0; moveWash(S); } // finale: the dish holds still while a Critique it answers is cast

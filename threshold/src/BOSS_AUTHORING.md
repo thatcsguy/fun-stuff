@@ -56,25 +56,41 @@ A door can have a harder version, picked with the Difficulty toggle on the door 
 
 ```js
 nightmare: {
-  hp: 23000, post: { ... }, music: { ... },        // any def field can be overridden
-  overtime: lastPetal,                              // optional: the "out of time" coroutine for every phase (else Boss.defaultOvertime)
+  hp: NM_HP, post: { ... }, music: { ... },        // any def field can be overridden
+  enrage: 355, enrageBase: 40, enrageGrow: 4,      // one overall enrage: a pulse every 2 s of 40, 48, 56 ... from 355 s
+  lastBlow: lastPetal, lastBlowAt: 24,             // optional: the themed end, 24 s into the enrage (default 24)
   death: myKill,                                    // optional: a custom kill sequence
   phases: [
-    { at: 1,   budget: 64, music: 1, *run(b) { ... } },
-    { at: 0.5, budget: 68, *enter(b) { ... }, *run(b) { ... }, overtime: special },   // a phase may have its own overtime
+    { at: 1,    music: 1, *run(b) { ... } },
+    { at: 0.66, *enter(b) { ... }, skipTo(b) { ... }, *run(b) { ... } },   // the last phase: 60-70% of health and time
   ],
 },
 ```
 
-- `budget` (seconds) gives the phase a clock. It runs only in `fight`, while the boss is alive and not in `enter` (cinematics never cost time), and not during the rehearsal. At zero the phase coroutine is stopped, phase hazards and bullets cleared, and the overtime coroutine starts (tagged `'phase'`). The boss stays hittable: a kill or a phase change during overtime still counts. The killing blow should be `p.hurt(9999, { blockable: false, src: 'enrage', pierce: true })`: `'enrage'` makes the death screen say "Out of time", `pierce` gets through god mode and immunities (tests rely on it).
-- A def whose phases have budgets skips the flat `enrage` timer. Leftover time is not carried over.
+- The enrage works on every def: from `enrage` seconds on, an unblockable pulse every 2 s of `enrageBase + enrageGrow * secondsOver` (defaults 120 and 14, what Normal fights use). Nightmare blocks set a softer creep. It never runs during the rehearsal.
+- `lastBlow` (a coroutine) starts `lastBlowAt` seconds into the enrage: the phase coroutine is stopped, phase hazards, bullets and the cast are cleared, and it runs tagged `'phase'`. Phase changes stop from then on; the boss stays hittable until it lands and the pulses keep going. The killing blow should be `p.hurt(9999, { blockable: false, src: 'enrage', pierce: true })`: `'enrage'` makes the death screen say "Out of time", `pierce` gets through god mode and immunities (tests rely on it).
+- There are no per-phase clocks. Pressure in the last phase comes from the boss file's own ramp (layers added on a timer or a mechanic count).
 - `G.nightmare` is set before `build()` runs. Use it to build the nightmare-only things in `build()` (and hide them): nothing should be created mid-fight. `NM(normal, nightmare)` picks a number by difficulty.
-- `Co.stopTag('phase')` skips a coroutine's cleanup. Every per-mechanic visual or flag a cut-off mechanic can leave behind (kneel, rings, a hidden or untargetable body, a grade, slow time) must be reset in the next phase's `enter` and in your overtime. `tools/nmphase.js` checks this.
+- `Co.stopTag('phase')` skips a coroutine's cleanup. Every per-mechanic visual or flag a cut-off mechanic can leave behind (kneel, rings, a hidden or untargetable body, a grade, slow time) must be reset in the next phase's `enter` and in your `lastBlow`. `tools/nmphase.js` checks this.
 - `ent.hpOwner = boss` makes a second body share the boss's health (hits on it land on the boss). `ent.onImmuneHit(info, ent)` is called when an immune body is hit; return true to hide the "IMMUNE" text.
 - Give every nightmare phase after the first a `skipTo(b)` that puts the world in the look that phase starts from (its grade, its colour state), even when its `enter` plays the transition: `?phase=N`, the tools and the rehearsal start phases directly, and `skipTo` is all they get of the phases before.
-- Phase results (`b.phaseLog`) and the fuse need nothing from the boss file.
+- Phase results (`b.phaseLog`: each phase's live time and damage) need nothing from the boss file. For `tools/nmpace.js`, write `b.state.stepAt[step] = G.ft` when each ramp step of the last phase starts, and expose a way to force a step in `nmTest`.
 
-Check it with `NM=1 node tools/smoke.js <id>`, `node tools/nmclock.js <id> all 6` (with `RAW=1` to tune), `node tools/nmphase.js <id>` (add a case for your mechanics), `NM=1 node tools/hitch.js <id>` and `NM=1 node tools/nanscan.js <id>`.
+Checklist (from `nightmare-design.md`):
+
+1. Name the one twist that makes it Nightmare, and show it in the first teaching beat.
+2. Teaching phases: 1 to 2 of them, about 30 to 60 s each, each showing one new rule. First appearance survivable.
+3. Last phase: 60 to 70% of health and of the time. Say how the pressure rises: added layers, shrinking space, tighter timing, or a mix.
+4. Damage gate: say exactly what the player must be doing for damage to land. Raw DPS on the wrong target or state must not progress the fight.
+5. Mistake cost: each failed mechanic either deals about 300 to 400 or costs time (a lost window or opening), one punishment per failure. Heal the boss only when it fits the theme.
+6. One overall enrage (`enrage`, a creeping pulse, an optional themed `lastBlow`). No clocks on phases.
+7. Length: a clean run 4:30 to 5:30; the enrage starts about 5:30 to 6:00. Tune with `tools/nmpace.js`; lower Nightmare health before touching class numbers.
+8. Normal stays exactly as it is.
+9. Cinematic: an intro or transition shot into the last phase, and a custom `nightmare.death`.
+10. Bot: `bot(b)` reads the gate, and a "wrong" bot that ignores the gate must fail.
+11. Test with a full normal entry (with intro), not only `skipTo`.
+
+Check it with `NM=1 node tools/smoke.js <id>`, `node tools/nmpace.js <id> all 6`, `node tools/nmphase.js <id>` (add a case for your mechanics), `NM=1 node tools/hitch.js <id>` and `NM=1 node tools/nanscan.js <id>`.
 
 ## Scripting
 

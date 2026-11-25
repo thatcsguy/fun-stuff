@@ -24,8 +24,8 @@ const { launch } = require('./harness.js');
     };
     await watch('p0', 120);
     for (let ph = 1; ph < n; ph++) { g.setPhase(ph); await watch('p' + ph, frames); }
-    // phase clocks (nightmare): run the clock out in the last phase and watch the overtime play through
-    if (def.phases.some((p) => p.budget)) { const b = g.G.boss; b.phaseT = (def.phases[b.phase].budget || 0) - 0.5; await watch('overtime', 900); }
+    // a themed last blow (nightmare): jump to just before it in the last phase and watch it play through
+    if (def.lastBlow && def.enrage) { g.G.ft = def.enrage + (def.lastBlowAt || 24) - 0.5; await watch('last blow', 900); }
     return { base, total: R.info.programs.length, log };
   }, { boss, cls, frames: +(process.env.FRAMES || 300) });
   console.log(boss, cls, 'programs at fight start', r.base, 'after all phases', r.total); console.log(r.log.join('\n'));
