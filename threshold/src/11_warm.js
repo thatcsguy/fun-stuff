@@ -85,6 +85,12 @@ const Warm = (() => {
       for (const m of matsOf(o)) if (!m.visible) force(m, 'visible', true);
       if (!o.layers.test(camera.layers)) force(o.layers, 'mask', camera.layers.mask);
     });
+    // Effects that outlive a fight (telegraph decals, rings, beams, bullets) are unlit, and three.js leaves an unlit
+    // material on the shader it already has when the lights change. But the number of lights is still part of every
+    // shader's identity, so the next decal or bullet made mid-fight (a pool growing for a bigger mechanic than this
+    // session had seen) would compile a fresh copy on the spot. Ask every material to look its shader up again in this
+    // frame, under this fight's lights: the ones that are current just find it, the stale ones compile now.
+    if (QS.get('warm') !== 'old') scene.traverse((o) => { for (const m of matsOf(o)) m.needsUpdate = true; });
     keep();
     // three.js only compiles and uploads when it draws, so draw a real frame (scene, shadows, bloom, grade) under the loading fade
     const was = renderer.shadowMap.autoUpdate; renderer.shadowMap.autoUpdate = true; renderer.shadowMap.needsUpdate = true;
