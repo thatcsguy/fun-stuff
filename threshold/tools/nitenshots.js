@@ -1,6 +1,7 @@
 // node nitenshots.js <outDir> : Issen Nightmare's Niten (Blade and Storm) at the moments to judge on a real GPU (TH_GPU=1): one shot
 // per ramp step with the Lighthouse Storm blowing, a cut lane mid-storm, the Eye of the Moon, and Twin Petal Storm. The question to
-// answer from them: can you see where the calm spot is at a glance? Moments are reached headless (god mode, health held at 20%).
+// answer from them: can you see where the calm spot is at a glance? Since options A + B also: standing ghosts under the storm,
+// a Waking Cut mid-tell (can you see your wedge?), Twin Petal Storm with the ghost lines calm, and a Final Verse still moment. Moments are reached headless (god mode, health held at 20%).
 const { launch } = require('./harness.js');
 const fs = require('fs');
 (async () => {
@@ -14,10 +15,13 @@ const fs = require('fs');
     if (!ok) { console.log('not reached', name); return; }
     await page.evaluate(() => window.__game.warm(0.6)); await page.waitForTimeout(400); await page.screenshot({ path: out + '/' + name + '.png' }); console.log('shot', name);
   };
-  for (let st = 0; st < 6; st++) await go('step-' + st, "S.storm === 'on' && S.nitenStep >= " + st + " && g.Bul.list.filter(q=>q.storm).length > 30", st);
-  await go('a-storm-lane', "S.storm === 'on' && S.lanes.length > 0 && (g.G.now - S.lanes[S.lanes.length-1].t0) > 0.5 && g.Bul.list.filter(q=>q.storm).length > 25", 0);
-  await go('b-eye', "S.eye && g.G.now - S.eye.t0 > 0.7 && S.storm === 'on'", 2);
-  await go('c-twin-storm', "S.unison && b.group.visible && g.Bul.list.filter(q=>q.petal && !q.storm).length > 40", 4);
-  await go('d-step3-storm', "S.storm === 'on' && S.nitenStep >= 3 && g.Bul.list.filter(q=>q.storm).length > 40", 3);
+  // (the storm never sleeps + standing cuts build): ONLY=name,name limits the list
+  const want = (n) => !process.env.ONLY || process.env.ONLY.split(',').includes(n);
+  for (const st of [0, 2, 4]) if (want('step-' + st)) await go('step-' + st, "S.storm === 'on' && S.nitenStep >= " + st + " && g.Bul.list.filter(q=>q.storm).length > 20", st);
+  if (want('a-standing-ghosts')) await go('a-standing-ghosts', "S.storm === 'on' && S.ghosts.filter(q=>q.cut).length >= 4 && S.lanes.length > 0", 3);
+  if (want('b-waking-cut')) await go('b-waking-cut', "S.waking && S.waking.n >= 4 && g.G.now - (S.wakeT || (S.wakeT = g.G.now)) > 0.8 || (S.waking ? false : (S.wakeT = 0))", 4);
+  if (want('c-twin-storm-ghosts')) await go('c-twin-storm-ghosts', "S.unison && b.group.visible && S.lanes.length > 0 && g.Bul.list.filter(q=>q.petal && !q.storm).length > 40", 4);
+  if (want('d-eye')) await go('d-eye', "S.eye && g.G.now - S.eye.t0 > 0.7 && S.storm === 'on'", 2);
+  if (want('e-verse-rest')) await go('e-verse-rest', "S.verse && S.lead && S.lead.ent.targetable", 3);
   await browser.close();
 })();

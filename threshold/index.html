@@ -7483,7 +7483,7 @@ const Hitch = (() => {
           ? 'uniform float uA,uT; uniform vec3 uC; varying vec2 vU; void main(){ float r=clamp(length(vU*2.0-1.0),0.0,1.0); float rim=smoothstep(0.84,0.95,r)*(1.0-smoothstep(0.95,1.0,r)); float fill=0.16*(1.0-smoothstep(0.7,1.0,r))*(0.85+0.15*sin(r*26.0-uT*3.0)); gl_FragColor=vec4(uC*uA*(fill+0.75*rim),1.0); }'
           : 'uniform float uA,uLen,uT; uniform vec3 uC; varying vec2 vU; void main(){ float x=abs(vU.x*2.0-1.0); float ends=smoothstep(0.0,0.05,vU.y)*(1.0-smoothstep(0.95,1.0,vU.y)); float edge=smoothstep(0.8,0.94,x)*(1.0-smoothstep(0.94,1.0,x)); float core=0.2*(1.0-smoothstep(0.55,0.95,x)); float sh=0.8+0.2*sin(vU.y*uLen*2.2+uT*3.5); gl_FragColor=vec4(uC*uA*ends*(core*sh+0.7*edge),1.0); }' });
       S.laneM = []; S.laneI = 0;
-      for (let i = 0; i < 4; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-PI / 2), calmMat(false)); m.visible = false; m.renderOrder = 5; m.frustumCulled = false; g.add(m); S.laneM.push(m); }
+      for (let i = 0; i < 8; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-PI / 2), calmMat(false)); m.visible = false; m.renderOrder = 5; m.frustumCulled = false; g.add(m); S.laneM.push(m); }
       S.eyeM = new THREE.Mesh(new THREE.PlaneGeometry(2 * CALM.eyeR, 2 * CALM.eyeR).rotateX(-PI / 2), calmMat(true)); S.eyeM.visible = false; S.eyeM.renderOrder = 5; S.eyeM.frustumCulled = false; g.add(S.eyeM);
     }
     b.onDamaged = (amt, info) => { if (S.still && !S.countered && G.now >= S.graceT && info.src === 'player') { S.countered = true; Co.start(counter(b), 'phase'); } };
@@ -7676,7 +7676,7 @@ const Hitch = (() => {
   function resetMech(b) {
     const S = b.state; S.walk = false; S.warn = 0; S.still = false; S.kneel = 0; S.open = 0; S.countered = false; b.dmgTaken = 1; S.fake.parryT = 0; S.tellT = STILL_TELL;
     b.group.visible = true; b.targetable = true; if (S.weapon) S.weapon.visible = true; G.timeScale = 1;
-    S.lanes = []; S.eye = null; S.calmHint = null; S.storm = null; S.stormHold = false; S.unison = false; S.echoing = false; S.moonK = null; S.stormUntil = 0;
+    S.lanes = []; S.eye = null; S.calmHint = null; S.storm = null; S.stormHold = false; S.unison = false; S.echoing = false; S.moonK = null; S.stormUntil = 0; S.waking = null; S.cycleCuts = 0; S.cycleMirror = false;
     if (S.verse) { S.verse = false; Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.4), 'fight'); }
     if (S.cine) { S.cine = false; Cam.release(); UI.hud(true); }
     const Rr = S.R; if (!Rr) return;
@@ -7746,17 +7746,34 @@ const Hitch = (() => {
   }
 
   // ---------------------------------------------------------------- phase IV, Niten: two bodies, one health, exactly one can be hurt
-  // "Blade and Storm". The awake one is the blade: he walks at the player, Draw Cuts and Moons. The still one is the storm: he
-  // kneels where he gave the swap tell (blinking in to KNEEL_R from the centre if he was further out), channels the Lighthouse
-  // Storm and casts Echo. The swap (Stillness) flips the roles. Each body owns its position; the blade never ends a walk or a
-  // dash within KEEP of the still one. Every overlap opens a calm place to stand: a Draw Cut leaves a petal-free lane for
-  // LANE_LIFE s, a Full Moon's safe hole is petal-free (the Eye of the Moon), and the swap and its opening are always petal-free.
+  // "Blade and Storm", made relentless (issen-intensity-ideas.md, options A + B). The awake one is the blade: Draw Cuts and Moons,
+  // move to move with no walking. The still one is the storm: he kneels where he gave the swap tell (blinking in to KNEEL_R from the
+  // centre if he was further out) and channels the Lighthouse Storm for as long as he is still. The swap (Stillness) flips the roles.
+  // Every Draw Cut's ghost stays on the deck; the swap's Waking Cut sets them all off, and surviving it earns the opening. Each body
+  // owns its position; the blade never ends a walk or a dash within KEEP of the still one. Calm places: a fresh Draw Cut leaves a
+  // petal-free lane for CALM.laneLife s, a Full Moon's safe hole is petal-free (the Eye of the Moon), and in Twin Petal Storm every
+  // standing ghost line is petal-free.
   // Levers (indexed by ramp step where it is an array): the storm, then the calm places. The plan's starting values were 3 arms from
   // step 3, rest 1.2 s (0 from step 4), lanes 3.0 s and two cuts everywhere; the cast-budget check in tools/nmpace.js (Stormcaller
   // must not lose planted-cast time to the old phase) pulled the levers in the plan's order: longer rest, 2 arms, 4 s lanes, one cut
   // at steps 3-5. row: seconds between an arm's 3-petal rows (0.4 leaves a gap you can step through as the arm passes).
-  const STORM = { arms: [2, 2, 2, 2, 2, 2], width: 3, spread: 0.12, row: 0.4, speed: 5.0, turn: 0.9, rest: [2.6, 2.6, 2.6, 3.4, 1.2, 1.2], dmg: 85, life: 3.6, tell: 1.2 };
-  const CALM = { laneLife: 4.0, laneW: 2.6, eyeR: 3.8, eyeAfter: 1.5, cuts: [2, 2, 2, 1, 1, 1] };
+  // "The storm never sleeps" (issen-intensity-ideas.md, option A): the Lighthouse Storm now runs the whole phase. It stops only for
+  // the two unison set pieces (and a Counter); at a swap the old still one's petals fly out while the new one starts from his own
+  // kneel spot after a short gather (swapTell). One arm at steps 0-1, two from step 2, three from step 4; turn speed per step
+  // (rad/s); from step flipFrom it turns back once per breath.
+  const STORM = { arms: [1, 1, 2, 2, 3, 3], turn: [0.7, 0.8, 0.9, 0.9, 1.0, 1.1], flipFrom: 3, width: 3, spread: 0.12, row: 0.4, speed: 5.0, dmg: 85, life: 3.6, tell: 1.2, swapTell: 0.5 };
+  const CALM = { laneLife: 4.0, laneW: 2.6, eyeR: 3.8, eyeAfter: 1.5 };
+  // "Standing cuts and the Waking Cut" (option B): every Draw Cut's ghost stays on the deck; the swap's Waking Cut sets them all off.
+  //   cuts: Draw Cuts per swap cycle by step, laid in chains of at most `chain` with `breath` s between chains (a Bolt fits).
+  //   tell: the Waking Cut's tell, started with the swap tell. From step `twoWaves` every other cut is claimed by the still one (his
+  //   colour) and fires `wave2` s later. From step `mirror` the lake adds one mirrored ghost per cycle (the still one's colour, wave 2).
+  //   openBreath: the blade's first chain waits this long after a swap (the opening is the waker's own burn).
+  //   laneAfter: a fired Waking Cut line stays petal-free this long (the opening's calm place: the cut cleans the air).
+  //   dmg: a Waking Cut hit (once per swap); a hit also costs the opening unless missOpen. unisonCuts: share of cuts in a set-piece bracket.
+  const WAKE = { cuts: [2, 3, 4, 4, 5, 6], chain: 3, breath: 1.8, openBreath: 2.6, tell: 1.3, wave2: 0.6, twoWaves: 2, mirror: 4, dmg: 300, missOpen: false, unisonCuts: 0.5, laneAfter: 3.2 };
+  // The two set-piece changes, separate levers: standing ghost lines stay petal-free through Twin Petal Storm (stormGhostCalm), and
+  // Final Verse comes in beats (verseBeats lines each, verseRest s still moment between, the blade shows and can be hit; null = one run).
+  const SET = { stormGhostCalm: true, verseBeats: [3, 2, 2], verseRest: 1.6 };
   const KEEP = 3, KNEEL_R = 9, STILL_KNEEL = 0.6;
   const lead = (S) => S.lead;
   const stillOf = (S) => other(S, S.lead);
@@ -7766,23 +7783,41 @@ const Hitch = (() => {
     if (!first && !G.headless) { const e = act.ent; FX.ring(e.pos.x, e.pos.z, { r0: 0.8, r1: 5.5, color: act.col, dur: 0.6, width: 0.3, mult: 1.6 }); FX.light(e.pos.x, 2.5, e.pos.z, act.col, 40, 0.6, 14); petals(e.pos.x, e.pos.z, 26, act.ice); }
     if (!first) Sound.sfx('bell', 0.55, act === S.A ? 0.5 : 0.62);
   }
-  // the storm stops from the start of the tell until the opening ends (STORM.rest later still), so the swap is always petal-free
+  // The swap. The storm keeps blowing through it (option A). The Waking Cut starts with the tell: every standing ghost telegraphs
+  // at once (WAKE.tell; the still one's wave WAKE.wave2 later) and fires as he wakes. Survive it and the one who wakes is open
+  // (3.2 s at 1.6x) from the moment the last wave lands; a hit costs WAKE.dmg and the opening. Then the board is clean.
   function* swap(b) {
-    const S = b.state, A = S.lead, B = other(S, A), e = A.ent, p = G.player; S.walk = false; S.stormHold = true;
+    const S = b.state, A = S.lead, B = other(S, A), e = A.ent, p = G.player; S.walk = false;
     e.facing = angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z); A.warn = 0.001;
     Sound.sfx('glint', 0.9); FX.flash(0xfff4e0, 0.16, 2.2);
     const T = S.tellT || STILL_TELL; // 1.2 s, 0.9 s at Niten's last ramp step
     if (!G.headless) { FX.ring(e.pos.x, e.pos.z, { r0: 7.5, r1: 1.3, color: 0xfff4e0, dur: T, width: 0.24, mult: 1.7 }); FX.light(e.pos.x, 3, e.pos.z, 0xfff0d0, 45, T, 18); }
+    const wk = S.waking = wakingCut(b, B);
     yield T;
     A.warn = 0; A.graceT = G.now + STILL_GRACE; A.kneel = 1;
     // he kneels where he gave the tell; from further out than KNEEL_R he petal-blinks in on the same bearing, so the storm has room
     { const d = Math.hypot(e.pos.x, e.pos.z); if (d > KNEEL_R) { petals(e.pos.x, e.pos.z, 18, A.ice); e.pos.x *= KNEEL_R / d; e.pos.z *= KNEEL_R / d; petals(e.pos.x, e.pos.z, 24, A.ice); } }
-    wake(b, B);
-    // burn check: a whole cycle with no hit on the still one opens the one who wakes (3.2 s at 1.6x, the old green ring)
-    if (S.cycleClean) { B.open = 3.2; B.ent.dmgTaken = 1.6; petals(B.ent.pos.x, B.ent.pos.z, 24); }
-    S.cycleClean = true; S.countered = false;
-    S.stormUntil = G.now + Math.max(0, B.open) + STORM.rest[S.nitenStep]; S.stormHold = false;
-    yield 1.0; if (A.still) A.kneel = STILL_KNEEL;
+    wake(b, B); S.countered = false; const tk = G.now;
+    while (G.now < wk.end) yield;
+    // the opening is earned by the Waking Cut, not by the cycle (a Counter is its own punishment: 380, no lost opening)
+    S.wakeLog = S.wakeLog || []; S.wakeLog.push({ n: wk.n, hit: wk.hit, t: G.ft });
+    if (!wk.hit || WAKE.missOpen) { B.open = 3.2; B.ent.dmgTaken = 1.6; petals(B.ent.pos.x, B.ent.pos.z, 24); }
+    S.waking = null; S.cycleCuts = 0; S.cycleMirror = false;
+    yield Math.max(0, 1.0 - (G.now - tk)); if (A.still) A.kneel = STILL_KNEEL;
+  }
+  // the Waking Cut: every standing ghost (and the lake's mirror) telegraphs from now and fires; one hit at most per swap
+  function wakingCut(b, W) {
+    const S = b.state, res = { hit: false, end: G.now, n: 0, cuts: [] }, hs = [];
+    for (const gh of S.ghosts) {
+      const c = gh.cut; if (!c) continue; const tt = WAKE.tell + (c.wave === 2 ? WAKE.wave2 : 0); res.end = Math.max(res.end, G.now + tt); res.n++; res.cuts.push(c);
+      if (gh.mark) Hz.cancel(gh.mark); gh.mark = null; laneLeave(S, c, tt);
+      vTele(b, c.x, c.z, c.dir, c.len, tt, c.blue ? BLUE_T : 0xff6a88);
+      hs.push(Hz.rect(c.x, c.z, c.dir, c.len, 2.3, tt, WAKE.dmg, { name: 'Waking Cut', color: c.blue ? BLUE : ROSE, quiet: true, silent: hs.length > 0,
+        onFire: () => { cutFx(b, c.x, c.z, c.dir, c.len, c.blue ? BLUE : PALE); if (gh.cut === c) { gh.g.visible = false; gh.cut = null; } if (WAKE.laneAfter > 0) addLane(b, Object.assign({}, c), WAKE.laneAfter); },
+        onHit: () => { res.hit = true; for (const h of hs) h.dmg = 0; } }));
+    }
+    if (res.n && !G.headless) { const e = W.ent; FX.ring(e.pos.x, e.pos.z, { r0: 0.6, r1: 3.2, color: W.col, dur: 0.5, width: 0.2, mult: 1.4 }); Sound.sfx('sword', 0.7, 0.6); }
+    return res;
   }
   function* counterN(b, act) {
     const S = b.state, p = G.player, e = act.ent; act.hold = true; FX.flash(0xffffff, 0.3, 4); Sound.sfx('parry', 0.8, 0.7); petals(e.pos.x, e.pos.z, 30, act.ice);
@@ -7794,8 +7829,8 @@ const Hitch = (() => {
   }
   // ---- calm places: petal-free lanes (Draw Cut) and the Eye of the Moon (Full Moon). Only this boss's petals are removed.
   function inLane(L, x, z) { const dx = x - L.x, dz = z - L.z, s = Math.sin(L.dir), c = Math.cos(L.dir), u = dx * s + dz * c, v = dx * c - dz * s; return u > -0.6 && u < L.len + 0.6 && Math.abs(v) < L.w / 2; }
-  function addLane(b, cut) {
-    const S = b.state, L = { x: cut.x, z: cut.z, dir: cut.dir, len: cut.len, w: CALM.laneW, t0: G.now, until: G.now + CALM.laneLife, cut, leave: false };
+  function addLane(b, cut, life = CALM.laneLife) {
+    const S = b.state, L = { x: cut.x, z: cut.z, dir: cut.dir, len: cut.len, w: CALM.laneW, t0: G.now, until: G.now + life, cut, leave: false };
     S.lanes.push(L); S.calmV = (S.calmV || 0) + 1; if (S.laneM) { const m = S.laneM[S.laneI = (S.laneI + 1) % S.laneM.length]; m.userData.L = L; m.position.set(L.x + Math.sin(L.dir) * L.len / 2, 0.022, L.z + Math.cos(L.dir) * L.len / 2); m.rotation.y = L.dir; m.scale.set(L.w, 1, L.len + 1.2); m.material.uniforms.uLen.value = L.len; m.material.uniforms.uC.value.set(cut.blue ? 0xb8ccff : 0xffe0ea); }
     return L;
   }
@@ -7826,9 +7861,9 @@ const Hitch = (() => {
   function calmHintOf(b) {
     const S = b.state, p = G.player; if (!p) return null;
     if (S.eye) { const dx = p.pos.x - S.eye.x, dz = p.pos.z - S.eye.z, d = Math.hypot(dx, dz) || 1; return { x: S.eye.x + dx / d * 2.3, z: S.eye.z + dz / d * 2.3 }; }
-    if (S.storm !== 'on' || p.cls.melee) return null;
+    if ((S.storm !== 'on' && !S.unison) || p.cls.melee) return null;
     // a point on a live lane near the player, preferably 7 m or more from the blade (who stands at the lane's far end, Moons ready)
-    let best = null, bs = 9; const e = S.lead.ent;
+    let best = null, bs = S.unison ? 30 : 9; const e = S.lead.ent;
     for (const L of S.lanes) { if (L.leave || L.until - G.now < 0.8) continue; const s = Math.sin(L.dir), c = Math.cos(L.dir), lo = Math.min(1.5, L.len / 2);
       for (let u = lo; u <= L.len - lo + 1e-6; u += 1) { const x = L.x + s * u, z = L.z + c * u, de = Math.hypot(x - e.pos.x, z - e.pos.z), sc = Math.hypot(p.pos.x - x, p.pos.z - z) + Math.max(0, 7 - de) * 1.5; if (sc < bs) { bs = sc; best = { x, z }; } } }
     return best;
@@ -7843,29 +7878,30 @@ const Hitch = (() => {
     const F = stillOf(S), e = F.ent, dx = x - e.pos.x, dz = z - e.pos.z, d = Math.hypot(dx, dz), fly = Math.max(0, d - 1.1) / STORM.speed;
     // the arm points at stA when the breath starts (rem s from now during the tell) and turns stSg * STORM.turn; a petal reaches d after fly
     const cs = S.storm === 'tell' && e.castState, rem = cs ? Math.max(0, cs.time - cs.t) : 0;
-    const n = STORM.arms[S.nitenStep], per = TAU / n, hw = (STORM.width - 1) / 2 * STORM.spread + 0.95 / Math.max(d, 1), w = STORM.turn;
+    const n = STORM.arms[S.nitenStep], per = TAU / n, hw = (STORM.width - 1) / 2 * STORM.spread + 0.95 / Math.max(d, 1), w = STORM.turn[S.nitenStep];
     const rel = ((S.stSg * (Math.atan2(dx, dz) - S.stA)) % per + per) % per, x0 = cs ? 0 : -w * Math.min(fly, S.stT || 0);
     const m = Math.ceil((x0 - rel - hw) / per), v = Math.max(x0, rel + m * per - hw);
     return Math.max(0, rem + v / w + fly);
   }
-  // ---- the Lighthouse Storm: the still one's channel, its own coroutine beside nitenRun. A 1.2 s tell each time it starts, then
-  // STORM.arms thick arms (STORM.width petals across) turning slowly from his kneel spot. Held during the swap and its opening,
-  // the unison brackets (Final Verse, Twin Petal Storm) and his own Echo; live petals fly out. From step 4 it turns back mid-breath.
-  const stormFree = (S) => S.niten && S.lead && !S.stormHold && !S.unison && !S.echoing && G.now >= S.stormUntil && !stillOf(S).hold;
+  // ---- the Lighthouse Storm: the still one's channel, its own coroutine beside nitenRun, and it never sleeps (option A). A tell
+  // (STORM.tell, STORM.swapTell right after a swap) each time it starts, then STORM.arms thick arms (STORM.width petals across)
+  // turning from his kneel spot. Held only by the unison brackets (Final Verse, Twin Petal Storm) and his own Counter; at a swap
+  // the old arms' petals fly out while the new still one gathers. From step flipFrom it turns back once per breath.
+  const stormFree = (S) => S.niten && S.lead && !S.unison && G.now >= S.stormUntil && !stillOf(S).hold;
   function* stormLoop(b) {
-    const S = b.state;
+    const S = b.state; let quick = false;
     while (true) {
-      while (!stormFree(S)) yield 0.05;
+      while (!stormFree(S)) { quick = false; yield 0.05; }
       const F = stillOf(S), e = F.ent, bl = F === S.R;
       // the tell: his cast bar and petals gathering; cancelled if a hold starts
       S.storm = 'tell'; petals(e.pos.x, e.pos.z, 20, F.ice); S.stA = rnd(TAU); S.stSg = rnd() < 0.5 ? 1 : -1; S.stT = 0; // the breath's start angle and turn are set at the tell
-      const cs = e.castState = { name: 'Petal Storm', t: 0, time: STORM.tell, int: false, result: null };
+      const cs = e.castState = { name: 'Petal Storm', t: 0, time: quick ? STORM.swapTell : STORM.tell, int: false, result: null };
       while (cs.t < cs.time && stormFree(S) && stillOf(S) === F) { cs.t += G.dt; yield; }
       if (e.castState === cs) e.castState = null;
-      if (cs.t < cs.time) { S.storm = null; continue; }
-      S.storm = 'on'; let a0 = S.stA, sg = S.stSg, t = 0, rowT = 0, sw = 0; const flip = S.nitenStep >= 4 ? rnd(2, 3.5) : Infinity;
+      if (cs.t < cs.time) { S.storm = null; quick = stormFree(S); continue; }
+      S.storm = 'on'; let a0 = S.stA, sg = S.stSg, t = 0, rowT = 0, sw = 0; const flip = S.nitenStep >= STORM.flipFrom ? rnd(2.5, 5) : Infinity;
       while (stormFree(S) && stillOf(S) === F) {
-        const dt = G.dt; t += dt; a0 += sg * STORM.turn * dt; rowT -= dt; if (t > flip && t - dt <= flip) sg = -sg;
+        const dt = G.dt; t += dt; a0 += sg * STORM.turn[S.nitenStep] * dt; rowT -= dt; if (t > flip && t - dt <= flip) sg = -sg;
         S.stA = a0; S.stSg = sg; S.stT = t;
         if (rowT <= 0) { rowT += STORM.row; const n = STORM.arms[S.nitenStep], w = STORM.width, ex = e.pos.x, ez = e.pos.z;
           for (let k = 0; k < n; k++) for (let j = 0; j < w; j++) { const a = a0 + k / n * TAU + (j - (w - 1) / 2) * STORM.spread;
@@ -7873,35 +7909,32 @@ const Hitch = (() => {
         e.facing = a0; if ((sw -= dt) <= 0) { sw = 0.6; F.model.swing(1, 0.3); }
         yield;
       }
-      S.storm = null;
+      S.storm = null; quick = stormFree(S); // still free: the swap handed the storm to the other body
     }
   }
-  // Niten Draw Cut: the blade alone (no mirror cut). Each cut leaves a ghost and a petal-free lane. A tell never starts just before a
-  // storm arm reaches the player; the dash stops short rather than end within KEEP of the still one.
+  // Niten Draw Cut: the blade alone (no mirror cut). Each cut leaves a petal-free lane for CALM.laneLife s and a ghost that STAYS
+  // until the swap's Waking Cut. From WAKE.twoWaves every other cut of the cycle is claimed by the still one (his colour, wave 2);
+  // from WAKE.mirror the cycle's first cut also leaves the lake's mirrored ghost. A tell never starts just before a storm arm
+  // reaches the player; the dash stops short rather than end within KEEP of the still one.
   function* nitenCut(b, n) {
     const S = b.state, p = G.player; S.walk = false;
-    // the lanes are for the storm: the blade walks until the still one's storm is about to blow (the swap's opening stays his own window)
-    { let w = 0; const soon = () => S.storm === 'on' || (S.storm === 'tell' && stillOf(S).ent.castState && stillOf(S).ent.castState.time - stillOf(S).ent.castState.t < 0.9);
-      while (w < 4.5 && !soon()) { S.walk = true; w += 0.1; yield 0.1; } S.walk = false; }
     for (let i = 0; i < n; i++) {
       { let w = 0; while (w < 1.5 && S.storm === 'on' && armSoon(p, 0.4)) { w += 0.05; yield 0.05; } }
       const L = S.lead, F = other(S, L), e = L.ent, a = angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z); e.facing = a;
       const full = Math.max(6, edgeLen(e.pos.x, e.pos.z, a)); let len = full;
       for (let q = full; q >= 3; q -= 0.5) { if (Math.hypot(e.pos.x + Math.sin(a) * q - F.ent.pos.x, e.pos.z + Math.cos(a) * q - F.ent.pos.z) >= KEEP) { len = q; break; } }
-      const cut = { x: e.pos.x, z: e.pos.z, dir: a, len, blue: L === S.R };
+      const idx = S.cycleCuts = (S.cycleCuts || 0) + 1, w2 = S.nitenStep >= WAKE.twoWaves && idx % 2 === 0;
+      const cut = { x: e.pos.x, z: e.pos.z, dir: a, len, blue: L === S.R, wave: 1 };
       L.fake.parryT = 1; const t = tele(b, i === 0 ? 0.95 : 0.72);
       Hz.rect(cut.x, cut.z, a, len, 2.3, t, 310, { name: 'Draw Cut', color: L.col, quiet: true, silent: i > 0 }); vTele(b, cut.x, cut.z, a, len, t, cut.blue ? BLUE_T : 0xff6a88);
       yield t; L.fake.parryT = 0; L.model.swing(1, 0.25);
-      cutFx(b, cut.x, cut.z, a, len, cut.blue ? BLUE : 0xffffff); addGhost(b, cut); addLane(b, cut);
+      cutFx(b, cut.x, cut.z, a, len, cut.blue ? BLUE : 0xffffff); addLane(b, cut);
+      if (w2) { cut.wave = 2; cut.blue = F === S.R; } // the still one claims it: his colour, his (second) wave
+      addGhost(b, cut);
+      if (S.nitenStep >= WAKE.mirror && !S.cycleMirror) { S.cycleMirror = true; const mc = { x: -cut.x, z: cut.z, dir: -cut.dir, len: cut.len, blue: F === S.R, wave: 2 }; addGhost(b, mc); petals(mc.x, mc.z, 12, F.ice); }
       e.pos.x += Math.sin(a) * len; e.pos.z += Math.cos(a) * len; petals(e.pos.x, e.pos.z, 14, L.ice); yield 0.3;
     }
     const e = S.lead.ent; e.facing = angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z); yield 0.5;
-  }
-  // Echo, cast by the still one: he stops his own storm to set off the lanes the blade cut (one at a time early, in pairs from step 3)
-  function* nitenEcho(b) {
-    const S = b.state, F = stillOf(S); S.echoing = true;
-    yield* echo(b, S.nitenStep >= 3 ? 1 : 0, F.ent);
-    S.echoing = false;
   }
   // Twin Focus is Niten's ramp bell: it plays at the start of every ramp step (both bodies: dome, roar, flash, petals), the
   // wordless signal that something new is coming. A new haste stack (step 5) shows with it.
@@ -7911,23 +7944,34 @@ const Hitch = (() => {
     Sound.sfx('roar', 0.6, 2.2); FX.flash(ROSE, 0.25, 3); S.bells = (S.bells || 0) + 1;
     yield 0.6;
   }
-  // Twin Final Verse (unison, storm held): both vanish; seven rose lines and their seven blue mirrors 0.45 s late; they come back at
-  // their own spots: the blade near the player, the still one at least 6 m from him and within KNEEL_R of the centre
+  // Twin Final Verse (unison, storm held): both vanish; rose lines and their blue mirrors 0.45 s late. In beats (SET.verseBeats):
+  // after each beat but the last the blade shows for SET.verseRest s near the player (a Bolt fits; he can be hit), then vanishes
+  // again. They come back at their own spots: the blade near the player, the still one at least 6 m from him and within KNEEL_R.
+  function showAct(S, act, on) { act.ent.targetable = on; if (act === S.A) act.ent.group.visible = on; else act.root.visible = on; }
+  function nearPlayer(r) { const p = G.player, a = rnd(TAU); let tx = p.pos.x + Math.sin(a) * r, tz = p.pos.z + Math.cos(a) * r; const d = Math.hypot(tx, tz); if (d > 13) { tx *= 13 / d; tz *= 13 / d; } return [tx, tz]; }
   function* twinFinalVerse(b, n = 7) {
     const S = b.state, Rr = S.R; S.walk = false; yield* S.lead.ent.cast({ name: 'Final Verse', time: 1.1 });
     for (const act of [S.A, Rr]) petals(act.ent.pos.x, act.ent.pos.z, 40, act.ice);
-    b.targetable = false; b.group.visible = false; Rr.ent.targetable = false; Rr.root.visible = false; S.verse = true; Co.start(Post.lerpTo({ sat: 0.75, vig: 1.05 }, 0.4), 'fight');
-    for (let i = 0; i < n; i++) {
-      const qa = rnd(TAU), qr = i % 3 === 0 ? 0 : rnd(2, 10), p = G.player, qx = i % 3 === 0 ? p.pos.x : Math.sin(qa) * qr, qz = i % 3 === 0 ? p.pos.z : Math.cos(qa) * qr, dir = rnd(TAU), ox = qx - Math.sin(dir) * 20, oz = qz - Math.cos(dir) * 20;
-      verseLine(b, ox, oz, dir, tele(b, 1.2), false); verseLine(b, -ox, oz, -dir, tele(b, 1.2) + 0.45, true); Sound.sfx('tick', 1, 1 + i * 0.08);
-      yield tele(b, 0.27);
+    showAct(S, S.A, false); showAct(S, Rr, false); S.verse = true; Co.start(Post.lerpTo({ sat: 0.75, vig: 1.05 }, 0.4), 'fight');
+    const beats = SET.verseBeats || [n];
+    for (let bi = 0; bi < beats.length; bi++) {
+      for (let i = 0; i < beats[bi]; i++) {
+        const qa = rnd(TAU), qr = i % 3 === 0 ? 0 : rnd(2, 10), p = G.player, qx = i % 3 === 0 ? p.pos.x : Math.sin(qa) * qr, qz = i % 3 === 0 ? p.pos.z : Math.cos(qa) * qr, dir = rnd(TAU), ox = qx - Math.sin(dir) * 20, oz = qz - Math.cos(dir) * 20;
+        verseLine(b, ox, oz, dir, tele(b, 1.2), false); verseLine(b, -ox, oz, -dir, tele(b, 1.2) + 0.45, true); Sound.sfx('tick', 1, 1 + i * 0.08);
+        yield tele(b, 0.27);
+      }
+      yield tele(b, 1.2) + 0.45;
+      if (bi < beats.length - 1) { // the still moment: the blade stands near the player, then is gone again
+        const L = S.lead, [tx, tz] = nearPlayer(5); L.ent.pos.set(tx, 0, tz); L.ent.facing = angTo(tx, tz, G.player.pos.x, G.player.pos.z); showAct(S, L, true); petals(tx, tz, 30, L.ice); Sound.sfx('sword', 0.6, 0.8);
+        yield SET.verseRest; petals(L.ent.pos.x, L.ent.pos.z, 30, L.ice); showAct(S, L, false);
+      }
     }
-    yield tele(b, 1.2) + 0.45; S.verse = false; Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.5), 'fight');
-    const p = G.player, a = rnd(TAU), L = S.lead, F = other(S, L); let tx = p.pos.x + Math.sin(a) * 4, tz = p.pos.z + Math.cos(a) * 4; const d = Math.hypot(tx, tz); if (d > 13) { tx *= 13 / d; tz *= 13 / d; }
+    S.verse = false; Co.start(Post.lerpTo({ sat: 1.08, vig: 0.9 }, 0.5), 'fight');
+    const p = G.player, L = S.lead, F = other(S, L), [tx, tz] = nearPlayer(4);
     L.ent.pos.set(tx, 0, tz);
     let fx = -tx, fz = -tz; for (let k = 0; k < 24; k++) { const fa = rnd(TAU), fr = rnd(3, KNEEL_R), x = Math.sin(fa) * fr, z = Math.cos(fa) * fr; if (Math.hypot(x - tx, z - tz) >= 6) { fx = x; fz = z; break; } }
     { const fd = Math.hypot(fx, fz); if (fd > KNEEL_R) { fx *= KNEEL_R / fd; fz *= KNEEL_R / fd; } } F.ent.pos.set(fx, 0, fz);
-    b.group.visible = true; b.targetable = true; Rr.root.visible = true; Rr.ent.targetable = true; for (const act of [S.A, Rr]) { petals(act.ent.pos.x, act.ent.pos.z, 40, act.ice); act.ent.facing = angTo(act.ent.pos.x, act.ent.pos.z, p.pos.x, p.pos.z); }
+    showAct(S, S.A, true); showAct(S, Rr, true); for (const act of [S.A, Rr]) { petals(act.ent.pos.x, act.ent.pos.z, 40, act.ice); act.ent.facing = angTo(act.ent.pos.x, act.ent.pos.z, p.pos.x, p.pos.z); }
     yield 0.4;
   }
   function moonAt(b, act, k, t) {
@@ -7956,6 +8000,8 @@ const Hitch = (() => {
     const S = b.state, L = S.lead, F = other(S, L), e = L.ent; S.walk = false; const sx = e.pos.x < 0 ? -1 : 1;
     for (const act of [L, F]) petals(act.ent.pos.x, act.ent.pos.z, 20, act.ice);
     e.pos.set(sx * 4, 0, 0); F.ent.pos.set(-sx * 4, 0, 0); for (const act of [L, F]) petals(act.ent.pos.x, act.ent.pos.z, 40, act.ice);
+    // the board you built: every standing ghost line stays petal-free from the cast until the spirals have flown out
+    if (SET.stormGhostCalm) for (const gh of S.ghosts) if (gh.cut) addLane(b, gh.cut, 1.2 + dur + 1.0);
     yield* e.cast({ name: 'Petal Storm', time: 1.2 });
     let t = 0, a0 = rnd(TAU); const dirSign = rnd() < 0.5 ? 1 : -1;
     while (t < dur) {
@@ -8032,47 +8078,60 @@ const Hitch = (() => {
     { const a0 = b.pos.clone(), r0 = ra.clone(); let t = 0; while (t < 1.3) { t += G.dt; const k = smooth(t / 1.3); b.pos.lerpVectors(a0, new V3(-4, 0, -6), k); ra.lerpVectors(r0, new V3(4, 0, -6), k); b.facing = dampAng(b.facing, angTo(b.pos.x, b.pos.z, -4, -6), 10, G.dt); Rr.ent.facing = dampAng(Rr.ent.facing, angTo(ra.x, ra.z, 4, -6), 10, G.dt); S.duoL[0].intensity = 46 * k; S.duoL[1].intensity = 70 * k; yield; } }
     const p = G.player; b.facing = b.angToPlayer(); Rr.ent.facing = -b.facing;
     if (!G.ents.includes(Rr.ent)) { G.ents.push(Rr.ent); G.world.add(Rr.ent.group); }
-    Rr.ent.targetable = true; S.niten = true; wake(b, A, true); S.cycleClean = true; S.countered = false; Rr.kneel = STILL_KNEEL;
+    Rr.ent.targetable = true; S.niten = true; wake(b, A, true); S.countered = false; Rr.kneel = STILL_KNEEL; S.cycleCuts = 0; S.cycleMirror = false; S.waking = null; S.wakeLog = [];
     S.low12 = false; S.lastStorm = false; S.moonN = S.moonN2 = 0; S.stormUntil = G.now + 1.5; Co.start(stormLoop(b), 'phase');
     yield 0.3;
   }
-  // Niten ramps every RAMP seconds of live phase time (S.nitenT), six steps. A swap follows every bracket and keeps its
-  // cadence (one about every 12 s, BRACKET) through the whole phase; what grows is what happens between swaps:
-  //   0: [Draw Cut] [Draw Cut]                             1: + Echo from the still one in both brackets
-  //   2: opens with [Twin Petal Storm] (the mid-fight one), then [Draw Cut, one Moon] [Draw Cut, Echo]
-  //   3: [Draw Cut, two Moons] [Final Verse] [Draw Cut, Echo]
-  //   4: + [Twin Petal Storm] every loop; the storm comes back sooner after the opening and turns back mid-breath
-  // (a Draw Cut is CALM.cuts cuts: two early, one from step 3. Each waits for the storm, so its lane is used while petals fly.)
-  //   5: step 4 tightened (swap tell 0.9 s, gaps 0.3 s, third haste stack)
-  // A step never starts mid-bracket: after the swap that follows the step's time, a fresh loop opens with the Focus flare and
-  // the new mechanic's bracket, so a new layer first appears right after a swap, with the full tell.
-  // The double storm at the end is guaranteed: the first time health drops below 12% the next bracket is Twin Petal Storm, and
-  // from the soft enrage on it comes every other bracket until The Last Petal.
-  const RAMP = 35, BRACKET = 12;
+  // Niten ramps every RAMP seconds of live phase time (S.nitenT), six steps. A swap (with its Waking Cut) follows every bracket, about
+  // every BRACKET s; the blade does not walk between moves any more. Every bracket lays the step's Draw Cuts (WAKE.cuts, in chains)
+  // and adds what its list names (the A + B ramp in issen-intensity-ideas.md):
+  //   0: 1 arm, 2 cuts                        1: 3 cuts, + one Moon every other bracket (Full Moon first: the Eye is taught)
+  //   2: 2 arms, 4 cuts, a Moon every bracket, the Waking Cut in two waves; opens with [cuts, Twin Petal Storm] (the mid-fight one)
+  //   3: 2 arms turning back once per breath; [cuts, two Moons] [Final Verse in beats, cuts]
+  //   4: 3 arms, 5 cuts, the lake's mirrored ghost; + [cuts, Twin Petal Storm] every loop
+  //   5: 3 arms faster, 6 cuts, swap tell 0.9 s, gaps 0.3 s, third haste stack
+  // Set-piece brackets lay WAKE.unisonCuts of the cuts. The cuts come before Twin Petal Storm (their ghosts are its calm lines) and
+  // after Final Verse. A step never starts mid-bracket: after the swap that follows the step's time, a fresh loop opens with the Focus
+  // flare and the new mechanic's bracket, so a new layer first appears right after a swap.
+  // The double storm at the end is guaranteed: the first time health drops below 12% the next bracket has Twin Petal Storm, and
+  // from the soft enrage on every other bracket has it until The Last Petal.
+  const RAMP = 35, BRACKET = 9;
   const nitenStepOf = (S) => Math.min(5, Math.floor(S.nitenT / RAMP));
   const NITEN_LOOP = [
-    [['cut'], ['cut']],
-    [['cut', 'echo'], ['cut', 'echo']],
-    [['cut', 'moon1'], ['cut', 'echo']],
-    [['cut', 'moon2'], ['verse'], ['cut', 'echo']],
-    [['cut', 'moon2'], ['verse'], ['cut', 'echo'], ['storm']],
-    [['cut', 'moon2'], ['verse'], ['cut', 'echo'], ['storm']],
+    [[]],
+    [['m1'], []],
+    [['m1']],
+    [['m2'], ['verse']],
+    [['m2'], ['verse'], ['storm']],
+    [['m2'], ['verse'], ['storm']],
   ];
   const NITEN_OPEN = [null, null, ['storm'], null, null, null]; // a one-off bracket that opens the step
-  const NITEN_NEW = [0, 0, 0, 0, 3, 0]; // the bracket that holds each step's new mechanic
+  const NITEN_NEW = [0, 0, 0, 1, 2, 0]; // the bracket that holds each step's new mechanic
+  // n cuts as chains of at most WAKE.chain, at least two chains from 2 cuts (6 -> 3 3, 5 -> 3 2, 4 -> 2 2, 3 -> 2 1, 2 -> 1 1)
+  function chainsOf(n) { if (n <= 1) return n ? [1] : []; const k = Math.max(2, Math.ceil(n / WAKE.chain)), out = []; for (let i = 0; i < k; i++) out.push(Math.floor(n / k) + (i < n % k ? 1 : 0)); return out; }
   function* nitenMech(b, k) {
     const S = b.state;
-    if (k === 'cut') yield* nitenCut(b, CALM.cuts[S.nitenStep]);
-    else if (k === 'echo') yield* nitenEcho(b);
-    else if (k === 'moon1') { S.moonN = (S.moonN || 0) + 1; yield* nitenMoons(b, [MOON1[(S.moonN - 1) % MOON1.length]]); }
-    else if (k === 'moon2') { S.moonN2 = (S.moonN2 || 0) + 1; yield* nitenMoons(b, MOON2[(S.moonN2 - 1) % MOON2.length]); }
+    if (k === 'm1') { S.moonN = (S.moonN || 0) + 1; yield* nitenMoons(b, [MOON1[(S.moonN - 1) % MOON1.length]]); }
+    else if (k === 'm2') { S.moonN2 = (S.moonN2 || 0) + 1; yield* nitenMoons(b, MOON2[(S.moonN2 - 1) % MOON2.length]); }
     else if (k === 'verse' || k === 'storm') { S.unison = true; S.storm = null; if (k === 'verse') yield* twinFinalVerse(b); else yield* twinStorm(b); S.unison = false; S.stormUntil = Math.max(S.stormUntil, G.now + 1.0); }
   }
   function* bracket(b, list, gap) {
-    const S = b.state, t0 = G.ft; S.lastStorm = list.length === 1 && list[0] === 'storm';
-    for (const k of list) { yield* nitenMech(b, k); S.walk = true; yield gap; }
-    // keep the swap cadence: walk until the bracket has run BRACKET seconds less the swap itself
+    const S = b.state, t0 = G.ft, st = S.nitenStep, set = list.find((k) => k === 'verse' || k === 'storm'), moons = list.filter((k) => k !== set);
+    S.lastStorm = set === 'storm';
+    const chains = chainsOf(set ? Math.ceil(WAKE.cuts[st] * WAKE.unisonCuts) : WAKE.cuts[st]);
+    // a breath (WAKE.breath, a Bolt fits) after the swap and between blocks: the opening is the waker's own, and no two blocks of
+    // telegraphs run back to back
+    const breath = function* (t = WAKE.breath) { S.walk = true; yield t; S.walk = false; };
+    if (set === 'verse') { yield* nitenMech(b, set); yield gap; } else yield* breath(WAKE.openBreath);
+    for (let i = 0; i < chains.length; i++) {
+      yield* nitenCut(b, chains[i]);
+      if (i === 0 && moons.length) { for (const k of moons) yield* nitenMech(b, k); }
+      if (i < chains.length - 1 || (i === 0 && moons.length)) yield* breath();
+    }
+    if (set === 'storm') { yield gap; yield* nitenMech(b, set); }
+    // keep the swap cadence: the blade closes in until the bracket has run BRACKET s less the swap itself
     while (G.ft - t0 < BRACKET - (S.tellT || STILL_TELL) - 1.0) { S.walk = true; yield 0.1; }
+    S.walk = false; yield gap;
     yield* swap(b);
   }
   // a forced Twin Petal Storm: once when health first drops below 12%, then every other bracket from the soft enrage on
@@ -8129,12 +8188,13 @@ const Hitch = (() => {
     return Object.assign({}, base, { layers });
   }
   // Nightmare health (the tuning lever; class numbers and the ramp stay). Tuned with tools/nmpace.js (god-mode level-3 autopilot,
-  // whole fights from phase 1, seeds 7/8/9) at 30,500 and enrage 355 s, after Blade and Storm (fewer Draw Cuts, so more uptime):
-  //   stormcaller 18/18 kills, medians 4:42-5:17 per seed (best 4:13, worst 5:35), Niten 54-65% of the time
-  //   hexslinger  6/6 kills, 4:47-4:51, Niten 56-61%
-  //   ashwarden   6/6 kills, 5:30-5:36, Niten 55-61% (was 5:53 at 28,000: the melee loses far less to the dash now)
-  //   duskblade   6/6 kills, 5:50-5:56, right at the enrage (was 0/6): still the slow melee outlier, not a target
-  const NM_HP = 30500;
+  // whole fights from phase 1, six runs per class) at 28,000 and enrage 355 s, after the storm never sleeps + standing cuts build
+  // (more movement, so Niten damage per second fell about a sixth; 30,500 gave Stormcaller 5:44 median):
+  //   stormcaller 18/18 kills, medians 4:57 / 4:44 / 4:36 on seeds 7 / 8 / 9 (best 4:29, worst 5:47), Niten 61-68% of the time
+  //   hexslinger  6/6 kills, 4:22-4:31 (the least affected by the storm)
+  //   ashwarden   6/6 kills, median 5:40 (5:24-5:51)
+  //   duskblade   6/6 kills, median 6:09 (5:46-6:22), inside the soft enrage: the slow melee outlier, not a target
+  const NM_HP = 28000;
   const MUSIC = { bpm: 92, root: 45, scale: [0, 2, 3, 7, 8], prog: [0, 0, 3, 2, 0, 0, 4, 2],
     layers: [
       { v: 'koto', pat: ['0...2...4..3....', '0...4...3..2....'], oct: 1, len: 4, vol: 0.14 }, { v: 'flute', pat: ['........4.......', '7.......5.......'], oct: 2, len: 7, vol: 0.07 },
@@ -8180,7 +8240,7 @@ const Hitch = (() => {
         { at: 0.78, music: 3, enter: lakeEnter, skipTo: lakeSkip, run: lakeRun },
         { at: 0.66, music: 5, enter: nitenEnter, run: nitenRun },
       ],
-      nmTest: { RAMP, stepOf: nitenStepOf, STORM, CALM },
+      nmTest: { RAMP, stepOf: nitenStepOf, STORM, CALM, WAKE, SET, BRACKET },
       // the autopilot reads the Lighthouse Storm's arms like a telegraph (see armAt). Nightmare only: Normal's autopilot is untouched.
       danger(b, x, z) { return b.state.niten ? armAt(b, x, z) : Infinity; },
     },

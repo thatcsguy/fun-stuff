@@ -15,6 +15,10 @@
 //   Step 3 in whole fights is mostly the twin Final Verse plus the guaranteed Twin Petal Storm at 12% health (fast kills end in
 //   step 3). Held at one step for 37 s (tools/nitencast.js STEP=n ONLY=n), main / new: step 3 65-67% / 61-70%, step 4 65-67% / 60-65%,
 //   step 5 60-62% / 61-66%.
+//   Storm never sleeps + standing cuts (28,000; tools/nitencast.js also reports moving/quiet shares, the Waking Cut and the design
+//   check noBoltMax): whole fights 0: 61% (53%) 19.9/m  1: 65% (53%) 28.1/m  2: 61% (55%) 20.3/m  3: 56% (40%) 20.4/m
+//   4: 60% (46%) 19.6/m  5: 52% (38%) 14.2/m. Held per step (nitencast STEP=n ONLY=n): 0: 63-70%, 1: 63-70%, 2: 57-65%,
+//   3: 46-51%, 4: 57-64%, 5: 53-59%; moving 12-29% (was 7-16%); no-Bolt stretch at most 2.5 s at every step.
 const { launch } = require('./harness.js');
 (async () => {
   const [boss = 'duelist', clsArg = 'all', runs = '4'] = process.argv.slice(2);
