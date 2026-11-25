@@ -56,7 +56,7 @@ const Bot = {
 };
 
 window.__game = {
-  G, Game, Bot, Hz, Bul, FX, Cam, Input, Binds, Settings, renderer, scene, camera,
+  G, Game, Bot, Hz, Bul, FX, Cam, Input, Binds, Settings, renderer, scene, camera, Hitch,
   start(id, opts = {}) { Game.start(id, Object.assign({ instant: true }, opts)); },
   bot(n) { Bot.level = n; },
   // the def a fight started from this page would use (the nightmare version when the URL has ?nm=1 and the door has one)

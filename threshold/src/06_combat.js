@@ -221,6 +221,7 @@ class Ent {
   // Cast bar. `yield* ent.cast({name, time, interruptible})` returns 'done' | 'interrupted' | 'dead'.
   *cast(o) {
     const cs = this.castState = { name: o.name || '', t: 0, time: o.time, int: !!o.interruptible, result: null };
+    if (!G.headless) Hitch.mark('cast ' + cs.name);
     if (cs.int) Sound.sfx('charge', 0.6);
     while (cs.t < cs.time && !cs.result) { if (!this.alive) return 'dead'; cs.t += G.dt; if (o.onTick) o.onTick(cs.t / cs.time, cs); yield; }
     if (this.castState === cs) this.castState = null;
@@ -267,6 +268,7 @@ class Boss extends Ent {
   goPhase(i) {
     const b = this, ph = this.def.phases[i];
     this.logPhase();
+    Hitch.mark('phase ' + (i + 1));
     this.phaseT = 0; this.liveT = 0; this.phaseDmg0 = G.player ? G.player.stats.dmg : 0;
     Co.stopTag('phase'); Hz.clear('phase'); Bul.clear('phase'); this.castState = null; this.phase = i; this.nextPhase = i + 1; this.transitioning = true;
     Co.start(function* () {

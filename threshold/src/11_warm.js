@@ -84,6 +84,7 @@ const Warm = (() => {
         const dw = new Map(); for (const m of fm) { dw.set(m, m.depthWrite); m.transparent = true; m.depthWrite = false; m.needsUpdate = true; }
         try { Post.composer.render(); } finally { for (const m of fm) { m.transparent = false; m.depthWrite = dw.get(m); m.needsUpdate = true; } }
       }
+      Hitch.scanDrawn(); // what this frame really drew, so the freeze log can tell a first draw mid-fight
     } catch (e) { reportError(e); }
     finally {
       renderer.shadowMap.autoUpdate = was;

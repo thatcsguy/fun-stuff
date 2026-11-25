@@ -51,6 +51,7 @@ const Game = (() => {
     const rh = (!G.headless && !opts.noRehearsal) ? rehearse(def, opts) : null;
     buildWorld(def, opts);
     if (!G.headless) Warm.run(rh);
+    Hitch.reset();
   }
   // Play the whole fight once, invisibly, before the real one: a throwaway copy of the arena runs every phase headless
   // for a while with the autopilot in god mode, so that everything a phase creates on the fly (adds, props, swapped
