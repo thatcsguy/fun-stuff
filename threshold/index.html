@@ -18180,7 +18180,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
 
 // ==== 38_boss_atelier.js ====
 // DOOR XIX: PENTIMENTO, the Unfinished Canvas. A blank canvas to the horizon, and the floor keeps every drop of paint.
-// You wear what you walk through, and what you are wearing decides what you can hurt.
+// You wear what you walk through, and what you are wearing decides whether his Critique breaks you. It never changes your damage.
 (() => {
   const R = 20, GN = 80, CELL = 0.5, N = 1024, U = N / (2 * R), WET = 20, RED = 1, YEL = 2, BLU = 4;
   const HEX = [0xffffff, 0xe23a2e, 0xf2c218, 0xf08a1e, 0x2a5fe0, 0x8a3cd0, 0x2aa858, 0x5c4332];
@@ -18202,6 +18202,10 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
   const need = (S) => S.split && S.call ? wantWear(S.call) : S.neg ? 7 ^ S.col : S.col; // in the negative the rule inverts with the world
   // the rule, at a point: the right paint (and, in the finale, the called half)
   const matched = (S, x, z) => S.wear === need(S) && (!S.split || !S.call || sideOf(S, x, z) === wantSide(S.call));
+  // damage never depends on paint (paint only decides a Critique): a flat DMG_BASE, and in the nightmare finale WRONG_SIDE while you
+  // stand outside the called half (the seam strip counts as outside)
+  const DMG_BASE = 1.0, WRONG_SIDE = 0.1;
+  const offSide = (S, x, z) => !!(S.split && S.call) && sideOf(S, x, z) !== wantSide(S.call);
   const tel = (S) => S.split ? NMTEL : S.neg ? 0xf4f4ff : INK;
   const inWash = (S, p) => !!p && Math.hypot(p.pos.x - S.wash.x, p.pos.z - S.wash.z) < S.wash.r;
   const CLIP = R - 0.25; // paint stops just inside the drawn edge of the tondo
@@ -18587,7 +18591,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
     const pal = new THREE.Mesh(pgeo, wood); pal.position.y = -1.0; pal.rotation.z = 1.2; S.elL.add(pal);
     [[RED, -0.5, 0.2], [YEL, -0.15, 0.45], [BLU, 0.25, 0.42], [0, -0.55, -0.25], [3, -0.1, -0.45], [7, 0.35, -0.3]].forEach(([m, bx, bz], i) => { const d = new THREE.Mesh(sphG, W.mat({ color: HEX[m], roughness: 0.16, metalness: 0 })); d.position.set(bx, 0.085, bz); d.scale.set(0.15 + (i % 3) * 0.03, 0.06, 0.13 + (i % 2) * 0.04); pal.add(d); });
     S.rig.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    // varnish cloche: shows while the figure is protected. A thin shell, clear in the middle, amber and glinting at the rim
+    // varnish cloche: shows while the figure is protected (only in the nightmare finale, while you stand in the wrong half). A thin shell, clear in the middle, amber and glinting at the rim
     S.varnU = { uA: { value: 1 }, uT: S.pT, uC: { value: new THREE.Color(0xd8a050) } };
     S.varnM = new THREE.ShaderMaterial(Object.assign({ uniforms: S.varnU, vertexShader: 'varying vec3 vN, vV; varying float vY; void main(){ vec4 mv=modelViewMatrix*vec4(position,1.0); vN=normalMatrix*normal; vV=-mv.xyz; vY=position.y; gl_Position=projectionMatrix*mv; }',
       fragmentShader: 'uniform float uA,uT; uniform vec3 uC; varying vec3 vN, vV; varying float vY; void main(){ vec3 n=vN/max(length(vN),1e-4), v=vV/max(length(vV),1e-4); float fr=1.0-clamp(abs(dot(n,v)),0.0,1.0); float rim=pow(max(fr,0.0),3.5); float a=uA*0.8*rim; float gl=uA*0.4*smoothstep(0.6,0.8,fr)*(1.0-smoothstep(0.82,0.95,fr))*pow(clamp(dot(n,normalize(vec3(-0.7+0.1*sin(uT*0.6),0.7,0.1))),0.0,1.0),16.0); gl_FragColor=vec4(uC*a+vec3(gl),clamp(a,0.0,1.0)); }' }, PREMUL));
@@ -19030,7 +19034,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
         const inWash = Math.hypot(p.pos.x - S.wash.x, p.pos.z - S.wash.z) < S.wash.r;
         if (inWash) { if (S.wear) { S.wear = 0; S.wearK = 1; Sound.sfx('heal', 0.5, 1.6); } }
         else if (p.grounded && p.pos.y < 0.15) { const m = wetAt(S, p.pos.x, p.pos.z); if (m) tint(S, m); }
-        p.speedMul = S.wear === 7 ? 0.8 : 1; const ok = matched(S, p.pos.x, p.pos.z); b.dmgTaken = ok ? 1.3 : 0.35; if (ok) S.match += dt;
+        p.speedMul = S.wear === 7 ? 0.8 : 1; if (matched(S, p.pos.x, p.pos.z)) S.match += dt; b.dmgTaken = DMG_BASE * (offSide(S, p.pos.x, p.pos.z) ? WRONG_SIDE : 1);
       }
       if (S.split) { // the finale: the seam turns; he holds the pivot, facing the half he calls while he paints or judges, else you
         if (G.state === 'fight') S.lineA += S.lineW * dt;
@@ -19054,7 +19058,7 @@ vec3 domeCol(vec3 d){ return domeColS(d, 0.0); }
       for (const m of [S.smockM, S.sleeveM]) { m.color.setHex(cc); m.emissive.setHex(cc); m.emissiveIntensity = (S.neg ? 0.55 : 0.3) + S.fl * 0.5; }
       S.hueU.value.setHex(cc); S.hueMax.value = 1.0; for (const [m, c0] of S.woodMats) { m.color.copy(c0).multiply(_c.setRGB(1 - 0.8 * k2, 1 - 0.77 * k2, 1 - 0.7 * k2)); m.emissive.setRGB(0.05, 0.048, 0.046).multiplyScalar(k2); } for (const m of [S.tipM, S.dripM]) { m.color.setHex(cc); m.emissive.setHex(cc); m.emissiveIntensity = S.neg ? 1.0 : 0.3; }
       S.light.color.setHex(cc); S.light.intensity = S.neg ? 4 : 2 + S.fl * 8;
-      const ok = p ? matched(S, p.pos.x, p.pos.z) : S.wear === need(S); S.vk = damp(S.vk === undefined ? 1 : S.vk, ok || S.down > 0 ? 0 : 1, 6, dt); S.varn.visible = S.vk > 0.02; S.varnU.uA.value = S.vk; S.varn.rotation.y += dt * 0.3;
+      const shell = !!p && offSide(S, p.pos.x, p.pos.z); S.vk = damp(S.vk === undefined ? 0 : S.vk, shell && S.down <= 0 ? 1 : 0, 6, dt); // the varnish shell: only the finale's wrong half protects him S.varn.visible = S.vk > 0.02; S.varnU.uA.value = S.vk; S.varn.rotation.y += dt * 0.3;
       S.swing = Math.max(0, S.swing - dt * 2.4); const dn = S.down > 0 ? 1 : 0; S.dnK = damp(S.dnK || 0, dn, 6, dt); const cast = b.castState ? 1 : 0; S.ck = damp(S.ck || 0, cast, 5, dt);
       S.armR.rotation.set(-0.6 - S.ck * 1.3 + S.swing * 1.9, 0, 0.25 - S.swing * 0.8); S.elR.rotation.x = -0.3 - S.ck * 0.2; S.brush.rotation.x = 0.7 + S.swing * 0.6 + S.ck * 0.2;
       S.armL.rotation.set(-0.5 + Math.sin(t * 1.1) * 0.06, 0, -0.5 - S.dnK * 0.8); S.elL.rotation.x = -0.55;
