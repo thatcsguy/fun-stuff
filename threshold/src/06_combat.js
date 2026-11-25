@@ -186,7 +186,8 @@ const Bul = (() => {
   function clear(tag) { if (!tag) list.length = 0; else for (let i = list.length - 1; i >= 0; i--) if (list[i].tag === tag) list.splice(i, 1); }
   function clearNear(x, z, r) { let n = 0; for (let i = list.length - 1; i >= 0; i--) { const b = list[i]; if (Math.hypot(b.x - x, b.z - z) < r) { FX.burst(b.x, b.y, b.z, { n: 5, color: b.color, speed: [1, 4], life: [0.2, 0.5] }); list.splice(i, 1); n++; } } return n; }
   // Autopilot query: is a bullet about to pass within `pad` of (x,z) in the next `t` seconds?
-  function threat(x, z, t = 0.6, pad = 0.9) { for (const b of list) { const vx = Math.sin(b.dir) * b.speed, vz = Math.cos(b.dir) * b.speed, rx = x - b.x, rz = z - b.z, vv = vx * vx + vz * vz || 1e-6, k = clamp((rx * vx + rz * vz) / vv, 0, t); if (Math.hypot(rx - vx * k, rz - vz * k) < b.r + pad) return true; } return false; }
+  // a bullet that knows it will be removed (b.stopAt, in its own time b.t) is only a threat along the path before that
+  function threat(x, z, t = 0.6, pad = 0.9) { for (const b of list) { const t1 = b.stopAt !== undefined ? Math.max(0, Math.min(t, b.stopAt - b.t)) : t, vx = Math.sin(b.dir) * b.speed, vz = Math.cos(b.dir) * b.speed, rx = x - b.x, rz = z - b.z, vv = vx * vx + vz * vz || 1e-6, k = clamp((rx * vx + rz * vz) / vv, 0, t1); if (Math.hypot(rx - vx * k, rz - vz * k) < b.r + pad) return true; } return false; }
   Hooks.step.push(update);
   return { list, fire, ring: ringOf, clear, clearNear, threat };
 })();
