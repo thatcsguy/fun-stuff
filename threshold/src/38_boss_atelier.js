@@ -1,5 +1,5 @@
 // DOOR XIX: PENTIMENTO, the Unfinished Canvas. A blank canvas to the horizon, and the floor keeps every drop of paint.
-// You wear what you walk through, and what you are wearing decides what you can hurt.
+// You wear what you walk through, and what you are wearing decides whether his Critique breaks you. It never changes your damage.
 (() => {
   const R = 20, GN = 80, CELL = 0.5, N = 1024, U = N / (2 * R), WET = 20, RED = 1, YEL = 2, BLU = 4;
   const HEX = [0xffffff, 0xe23a2e, 0xf2c218, 0xf08a1e, 0x2a5fe0, 0x8a3cd0, 0x2aa858, 0x5c4332];
@@ -13,7 +13,7 @@
   const px = (v) => (v + R) * U, bitsOf = (m) => [RED, YEL, BLU].filter((q) => m & q);
   // nightmare finale ("Chiaroscuro"): a seam through the centre turns once in 40 s and splits the canvas into a white half
   // (s > 0) and a black half. He calls a half and a colour: white + red = be red in the white half; black + red = be the
-  // complement (green) in the black half; bare = clean (white) or mud (black). Standing on the seam counts as neither half.
+  // complement (green) in the black half. Every call names a real colour (no clean or mud calls). Standing on the seam counts as neither half.
   const SEAM = 0.6, FIN_LOOK = 1.35, VARN = 0xd8a050, NMTEL = 0x8f93b0, WALK = 5.6, DETOUR = 1.25;
   const wantWear = (c) => c.tone === 'w' ? c.col : 7 ^ c.col, wantSide = (c) => c.tone === 'w' ? 1 : -1;
   const sideAt = (A, x, z) => { const s = x * Math.cos(A) - z * Math.sin(A); return s > SEAM ? 1 : s < -SEAM ? -1 : 0; };
@@ -21,6 +21,10 @@
   const need = (S) => S.split && S.call ? wantWear(S.call) : S.neg ? 7 ^ S.col : S.col; // in the negative the rule inverts with the world
   // the rule, at a point: the right paint (and, in the finale, the called half)
   const matched = (S, x, z) => S.wear === need(S) && (!S.split || !S.call || sideOf(S, x, z) === wantSide(S.call));
+  // damage never depends on paint (paint only decides a Critique): a flat DMG_BASE, and in the nightmare finale WRONG_SIDE while you
+  // stand outside the called half (the seam strip counts as outside)
+  const DMG_BASE = 1.0, WRONG_SIDE = 0.1;
+  const offSide = (S, x, z) => !!(S.split && S.call) && sideOf(S, x, z) !== wantSide(S.call);
   const tel = (S) => S.split ? NMTEL : S.neg ? 0xf4f4ff : INK;
   const inWash = (S, p) => !!p && Math.hypot(p.pos.x - S.wash.x, p.pos.z - S.wash.z) < S.wash.r;
   const CLIP = R - 0.25; // paint stops just inside the drawn edge of the tondo
@@ -406,7 +410,7 @@
     const pal = new THREE.Mesh(pgeo, wood); pal.position.y = -1.0; pal.rotation.z = 1.2; S.elL.add(pal);
     [[RED, -0.5, 0.2], [YEL, -0.15, 0.45], [BLU, 0.25, 0.42], [0, -0.55, -0.25], [3, -0.1, -0.45], [7, 0.35, -0.3]].forEach(([m, bx, bz], i) => { const d = new THREE.Mesh(sphG, W.mat({ color: HEX[m], roughness: 0.16, metalness: 0 })); d.position.set(bx, 0.085, bz); d.scale.set(0.15 + (i % 3) * 0.03, 0.06, 0.13 + (i % 2) * 0.04); pal.add(d); });
     S.rig.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-    // varnish cloche: shows while the figure is protected. A thin shell, clear in the middle, amber and glinting at the rim
+    // varnish cloche: shows while the figure is protected (only in the nightmare finale, while you stand in the wrong half). A thin shell, clear in the middle, amber and glinting at the rim
     S.varnU = { uA: { value: 1 }, uT: S.pT, uC: { value: new THREE.Color(0xd8a050) } };
     S.varnM = new THREE.ShaderMaterial(Object.assign({ uniforms: S.varnU, vertexShader: 'varying vec3 vN, vV; varying float vY; void main(){ vec4 mv=modelViewMatrix*vec4(position,1.0); vN=normalMatrix*normal; vV=-mv.xyz; vY=position.y; gl_Position=projectionMatrix*mv; }',
       fragmentShader: 'uniform float uA,uT; uniform vec3 uC; varying vec3 vN, vV; varying float vY; void main(){ vec3 n=vN/max(length(vN),1e-4), v=vV/max(length(vV),1e-4); float fr=1.0-clamp(abs(dot(n,v)),0.0,1.0); float rim=pow(max(fr,0.0),3.5); float a=uA*0.8*rim; float gl=uA*0.4*smoothstep(0.6,0.8,fr)*(1.0-smoothstep(0.82,0.95,fr))*pow(clamp(dot(n,normalize(vec3(-0.7+0.1*sin(uT*0.6),0.7,0.1))),0.0,1.0),16.0); gl_FragColor=vec4(uC*a+vec3(gl),clamp(a,0.0,1.0)); }' }, PREMUL));
@@ -541,7 +545,7 @@
   //   ashwarden   3/8 kills, median 5:50 (best 5:22, worst 6:08)
   // At 32,000 and 340 s: duskblade 7/8 (median 5:02). Colour and the Negative go much faster than planned (180-250 dps matched),
   // so Chiaroscuro is 63-84% of the time rather than 60-70%; the thresholds were left as planned.
-  const NM_HP = 34000;
+  const NM_HP = 30000;
   const SEAM_FS = `uniform float uT, uP, uW, uPulse, uSide; uniform vec3 uPC; varying vec2 vUv;
     void main(){
       float c = (vUv.x - 0.5) * 1.2, zl = (0.5 - vUv.y) * ${2 * R}.0;
@@ -580,15 +584,15 @@
     for (const e of S.blotList.slice()) if (e.alive) e.die(); S.blotList = []; S.blots = 0;
     if (S.cine) { S.cine = false; Cam.release(); } G.timeScale = 1;
   }
-  // the order of calls: white + a primary (only the half is new), black + a secondary, bare (either tone), then a shuffled bag of the
+  // the order of calls: white + a primary (only the half is new), black + a secondary, white + a secondary (a mix), then a shuffled bag of the
   // rest, never the same tone three times running and never a call you already answer where you stand
-  const CALLS = []; for (const tone of ['w', 'b']) for (let col = 0; col <= 6; col++) CALLS.push({ tone, col });
+  const CALLS = []; for (const tone of ['w', 'b']) for (let col = 1; col <= 6; col++) CALLS.push({ tone, col });
   function nextCall(b) {
     const S = b.state, p = G.player, k = S.fk;
     let c;
     if (k === 0) c = { tone: 'w', col: pick([RED, YEL, BLU]) };
     else if (k === 1) c = { tone: 'b', col: pick([3, 5, 6]) };
-    else if (k === 2) c = { tone: rnd() < 0.5 ? 'w' : 'b', col: 0 };
+    else if (k === 2) c = { tone: 'w', col: pick([3, 5, 6]) };
     else {
       const h = S.tones.slice(-2), fine = (q) => !(h.length === 2 && h[0] === q.tone && h[1] === q.tone) && !(p && S.wear === wantWear(q) && sideOf(S, p.pos.x, p.pos.z) === wantSide(q));
       if (!S.cbag.length) S.cbag = shuffle(CALLS.filter((q) => !S.used || !S.used.some((u) => u.tone === q.tone && u.col === q.col)));
@@ -698,7 +702,7 @@
   const finStepOf = (S) => Math.min(4, Math.floor(S.fk / SIT_PER_STEP));
   // the second call of a pair: the same tone (same half), another colour, never one you already answer where you stand
   function pairCall(b, call) {
-    const S = b.state, p = G.player, list = shuffle([0, 1, 2, 3, 4, 5, 6].filter((c) => c !== call.col)).map((col) => ({ tone: call.tone, col }));
+    const S = b.state, p = G.player, list = shuffle([1, 2, 3, 4, 5, 6].filter((c) => c !== call.col)).map((col) => ({ tone: call.tone, col }));
     return list.find((q) => !(p && S.wear === wantWear(q) && sideOf(S, p.pos.x, p.pos.z) === wantSide(q))) || list[0];
   }
   // one sitting: Fresh Coat with the call, three strokes (what the answer needs first), the step's pressure, the route check, Critique
@@ -849,7 +853,7 @@
         const inWash = Math.hypot(p.pos.x - S.wash.x, p.pos.z - S.wash.z) < S.wash.r;
         if (inWash) { if (S.wear) { S.wear = 0; S.wearK = 1; Sound.sfx('heal', 0.5, 1.6); } }
         else if (p.grounded && p.pos.y < 0.15) { const m = wetAt(S, p.pos.x, p.pos.z); if (m) tint(S, m); }
-        p.speedMul = S.wear === 7 ? 0.8 : 1; const ok = matched(S, p.pos.x, p.pos.z); b.dmgTaken = ok ? 1.3 : 0.35; if (ok) S.match += dt;
+        p.speedMul = S.wear === 7 ? 0.8 : 1; if (matched(S, p.pos.x, p.pos.z)) S.match += dt; b.dmgTaken = DMG_BASE * (offSide(S, p.pos.x, p.pos.z) ? WRONG_SIDE : 1);
       }
       if (S.split) { // the finale: the seam turns; he holds the pivot, facing the half he calls while he paints or judges, else you
         if (G.state === 'fight') S.lineA += S.lineW * dt;
@@ -873,7 +877,7 @@
       for (const m of [S.smockM, S.sleeveM]) { m.color.setHex(cc); m.emissive.setHex(cc); m.emissiveIntensity = (S.neg ? 0.55 : 0.3) + S.fl * 0.5; }
       S.hueU.value.setHex(cc); S.hueMax.value = 1.0; for (const [m, c0] of S.woodMats) { m.color.copy(c0).multiply(_c.setRGB(1 - 0.8 * k2, 1 - 0.77 * k2, 1 - 0.7 * k2)); m.emissive.setRGB(0.05, 0.048, 0.046).multiplyScalar(k2); } for (const m of [S.tipM, S.dripM]) { m.color.setHex(cc); m.emissive.setHex(cc); m.emissiveIntensity = S.neg ? 1.0 : 0.3; }
       S.light.color.setHex(cc); S.light.intensity = S.neg ? 4 : 2 + S.fl * 8;
-      const ok = p ? matched(S, p.pos.x, p.pos.z) : S.wear === need(S); S.vk = damp(S.vk === undefined ? 1 : S.vk, ok || S.down > 0 ? 0 : 1, 6, dt); S.varn.visible = S.vk > 0.02; S.varnU.uA.value = S.vk; S.varn.rotation.y += dt * 0.3;
+      const shell = !!p && offSide(S, p.pos.x, p.pos.z); S.vk = damp(S.vk === undefined ? 0 : S.vk, shell && S.down <= 0 ? 1 : 0, 6, dt); // the varnish shell: only the finale's wrong half protects him S.varn.visible = S.vk > 0.02; S.varnU.uA.value = S.vk; S.varn.rotation.y += dt * 0.3;
       S.swing = Math.max(0, S.swing - dt * 2.4); const dn = S.down > 0 ? 1 : 0; S.dnK = damp(S.dnK || 0, dn, 6, dt); const cast = b.castState ? 1 : 0; S.ck = damp(S.ck || 0, cast, 5, dt);
       S.armR.rotation.set(-0.6 - S.ck * 1.3 + S.swing * 1.9, 0, 0.25 - S.swing * 0.8); S.elR.rotation.x = -0.3 - S.ck * 0.2; S.brush.rotation.x = 0.7 + S.swing * 0.6 + S.ck * 0.2;
       S.armL.rotation.set(-0.5 + Math.sin(t * 1.1) * 0.06, 0, -0.5 - S.dnK * 0.8); S.elL.rotation.x = -0.55;
@@ -906,7 +910,7 @@
       if (S.split && S.call && !extra && !miss && !Bot.sideBlind) { const sg = wantSide(S.call), A = S.lineA + S.lineW, rr = p.cls.melee ? b.radius + 2.4 : 8; out.x = sg * Math.cos(A) * rr; out.z = -sg * Math.sin(A) * rr; out.w = 4; S.goal = null; return out; }
       if (extra) { out.x = S.wash.x * 0.97; out.z = S.wash.z * 0.97; out.w = 4; return out; }
       if (miss) {
-        S.scanT -= G.dt; if (S.scanT <= 0 || !S.goal) { S.scanT = 0.3; let best = null, bd = Infinity; for (let j = 0; j < GN; j += 1) for (let i = 0; i < GN; i += 1) { const k = j * GN + i, m = S.dryAt[k] > G.ft + 0.5 ? S.pig[k] : 0; if (!m || (m & ~nd) || !(m & miss)) continue; const x = (i + 0.5) * CELL - R, z = (j + 0.5) * CELL - R, d = Math.hypot(x - p.pos.x, z - p.pos.z); if (Math.hypot(x - S.wash.x, z - S.wash.z) < S.wash.r + 0.4) continue; if (d < bd) { bd = d; best = { x, z }; } } S.goal = best; }
+        S.scanT -= G.dt; if (S.scanT <= 0 || !S.goal) { S.scanT = 0.3; let best = null, bd = Infinity; for (let j = 0; j < GN; j += 1) for (let i = 0; i < GN; i += 1) { const k = j * GN + i, m = S.dryAt[k] > G.ft + 0.5 ? S.pig[k] : 0; if (!m || (m & ~nd) || !(m & miss)) continue; const x = (i + 0.5) * CELL - R, z = (j + 0.5) * CELL - R, d = Math.hypot(x - p.pos.x, z - p.pos.z) + (S.split && S.call && sideOf(S, x, z) !== wantSide(S.call) ? 8 : 0); if (Math.hypot(x - S.wash.x, z - S.wash.z) < S.wash.r + 0.4) continue; if (d < bd) { bd = d; best = { x, z }; } } S.goal = best; }
         if (S.goal) { out.x = S.goal.x; out.z = S.goal.z; out.w = 4; }
       } else S.goal = null;
       return out;
