@@ -5,7 +5,7 @@
 // Settings > Testing > Freeze log copies it; `__game.Hitch.log` holds it; tools/hitchscan.js plays whole fights and prints it.
 // `?hitch=1` (or Hitch.deep = true) also walks the visible scene every frame to catch programs on their first real draw.
 const Hitch = (() => {
-  const LIM = 50, KEEP = 120, log = [], ev = [];
+  const LIM = 50, KEEP = 400, log = [], ev = [];
   const sync = QS.get('hitch') === '2'; // also wait for the graphics card each frame, so its work is timed inside `draw`
   let heap = 0;
   let deep = QS.has('hitch'), prev = null, quiet = 3, progs = 0, tex = 0, geo = 0, seen = new WeakSet(), drawn = new WeakSet(), t0 = performance.now();

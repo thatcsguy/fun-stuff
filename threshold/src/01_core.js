@@ -7,6 +7,11 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const QS = new URLSearchParams(location.search);
+// Every 2D canvas in the game (procedural textures, painted floors, HUD bits) is drawn on the CPU. Left alone, the browser
+// draws canvases with the graphics card: its own shaders get compiled the first time each kind of stroke, gradient or blend
+// is used, and handing the result to WebGL as a texture stalls the frame. Both showed up as freezes in fights that repaint
+// a canvas while you play (see 12_hitch.js). ?warm=old leaves canvases as the browser likes, for before/after measurements.
+if (QS.get('warm') !== 'old') { const gc = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (type, o) { return gc.call(this, type, type === '2d' ? Object.assign({ willReadFrequently: true }, o) : o); }; }
 const TAU = Math.PI * 2, PI = Math.PI;
 const V3 = THREE.Vector3;
 const $ = (s) => document.querySelector(s);
