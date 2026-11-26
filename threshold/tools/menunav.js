@@ -24,10 +24,10 @@ const fails = []; const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') +
 
   // ---- mouse
   await page.click('#set-diff span[data-v="nightmare"]'); await frames(); s = await st();
-  ok(s.diff === 'nightmare' && s.nm && s.na === 16 && s.nav === 3, `mouse: Nightmare greys 16 fights, leaves Issen, Pentimento and the Impresario (${s.na}/${s.nav})`);
+  ok(s.diff === 'nightmare' && s.nm && s.na === 15 && s.nav === 4, `mouse: Nightmare greys 15 fights, leaves Issen, Pentimento, the Impresario and Parallax (${s.na}/${s.nav})`);
   const box = await page.locator('#doors .door[data-door="cathedral"]').boundingBox(); await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); await frames(10); s = await st();
   ok(s.state === 'menu', 'mouse: clicking greyed cathedral does nothing');
-  await page.reload(); await menu(); s = await st(); ok(s.diff === 'nightmare' && s.nm && s.na === 16, 'reload: Nightmare is remembered');
+  await page.reload(); await menu(); s = await st(); ok(s.diff === 'nightmare' && s.nm && s.na === 15, 'reload: Nightmare is remembered');
   await page.click('#set-diff span[data-v="normal"]'); await frames(); s = await st(); ok(s.diff === 'normal' && s.na === 0, 'mouse: back to Normal');
   await page.click('#diffrow', { position: { x: 2, y: 2 } }); await frames(); s = await st(); ok(s.diff === 'nightmare', 'mouse: clicking the row edge flips it');
 
@@ -42,6 +42,7 @@ const fails = []; const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') +
   for (let i = 0; i < 4; i++) await key('ArrowDown'); s = await st(); ok(s.focus === 'door:duelist', `keys: past the group toggles, greyed fights skipped, lands on duelist (${s.focus})`);
   await key('ArrowDown'); s = await st(); ok(s.focus === 'door:atelier', `keys: next is atelier, no greyed fight in between (${s.focus})`);
   await key('ArrowDown'); s = await st(); ok(s.focus === 'door:theatre', `keys: then theatre (${s.focus})`);
+  await key('ArrowDown'); s = await st(); ok(s.focus === 'door:engine', `keys: then engine (${s.focus})`);
   await key('ArrowDown'); s = await st(); ok(s.focus === 'btn-settings', `keys: then Settings (${s.focus})`);
 
   // ---- simulated controller

@@ -4,6 +4,7 @@
 //   cast   share of live time spent in a planted cast (also the ones cancelled by moving); (fin) only casts that completed
 //   noBoltMax the design check, independent of how well the autopilot plays: the longest stretch in which no lit spot within 3 m
 //          of the player (same wedge) is safe for a whole Bolt (no beam, Lance, flip, Swallow or bullet reaches it within walk time + 1.6 s)
+//          (the condemned colour counts during Polarize while the blast leaves time to walk off)
 //   gapMax  the autopilot's longest stretch of live time without a finished planted cast (Bolt / Overcharge), for information
 //   live   share of live time standing on a live tile (the only place hits count in full)
 // OFFLOG=1 splits the time off a live tile by cause (no live tile the autopilot can reach in its wedge, a Polarize in progress,
@@ -33,7 +34,7 @@ const { launch } = require('./harness.js');
       const hu = p.hurt.bind(p); p.hurt = (amt, o) => { const n = o && o.src ? (typeof o.src === 'string' ? o.src : o.src.name || 'bullet') : 'bullet'; A.hits[n] = (A.hits[n] || 0) + 1; return hu(amt, o); };
       let nbT = 0, nbAcc = 0; const T2 = T; const boltSpot = () => { // design check: a lit spot within 3 m, same wedge, that nothing reaches for walk time + 1.6 s
         const pw = T2.wedge(S, p.pos.x, p.pos.z), pts = [[p.pos.x, p.pos.z]]; for (const r of [1.5, 3]) for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; pts.push([p.pos.x + Math.sin(a) * r, p.pos.z + Math.cos(a) * r]); }
-        for (const [x, z] of pts) { const j = T2.tIdx(x, z); if (j < 0 || !T2.live(S, j) || S.tiles[j].warn > 0 || Math.hypot(x, z) < 3.2) continue; if (pw >= 0 && T2.wedge(S, x, z) !== pw) continue;
+        for (const [x, z] of pts) { const j = T2.tIdx(x, z); if (j < 0 || !T2.lit(S, j) || S.tiles[j].warn > 0 || Math.hypot(x, z) < 3.2) continue; if (pw >= 0 && T2.wedge(S, x, z) !== pw) continue;
           const need = Math.hypot(x - p.pos.x, z - p.pos.z) / 7 + 1.6; if (b.def.danger(b, x, z) > need && g.Hz.threat(x, z) > need && !g.Bul.threat(x, z, need)) return true; } return false; };
       const on = (dt) => { lastC = p.casting; if (!b.transitioning && G.state === 'fight') { nbAcc += dt; if (nbAcc >= 0.1) { if (boltSpot()) { A.noBoltMax = Math.max(A.noBoltMax || 0, nbT); nbT = 0; } else nbT += nbAcc; nbAcc = 0; } } b.hp = Math.max(b.hp, b.maxHp * 0.15); if (b.transitioning || G.state !== 'fight') return; A.t += dt; A.gap += dt; if ((tlT += dt) >= 0.25) { tlT -= 0.25; const cs = b.castState ? b.castState.name[0] : S.pol ? 'p' : '-', sw = S.sweep; tl += cs + (p.casting ? 'c' : p.moving ? 'm' : '.') + (S.onLive ? '' : 'x') + (g.Bul.list.length ? 'b' : '') + (sw && sw.out ? 'o' : '') + ' '; } if (p.casting) A.cast += dt; if (S.onLive) A.live += dt; else { const h = b.def.bot(b, p), why = h.w !== 3 ? 'noLiveInReach' : S.pol ? 'polarize' : g.Bul.list.length ? 'bullets' : 'walking'; A.off = A.off || {}; A.off[why] = (A.off[why] || 0) + dt; } if (p.moving) A.moving += dt; };
       for (let i = 0; i < SEC / 2; i++) { s = g.fastForward(2, true, on); if (s.state !== 'fight') break; }

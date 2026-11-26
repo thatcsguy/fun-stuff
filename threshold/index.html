@@ -8897,16 +8897,21 @@ const Hitch = (() => {
 
   // ======================== NIGHTMARE: "Totality" (threshold-design/parallax-nightmare-plan.md) ========================
   // The charge stays: after a Polarize the colour that lived stays lit and the one that died burns out, and your hits only
-  // count from a lit tile (live: present, painted, and not the colour the core shows). Slow always-on Meridian beams go out
+  // count from a lit tile (present, painted and not burnt out; during Polarize both colours count until the blast, so the
+  // cast is a window to plant anywhere and step over late). Slow always-on Meridian beams go out
   // during each Polarize cast, Siphon Drones drink lit tiles, and the floor shrinks on a fixed script from 24 tiles to the
   // 3 by 3 ring while the eclipse goes total. Every piece below is a nightmare-only path: Normal's functions and their random
   // calls are untouched. Levers:
-  const NM_HP = 20000, NM_AT = [1, 0.86, 0.70];
+  // NM_HP measured 2026-11-26 (nmpace.js engine all 6, seeds 7/8/9, level-3 autopilot in god mode; class medians, best):
+  //   Hexslinger 4:10-4:13 (4:01), Duskblade 4:13-5:01 (4:08), Ashwarden 4:41-5:44 (4:40, 2 of 18 out of time),
+  //   Stormcaller 5:12-5:35 (4:22, 6 of 18 out of time). Totality is 69-78% of the fight. 21,000 had the old gate (the
+  //   condemned colour dark during Polarize): Stormcaller never killed and was 1.6x Hexslinger (Normal: 1.44x).
+  const NM_HP = 23000, NM_AT = [1, 0.86, 0.70];
   const GATE = { off: 0.15 }; // damage off a live tile (the core and the drones)
   const POL = { time: [4.2, 4.2, 4.2, 4.0, 4.0, 3.8], flips: [[1, 2], [1, 2], [1, 3], [1, 3], [1, 3], [1, 3]], lastWindow: 1.0, firstAt: 0.9, gap: 0.9, teachTime: [3.8, 4.0] };
-  const SWEEP = { w: 0.17, arms: [2, 2, 2, 3, 3, 3], dmg: 330, outFrom: 0.8, relight: 0.4, armT: 1.3, creep: 0.3 };
-  const DRONE = { innerBias: 6, hp: 450, speed: 2.6, drink: 1.6, fromStep: 2, cap: [0, 0, 1, 1, 1, 1], blastKills: true };
-  const CYCLE = { perStep: 2, breath: 3.5, novaWaves: 2, novaFrom: 1, clockFrom: 6, clockDur: 4 }; // (cast-budget levers pulled: Supernova 3 to 2 waves, Overclock dropped from Totality; it stays in phase II)
+  const SWEEP = { w: 0.17, arms: [2, 2, 2, 3, 3, 3], dmg: 330, outFrom: 0.8, relight: 0.4, armT: 1.3, creep: 0.3 }; // (cast levers: w 0.2 to 0.17, step 5 held at 3 arms)
+  const DRONE = { innerBias: 6, hp: 450, speed: 2.6, drink: 1.6, fromStep: 2, cap: [0, 0, 1, 1, 1, 1], blastKills: true }; // (cap 2 to 1 at steps 4-5; innerBias: metres added to tiles next to the core, so melee keeps its ring)
+  const CYCLE = { perStep: 2, breath: 3.5, novaWaves: 2, novaFrom: 1, clockFrom: 6, clockDur: 4, p2Clock: false }; // (levers pulled: breath 2.5 to 3.5 s, Supernova 3 to 2 waves, Overclock dropped from Totality and from phase II, where the breath takes its place: phase II ran 55-90 s)
   const FINALE = 0.10; // below this health the breath in each Totality cycle is dropped
   const ECL3 = { sun: 0.25, hemi: 0.4, dist: 1700 }; // totality: sun light, hemisphere floor (the hero still reads), planet distance
   const EMBER = 0x5a1608, CTR = 24;
@@ -8922,7 +8927,10 @@ const Hitch = (() => {
     for (let st = 1; st <= 4; st++) { cur = cur.filter((i) => !SWALLOW[st].includes(i)); o[['', 'no corners (step 1)', 'no edge middles (step 2)', 'pinwheel (step 3)', '3x3 ring (steps 4-5)'][st]] = cur; }
     return o;
   })();
-  const live = (S, i) => { const q = S.tiles[i]; return !!q && q.present && q.col > 0 && !q.dead && q.col !== S.dangerCol; };
+  // lit: a painted tile that is not dead. Hits count in full from any lit tile, the condemned colour included until the blast
+  // (so Polarize is a cast window: plant anywhere, be on the safe colour when it fires). live: lit and not condemned.
+  const lit = (S, i) => { const q = S.tiles[i]; return !!q && q.present && q.col > 0 && !q.dead; };
+  const live = (S, i) => lit(S, i) && S.tiles[i].col !== S.dangerCol;
   // a pattern is fair on a board when each colour has at least 2 present tiles (3 on boards of 12 or more) and every painted tile
   // has a tile of the other colour among its 8 neighbours (a flip leaves 1.0 s: about 5 m at run speed). isP(i): tile i is present.
   function patOk(isP, pat, inv = 0) {
@@ -8992,7 +9000,7 @@ const Hitch = (() => {
 
   // ---- the gate: every frame, from the tile the player stands on
   function nmUpdate(b, dt) {
-    const S = b.state, p = G.player, i = p ? tIdx(p.pos.x, p.pos.z) : -1, on = !!p && p.alive && i >= 0 && live(S, i);
+    const S = b.state, p = G.player, i = p ? tIdx(p.pos.x, p.pos.z) : -1, on = !!p && p.alive && i >= 0 && lit(S, i);
     S.onLive = on; S.onT = on ? S.tiles[i] : null;
     const k = on ? 1 : GATE.off; b.dmgTaken = k;
     for (let j = S.siphons.length - 1; j >= 0; j--) { const e = S.siphons[j]; if (!e.alive) { S.siphons.splice(j, 1); continue; } e.dmgTaken = k; }
@@ -9106,7 +9114,7 @@ const Hitch = (() => {
   function* siphonRun(b) {
     const S = b.state; siphon(b, true); let k = 0; // straight away, in view
     // then a drone on every other loop if none is alive (one per loop kept a caster on drones half the phase: 75-90 s)
-    while (true) { yield* polarizeNM(b, POL.teachTime[1], [1, 2]); if (k++ % 2 === 1 && !siphonsAlive(S)) siphon(b); yield* lance(b, 2); yield* overclock(b, 3, CYCLE.clockDur); }
+    while (true) { yield* polarizeNM(b, POL.teachTime[1], [1, 2]); if (k++ % 2 === 1 && !siphonsAlive(S)) siphon(b); yield* lance(b, 2); if (CYCLE.p2Clock) yield* overclock(b, 3, CYCLE.clockDur); else yield CYCLE.breath; }
   }
   // Totality: Critical Mass, then the planet slides fully across the sun (eclipse level 3) in one shot from the near side of the
   // board; the outer ring falls away in silhouette and the lit tiles become the light in the scene
@@ -9183,10 +9191,13 @@ const Hitch = (() => {
   }
 
   // ---- the autopilot's view of the nightmare
+  function safeWalk(S, x, z) { // seconds from (x, z) to 0.4 m inside the nearest tile of the safe colour
+    let d = Infinity; for (let j = 0; j < S.tiles.length; j++) { if (j === CTR || !live(S, j)) continue; const q = S.tiles[j], ex = Math.max(0, Math.abs(x - q.x) - (TS / 2 - 0.4)), ez = Math.max(0, Math.abs(z - q.z) - (TS / 2 - 0.4)); d = Math.min(d, Math.hypot(ex, ez)); }
+    return d / 7; }
   function nmDanger(b, x, z) {
     const S = b.state; let best = Infinity; const i = tIdx(x, z);
-    // (the condemned colour reads as about to fire: a cast started on it is not worth finishing at a sixth of the damage)
-    if (i >= 0) { const q = S.tiles[i]; if (q.warn > 0) best = Math.max(0, q.warn - 0.5); if (S.pol && q.col === S.dangerCol) best = Math.min(best, S.pol.t, 0.6); }
+    // (the condemned colour: the time left before the blast, less the walk to the nearest tile of the safe colour)
+    if (i >= 0) { const q = S.tiles[i]; if (q.warn > 0) best = Math.max(0, q.warn - 0.5); if (S.pol && q.col === S.dangerCol) best = Math.min(best, Math.max(0, S.pol.t - safeWalk(S, x, z) - 0.35)); }
     return Math.min(best, beamT(S, x, z));
   }
   // the bot stands on the best live tile it can reach without crossing a beam (near, far from the next beam, not being drunk),
@@ -9206,7 +9217,9 @@ const Hitch = (() => {
       // while the beams are out you may cross: prefer a wedge (between the beams where they stopped) that holds more lit tiles
       const wc = []; if (sw && sw.nm && (sw.out || sw.arm > 0.9)) for (let i = 0; i < S.tiles.length; i++) if (i !== CTR && live(S, i) && S.tiles[i].warn <= 0) { const q = S.tiles[i], pa = Math.atan2(q.x, q.z), k = Math.floor((((pa - sw.a) % TAU) + TAU) % TAU / (TAU / sw.n)); wc[k] = (wc[k] || 0) + 1; }
       for (let i = 0; i < S.tiles.length; i++) {
-        const q = S.tiles[i]; if (i === CTR || !live(S, i) || q.warn > 0 || ds.some((e) => e.drink === q)) continue;
+        const q = S.tiles[i]; if (i === CTR || !lit(S, i) || q.warn > 0 || ds.some((e) => e.drink === q)) continue;
+        // the condemned colour: fine to stand and cast on early in Polarize, never once the blast is close
+        const cond = !!S.pol && q.col === S.dangerCol; if (cond && S.pol.t < 1.8) continue;
         // the spot on the tile with the most time before the trailing beam reaches it (you can ride a tile as the wedge turns)
         if (melee && ring(i) > 1) continue; const OF = melee ? OFFS_M : OFFS;
         for (const ox of OF) for (const oz of OF) {
@@ -9215,7 +9228,7 @@ const Hitch = (() => {
           if (pw >= 0 && wedge(S, ax, az) !== pw) continue;
           const tt = Math.hypot(ax - p.pos.x, az - p.pos.z) / 7, bt = beamT(S, ax, az);
           if (bt < tt + 1.0) continue;
-          let s = tt * 1.6 - Math.min(bt, 7) * 0.45 + (i === here ? -1.2 : 0) + (melee ? r * 0.15 : 0);
+          let s = tt * 1.6 - Math.min(bt, 7) * 0.45 + (i === here ? -1.2 : 0) + (melee ? r * 0.15 : 0) + (cond ? 1.0 : 0);
           if (!melee && r > 24) s += 8;
           if (wc.length) { const pa = Math.atan2(ax, az), k = Math.floor((((pa - sw.a) % TAU) + TAU) % TAU / (TAU / sw.n)); s -= 0.8 * Math.min(3, wc[k] || 0); }
           if (s < bs) { bs = s; goal = [ax, az]; }
@@ -9226,10 +9239,13 @@ const Hitch = (() => {
     else if (sw && sw.nm && !sw.out && sw.n) { // no live tile to reach: the middle of the wedge, near the core
       const cx = p.pos.x, cz = p.pos.z, pa = Math.atan2(cx, cz); let best = 0, bd = 9;
       for (let k = 0; k < sw.n; k++) { const m = sw.a + (k + 0.5) / sw.n * TAU, d = Math.abs(angDiff(m, pa)); if (d < bd) { bd = d; best = m; } }
-      const sg = Math.sign(sw.tw) || 1, lead = best + sg * 0.25 * TAU / sw.n, r = melee ? 4.3 : 7.5; h.x = Math.sin(lead) * r; h.z = Math.cos(lead) * r; h.w = 1.5;
+      const sg = Math.sign(sw.tw) || 1, lead = best + sg * 0.25 * TAU / sw.n;
+      // (on standing floor that is not about to fall: on the small boards 7.5 m out is already over the edge)
+      let r = melee ? 4.3 : 7.5; for (const rr of melee ? [4.3, 3.4] : [7.5, 5.6, 4.3, 3.4]) { const j = tIdx(Math.sin(lead) * rr, Math.cos(lead) * rr); if (j >= 0 && S.tiles[j].present && S.tiles[j].warn <= 0) { r = rr; break; } }
+      h.x = Math.sin(lead) * r; h.z = Math.cos(lead) * r; h.w = 1.5;
     }
     // planted casts: none while walking to a lit tile, none that a beam, a Lance or a flip would cut off
-    const onLive = here >= 0 && live(S, here), far = goal ? Math.hypot(goal[0] - p.pos.x, goal[1] - p.pos.z) : 0;
+    const onLive = here >= 0 && lit(S, here), far = goal ? Math.hypot(goal[0] - p.pos.x, goal[1] - p.pos.z) : 0;
     // (a Lance locks 0.55 s before it fires, so it needs a margin to step out of; bullets close by cut any cast)
     // hits from a dark tile land at GATE.off: hold every attack (a Discharge above all) until standing on the lit tile it walks to
     if ((goal && !onLive) || b.immune) h.holdFire = true; // (and nothing into Critical Mass, when he is immune)
@@ -9238,7 +9254,7 @@ const Hitch = (() => {
   }
   // test hooks for the tools (polfuzz, engcast, nmshots, nmphase)
   const nmTest = {
-    BOARDS, PATTERNS, POL, SWEEP, DRONE, CYCLE, GATE, N, TS, HALF, CTR, SWALLOW, P2_DROP, patOk, deckOf, flipSchedule, live, tIdx, beamT, wedge,
+    BOARDS, PATTERNS, POL, SWEEP, DRONE, CYCLE, GATE, N, TS, HALF, CTR, SWALLOW, P2_DROP, patOk, deckOf, flipSchedule, live, lit, tIdx, beamT, wedge,
     deckFor: (b) => deckFor(b.state),
     // jump the Totality ramp to step n (the board of that step at once); hold: stay at that step (engcast)
     setStep(b, n, hold) { const S = b.state; S.cyc = Math.max(S.cyc, n * CYCLE.perStep); for (let st = 1; st <= Math.min(4, n); st++) if (!S.swallowed[st]) { S.swallowed[st] = true; dropNow(S, SWALLOW[st]); } if (hold) S.holdStep = n; },
