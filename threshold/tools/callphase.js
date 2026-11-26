@@ -16,7 +16,7 @@ const { launch } = require('./harness.js');
     const bad = (b, last) => { const S = b.state, q = []; if (!last && b.transitioning) q.push('transitioning');
       if (S.black) q.push('blackout/cue'); if (S.dark && !(last && S.finaleOver)) q.push('dark=' + S.dark); // the Final Curtain darkens the house itself if (S.recast) q.push('recast'); if (G.now < S.ovUntil) q.push('ovation'); if (S.bow) q.push('bow');
       if (b.dmgTaken !== 1 && b.dmgTaken !== T.GATE.off) q.push('dmgTaken=' + b.dmgTaken); if (b.pos.y) q.push('lifted=' + b.pos.y.toFixed(2)); if (S.lift) q.push('lift');
-      if (S.hands.some((H) => H.tgt.y < 5 && !last)) q.push('hand on the floor'); if (S.spin) q.push('spin'); if (S.fanOn) q.push('fan'); if (S.curtainOn) q.push('curtain call');
+      if (S.hands.some((H) => H.tgt.y < 5 && !last)) q.push('hand on the floor'); if (S.spin) q.push('spin'); if (S.fanOn) q.push('fan'); if (S.curtainOn) q.push('curtain call'); if (S.dolls.some((d) => d.air)) q.push('doll still lifted');
       if (S.cones.some((c) => c.visible)) q.push('lit cones'); if (S.cine || g.Cam.cine) q.push('cinematic'); if (G.timeScale !== 1) q.push('timeScale=' + G.timeScale);
       if (!last && (b.lastBlowing || b.immune)) q.push(b.lastBlowing ? 'lastBlow' : 'immune');
       if (b.phase >= 1 && !S.dolls[1].on) q.push('blue doll missing'); if (b.phase >= 1 && S.split) q.push('still split'); if (S.lead !== 0 && S.lead !== 1) q.push('lead=' + S.lead);
@@ -31,6 +31,7 @@ const { launch } = require('./harness.js');
       ['during the Curtain call', (b) => !!b.state.curtainOn && !!b.state.black],
       ['during Knife Act', (b) => !!b.state.fanOn],
       ['during a Pirouette', (b) => !!b.state.spin],
+      ['during Paper Birds (blue doll lifted)', (b) => !!b.state.dolls[1].air],
     ];
     const run = (ph, cond, maxSec, hold) => { g.start('theatre', { cls: 'stormcaller', phase: ph }); G.headless = true; g.bot(3); g.god(true);
       const b = G.boss; let t = 0; while (t < maxSec && !(b.phase === ph && !b.transitioning && cond(b))) { if (hold) hold(b); step(0.05); b.hp = Math.max(b.hp, b.maxHp * (ph + 1 < n ? def.phases[ph + 1].at + 0.02 : 0.11)); t += 0.05; } return t < maxSec; };
@@ -49,7 +50,7 @@ const { launch } = require('./harness.js');
     }
     // a restart resets the ramp
     { run(n - 1, (b) => b.state.callStep >= 3, 200, (b) => { if (b.state.finale) T.setStep(b, 3); }); g.start('theatre', { cls: 'stormcaller', phase: 2 }); G.headless = true; step(0.5); const S = G.boss.state, q = [];
-      if (S.callT > 1) q.push('callT=' + S.callT.toFixed(1)); if (S.callStep) q.push('callStep=' + S.callStep); if ((S.stepAt || []).length > 1) q.push('stepAt=' + S.stepAt.join(',')); if (S.curtainDone) q.push('curtainDone'); if (S.lead !== 0) q.push('lead=' + S.lead);
+      if (S.callT > 1) q.push('callT=' + S.callT.toFixed(1)); if (S.callStep) q.push('callStep=' + S.callStep); if ((S.stepAt || []).length > 1) q.push('stepAt=' + S.stepAt.join(',')); if (S.curtainDone) q.push('curtainDone'); if (S.lead !== 0) q.push('lead=' + S.lead); if (S.dolls.some((d) => d.air)) q.push('doll lifted');
       push('restart resets the ramp', q); }
     g.god(false); return out;
   });

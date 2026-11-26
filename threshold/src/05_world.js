@@ -51,17 +51,27 @@ const Cam = {
   // Meshes with userData.fadeOcclude = true fade out while they sit between the camera and what it looks at (pillars, tree
   // canopies, a giant boss's limbs). The fade sets the mesh's own material(s) transparent, so give such meshes their own
   // material; an InstancedMesh fades as a whole. userData.fadeMin sets how far it fades (default 0.18). userData.fadeCol =
-  // {r, y0, y1} tests an upright column's axis instead of the bounding sphere. Meshes that share the faded material fade with it.
-  occ: [], occScan: 0,
+  // {r, y0, y1} tests an upright column's axis instead of the bounding sphere. userData.fadeBox = {pad} tests the view line(s)
+  // against the mesh's own bounding box in its local space (big flat scenery: backdrops, wings, curtains), padded by pad (0.3).
+  // Meshes that share the faded material fade with it. An arena may add more points to keep in view with fadeTargets(out): it
+  // pushes [x, y, z] arrays and every fading mesh then also clears the lines from the camera to those (a doll, the boss).
+  // Materials with an alphaTest (cut-out paper) scale it with the fade, so a cut-out fades instead of popping out at half.
+  occ: [], occScan: 0, occT: [],
   fadeOccluders(rdt, lx, ly, lz) {
     if (G.headless) return;
     if ((this.occScan -= rdt) <= 0) { this.occScan = 1; this.occ.length = 0; scene.traverse((o) => { if (o.isMesh && o.userData.fadeOcclude) this.occ.push(o); }); }
     if (!this.occ.length) return;
+    const T = this.occT; T.length = 0; if (G.arena && G.arena.fadeTargets) G.arena.fadeTargets(T);
     const c = camera.position, sx = lx - c.x, sy = ly - c.y, sz = lz - c.z, sl2 = Math.max(sx * sx + sy * sy + sz * sz, 1e-6);
     for (const o of this.occ) {
       if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
       const ud = o.userData; let hit;
-      if (ud.fadeCol) {
+      if (ud.fadeBox) {
+        let bb = o.isInstancedMesh ? (o.boundingBox || (o.computeBoundingBox(), o.boundingBox)) : (o.geometry.boundingBox || (o.geometry.computeBoundingBox(), o.geometry.boundingBox));
+        _occI.copy(o.matrixWorld).invert(); _occA.copy(c).applyMatrix4(_occI); const pad = ud.fadeBox.pad === undefined ? 0.3 : ud.fadeBox.pad;
+        hit = false; let vis = o.visible; for (let q = o.parent; vis && q; q = q.parent) vis = q.visible; // a hidden group's world matrix is stale
+        if (vis) for (let i = -1; i < T.length && !hit; i++) { if (i < 0) _occB.set(lx, ly, lz); else _occB.set(T[i][0], T[i][1], T[i][2]); _occB.applyMatrix4(_occI); hit = segBox(_occA, _occB, bb, pad); }
+      } else if (ud.fadeCol) {
         // upright column: test the view line against its vertical axis (radius r, from y0 to y1 above the mesh origin), so a
         // tall pillar fades only when it really is in the way, and also while the camera itself sits inside it
         const q = ud.fadeCol, e = o.matrixWorld.elements, ox = e[12], oy = e[13], oz = e[14], h2 = sx * sx + sz * sz;
@@ -81,14 +91,25 @@ const Cam = {
       const fading = ud.fadeA < 0.995;
       for (const m of mats) {
         const mu = m.userData;
-        if (mu.fadeBase === undefined) { mu.fadeBase = m.opacity; mu.fadeT = m.transparent; mu.fadeDW = m.depthWrite; mu.fading = false; }
+        if (mu.fadeBase === undefined) { mu.fadeBase = m.opacity; mu.fadeT = m.transparent; mu.fadeDW = m.depthWrite; mu.fadeAT = m.alphaTest; mu.fading = false; }
         if (mu.fading !== fading) { mu.fading = fading; m.transparent = fading || mu.fadeT; m.depthWrite = fading ? false : mu.fadeDW; m.needsUpdate = true; }
-        m.opacity = mu.fadeBase * ud.fadeA;
+        m.opacity = mu.fadeBase * ud.fadeA; if (mu.fadeAT > 0) m.alphaTest = Math.max(0.002, mu.fadeAT * ud.fadeA); // stays > 0: no new shader
       }
     }
   },
 };
-const _occV = new THREE.Vector3();
+const _occV = new THREE.Vector3(), _occA = new THREE.Vector3(), _occB = new THREE.Vector3(), _occI = new THREE.Matrix4();
+// does the segment a -> b (stopping just short of b, so what stands behind the target never fades) cross box bb grown by pad?
+function segBox(a, b, bb, pad) {
+  let t0 = 0, t1 = 0.97;
+  for (const k of ['x', 'y', 'z']) {
+    const d = b[k] - a[k], lo = bb.min[k] - pad, hi = bb.max[k] + pad;
+    if (Math.abs(d) < 1e-9) { if (a[k] < lo || a[k] > hi) return false; continue; }
+    let u = (lo - a[k]) / d, v = (hi - a[k]) / d; if (u > v) { const w = u; u = v; v = w; }
+    if (u > t0) t0 = u; if (v < t1) t1 = v; if (t0 > t1) return false;
+  }
+  return true;
+}
 Hooks.frame.push((rdt, stage) => { if (stage === 1) Cam.update(rdt); });
 
 const W = (() => {

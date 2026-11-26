@@ -1400,17 +1400,27 @@ const Cam = {
   // Meshes with userData.fadeOcclude = true fade out while they sit between the camera and what it looks at (pillars, tree
   // canopies, a giant boss's limbs). The fade sets the mesh's own material(s) transparent, so give such meshes their own
   // material; an InstancedMesh fades as a whole. userData.fadeMin sets how far it fades (default 0.18). userData.fadeCol =
-  // {r, y0, y1} tests an upright column's axis instead of the bounding sphere. Meshes that share the faded material fade with it.
-  occ: [], occScan: 0,
+  // {r, y0, y1} tests an upright column's axis instead of the bounding sphere. userData.fadeBox = {pad} tests the view line(s)
+  // against the mesh's own bounding box in its local space (big flat scenery: backdrops, wings, curtains), padded by pad (0.3).
+  // Meshes that share the faded material fade with it. An arena may add more points to keep in view with fadeTargets(out): it
+  // pushes [x, y, z] arrays and every fading mesh then also clears the lines from the camera to those (a doll, the boss).
+  // Materials with an alphaTest (cut-out paper) scale it with the fade, so a cut-out fades instead of popping out at half.
+  occ: [], occScan: 0, occT: [],
   fadeOccluders(rdt, lx, ly, lz) {
     if (G.headless) return;
     if ((this.occScan -= rdt) <= 0) { this.occScan = 1; this.occ.length = 0; scene.traverse((o) => { if (o.isMesh && o.userData.fadeOcclude) this.occ.push(o); }); }
     if (!this.occ.length) return;
+    const T = this.occT; T.length = 0; if (G.arena && G.arena.fadeTargets) G.arena.fadeTargets(T);
     const c = camera.position, sx = lx - c.x, sy = ly - c.y, sz = lz - c.z, sl2 = Math.max(sx * sx + sy * sy + sz * sz, 1e-6);
     for (const o of this.occ) {
       if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
       const ud = o.userData; let hit;
-      if (ud.fadeCol) {
+      if (ud.fadeBox) {
+        let bb = o.isInstancedMesh ? (o.boundingBox || (o.computeBoundingBox(), o.boundingBox)) : (o.geometry.boundingBox || (o.geometry.computeBoundingBox(), o.geometry.boundingBox));
+        _occI.copy(o.matrixWorld).invert(); _occA.copy(c).applyMatrix4(_occI); const pad = ud.fadeBox.pad === undefined ? 0.3 : ud.fadeBox.pad;
+        hit = false; let vis = o.visible; for (let q = o.parent; vis && q; q = q.parent) vis = q.visible; // a hidden group's world matrix is stale
+        if (vis) for (let i = -1; i < T.length && !hit; i++) { if (i < 0) _occB.set(lx, ly, lz); else _occB.set(T[i][0], T[i][1], T[i][2]); _occB.applyMatrix4(_occI); hit = segBox(_occA, _occB, bb, pad); }
+      } else if (ud.fadeCol) {
         // upright column: test the view line against its vertical axis (radius r, from y0 to y1 above the mesh origin), so a
         // tall pillar fades only when it really is in the way, and also while the camera itself sits inside it
         const q = ud.fadeCol, e = o.matrixWorld.elements, ox = e[12], oy = e[13], oz = e[14], h2 = sx * sx + sz * sz;
@@ -1430,14 +1440,25 @@ const Cam = {
       const fading = ud.fadeA < 0.995;
       for (const m of mats) {
         const mu = m.userData;
-        if (mu.fadeBase === undefined) { mu.fadeBase = m.opacity; mu.fadeT = m.transparent; mu.fadeDW = m.depthWrite; mu.fading = false; }
+        if (mu.fadeBase === undefined) { mu.fadeBase = m.opacity; mu.fadeT = m.transparent; mu.fadeDW = m.depthWrite; mu.fadeAT = m.alphaTest; mu.fading = false; }
         if (mu.fading !== fading) { mu.fading = fading; m.transparent = fading || mu.fadeT; m.depthWrite = fading ? false : mu.fadeDW; m.needsUpdate = true; }
-        m.opacity = mu.fadeBase * ud.fadeA;
+        m.opacity = mu.fadeBase * ud.fadeA; if (mu.fadeAT > 0) m.alphaTest = Math.max(0.002, mu.fadeAT * ud.fadeA); // stays > 0: no new shader
       }
     }
   },
 };
-const _occV = new THREE.Vector3();
+const _occV = new THREE.Vector3(), _occA = new THREE.Vector3(), _occB = new THREE.Vector3(), _occI = new THREE.Matrix4();
+// does the segment a -> b (stopping just short of b, so what stands behind the target never fades) cross box bb grown by pad?
+function segBox(a, b, bb, pad) {
+  let t0 = 0, t1 = 0.97;
+  for (const k of ['x', 'y', 'z']) {
+    const d = b[k] - a[k], lo = bb.min[k] - pad, hi = bb.max[k] + pad;
+    if (Math.abs(d) < 1e-9) { if (a[k] < lo || a[k] > hi) return false; continue; }
+    let u = (lo - a[k]) / d, v = (hi - a[k]) / d; if (u > v) { const w = u; u = v; v = w; }
+    if (u > t0) t0 = u; if (v < t1) t1 = v; if (t0 > t1) return false;
+  }
+  return true;
+}
 Hooks.frame.push((rdt, stage) => { if (stage === 1) Cam.update(rdt); });
 
 const W = (() => {
@@ -11186,9 +11207,14 @@ const Hitch = (() => {
   const HX = 15, HZ = 9, LIME = 0xfff2c8, ROSE = 0xff3d6e, VIO = 0xc86bff, MID = 1.6, PIT = 2.3, GOLD = 0xffc24a;
   const _a = new V3(), _b2 = new V3(), _m = new THREE.Object3D(), _w = new V3(), _w2 = new V3(), _c = new THREE.Color(), _c2 = new THREE.Color(), _Y = new V3(0, 1, 0);
   const ROWZ = [-6, 0, 6];
+  const _ft = new V3();
 
   // ---- the understudies ----
-  const dolls = (S) => S.dolls.filter((d) => d.on);
+  // a doll he has lifted into the air by its strings (Paper Birds) is out of the play: nothing aims at it or lands on it
+  const dolls = (S) => S.dolls.filter((d) => d.on && !d.air);
+  // Paper Birds with two dolls: he lifts the blue doll (the front-to-back mirror, the one whose lane is not yours) for the flight,
+  // so only you and the rose doll dodge (the rose doll is always in your lane). h: how high, fall: the set-down, max: wait cap.
+  const AIR = { h: 4.2, fall: 0.6, max: 6.0 };
   const mir = (d, x, z, out) => { if (d.mode === 'x') { out.x = -x; out.z = z; } else { out.x = x; out.z = -z; } return out; };
   const dpos = (d, out) => mir(d, G.player.pos.x, G.player.pos.z, out);
   function dollHurt(b, d, dmg, o = {}) {
@@ -11263,6 +11289,13 @@ const Hitch = (() => {
       sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform float uCut; varying vec2 vDis;\nvoid main() {\nif (vDis.y < uCut + 0.45 * sin(vDis.x * 2.1) + 0.25 * sin(vDis.x * 5.3 + 1.0)) discard;'); };
     mat.customProgramCacheKey = () => 'theatreDis'; return mat;
   }
+  // scenery that fades while it stands between the camera and you, the boss or a doll (Cam.fadeOccluders, fadeBox test). The
+  // material is cloned so nothing else that shares it (a knife's gilt handle, the other legs) fades with it; a clone keeps the
+  // same shader program, and Warm.run compiles the transparent variant before the fight.
+  function occ(m, min = 0.15, pad = 0.3, own = false) {
+    if (!own) { const o = m.material, c = o.clone(); c.onBeforeCompile = o.onBeforeCompile; c.customProgramCacheKey = o.customProgramCacheKey; m.material = c; }
+    m.userData.fadeOcclude = true; m.userData.fadeMin = min; m.userData.fadeBox = { pad }; return m;
+  }
   const velvetM = (color, o = {}) => new THREE.MeshPhysicalMaterial(Object.assign({ color, roughness: 0.85, sheen: 1, sheenColor: new THREE.Color(0xff6a50), sheenRoughness: 0.42, side: THREE.DoubleSide, envMapIntensity: 0.45 }, o));
 
   function build(b) {
@@ -11314,33 +11347,33 @@ const Hitch = (() => {
     S.curt = [];
     const pil = new THREE.CylinderGeometry(1.0, 1.0, 15, 32, 1), PP = pil.attributes.position; for (let i = 0; i < PP.count; i++) { const x = PP.getX(i), z = PP.getZ(i), a = Math.atan2(x, z), k = 1 - 0.06 * Math.pow(Math.abs(Math.cos(a * 8)), 0.5); PP.setX(i, x * k); PP.setZ(i, z * k); } pil.computeVertexNormals();
     for (const sx of [-1, 1]) {
-      const pg = W.mat({ color: 0xb08a44, roughness: 0.42, metalness: 1, envMapIntensity: 1.0 }); const col = new THREE.Mesh(pil, pg); col.position.set(sx * 18.2, 7.5, HZ + 1.6); g.add(col);
-      for (const [y, s] of [[0.4, 1.0], [15.2, 1.15]]) { const cap = new THREE.Mesh(new THREE.BoxGeometry(2.6 * s, 0.8, 2.6 * s), pg); cap.position.set(sx * 18.2, y, HZ + 1.6); g.add(cap); }
+      const pg = W.mat({ color: 0xb08a44, roughness: 0.42, metalness: 1, envMapIntensity: 1.0 }); const col = occ(new THREE.Mesh(pil, pg), 0.2); col.position.set(sx * 18.2, 7.5, HZ + 1.6); g.add(col);
+      for (const [y, s] of [[0.4, 1.0], [15.2, 1.15]]) { const cap = occ(new THREE.Mesh(new THREE.BoxGeometry(2.6 * s, 0.8, 2.6 * s), pg), 0.2); cap.position.set(sx * 18.2, y, HZ + 1.6); g.add(cap); }
       const cutU = { value: -9.5 }, legU = { value: -9.5 }, cm = dissolve(velvetM(0x7a0a18), cutU), tm = W.mat({ color: 0xc9a050, roughness: 0.45, metalness: 1, envMapIntensity: 0.9, transparent: true });
       const cur = new THREE.Mesh(folds(5.5, 16, 5, 0.42), cm); cur.position.set(sx * 15.4, 7.6, HZ + 1.1); g.add(cur);
       const tie = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.12, 8, 24), tm); tie.position.set(sx * 15.6, 5.2, HZ + 1.2); tie.rotation.x = PI / 2; tie.scale.set(1.6, 0.6, 1); g.add(tie);
       const tas = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.9, 10), tm); tas.position.set(sx * 14.2, 4.5, HZ + 1.3); g.add(tas);
       const wm = W.mat({ color: 0x2a0810, roughness: 0.9, emissive: 0x160306 }), legM = dissolve(velvetM(0x4a0814, { sheenColor: new THREE.Color(0xff8a60) }), legU);
-      const wing = new THREE.Mesh(new THREE.BoxGeometry(1, 20, 24), wm); S.curt.push({ sx, a: 1, b: 1, mats: [tm], cutU, legU, wing }); wing.position.set(sx * 20.5, 9, -2); g.add(wing);
-      for (let k = 0; k < 3; k++) { const leg = new THREE.Mesh(folds(4, 16, 3, 0.34), legM); leg.position.set(sx * 17.3, 7.6, -6.5 + k * 6); g.add(leg); }
+      const wing = occ(new THREE.Mesh(new THREE.BoxGeometry(1, 20, 24), wm), 0.12, 0.3, true); S.curt.push({ sx, a: 1, b: 1, mats: [tm], cutU, legU, wing }); wing.position.set(sx * 20.5, 9, -2); g.add(wing);
+      for (let k = 0; k < 3; k++) { const leg = occ(new THREE.Mesh(folds(4, 16, 3, 0.34), legM), 0.15); leg.position.set(sx * 17.3, 7.6, -6.5 + k * 6); g.add(leg); }
     }
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(39, 2.2, 2.2), goldM); beam.position.set(0, 16.2, HZ + 1.6); g.add(beam);
-    { const pts = []; for (let i = 0; i <= 32; i++) { const u = i / 32 * 2 - 1; pts.push(new V3(u * 17.6, 15.0 + 2.6 * Math.sqrt(Math.max(0, 1 - u * u)), HZ + 2.75)); } const ar = new THREE.Mesh(tubeOf(pts, 0.42, 64, 8), goldM); g.add(ar); }
-    const valM = velvetM(0x7a0a18); const val = new THREE.Mesh(folds(34.5, 3.4, 16, 0.35), valM); val.position.set(0, 13.7, HZ + 1.2); g.add(val);
-    { const fr = [], sw = []; for (let s = 0; s < 4; s++) { const x0 = -17 + s * 8.5, x1 = x0 + 8.5, pts = [], fp = []; for (let i = 0; i <= 16; i++) { const u = i / 16, x = lerp(x0, x1, u), y = 12.4 - Math.sin(u * PI) * 1.1; pts.push(new V3(x, y, HZ + 0.95)); fp.push(new V3(x, y - 0.42, HZ + 0.95)); if (i % 2 === 0 && i > 0 && i < 16) fr.push(new V3(x, y - 0.6, HZ + 0.95)); } sw.push(tubeOf(pts, 0.42, 32, 8)); g.add(new THREE.Mesh(tubeOf(fp, 0.07, 32, 5), goldM)); }
-      for (const q of sw) g.add(new THREE.Mesh(q, valM));
-      const ft = new THREE.InstancedMesh(new THREE.ConeGeometry(0.11, 0.5, 6), goldM, fr.length); fr.forEach((p, i) => { _m.position.copy(p); _m.rotation.set(PI, 0, 0); _m.scale.set(1, 1, 1); _m.updateMatrix(); ft.setMatrixAt(i, _m.matrix); }); g.add(ft); }
-    const crest = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.5, 6), goldM); crest.rotation.x = PI / 2; crest.position.set(0, 18.3, HZ + 3.0); g.add(crest);
+    const beam = occ(new THREE.Mesh(new THREE.BoxGeometry(39, 2.2, 2.2), goldM), 0.2); beam.position.set(0, 16.2, HZ + 1.6); g.add(beam);
+    { const pts = []; for (let i = 0; i <= 32; i++) { const u = i / 32 * 2 - 1; pts.push(new V3(u * 17.6, 15.0 + 2.6 * Math.sqrt(Math.max(0, 1 - u * u)), HZ + 2.75)); } const ar = occ(new THREE.Mesh(tubeOf(pts, 0.42, 64, 8), goldM), 0.2); g.add(ar); }
+    const valM = velvetM(0x7a0a18); const val = occ(new THREE.Mesh(folds(34.5, 3.4, 16, 0.35), valM), 0.15); val.position.set(0, 13.7, HZ + 1.2); g.add(val);
+    { const fr = [], sw = []; for (let s = 0; s < 4; s++) { const x0 = -17 + s * 8.5, x1 = x0 + 8.5, pts = [], fp = []; for (let i = 0; i <= 16; i++) { const u = i / 16, x = lerp(x0, x1, u), y = 12.4 - Math.sin(u * PI) * 1.1; pts.push(new V3(x, y, HZ + 0.95)); fp.push(new V3(x, y - 0.42, HZ + 0.95)); if (i % 2 === 0 && i > 0 && i < 16) fr.push(new V3(x, y - 0.6, HZ + 0.95)); } sw.push(tubeOf(pts, 0.42, 32, 8)); g.add(occ(new THREE.Mesh(tubeOf(fp, 0.07, 32, 5), goldM), 0.15)); }
+      for (const q of sw) g.add(occ(new THREE.Mesh(q, valM), 0.15));
+      const ft = new THREE.InstancedMesh(new THREE.ConeGeometry(0.11, 0.5, 6), goldM, fr.length); fr.forEach((p, i) => { _m.position.copy(p); _m.rotation.set(PI, 0, 0); _m.scale.set(1, 1, 1); _m.updateMatrix(); ft.setMatrixAt(i, _m.matrix); }); ft.computeBoundingBox(); g.add(occ(ft, 0.15)); }
+    const crest = occ(new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.5, 6), goldM), 0.2); crest.rotation.x = PI / 2; crest.position.set(0, 18.3, HZ + 3.0); g.add(crest);
     S.mask0 = W.glow(0xfff0c0, 1.2); for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 8), S.mask0); e.scale.set(1.4, 0.7, 0.4); e.position.set(sx * 0.7, 18.6, HZ + 3.3); g.add(e); }
     // painted backdrop
     S.drop = new THREE.Group(); g.add(S.drop);
     S.skyT = [ptex(ART.sky(false)), ptex(ART.sky(true))];
-    S.skyP = paper(42, 20, S.skyT[0], { em: 0.5 }); S.skyP.position.set(0, 9, -15); S.drop.add(S.skyP);
+    S.skyP = occ(paper(42, 20, S.skyT[0], { em: 0.5 }), 0.12, 0.3, true); S.skyP.position.set(0, 9, -15); S.drop.add(S.skyP);
     S.moonM = W.glow(0xfff4d0, 2.2); S.moon = new THREE.Group(); S.moon.position.set(7, 11.5, -14.6); S.drop.add(S.moon);
     S.moon.add(new THREE.Mesh(new THREE.CircleGeometry(2.3, 48), S.moonM)); { const st = new THREE.Mesh(new THREE.BoxGeometry(0.06, 14, 0.04), W.mat({ color: 0xd8c8a0, roughness: 0.6 })); st.position.y = 9; S.moon.add(st); }
     S.layers = [];
     S.townT = [ptex(ART.town('#1c1a3a', '#ffd070')), ptex(ART.town('#2a0e22', '#ff3a2a')), ptex(ART.town('#160a14', '#ff8a2a', true))];
-    const lay = (art, w, h, y, z, amp, sp, rz, dy) => { const m = paper(w, h, art); m.position.set(0, y, z); S.drop.add(m); const L = { m, amp, sp, y0: y, rz, dy, w, h }; S.layers.push(L); return L; };
+    const lay = (art, w, h, y, z, amp, sp, rz, dy) => { const m = occ(paper(w, h, art), 0.12, 0.3, true); m.position.set(0, y, z); S.drop.add(m); const L = { m, amp, sp, y0: y, rz, dy, w, h }; S.layers.push(L); return L; };
     lay(ART.hills('#3a2a6a', '#8a70c0'), 46, 9, 4.2, -13.8, 0.6, 0.23, 0.07, -1.6); S.townL = lay(S.townT[0], 40, 6.5, 3.0, -12.9, 0, 0, -0.11, -1.0); lay(ART.trees('#14302a', '#0a1814'), 44, 6, 2.6, -11.9, 0.35, 0.5, 0.14, -0.6);
     lay(ART.waves('#2a5a8a', '#c0e0ff'), 40, 2.6, 0.9, -11.0, 1.6, 0.9, -0.05, -0.4); lay(ART.waves('#1c406a', '#a0c8f0'), 40, 2.4, 0.7, -10.4, 1.6, -0.7, 0.07, -0.3);
     S.starG = new THREE.Group(); S.starG.position.set(-2, 13.4, -14.2); S.drop.add(S.starG);
@@ -11352,14 +11385,14 @@ const Hitch = (() => {
     // act two scenery: a painted sun and storm clouds lowered on ropes
     const ropeM = W.mat({ color: 0xd8c8a0, roughness: 0.8 }), ropeG = new THREE.BoxGeometry(0.05, 20, 0.05);
     S.hung = [];
-    const hang = (m, x, y, z, rx) => { m.position.set(x, y + 16, z); for (const o of rx) { const rp = new THREE.Mesh(ropeG, ropeM); rp.position.set(o, 10, -0.02); m.add(rp); } S.drop.add(m); m.visible = false; S.hung.push({ m, y, em: m.material.emissiveIntensity }); };
+    const hang = (m, x, y, z, rx) => { occ(m, 0.15, 0.3, true); m.position.set(x, y + 16, z); for (const o of rx) { const rp = new THREE.Mesh(ropeG, ropeM); rp.position.set(o, 10, -0.02); m.add(rp); } S.drop.add(m); m.visible = false; S.hung.push({ m, y, em: m.material.emissiveIntensity }); };
     hang(paper(7, 7, ART.sun(), { em: 0.6, cw: 256, ch: 256 }), -7, 8.6, -14.3, [0]);
     hang(paper(12, 4, ART.cloud('#3a1838', '#c06080'), { em: 0.25 }), -12, 13.2, -13.4, [-4, 4]); hang(paper(13, 4.4, ART.cloud('#2a1030', '#a05080'), { em: 0.25 }), 9.5, 14.0, -13.2, [-4.5, 4.5]);
     // finale: flames on the flats, a hard limelight, embers
     S.fireM = new THREE.ShaderMaterial({ uniforms: { uT: { value: 0 }, uA: { value: 0 }, uD: { value: 0 } }, vertexShader: POOLV, fragmentShader: FIREF, transparent: true, depthWrite: false, side: THREE.DoubleSide });
     S.fireL = new THREE.PointLight(0xff6a20, 0, 34, 1.4); S.fireL.position.set(-2, 6, -8.5); g.add(S.fireL);
     { const fg = new THREE.PlaneGeometry(4.2, 4.4); fg.translate(0, 1.5, 0); const fx = mulberry(12);
-      for (const [li, n] of [[0, 4], [1, 4], [2, 3]]) { const L = S.layers[li]; for (let i = 0; i < n; i++) { const f = new THREE.Mesh(fg, S.fireM); f.position.set((i + 0.5) / n * L.w - L.w / 2 + (fx() - 0.5) * 3, L.h * (0.05 + fx() * 0.2), 0.06); f.scale.setScalar(0.8 + fx() * 0.7); f.renderOrder = 3; f.visible = false; L.m.add(f); (S.fires = S.fires || []).push(f); } } }
+      for (const [li, n] of [[0, 4], [1, 4], [2, 3]]) { const L = S.layers[li]; L.fireM = new THREE.ShaderMaterial({ uniforms: { uT: S.fireM.uniforms.uT, uA: { value: 0 }, uD: S.fireM.uniforms.uD }, vertexShader: POOLV, fragmentShader: FIREF, transparent: true, depthWrite: false, side: THREE.DoubleSide }); for (let i = 0; i < n; i++) { const f = new THREE.Mesh(fg, L.fireM); f.position.set((i + 0.5) / n * L.w - L.w / 2 + (fx() - 0.5) * 3, L.h * (0.05 + fx() * 0.2), 0.06); f.scale.setScalar(0.8 + fx() * 0.7); f.renderOrder = 3; f.visible = false; L.m.add(f); (S.fires = S.fires || []).push(f); } } }
     S.lime = new THREE.Group(); S.lime.visible = false; g.add(S.lime);
     { const LP = new V3(-10, 17, -17.5), LE = new V3(-3.5, 6.5, -9.5); const d = new THREE.Mesh(new THREE.CircleGeometry(1.7, 48), W.glow(0xffffff, 1.7)); d.position.copy(LP); d.lookAt(0, 4, 0); S.lime.add(d);
       const hs = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.2, 1.6, 24, 1, true), W.mat({ color: 0x18141a, roughness: 0.5, metalness: 0.6, side: THREE.DoubleSide })); hs.position.copy(LP); hs.quaternion.setFromUnitVectors(_Y, _w.copy(LP).sub(LE).normalize()); hs.position.addScaledVector(_w, 0.6); S.lime.add(hs);
@@ -11369,13 +11402,13 @@ const Hitch = (() => {
     S.hotPools = []; for (const [x, z, r] of [[-9, -4, 3.2], [8, 3.5, 3.6], [1, -6.5, 2.8]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), poolMat(0xfff0e0)); m.rotation.x = -PI / 2; m.position.set(x, 0.035, z); m.scale.setScalar(r * 2); m.renderOrder = 2; m.visible = false; g.add(m); S.hotPools.push(m); }
     // fly loft: battens, ropes, sandbags, spare flats
     const dark = W.mat({ color: 0x0a0808, roughness: 0.9 }), pipe = W.mat({ color: 0x2a2630, roughness: 0.5, metalness: 0.7 });
-    for (const z of [-6, 0, 6]) { const r = new THREE.Mesh(new THREE.BoxGeometry(38, 0.3, 0.3), dark); r.position.set(0, 14, z); g.add(r); }
+    for (const z of [-6, 0, 6]) { const r = occ(new THREE.Mesh(new THREE.BoxGeometry(38, 0.3, 0.3), dark), 0.15, 0.5); r.position.set(0, 14, z); g.add(r); }
     { const rp = [], bat = [[15.5, -16.2], [19, -17.6], [12.5, -18.6], [21, -15.4], [17, -19.5]];
-      for (const [y, z] of bat) { const m = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 40, 8), pipe); m.rotation.z = PI / 2; m.position.set(0, y, z); g.add(m); for (const x of [-14, -5, 5, 14]) rp.push(x, y, z, x, 44, z); }
+      for (const [y, z] of bat) { const m = occ(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 40, 8), pipe), 0.2); m.rotation.z = PI / 2; m.position.set(0, y, z); g.add(m); for (const x of [-14, -5, 5, 14]) rp.push(x, y, z, x, 44, z); }
       const NB = 12, sb = new THREE.InstancedMesh(new THREE.SphereGeometry(0.5, 12, 10), W.mat({ color: 0x6a5434, roughness: 0.95 }), NB), sr = mulberry(9);
       for (let i = 0; i < NB; i++) { const sx = i % 2 ? 1 : -1, x = sx * (19.3 + sr() * 0.8), y = 3 + sr() * 12, z = -17 + sr() * 9; _m.position.set(x, y, z); _m.rotation.set(0, sr() * 3, 0); _m.scale.set(0.9, 1.35, 0.9); _m.updateMatrix(); sb.setMatrixAt(i, _m.matrix); rp.push(x, y + 0.6, z, x, 44, z); }
-      g.add(sb); const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3)); g.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x8a7a60, transparent: true, opacity: 0.55 })));
-      const sp1 = paper(18, 6, ART.trees('#1a3a2a', '#0a1814'), { em: 0.08 }); sp1.position.set(-8, 21, -17.6); sp1.rotation.z = 0.06; g.add(sp1); const sp2 = paper(16, 5, ART.cloud('#2a2040', '#6a5a90'), { em: 0.08 }); sp2.position.set(9, 23, -19.4); sp2.rotation.z = -0.08; g.add(sp2); }
+      sb.computeBoundingBox(); g.add(occ(sb, 0.2)); const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3)); g.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x8a7a60, transparent: true, opacity: 0.55 })));
+      const sp1 = occ(paper(18, 6, ART.trees('#1a3a2a', '#0a1814'), { em: 0.08 }), 0.15, 0.3, true); sp1.position.set(-8, 21, -17.6); sp1.rotation.z = 0.06; g.add(sp1); const sp2 = occ(paper(16, 5, ART.cloud('#2a2040', '#6a5a90'), { em: 0.08 }), 0.15, 0.3, true); sp2.position.set(9, 23, -19.4); sp2.rotation.z = -0.08; g.add(sp2); }
     // follow spots for the blackout: beam with dust, housing, hot pool on the boards
     S.cones = []; S.spotPools = [];
     for (let i = 0; i < 7; i++) {
@@ -11389,7 +11422,7 @@ const Hitch = (() => {
     // sliding flats for the scene changes
     S.flats = [];
     const arts = [ART.trees('#14302a', '#0a1814'), ART.town('#3a1a30', '#d8a050'), ART.hills('#5a3a20', '#c8a070')];
-    for (let r = 0; r < 3; r++) for (const sx of [-1, 1]) { const f = paper(20, 7.5, arts[r], { em: 0.25 }); f.position.set(sx * 30, 3.7, ROWZ[r]); f.castShadow = true; g.add(f); S.flats.push({ m: f, row: r, sx, x: sx * 30, tx: sx * 30 }); }
+    for (let r = 0; r < 3; r++) for (const sx of [-1, 1]) { const f = occ(paper(20, 7.5, arts[r], { em: 0.25 }), 0.35, 0.3, true); f.position.set(sx * 30, 3.7, ROWZ[r]); f.castShadow = true; g.add(f); S.flats.push({ m: f, row: r, sx, x: sx * 30, tx: sx * 30 }); }
     // the house
     const NA = 150, heads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.42, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }), NA), ar = mulberry(31);
     for (let i = 0; i < NA; i++) { const row = Math.floor(i / 25), k = i % 25; _m.position.set((k - 12) * 1.5 + (row % 2) * 0.7 + (ar() - 0.5) * 0.3, -1.6 + row * 0.5 + ar() * 0.15, 15 + row * 1.9); _m.scale.set(1, 1.15, 1); _m.rotation.set(0, 0, 0); _m.updateMatrix(); heads.setMatrixAt(i, _m.matrix); heads.setColorAt(i, _c.setHex(row === 0 ? 0x2a0e08 : row === 1 ? 0x180705 : 0x070204)); }
@@ -11490,7 +11523,7 @@ const Hitch = (() => {
     carve.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n{ vec3 wn = (vec4(normal, 0.0) * viewMatrix).xyz; wn /= max(length(wn), 1e-4); float up = clamp(wn.y, -1.0, 1.0); diffuseColor.rgb *= mix(1.0, 0.55, clamp(up, 0.0, 1.0)); totalEmissiveRadiance += vec3(0.3, 0.1, 0.62) * clamp(-up, 0.0, 1.0) * 0.85; }'); };
     carve.customProgramCacheKey = () => 'theatreCarve';
     const jointM = W.mat({ color: 0x8a7a74, roughness: 0.5 }), nailM = W.mat({ color: 0xf0e4dc, roughness: 0.15, envMapIntensity: 1.4 });
-    { const gg = new THREE.Group(); gg.position.set(0, 15, -23); gg.scale.set(0.85, 1.12, 0.5); S.giant.add(gg); const ft = ptex(FACE, 512, 256); const gm = new THREE.Mesh(new THREE.SphereGeometry(7, 48, 32), new THREE.MeshStandardMaterial({ map: ft, color: 0x7a7078, roughness: 0.5, envMapIntensity: 0.4 })); gm.rotation.y = -PI / 2; gg.add(gm); }
+    { const gg = new THREE.Group(); gg.position.set(0, 15, -23); gg.scale.set(0.85, 1.12, 0.5); S.giant.add(gg); const ft = ptex(FACE, 512, 256); const gm = occ(new THREE.Mesh(new THREE.SphereGeometry(7, 48, 32), new THREE.MeshStandardMaterial({ map: ft, color: 0x7a7078, roughness: 0.5, envMapIntensity: 0.4 })), 0.2, 0.3, true); gm.rotation.y = -PI / 2; gg.add(gm); }
     S.gEye = W.glow(VIO, 0.1); for (const sx of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.36, 16, 12), S.gEye); e.position.set(sx * 2.19, 16.18, -19.7); S.giant.add(e); }
     S.gL = new THREE.PointLight(VIO, 0, 60, 1.6); S.gL.position.set(0, 7, -7); g.add(S.gL);
     S.hands = [];
@@ -11509,6 +11542,8 @@ const Hitch = (() => {
       ho.position.set(sx * 9, 30, -8); S.giant.add(ho); S.hands.push({ g: ho, sx, home: new V3(sx * 9, 13.5, -9), tgt: new V3(sx * 9, 13.5, -9), fast: 0 });
     }
     S.split = false; S.dark = 0; S.black = null; S.twang = 0; S.dz = 0; S.act = 0; S.gesture = 0; S.pitY = 0; S.a1 = 0; S.a2 = 0; S.lx = 0; S.lz = 0;
+    // the giant (hands, sleeves, face) fades too when it hangs between the camera and the play; its eyes keep their shared glow
+    S.giant.traverse((o) => { if (o.isMesh && !o.userData.fadeOcclude && o.material !== S.gEye && !o.material.isShaderMaterial) occ(o, 0.2); });
     if (G.nightmare) buildNM(b, g, S, { goldM, velvetM, coneMat, poolMat, folds });
     const _dt = {};
     b.distTo = function (x, z) { if (S.nmOn) { const m = mir(S.dolls[S.lead], x, z, _dt); x = m.x; z = m.z; } else if (S.split) x = -x; return Math.max(0, Math.hypot(x - this.pos.x, z - this.pos.z) - this.radius); };
@@ -11517,7 +11552,11 @@ const Hitch = (() => {
       contains: (x, z) => Math.abs(x) <= HX - 0.4 && Math.abs(z) <= HZ - 0.4 && (!S.split || x <= -PIT - 0.3),
       clamp(p) { p.x = clamp(p.x, -HX + 0.5, S.split ? -PIT - 0.4 : HX - 0.5); p.z = clamp(p.z, -HZ + 0.5, HZ - 0.5); },
       bulletBounds: (x, z) => Math.abs(x) < 17.5 && Math.abs(z) < 11,
-      camLimit(x, y, z) { return { x: clamp(x, -14.3, 14.3), y: Math.min(y, 12.5), z: clamp(z, -9.5, 30) }; },
+      // the camera may pull all the way out (behind the backdrop, into the wings, up into the fly loft): scenery in the way fades
+      // (occ above). It stays inside the house and in front of the giant's face.
+      camLimit(x, y, z) { return { x: clamp(x, -31, 31), y: clamp(y, 0.6, 26), z: clamp(z, -21, 34) }; },
+      fadeTargets(out) { const p = G.player; if (!p) return; out.push([p.pos.x, p.pos.y + 0.3, p.pos.z], [p.pos.x, p.pos.y + 2.0, p.pos.z]); if (b.alive !== false) out.push([b.pos.x, b.pos.y + 2.6, b.pos.z]);
+        for (const d of S.dolls) if (d.on) { const q = dpos(d, _ft); out.push([q.x, p.pos.y + 1.2 + (d.airK || 0) * AIR.h, q.z]); } },
     };
   }
   function folds(w, h, n, amp) { const geo = new THREE.PlaneGeometry(w, h, n * 8, 8), P = geo.attributes.position; for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i); P.setZ(i, Math.sin(x / w * n * TAU) * amp * (0.5 + 0.5 * (0.5 - y / h)) + Math.sin(x / w * n * 3.1 * TAU + 1) * amp * 0.18); } geo.computeVertexNormals(); return geo; }
@@ -11559,7 +11598,19 @@ const Hitch = (() => {
     }
     yield 2.0;
   }
-  function* birds(b, side, waves = 3) {
+  function* airborne(b, inner) {
+    const S = b.state, d = S.dolls[1];
+    if (!d.on || d.air) { yield* inner; return; }
+    d.air = true; d.up = 1; S.twang = 1; S.gesture = 1; Sound.sfx('parry', 0.5, 0.7);
+    yield* inner;
+    for (let t = 0; t < AIR.max && Bul.list.some((q) => q.bird && !q.dead); t += 0.1) yield 0.1; // the last wave has flown past
+    d.up = 0; yield AIR.fall; d.air = false; S.twang = 1;
+  }
+  // anything that needs both dolls on the boards (Recast, a Cue) waits for the set-down first
+  function* grounded(b) { const S = b.state; for (let t = 0; S.dolls.some((d) => d.air) && t < AIR.max + 2; t += 0.1) yield 0.1; groundAll(S); }
+  const groundAll = (S) => { for (const d of S.dolls) { d.air = false; d.up = 0; } };
+  function* birds(b, side, waves = 3) { yield* airborne(b, birdWaves(b, side, waves)); }
+  function* birdWaves(b, side, waves) {
     yield* b.cast({ name: 'Paper Birds', time: 0.8 });
     let g0 = rndi(0, 6);
     for (let w = 0; w < waves; w++) {
@@ -11623,7 +11674,7 @@ const Hitch = (() => {
     yield 1.2;
   }
   function setAct(b, n) {
-    const S = b.state, p = G.player; S.act = n; S.split = n === 1;
+    const S = b.state, p = G.player; S.act = n; S.split = n === 1; groundAll(S);
     S.black = null; S.dark = 0; S.spin = 0; S.fanOn = 0; for (const c of S.cones) c.visible = false; if (S.spotPools) for (const pl of S.spotPools) pl.visible = false;
     const d1 = S.dolls[1]; d1.on = n === 2; d1.M.group.visible = d1.bar.visible = d1.ln.visible = d1.on;
     S.giant.visible = n === 2;
@@ -11716,7 +11767,7 @@ const Hitch = (() => {
   // Co.stopTag('phase') skips a coroutine's cleanup, so every per-mechanic flag a cut-off mechanic can leave behind is reset here:
   // in every Nightmare phase, the last blow and the kill. Who the lead is stays (it is not per-mechanic); a half-done Recast is dropped.
   function resetMech(b) {
-    const S = b.state; S.black = null; S.dark = 0; S.spin = 0; S.fanOn = 0; S.ovUntil = 0; S.bow = 0; S.lift = 0; b.pos.y = 0; S.recast = null; S.heroTwang = 0; S.curtainOn = false;
+    const S = b.state; S.black = null; S.dark = 0; S.spin = 0; S.fanOn = 0; S.ovUntil = 0; S.bow = 0; S.lift = 0; b.pos.y = 0; S.recast = null; S.heroTwang = 0; S.curtainOn = false; groundAll(S);
     if (!G.headless) { for (const c of S.cones) c.visible = false; for (const pl of S.spotPools) pl.visible = false; }
     for (const H of S.hands) { H.fast = 0; if (H.tgt.y < 5) H.tgt.copy(H.home); }
     const q = leadPos(S, _g); S.inLight = Math.hypot(q.x - b.pos.x, q.z - b.pos.z) <= GATE.r; b.dmgTaken = S.inLight ? 1 : GATE.off;
@@ -11752,6 +11803,7 @@ const Hitch = (() => {
     C.sort((a, c) => a.bad - c.bad); return C.length ? C[0].c : { x: b.pos.x, z: b.pos.z };
   }
   function* recast(b) {
+    yield* grounded(b);
     const S = b.state, st = S.finale ? S.callStep : 0, tell = RECAST.tell[st], to = 1 - S.lead, c = pickMark(b, to);
     S.recast = { to, x: c.x, z: c.z, t0: G.now, at: G.now + tell, tell };
     const mk = Hz.mark({ type: 'circle', x: c.x, z: c.z, r: 1.3 }, tell + 0.1, { color: GOLD, alpha: 0.7 });
@@ -11819,6 +11871,7 @@ const Hitch = (() => {
     return lit(-x, z) && lit(x, -z);
   }
   function* cue(b, o) {
+    yield* grounded(b);
     const S = b.state, p = G.player, time = o.time, c = genCue(b.pos, p.pos, o.decoys, time), spots = c.lights.slice();
     const near = Math.hypot(p.pos.x - c.q.x, p.pos.z - c.q.z) <= Math.hypot(p.pos.x - c.q2.x, p.pos.z - c.q2.z) ? c.q : c.q2;
     let faint; if (o.own) { faint = spots.length; spots.push({ x: near.x, z: near.z }); }
@@ -11914,7 +11967,7 @@ const Hitch = (() => {
   }
   function* moveA(b, st) {
     const S = b.state, k = (S.mA = (S.mA || 0) + 1) % 3;
-    if (STEP[st].birds) Co.start(nmBirds(b, BIRDS.waves), 'phase');
+    if (STEP[st].birds) Co.start(airborne(b, nmBirds(b, BIRDS.waves)), 'phase');
     if (k === 1) yield* knives(b, 4); else if (k === 2) yield* sandbags(b, 3); else { yield* flourish(b); yield* pirouette(b); }
   }
   function* moveB(b, st) {
@@ -12001,7 +12054,7 @@ const Hitch = (() => {
       d.gk = damp(d.gk, want, 12, dt);
       d.ln.material.color.copy(d.col0).multiplyScalar(0.55 + 0.45 * d.gk).lerp(_c.setHex(GOLD).multiplyScalar(1.9), d.gk); d.ln.material.opacity = 0.3 + 0.6 * d.gk + S.twang * 0.3;
       for (const m of d.barM) { m.color.setHex(0x3a2412).lerp(_c.setHex(GOLD), d.gk); m.emissive.setHex(GOLD).multiplyScalar(d.gk * 0.6); }
-      const q = dpos(d, _g2); d.shell.visible = d.foot.visible = d.gk > 0.03; d.shell.position.set(q.x, p.pos.y + 1.15 + (d.drop || 0) * 16, q.z); d.shell.material.uniforms.uA.value = d.gk * (0.75 + 0.5 * dk); d.foot.position.set(q.x, 0.042, q.z); d.foot.material.uniforms.uA.value = d.gk * (0.45 + 0.3 * dk);
+      const q = dpos(d, _g2); d.shell.visible = d.foot.visible = d.gk > 0.03; d.shell.position.set(q.x, p.pos.y + 1.15 + (d.drop || 0) * 16 + (d.airK || 0) * AIR.h, q.z); d.shell.material.uniforms.uA.value = d.gk * (0.75 + 0.5 * dk); d.foot.position.set(q.x, 0.042, q.z); d.foot.material.uniforms.uA.value = d.gk * (0.45 + 0.3 * dk);
       const face = i === S.lead && S.inLight && p.moveSpeed < 0.5 ? angTo(q.x, q.z, b.pos.x, b.pos.z) : d.M.group.rotation.y;
       d.face = d.face === undefined ? face : dampAng(d.face, face, 10, dt); d.M.group.rotation.y = d.face;
     });
@@ -12126,7 +12179,7 @@ const Hitch = (() => {
       // understudies copy the player's body
       const pm = p.model;
       for (const d of S.dolls) {
-        if (!d.on) continue; const q = dpos(d, _b2), M = d.M, drop = (d.drop || 0) * 16;
+        if (!d.on) continue; d.airK = damp(d.airK || 0, d.up ? 1 : 0, d.up ? 4 : 6, dt); const q = dpos(d, _b2), M = d.M, drop = (d.drop || 0) * 16 + d.airK * AIR.h;
         M.group.position.set(q.x, p.pos.y + drop, q.z); M.group.rotation.y = d.mode === 'x' ? -p.facing : PI - p.facing; M.group.scale.x = -1;
         d.fake.moveSpeed = p.moveSpeed; d.fake.grounded = p.grounded; d.fake.casting = p.casting; d.fake.parryT = p.parryT; d.fake.rollT = p.rollT; d.fake.aimT = p.aimT; d.fake.loadT = p.loadT; d.fake.flashT = p.flashT;
         M.anim.swing = pm.anim.swing; M.anim.swingDur = pm.anim.swingDur; M.anim.swingKind = pm.anim.swingKind; M.update(dt, d.fake); if (pm.anim.swing > 0) M.anim.swing = pm.anim.swing;
@@ -12179,7 +12232,7 @@ const Hitch = (() => {
       for (const H of S.hung) { H.m.position.y = H.y + (1 - S.a1) * 16; H.m.visible = S.a1 > 0.02; }
             for (const L of S.layers) { L.m.position.x = L.amp ? Math.sin(t * L.sp) * L.amp * (1 - burn * 0.7) : 0; L.m.position.y = L.y0 + L.dy * burn + Math.sin(t * 0.7 + L.y0) * 0.08 * burn; L.m.rotation.z = L.rz * burn + Math.sin(t * 0.9 + L.y0 * 3) * 0.012 * burn; }
       S.skyP.visible = burn < 0.7; S.lime.visible = S.embers.visible = burn > 0.05; for (const f of S.fires) f.visible = burn > 0.05;
-      S.fireM.uniforms.uA.value = burn * (1 - dk * 0.67); S.fireM.uniforms.uD.value = dk; S.fireM.uniforms.uT.value = tu; S.fireL.intensity = burn * (55 + 22 * Math.sin(t * 13) + 12 * Math.sin(t * 7.3)) * (1 - dk * 0.7);
+      S.fireM.uniforms.uA.value = burn * (1 - dk * 0.67); for (const L of S.layers) if (L.fireM) L.fireM.uniforms.uA.value = S.fireM.uniforms.uA.value * (L.m.userData.fadeA === undefined ? 1 : L.m.userData.fadeA); /* flames fade with their flat */ S.fireM.uniforms.uD.value = dk; S.fireM.uniforms.uT.value = tu; S.fireL.intensity = burn * (55 + 22 * Math.sin(t * 13) + 12 * Math.sin(t * 7.3)) * (1 - dk * 0.7);
       if (S.lime.visible) { S.limeCone.material.uniforms.uA.value = 0.32 * burn * (1 - dk * 0.6); S.limeCone.material.uniforms.uT.value = tu; }
       for (const hp of S.hotPools) { hp.visible = burn > 0.05; hp.material.uniforms.uA.value = 0.1 * burn * (1 - dk); }
       S.gEye.color.setHex(VIO).multiplyScalar(0.1 + burn * (1.8 + Math.sin(t * 2) * 0.5)); S.gL.intensity = burn * 90;

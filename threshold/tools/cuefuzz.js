@@ -59,7 +59,7 @@ const { launch } = require('./harness.js');
       const g = window.__game, G = g.G; G.headless = true; g.bot(3); g.god(true); g.start('theatre', { cls: 'stormcaller', phase: 2 });
       const b = G.boss, p = G.player, S = b.state, T = b.def.nmTest, Hz = g.Hz, Bul = g.Bul;
       let samples = 0, bad = 0, acc = 0, news = 0, badNew = 0; const where = {}, seen = new Set();
-      const bodies = (x, z) => [[x, z], [-x, z], [x, -z]];
+      const bodies = (x, z) => [[x, z]].concat(S.dolls[0].air ? [] : [[-x, z]], S.dolls[1].air ? [] : [[x, -z]]); // a doll lifted for Paper Birds is out of the play
       const live = () => Hz.list.filter((h) => h.state !== 'done' && h.state !== 'fired' && h.dmg);
       const hit = (x, z) => { for (const h of live()) if (Hz.inShape(h.shape, x, z) !== !!h.invert) return true; return Bul.threat(x, z, 0.5, 0.5); };
       const tFire = (x, z) => { let t = Infinity; for (const h of live()) if (Hz.inShape(h.shape, x, z) !== !!h.invert) t = Math.min(t, h.state === 'zone' ? 0 : h.delay - h.t); return t; };
