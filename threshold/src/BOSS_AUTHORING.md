@@ -24,6 +24,9 @@ House rules for these fights:
       clamp(p) { /* push p back inside (wall arenas) */ },
       // optional: solid(p, ox, oz) for pillars, camLimit(x, y, z) -> {x,y,z}, bulletBounds(x, z),
       // camDist / camPitch for the starting camera, floorY
+      // fadeTargets(out): extra [x, y, z] points (a doll, the boss) that scenery flagged userData.fadeOcclude must not hide.
+      // Big flat scenery (backdrops, wings, curtains) sets userData.fadeBox = { pad } as well: see Cam.fadeOccluders in
+      // 05_world.js and occ() in 26_boss_theatre.js, where the camera may pull all the way out and the stage fades instead.
     };
   }
   G.bosses.push({
