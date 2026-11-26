@@ -122,6 +122,7 @@ Options: `name`, `color`, `blockable` (false means Riposte and Aegis cannot stop
 - `FX.burst / ring / pillar / beam / lightning / slash / dome / missile / explode / flash / shake` for effects. Skip purely cosmetic effects when `G.headless` is true.
 - `Post.lerpTo({ bloom, exposure, tint, ... }, seconds)` as a coroutine for phase mood changes. Bloom above about 0.8 washes the screen out quickly, so check a screenshot.
 - `Cam.shot(posFrom, lookFrom, posTo, lookTo, seconds, fov)` for cinematics, then control returns to the player.
+- Any time `Cam.cine` is set (Cam.shot, or a hand-set `Cam.cine = {...}`) during the intro, the fight or the kill, the player is locked centrally (`G.cineLock`, 10_game.js): no movement, skills, jump, targeting or mouse look, a cast in progress is dropped, GCD/cooldowns/buffs/class gauge freeze, no hits land except `pierce` blows, and the HUD hides. A boss needs nothing extra; just `Cam.release()` when the shot ends. Ground that falls away under the frozen hero puts them on the nearest standing ground when the camera returns. `tools/cinelock.js` checks it.
 - Music is a 16-step sequencer: each layer is `{ v: voice, pat: 'x...x...' or note digits, from: phaseIndex, to, oct, len, vol }`. Layers with `from: 1` join in phase two, and so on. Voices: kick snare hat tom taiko clap bass sub pad arp lead organ bell choir koto flute brass pulse.
 
 ## Loading and hitches (`11_warm.js`, `Game.rehearse`)
