@@ -76,7 +76,7 @@ HUD hooks on a skill: `rdy(p)` (glow), `act(p)` (lit while active), `interrupt: 
 
 The door page has a Normal / Nightmare toggle between the classes and the doors (mouse, arrows / d-pad left-right on it, Enter / A flips it).
 On Nightmare, a door without a nightmare version is greyed out, cannot be focused or clicked, and the hall behind the menu dims it.
-Three fights have one so far. Door III, Niten: four phases on the same 23,000 health (sunset, nightfall, the lake with its seam and mirrored
+Four fights have one so far. Door III, Niten: four phases on the same 23,000 health (sunset, nightfall, the lake with its seam and mirrored
 ghosts, then his reflection fighting beside him, where exactly one of the two can be hurt and Stillness is the swap). Door XIX, Chiaroscuro:
 three phases on 24,000 health (Normal: 31,000) (the fight opens in colour, then the Negative, then a turning seam splits the canvas into a white
 half and a black half, and every Critique names a half and a colour, shown as his whole body white or black with the colour as a swirl of
@@ -85,7 +85,13 @@ three phases on 28,000 health (100 / 85 / 68). The Impresario only takes real da
 shell) stands in the pool of light at his feet (x0.1 otherwise); the dolls mirror your moves, so you steer the lead into it. Every 15 s he
 recasts the lead. Phase 2 adds a second doll, phase 3 ("Final Call") ties strings to you and ramps every 35 s (the Hand, dark Cues where only
 the dolls carry lights, birds and scenery, a faster tempo, then a triple-Cue Curtain call); a passed Cue gives a 4 s Ovation (x2 damage).
-No Encore on Nightmare; the last blow is "Final Curtain". Normal play is untouched by any of this.
+No Encore on Nightmare; the last blow is "Final Curtain". Euryale, "The Garden Remembers": three phases on 20,500 health
+(100 / 88 / 74). Her skin is stone (x0.2) and statues cannot be hurt; every awake statue her own Behold crumbles cracks her open for
+4 s (banked up to 14 s, shown as a lit arc on the stone ring under her, one segment per statue). Statues walk only while unseen, so
+you herd them with your eyes into her cone. Phase 1 raises the first two in her lane, phase 2 adds the first mirror, phase 3 (the
+garden) ramps every 35 s: more statues kept awake (3 to 5), faster (3.2 to 4.2 m/s), a second mirror, bare plinths (the last
+statues rise from the floor), paired Beholds. Petrify roots for 1.8 s. The last blow is "A Thousand Eyes". Normal play is
+untouched by any of this.
 
 A nightmare version is a `nightmare` block on the boss def (see `BOSS_AUTHORING.md`). It has short teaching phases and a long last
 phase that ramps on its own, and one overall enrage: from `enrage` seconds a soft creeping pulse (`enrageBase` 40 + `enrageGrow` 4 per
@@ -109,7 +115,7 @@ Later fights use the ids `clock`, `portal`, `atelier`, `sumi`. `portal` also tak
 - `superdmg.js [door ids]`: the Settings testing options (God mode + Super damage) on, level-3 autopilot clears every door, normal and nightmare; passes when each phase is entered once and in order, the player never dies and the boss falls.
 - `smoke.js <boss>`: every phase with every class in god mode, reports script errors.
 - `NM=1` before any of these tools adds `&nm=1` to every page they load, so `smoke`, `sim`, `matrix`, `hitch`, `nanscan`, `shot` and the rest run the nightmare version unchanged. The nightmare last blow pierces god mode on purpose, so god-mode runs still run out of time.
-- `nmpace.js <boss> [classes|all] [runs]`: Nightmare pace. Plays whole fights from phase 1 with the level-3 autopilot in god mode and prints per run the kill time (or `OUT` when the last blow lands), each phase's time and dps, the last phase's share of the time, and the fight time each ramp step started; then kills, median, best and worst per class. `REAL=1` turns god mode off (survival, deaths with their source); `PASSIVE=1` never attacks; `SWAPBLIND=1` ignores who is awake in Niten; `SIDEBLIND=1` ignores the called half in Chiaroscuro (both must never kill).
+- `nmpace.js <boss> [classes|all] [runs]`: Nightmare pace. Plays whole fights from phase 1 with the level-3 autopilot in god mode and prints per run the kill time (or `OUT` when the last blow lands), each phase's time and dps, the last phase's share of the time, and the fight time each ramp step started; then kills, median, best and worst per class. `REAL=1` turns god mode off (survival, deaths with their source); `PASSIVE=1` never attacks; `SWAPBLIND=1` ignores who is awake in Niten; `SIDEBLIND=1` ignores the called half in Chiaroscuro, `GARDENBLIND=1` ignores Euryale's garden (all must never kill). Bosses whose `nmTest.castStep(b)` names a ramp step (Niten, Euryale's garden) also get the cast budget per step.
 - `nmphase.js [boss]`: forces each nightmare phase change in the middle of a mechanic (Issen: Stillness, a Counter, Final Verse; Pentimento: a Roller, a live Blot, a Critique, a matched Critique), then in the last phase starts the last blow mid-mechanic (Issen: a swap, a Counter, the twin Verse, paired Moons, a step-5 swap, the twin Petal Storm; Pentimento: a Fresh Coat, a Critique, a Roller, a repair drop, a Roller on the fast seam, a pair, the signature), and checks nothing is left behind; then that a restart resets the ramp state.
 - `moonfuzz.js [classes] [runs]`: Issen's Moons (Full Moon = the "in", New Moon = the "out"). Whole fights with the level-3 autopilot; per Moon the share of the deck it leaves safe, whether the player already stood safe when its tell began, the walk to safety otherwise, and the hits. `NM=1` for Nightmare, `REAL=1` god mode off.
 - `critfuzz.js [runs] [classes|all]`: door XIX's finale, where every Critique asks for a half and a paint at the instant it lands. Plays it (god mode; `STEPS=0,3,4` by default, forcing the ramp step so the fast seam and both Critiques of a pair are covered) with the level-3 autopilot and with a lazy one that never washes or fetches paint, and lists every Critique's route check (how long the walk to an answer takes, and the repair the boss made: moving the dish, dropping the missing paint, or stretching the cast). Passes when every Critique has an answer, all 14 calls appear, the level-3 bot needs a repair in under 25% of them and a stretched cast in at most 5% (the signature's stretched gaps are by design and counted apart).
@@ -119,6 +125,10 @@ Later fights use the ids `clock`, `portal`, `atelier`, `sumi`. `portal` also tak
 - `callphase.js`: forces each Impresario nightmare phase change and the last blow in the middle of every mechanic, checks nothing is left behind, then that a restart resets the state.
 - `callentry.js`: the Impresario's Nightmare through the full intro for every class (split stage, pit, one doll), then a whole god-mode fight with ramp step times.
 - `callshots.js <outDir>`: GPU shot list for the Impresario's Nightmare (opening, gate open / closed, recast tell, each ramp step, a dark Cue, an Ovation, the Curtain call, the last blow, the Final Call cinematic, the kill).
+- `gardenfuzz.js [classes] [runs]`: Euryale's Nightmare garden: per phase the share of live time she was open, each Behold's crumbled statues (0 = a wasted stare), Stone Grasps, petrifies and the most statues awake. `REAL=1`, `GARDENBLIND=1` (ignores the garden, must not kill), `PHASE=n`, `BY=1` (damage taken by source).
+- `gardenphase.js`: forces each Euryale nightmare phase change and the last blow in the middle of every mechanic (a locked Behold, a floor rise, Lash, Vipers, an open window, the second mirror rising), checks nothing is left behind, then that a restart resets the garden.
+- `gardenentry.js`: Euryale's Nightmare through the full intro for every class (the lesson statues rise in real frames), then a whole god-mode fight with garden step times.
+- `gardenshots.js <outDir>`: GPU shot list for Euryale's Nightmare (the lesson, shell shut / open, a Behold with statues in the lane, each garden step, a floor rise, the garden cinematic, A Thousand Eyes, the kill).
 - `menunav.js`: the Difficulty toggle with mouse, keyboard and a simulated controller (values, greyed doors skipped, focus, persistence, Restart keeps Nightmare, Normal still starts Normal). Must print `ALL PASS`.
 - `matrix.js <class,class|all> [runs] [boss,boss]`: autopilot attempts for every door and class, one summary line each (wins, boss health left, dps). `GOD=1` checks instead that each class can finish every fight before the enrage.
 - `sim.js <boss> <class> <botLevel> [runs] [maxSec] [phase]`: full autopilot attempts.
@@ -151,7 +161,7 @@ Run them with `NODE_PATH=<global node_modules with playwright> THREE_DIR=<unpack
 - Mechanic damage and telegraph time: the `delay` and `dmg` arguments of each `Hz.*` call in the boss file.
 - Player health and speed: `Player` in `07_player.js` (1000 hp, speed 7). Class numbers: `08_classes.js`.
 - Look per fight: the `post` block of each boss (bloom, exposure, tint) and its `build()`.
-- Nightmare pace: `NM_HP` in `22_boss_duelist.js` (Issen), `38_boss_atelier.js` (Pentimento) and `26_boss_theatre.js` (the Impresario), with the measured table next to it, then the `enrage` time (330 to 360 s), then the ramp (`RAMP` for Niten and the Final Call, `SIT_PER_STEP` for Chiaroscuro). Tune with `tools/nmpace.js`; never touch class numbers or Normal for it.
+- Nightmare pace: `NM_HP` in `22_boss_duelist.js` (Issen), `38_boss_atelier.js` (Pentimento), `26_boss_theatre.js` (the Impresario) and `25_boss_gorgon.js` (Euryale; also `OPEN`, `WAKE`, `STEP`), with the measured table next to it, then the `enrage` time (330 to 360 s), then the ramp (`RAMP` for Niten and the Final Call, `SIT_PER_STEP` for Chiaroscuro). Tune with `tools/nmpace.js`; never touch class numbers or Normal for it.
 
 The autopilot is a rough stand-in for a player who already knows the fight. At the time of writing it clears the cathedral and the engine, gets the leviathan and titan into their last phase, and dies in phase two of the duelist. Nothing has been tuned against a human yet.
 
