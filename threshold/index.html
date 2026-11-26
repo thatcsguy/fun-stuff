@@ -4573,9 +4573,9 @@ G.classes.push({
 // theatre (Impresario), wheel (Lady Fortuna), express (Ironjaw), winter (Huntsman), origami (Oriko), lamp (Vesper),
 // chess (Zugzwang), festival (Nian), fall (Anzu), clock (Horologist), portal (Janus), atelier (Pentimento), sumi (Garyo).
 const GROUPS = [
-  { id: 'nightmare', name: 'Nightmare', bosses: ['duelist', 'atelier', 'theatre', 'engine'] },
+  { id: 'nightmare', name: 'Nightmare', bosses: ['duelist', 'atelier', 'theatre', 'engine', 'gorgon'] },
   { id: 'ready', name: 'Ready', bosses: [] },
-  { id: 'almost', name: 'Almost', bosses: ['cathedral', 'leviathan', 'gorgon', 'origami', 'lamp', 'chess', 'festival', 'fall', 'portal'] },
+  { id: 'almost', name: 'Almost', bosses: ['cathedral', 'leviathan', 'origami', 'lamp', 'chess', 'festival', 'fall', 'portal'] },
   { id: 'concept', name: 'Concept', bosses: ['titan', 'wheel', 'express', 'winter', 'clock', 'sumi'] },
 ];
 // the fights of each group, as boss defs (unknown ids are skipped; unlisted bosses fall into the last group)
@@ -10483,6 +10483,7 @@ const Hitch = (() => {
     // soft fill from below-front (in view space, so her face always reads) plus a cool rim
     skin.onBeforeCompile = (sh) => { sh.uniforms.uRim = S.skinRim; sh.uniforms.uFill = S.fill; sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'uniform vec3 uRim; uniform vec3 uFill;\nvoid main() {').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n{ vec3 vv = vViewPosition / max(length(vViewPosition), 1e-4); float fr = 1.0 - clamp(abs(dot(normal, vv)), 0.0, 1.0); totalEmissiveRadiance += uRim * pow(max(fr, 0.0), 2.2); float fl = clamp(dot(normal, vec3(0.0, -0.33, 0.944)), 0.0, 1.0); totalEmissiveRadiance += uFill * diffuseColor.rgb * (0.2 + 0.8 * fl * fl); }'); }; skin.customProgramCacheKey = () => 'gorSkin';
     const gold = withRim(W.mat({ color: 0xa87a32, roughness: 0.52, metalness: 1, envMapIntensity: 1.4 }), S.rim, 2.6), dark = W.mat({ color: 0x0a0806, roughness: 0.6 });
+    S.skinM = skin; S.scM = [scales, scalesB]; S.goldM = gold;
     const claw = W.mat({ color: 0x241a0c, roughness: 0.3, metalness: 0.8 }), ivory = W.mat({ color: 0xe6dcc0, roughness: 0.4 });
     // serpent body: one continuous tube, emerald back, pale gold belly plates, rebuilt from the spine every frame
     { const NL = 58, NR = 12, n = NL * (NR + 1), pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2), col = new Float32Array(n * 3), idx = [];
@@ -10572,6 +10573,7 @@ const Hitch = (() => {
     S.vis = visionWedge(); g.add(S.vis.g);
     S.gaze = 0; S.stoneT = 0; S.statSpeed = 2.7; S.botYaw = PI; S.nMir = 0; S.rear = 0; S.slashT = 0; S.grind = 0; S.seedN = 20; S.mode = 0; S.pk = 0; S.frostT = 0;
     tailUpd(S, 0, 0, 0, 0);
+    if (G.nightmare) buildNM(b, g, S);
     return {
       edge: 'wall', spawn: { x: 0, z: 13 }, bossStart: { x: 0, z: -3, face: 0 },
       contains: (x, z) => Math.hypot(x, z) <= R - 0.3,
@@ -10594,30 +10596,39 @@ const Hitch = (() => {
     const free = S.ped.filter((q) => q.has).sort((u, w) => dist2(w.x, w.z, p.pos.x, p.pos.z) - dist2(u.x, u.z, p.pos.x, p.pos.z));
     for (let k = 0; k < n && free.length; k++) {
       const q = free.splice(Math.floor(rnd(0, Math.min(free.length, 4))), 1)[0]; q.has = false; q.mesh.visible = false; q.regrow = 26;
-      const sm = S.pool.length ? S.pool.splice(Math.floor(vrand() * S.pool.length), 1)[0] : awakeMesh(S, S.seedN++); sm.g.visible = true; sm.g.position.set(0, 0, 0); sm.g.rotation.set(0, 0, 0);
-      const a = b.spawnAdd({
-        name: 'Petrified', hp: 520, x: q.x, z: q.z, radius: 0.8, aimY: 1.5, mesh: sm.g, color: 0xb8c0b4, facing: angTo(q.x, q.z, p.pos.x, p.pos.z),
-        onDeath() { sm.g.visible = false; G.world.add(sm.g); S.pool.push(sm); },
-        update(e, dt) {
-          const pl = G.player; if (!pl.alive || G.state !== 'fight') return;
-          e.watched = seen(S, e.pos.x, 1.5, e.pos.z);
-          const d = Math.hypot(pl.pos.x - e.pos.x, pl.pos.z - e.pos.z);
-          e.pos.y = Math.max(0, e.pos.y - dt * 1.5);
-          if (e.strike || b.transitioning) return;
-          if (d < 2.3) {
-            e.strike = true; Sound.sfx('sword', 0.8, 0.5);
-            Hz.circle(e.pos.x, e.pos.z, 3.4, 0.85, 340, { name: 'Stone Grasp', color: VEN, tag: 'fight' });
-            Co.start(function* () { yield 0.9; if (e.alive) e.die(); }, e.tag);
-          } else if (!e.watched) {
-            const s = S.statSpeed * dt; e.pos.x += (pl.pos.x - e.pos.x) / d * s; e.pos.z += (pl.pos.z - e.pos.z) / d * s; e.facing = angTo(e.pos.x, e.pos.z, pl.pos.x, pl.pos.z);
-            e.step = (e.step || 0) + dt; if (e.step > 0.42) { e.step = 0; Sound.sfx('hit', clamp(1.4 - d / 14, 0.25, 1.1), 0.35); if (!G.headless) FX.burst(e.pos.x, 0.15, e.pos.z, { n: 6, smoke: true, color: 0x8a9088, color2: 0x30342e, speed: [0.4, 1.6], life: [0.5, 1], size: [0.5, 1.1], alpha: 0.4 }); }
-          }
-          if (e.eyes) e.eyes.color.setHex(VEN).multiplyScalar(e.watched ? 1.2 : 5);
-        },
-      });
-      a.eyes = sm.eyes; a.pos.y = 0.5;
-      FX.burst(q.x, 1.5, q.z, { n: 30, color: VEN, speed: [1, 5], life: [0.4, 1], size: [0.15, 0.4] }); FX.ring(q.x, q.z, { r1: 4, color: VEN, dur: 0.6 }); Sound.sfx('shatter', 0.5, 0.5);
+      rise(b, q.x, q.z, false);
     }
+  }
+  // one awakened statue at x, z: off a plinth, or (Nightmare) up out of the floor
+  function rise(b, x, z, floor) {
+    const S = b.state, p = G.player;
+    const sm = S.pool.length ? S.pool.splice(Math.floor(vrand() * S.pool.length), 1)[0] : awakeMesh(S, S.seedN++); sm.g.visible = true; sm.g.position.set(0, 0, 0); sm.g.rotation.set(0, 0, 0);
+    const a = b.spawnAdd({
+      name: 'Petrified', hp: 520, x, z, radius: 0.8, aimY: 1.5, mesh: sm.g, color: 0xb8c0b4, facing: angTo(x, z, p.pos.x, p.pos.z),
+      onDeath() { sm.g.visible = false; G.world.add(sm.g); S.pool.push(sm); },
+      update(e, dt) {
+        const pl = G.player; if (!pl.alive || G.state !== 'fight') return;
+        e.watched = seen(S, e.pos.x, 1.5, e.pos.z);
+        const d = Math.hypot(pl.pos.x - e.pos.x, pl.pos.z - e.pos.z);
+        if (e.rising) { e.pos.y = Math.min(0, e.pos.y + dt * 3.2); if (e.pos.y < 0) return; e.rising = false; }
+        e.pos.y = Math.max(0, e.pos.y - dt * 1.5);
+        if (e.strike || b.transitioning) return;
+        if (d < 2.3) {
+          e.strike = true; Sound.sfx('sword', 0.8, 0.5);
+          Hz.circle(e.pos.x, e.pos.z, 3.4, 0.85, 340, { name: 'Stone Grasp', color: VEN, tag: 'fight' });
+          Co.start(function* () { yield 0.9; if (e.alive) e.die(); }, e.tag);
+        } else if (!e.watched) {
+          const s = S.statSpeed * dt; e.pos.x += (pl.pos.x - e.pos.x) / d * s; e.pos.z += (pl.pos.z - e.pos.z) / d * s; e.facing = angTo(e.pos.x, e.pos.z, pl.pos.x, pl.pos.z);
+          e.step = (e.step || 0) + dt; if (e.step > 0.42) { e.step = 0; Sound.sfx('hit', clamp(1.4 - d / 14, 0.25, 1.1), 0.35); if (!G.headless) FX.burst(e.pos.x, 0.15, e.pos.z, { n: 6, smoke: true, color: 0x8a9088, color2: 0x30342e, speed: [0.4, 1.6], life: [0.5, 1], size: [0.5, 1.1], alpha: 0.4 }); }
+        }
+        if (e.eyes) e.eyes.color.setHex(VEN).multiplyScalar(e.watched ? 1.2 : 5);
+      },
+    });
+    a.eyes = sm.eyes; a.pos.y = floor ? -2.4 : 0.5; if (floor) a.rising = true;
+    // Nightmare: the garden cannot be broken by hand (only her own gaze crumbles it)
+    if (S.nmOn) { a.immune = true; a.targetable = false; a.onImmuneHit = () => true; }
+    FX.burst(x, 1.5, z, { n: 30, color: VEN, speed: [1, 5], life: [0.4, 1], size: [0.15, 0.4] }); FX.ring(x, z, { r1: 4, color: VEN, dur: 0.6 }); Sound.sfx('shatter', 0.5, 0.5);
+    return a;
   }
   function crumble(e) { if (!e.alive) return; FX.burst(e.pos.x, 1.3, e.pos.z, { n: 40, color: 0xc8d0c4, color2: 0x505850, speed: [2, 9], grav: 14, life: [0.5, 1.2], size: [0.15, 0.45] }); e.die(); }
 
@@ -10628,7 +10639,7 @@ const Hitch = (() => {
   function petrify(b) {
     const S = b.state, p = G.player; if (!p.alive) return;
     p.hurt(360, { blockable: false, src: { name: 'Behold' } }); if (!p.alive) return;
-    p.rooted = 2.6; p.casting = null; p.addBuff('stone', 2.6, 'aegis'); S.stoneT = 2.6;
+    const st = S.nmOn ? STONE_NM : 2.6; p.rooted = st; p.casting = null; p.addBuff('stone', st, 'aegis'); S.stoneT = st;
     FX.flash(0xb8c4bc, 0.1, 5); Sound.sfx('shatter', 0.9, 0.4); FX.burst(p.pos.x, 1, p.pos.z, { n: 30, color: 0xc0c8c0, speed: [1, 4], life: [0.5, 1.2] }); FX.ring(p.pos.x, p.pos.z, { r1: 3, color: 0xc0c8c0, dur: 0.5 });
   }
   function* behold(b, o = {}) {
@@ -10638,7 +10649,8 @@ const Hitch = (() => {
     const resolve = (h) => {
       const hit = sources(b).some((q) => seen(S, q.x, q.y, q.z));
       FX.ring(b.pos.x, b.pos.z, { r1: 30, color: 0x8ac8a8, dur: 0.7, width: 0.08 }); Sound.sfx('laser', 0.8, 0.5); if (!G.headless) { headPos(b, _a); FX.light(_a.x, _a.y, _a.z, VEN, 20, 0.35, 20); for (const m of S.mir) if (m.on) { mirPos(m, _a); FX.burst(_a.x, _a.y, _a.z, { n: 20, color: VEN, speed: [2, 8], life: [0.3, 0.7] }); } }
-      for (const e of awake()) if (Hz.inShape(h.shape, e.pos.x, e.pos.z)) crumble(e);
+      let fed = 0; for (const e of awake()) if (Hz.inShape(h.shape, e.pos.x, e.pos.z)) { if (S.nmOn && !e.strike && !e.rising) { fed++; feed(b, e); } crumble(e); }
+      if (fed) crack(b, fed); if (S.nmOn) S.fedLog.push(b.phase * 100 + fed); // tools/gardenfuzz.js reads it
       if (hit) petrify(b); else FX.flash(VEN, 0.06, 4);
     };
     Hz.cone(b.pos.x, b.pos.z, b.angToPlayer(), 1.15, 36, time, 0, { color: PALE, alpha: 0.55, silent: true, track: (s) => { s.x = b.pos.x; s.z = b.pos.z; s.dir = b.angToPlayer(); }, lock: 0.8, onFire: resolve });
@@ -10737,6 +10749,237 @@ const Hitch = (() => {
   const palC = (arr, pk, out) => { const i = clamp(Math.floor(pk), 0, 1), f = sat(pk - i); return out.setHex(arr[i]).lerp(_c2.setHex(arr[i + 1]), f); };
   const palN = (arr, pk) => { const i = clamp(Math.floor(pk), 0, 1); return lerp(arr[i], arr[i + 1], sat(pk - i)); };
 
+  // ================================================================ NIGHTMARE ("The Garden Remembers")
+  // Her skin is stone: she takes OPEN.off damage until her own gaze crumbles an awake statue. Every statue a Behold breaks opens
+  // her for OPEN.per s (banked up to OPEN.cap). Statues cannot be hurt on Nightmare, so the only way to clear them is to herd them
+  // with your eyes (they walk only while unseen) into her lane and turn away as the stare fires through them.
+  // Phase I (100-88): two slow statues; the first two rise out of the floor already in her lane. Phase II (88-74): the first
+  // mirror (a stare source that crumbles nothing). Phase III, the garden (74-0), ramps every RAMP s of live time: more statues
+  // kept awake, faster, a second mirror, the plinths stop regrowing (the last statues rise from the floor), paired Beholds.
+  // Plan: threshold-design/nightmare-options-gorgon.md (Option B). Normal never reaches any of this: every hook in the shared code
+  // is behind S.nmOn (set by buildNM, which only runs when G.nightmare).
+  // Levers:
+  const NM_HP = 20500;
+  const OPEN = { per: 4.0, cap: 14, off: 0.2, on: 1.0 };   // seconds open per crumbled statue, most that can be banked, shell / open damage taken
+  const STONE_NM = 1.8;                                      // petrify root (Normal 2.6), so a petrify never chains into a sure second hit
+  const WAKE = { after: 2.5, gap: 1.4, far: 7, band: 15, behind: PI / 2, floorMin: 7.5, floorMax: 12, tell: 1.3, regrow: 18 }; // keeper: refill starts `after` s past a crumble, one statue per `gap` s, plinths `far` to `band` m from you, behind you as seen from her (within `behind` rad) when there are any (else any past `far`); floor rises 7.5-12 m from you with a `tell` s mark
+  const RAMP = 35;
+  const TEACH = [{ want: 2, speed: 2.7, cast: 2.6 }, { want: 2, speed: 3.0, cast: 2.4 }];
+  const STEP = [ // what each garden ramp step turns on (old layers keep running)
+    { name: 'Garden', want: 3, speed: 3.2, mirrors: 1, regrow: true, twice: false, cast: 2.3 },
+    { name: 'Crowd', want: 3, speed: 3.4, mirrors: 1, regrow: true, twice: false, cast: 2.3 },
+    { name: 'Second mirror', want: 4, speed: 3.6, mirrors: 2, regrow: true, twice: false, cast: 2.2 },
+    { name: 'Bare plinths', want: 4, speed: 3.8, mirrors: 2, regrow: false, twice: false, cast: 2.2 },
+    { name: 'Paired stare', want: 5, speed: 4.0, mirrors: 2, regrow: false, twice: true, cast: 2.1 },
+    { name: 'Five', want: 5, speed: 4.2, mirrors: 2, regrow: false, twice: true, cast: 2.1 },
+  ];
+  const SKY2 = { uSunCol: 0xff5a3a, uHor: 0x3a1418, uTop: 0x0a0408, uCloudCol: 0x9a4430, uStars: 0.3 }, POST2 = { tint: [1.06, 0.98, 0.95], bloom: 0.66 };
+  const SKY3 = { uSunCol: 0x1a2a26, uSunGlow: 0.3, uHor: 0x0a181a, uTop: 0x010304, uStars: 0.25, uCloud: 0.5, uCloudCol: 0x2a3c3e }, POST3 = { tint: [0.96, 1.0, 1.03], bloom: 0.62, vig: 1.12, sat: 0.95 };
+  const gardenStepOf = (S) => Math.min(STEP.length - 1, Math.floor((S.gardenT || 0) / RAMP));
+
+  // the shell under her: a stone ring; banked open time lights it as an arc, one segment per statue
+  const shellMat = () => new THREE.ShaderMaterial({
+    uniforms: { uK: { value: 0 }, uO: { value: 0 }, uP: { value: 0 }, uT: { value: 0 }, uSeg: { value: OPEN.per / OPEN.cap } }, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending,
+    vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader: `uniform float uK,uO,uP,uT,uSeg; varying vec2 vUv;
+      void main(){ vec2 p=vUv*2.0-1.0; float r=length(p); if(r>1.0||r<0.7) discard;
+        float a=atan(p.x,p.y)/6.28318+0.5, band=smoothstep(0.7,0.76,r)*(1.0-smoothstep(0.93,1.0,r));
+        float sg=fract(a/max(uSeg,0.01)), gap=smoothstep(0.0,0.03,sg)*(1.0-smoothstep(0.97,1.0,sg));
+        float lit=(1.0-smoothstep(uK-0.004,uK+0.004,a))*step(0.001,uK);
+        vec3 stone=vec3(0.22,0.26,0.24)*(0.6+0.4*gap);
+        vec3 crack=vec3(0.5,1.0,0.42)*(1.8+0.5*sin(uT*5.0-a*18.0))*gap;
+        gl_FragColor=vec4((mix(stone,crack,lit*uO)+vec3(0.6,1.0,0.5)*uP*0.8)*band,1.0); }`,
+  });
+  function buildNM(b, g, S) {
+    Object.assign(S, { nmOn: true, openUntil: 0, openK: 0, crackK: 0, want: 0, wakeCd: 0, refillAt: 0, rising: [], gardenT: 0, gStep: -1, stepAt: [], finale: false,
+      noRegrow: false, fedLog: [], twice: false, bCast: 2.6, fed: 0, lastEyes: 0, selfStone: 0, fk: 0, cine: false });
+    for (let k = S.pool.length; k < 10; k++) S.pool.push(awakeMesh(S, k)); // six awake at most, plus the ones still striking: nothing is built mid-fight
+    S.shell = new THREE.Mesh(new THREE.PlaneGeometry(8.4, 8.4), shellMat()); S.shell.rotation.x = -PI / 2; S.shell.position.y = 0.03; S.shell.renderOrder = 3; g.add(S.shell);
+    S.skin0 = S.skinM.color.clone(); S.sc0 = S.scM.map((m) => m.color.clone()); S.gold0 = S.goldM.color.clone();
+  }
+  function nmPhase(b, T) { const S = b.state; S.want = T.want; S.statSpeed = T.speed; S.bCast = T.cast; S.twice = !!T.twice; S.wakeCd = 0; }
+  // anything a phase change or the last blow can cut off mid-way (Co.stopTag('phase') skips cleanup)
+  function nmReset(b) {
+    const S = b.state; S.gaze = 0; S.mode = 0; S.locked = false; S.rear = 0; S.slashT = 0; b.autoFace = true; S.rising.length = 0;
+    for (const m of S.mir) if (m.on) m.y = 5.2;
+    if (S.cine) { S.cine = false; Cam.release(); UI.hud(true); }
+  }
+  function skySet(b, o) { const U = b.state.sky.material.uniforms; for (const k in o) { if (U[k].value.isColor) U[k].value.set(o[k]); else U[k].value = o[k]; } }
+  function postSet(o) { Object.assign(Post.cur, o); Post.apply(); }
+  // a crumbled statue feeds her: a streak of stone light from where it stood to her chest
+  function feed(b, e) {
+    if (G.headless) return; _a.set(e.pos.x, 1.4, e.pos.z); _b2.set(b.pos.x, 3.6, b.pos.z);
+    FX.beam(_a, _b2, { color: VEN, width: 0.12, dur: 0.45 }); FX.burst(b.pos.x, 3.4, b.pos.z, { n: 14, color: 0xd8e0d4, color2: 0x5a645a, speed: [2, 7], grav: 12, life: [0.4, 0.9], size: [0.12, 0.3] });
+  }
+  function crack(b, n) {
+    const S = b.state, now = G.now; S.openUntil = Math.min(now + OPEN.cap, Math.max(now, S.openUntil) + OPEN.per * n); S.refillAt = now + WAKE.after; S.crackK = 1; S.fed += n;
+    Sound.sfx('shatter', 1, 0.7); Sound.sfx('bell', 0.6, 1.4); FX.shake(0.25 + n * 0.08); FX.flash(VEN, 0.08 + n * 0.02, 4);
+  }
+  function floorWake(b, x, z, tell) {
+    const S = b.state; S.rising.push({ x, z, at: G.now + tell });
+    Hz.mark({ type: 'circle', x, z, r: 1.3 }, tell, { color: VEN, tag: 'phase' }); if (!G.headless) FX.burst(x, 0.2, z, { n: 10, smoke: true, color: 0x8a9088, color2: 0x30342e, speed: [0.4, 1.4], life: [0.6, 1.2], size: [0.6, 1.2], alpha: 0.4 });
+  }
+  // the lesson: two statues rise in her lane, 5.5 and 7.5 m in front of her toward you, so the first stare shows the crack
+  function laneWake(b, n) {
+    const p = G.player, dx = p.pos.x - b.pos.x, dz = p.pos.z - b.pos.z, L = Math.max(Math.hypot(dx, dz), 1);
+    for (let i = 0; i < n; i++) { const f = Math.min(5.5 + i * 2.0, L * 0.65) / L, side = i % 2 ? 1.2 : -1.2; let x = b.pos.x + dx * f - dz / L * side, z = b.pos.z + dz * f + dx / L * side; const r = Math.hypot(x, z); if (r > R - 2) { x *= (R - 2) / r; z *= (R - 2) / r; } floorWake(b, x, z, 1.4); }
+  }
+  // the keeper wakes one statue: a plinth well away from you, or (bare rim) a spot on the floor 7.5-12 m from you
+  function nmWake(b) {
+    const S = b.state, p = G.player, dq = (q) => Math.hypot(q.x - p.pos.x, q.z - p.pos.z), all = S.ped.filter((q) => q.has && dq(q) >= WAKE.far), band = all.filter((q) => dq(q) <= WAKE.band), away = angTo(b.pos.x, b.pos.z, p.pos.x, p.pos.z), behind = band.filter((q) => Math.abs(angDiff(away, angTo(p.pos.x, p.pos.z, q.x, q.z))) < WAKE.behind), free = behind.length ? behind : band.length ? band : all;
+    if (free.length) { const q = free[Math.floor(rnd(0, free.length))]; q.has = false; q.mesh.visible = false; q.regrow = WAKE.regrow; rise(b, q.x, q.z, false); return true; }
+    for (let t = 0; t < 16; t++) {
+      const a = rnd(TAU), d = rnd(WAKE.floorMin, WAKE.floorMax), x = p.pos.x + Math.sin(a) * d, z = p.pos.z + Math.cos(a) * d;
+      if (Math.hypot(x, z) > R - 1.6 || Math.hypot(x - b.pos.x, z - b.pos.z) < 4.5) continue;
+      floorWake(b, x, z, WAKE.tell); return true;
+    }
+    return false;
+  }
+  function setStep(b, st) {
+    const S = b.state, T = STEP[st]; if (S.stepAt[st] !== undefined) return;
+    S.gStep = Math.max(S.gStep, st); S.stepAt[st] = Math.round(G.ft * 10) / 10; nmPhase(b, T);
+    if (!T.regrow) S.noRegrow = true;
+    if (T.mirrors > S.nMir) { setMirrors(b, T.mirrors); const m = S.mir[T.mirrors - 1]; m.y = -2; Sound.sfx('bell', 0.9, 0.8); mirPos(m, _a); FX.pillar(_a.x, _a.z, { r: 2, h: 20, color: 0xffe0a0, dur: 1.2 }); Co.start(W.tween(1.6, (k) => { if (m.y < 5.2) m.y = lerp(-2, 5.2, k); }), 'phase'); }
+    if (st > 0) { Sound.sfx('roar', 0.5, 0.8 + st * 0.05); Sound.sfx('bell', 0.8, 0.5); FX.flash(VEN, 0.12, 2); FX.ring(b.pos.x, b.pos.z, { r1: 22, color: VEN, dur: 1.2, width: 0.1 }); }
+    if (st === 2) Music.intensity(3); if (st === 4) Music.intensity(4);
+  }
+  // per frame, headless too: the shell, the garden keeper, the ramp clock
+  function nmSim(b, dt) {
+    const S = b.state, now = G.now; b.dmgTaken = now < S.openUntil ? OPEN.on : OPEN.off; S.crackK = Math.max(0, S.crackK - dt * 1.6);
+    if (G.state !== 'fight' || b.phase < 0 || !b.alive) return;
+    const live = !b.transitioning && !b.lastBlowing;
+    if (live && S.finale) { S.gardenT += dt; const st = gardenStepOf(S); if (st > S.gStep) setStep(b, st); }
+    for (let i = S.rising.length - 1; i >= 0; i--) { const q = S.rising[i]; if (now >= q.at) { S.rising.splice(i, 1); if (live) rise(b, q.x, q.z, true); } }
+    if (!live || !S.want) return;
+    S.wakeCd -= dt; let n = S.rising.length; for (const e of G.ents) if (e.isAdd && e.alive && !e.strike) n++;
+    if (n < S.want && S.wakeCd <= 0 && now >= S.refillAt) { nmWake(b); S.wakeCd = WAKE.gap; }
+  }
+  // per frame, not headless: the shell ring and her skin (stone grey shut, lit cracks open), her own petrification on the kill
+  function nmLook(b, dt) {
+    const S = b.state, t = G.now, open = G.now < S.openUntil; S.openK = damp(S.openK, open ? 1 : 0, 9, dt);
+    const ok = S.openK, ck = S.crackK, ss = S.selfStone;
+    { const U = S.shell.material.uniforms; S.shell.visible = b.alive && !ss; S.shell.position.set(b.pos.x, 0.03, b.pos.z); U.uK.value = sat((S.openUntil - G.now) / OPEN.cap); U.uO.value = ok; U.uP.value = ck * ck; U.uT.value = t % 100; }
+    S.skinRim.value.lerp(_c.setHex(0x8a948e), (1 - ok) * 0.6).add(_c.setRGB(0.25, 0.6, 0.2).multiplyScalar(ok * 0.6 + ck * 1.2));
+    S.fill.value.multiplyScalar(1 - (1 - ok) * 0.25);
+    const grey = Math.max((1 - ok) * 0.55, ss);
+    S.skinM.color.copy(S.skin0).lerp(_c.setRGB(0.62, 0.66, 0.63), grey);
+    S.scM.forEach((m, i) => { m.color.copy(S.sc0[i]).lerp(_c.setRGB(0.55, 0.58, 0.55), grey); m.emissive.setHex(0x05140c).lerp(_c.setHex(VEN), (ok * 0.18 + ck * 0.5) * (1 - ss)); });
+    S.goldM.color.copy(S.gold0).lerp(_c.setRGB(0.5, 0.52, 0.5), ss);
+    if (ss) { S.eyeMat.color.multiplyScalar(1 - ss); S.hairEyeMat.color.multiplyScalar(1 - ss); S.gemMat.color.multiplyScalar(1 - ss); S.headL.intensity *= 1 - ss; }
+    // the last blow: every eye in the garden opens wide; the world drains of colour
+    if (S.lastEyes > 0) { const k = S.lastEyes; S.eyesFar.material.opacity = 1; S.eyesFar.material.size = 0.9 + k * 1.6; S.mosU.eye.value.setRGB(0.5, 1.0, 0.45).multiplyScalar(0.6 + k * 2.2); Post.final.uniforms.uSat.value = Post.cur.sat * (1 - 0.85 * k); }
+  }
+  // ---- phases
+  function* teachRun(b) {
+    const S = b.state; nmPhase(b, TEACH[0]); S.want = 0; b.autoFace = true; b.turnRate = 5; yield 1.0;
+    laneWake(b, 2); S.want = TEACH[0].want; yield 3.4;
+    while (true) {
+      yield* behold(b, { time: S.bCast }); yield 0.6;
+      yield* spit(b, 3); yield* slither(b);
+      yield* lash(b); yield 1.0;
+      yield* behold(b, { time: S.bCast }); yield 0.6;
+      yield* vipers(b); yield* slither(b);
+      yield* coil(b); yield 0.8;
+    }
+  }
+  function* mirrorEnter(b) {
+    const S = b.state; nmReset(b); S.rear = 1; for (const e of awake()) crumble(e); nmPhase(b, TEACH[1]); S.want = 0;
+    Sound.sfx('roar', 0.9, 1.7); FX.shake(0.8); FX.flash(0xff4030, 0.25, 2);
+    Co.start(skyTo(b, SKY2, 3), 'fight'); Co.start(Post.lerpTo(POST2, 3), 'fight');
+    yield 1.2; setMirrors(b, 1); const m = S.mir[0]; m.y = -2; Sound.sfx('bell', 0.9, 0.8); mirPos(m, _a); FX.pillar(_a.x, _a.z, { r: 2, h: 20, color: 0xffe0a0, dur: 1.2 });
+    yield* W.tween(1.6, (k) => { m.y = lerp(-2, 5.2, k); }); S.rear = 0; yield 0.3;
+  }
+  function mirrorSkip(b) { const S = b.state; skySet(b, SKY2); postSet(POST2); setMirrors(b, 1); S.mir[0].y = 5.2; }
+  function* mirrorRun(b) {
+    const S = b.state; nmPhase(b, TEACH[1]); if (!S.nMir) setMirrors(b, 1); S.refillAt = G.now + 0.5; yield 2.0;
+    while (true) {
+      yield* behold(b, { time: S.bCast }); yield 0.6;
+      yield* coil(b, true); yield* spit(b, 3); yield 0.6;
+      yield* behold(b, { time: S.bCast }); yield 0.6;
+      yield* vipers(b, true); yield* slither(b); yield* lash(b); yield 0.6;
+    }
+  }
+  function* gardenEnter(b) {
+    const S = b.state; nmReset(b); S.rear = 1; S.gaze = 0.6; S.want = 0; for (const e of awake()) crumble(e);
+    if (!G.headless) { S.cine = true; UI.hud(false); const a = angTo(b.pos.x, b.pos.z, G.player.pos.x, G.player.pos.z), sx = Math.sin(a), cz = Math.cos(a);
+      Co.start(Cam.shot([b.pos.x + sx * 8 + cz * 2, 5.2, b.pos.z + cz * 8 - sx * 2], [b.pos.x, 5.0, b.pos.z], [b.pos.x + sx * 19, 9, b.pos.z + cz * 19], [b.pos.x - sx * 5, 5.0, b.pos.z - cz * 5], 4.4, 46), 'phase'); }
+    yield* b.cast({ name: 'A Thousand Eyes', time: 2.6, onTick: (k) => { FX.shake(k * 0.5); S.eyesFar.material.opacity = k; } }); S.eyesFar.material.opacity = 1;
+    Sound.sfx('roar', 1, 2); Sound.sfx('bigboom', 0.7); FX.flash(0xa8c8b8, 0.26, 2.5); FX.shake(1.1);
+    Co.start(skyTo(b, SKY3, 2.5), 'fight'); Co.start(Post.lerpTo(POST3, 2.5), 'fight');
+    S.gaze = 0; yield 1.6;
+    if (S.cine) { S.cine = false; Cam.release(); UI.hud(true); }
+    S.rear = 0; Object.assign(S, { finale: true, gardenT: 0, gStep: -1, stepAt: [], fk: 0 }); S.refillAt = G.now;
+  }
+  function gardenSkip(b) { const S = b.state; skySet(b, SKY3); postSet(POST3); S.eyesFar.material.opacity = 1; if (!S.nMir) { setMirrors(b, 1); S.mir[0].y = 5.2; } }
+  function* gardenRun(b) {
+    const S = b.state; S.eyesFar.material.opacity = 1; if (!S.finale) Object.assign(S, { finale: true, gardenT: 0, gStep: -1, stepAt: [], fk: 0 });
+    if (S.gStep < 0) setStep(b, 0); yield 1.2;
+    while (true) {
+      yield* behold(b, { time: S.bCast, twice: S.twice }); yield 0.6;
+      const k = (S.fk = (S.fk || 0) + 1) % 3;
+      if (k === 1) { yield* spit(b, 3); yield* slither(b); yield* lash(b); }
+      else if (k === 2) { yield* vipers(b, S.gStep >= 2); yield* slither(b); }
+      else { yield* coil(b, true); yield* spit(b, 2); }
+      yield 0.6;
+    }
+  }
+  // ---- the last blow (24 s into the enrage): every eye in the garden opens at once, and there is nowhere left to look
+  function* nmLastBlow(b) {
+    const S = b.state; nmReset(b); S.want = 0; for (const e of awake()) crumble(e); S.openUntil = 0;
+    Music.stop(0.3); Sound.sfx('bell', 1, 0.35); Sound.sfx('roar', 0.8, 0.5); S.rear = 1; S.mode = 1;
+    yield* b.cast({ name: 'A Thousand Eyes', time: 3.2, onTick: (k) => { S.gaze = k; S.lastEyes = k; FX.shake(k * 0.45); } });
+    S.lastEyes = 1; const p = G.player; FX.flash(0xb8c4bc, 0.5, 1.5); Sound.sfx('shatter', 1, 0.4); Sound.sfx('bigboom', 0.8);
+    if (p && p.alive) { p.addBuff('stone', 6, 'aegis'); p.rooted = 6; p.hurt(9999, { blockable: false, src: 'enrage', pierce: true }); }
+    while (true) yield 1;
+  }
+  // ---- the kill: her stare turns back on her; she greys from the tail up and breaks apart
+  function* nmDeath(b) {
+    const S = b.state; nmReset(b); S.want = 0; for (const e of awake()) crumble(e); S.lastEyes = 0;
+    { const a = Cam.yaw + 0.6, r = 14; Cam.cine = { pos: new V3(b.pos.x - Math.sin(a) * r, 6.5, b.pos.z - Math.cos(a) * r), look: new V3(b.pos.x, 3.6, b.pos.z), fov: 44 }; }
+    yield 0.3; G.timeScale = 0.7; S.rear = 1;
+    for (const m of S.mir) if (m.on) { mirPos(m, _a); FX.beam(_a.set(_a.x, m.y, _a.z), _b2.set(b.pos.x, 5.4, b.pos.z), { color: VEN, width: 0.08, dur: 1.2 }); }
+    Sound.sfx('charge', 0.8, 0.5); yield* W.tween(1.6, (k) => { S.selfStone = k; if (vrand() < 0.3) Sound.sfx('hit', 0.4, 0.4 + k * 0.4); }); S.selfStone = 1;
+    yield 0.35; Sound.sfx('shatter', 1, 0.5); Sound.sfx('bigboom', 0.7); FX.shake(0.9);
+    for (let i = 0; i < 6; i++) FX.burst(b.pos.x + rnd(-1.5, 1.5), 1 + i * 0.8, b.pos.z + rnd(-1.5, 1.5), { n: 40, color: 0xc8d0c4, color2: 0x505850, speed: [2, 9], grav: 14, life: [0.6, 1.4], size: [0.2, 0.6] });
+    b.group.visible = false; S.vis.g.visible = false; yield 0.9; G.timeScale = 1;
+  }
+  // ---- the autopilot: stand between her and the crowd (melee at her side, ranged short of the statues) so they come at you along
+  // her lane; freeze any statue that gets close, let the far ones walk; at a Behold look away from her and the mirrors.
+  // Bot.gardenBlind (tests only) ignores the garden (looks at her, away only from a firing stare, stands anywhere): it must never kill.
+  const LANE = 10;
+  function nmBot(b, p) {
+    const S = b.state, L = awake().filter((e) => !e.strike && !e.rising), h = { target: b }, cs = b.castState, blind = Bot.gardenBlind;
+    let near = null, nd = 1e9; for (const e of L) { const d = Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z); if (d < nd) { nd = d; near = e; } }
+    // where to stand: on the crowd's side of her, so the statues come at you along her lane (melee at her side, ranged LANE m out)
+    if (!blind && L.length) {
+      let cx = 0, cz = 0, w = 0; for (const e of L) { const k = 1 / (1 + Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z) * 0.3); cx += e.pos.x * k; cz += e.pos.z * k; w += k; } cx /= w; cz /= w;
+      let ux = cx - b.pos.x, uz = cz - b.pos.z; const dc = Math.hypot(ux, uz) || 1; ux /= dc; uz /= dc;
+      const off = p.cls.melee ? b.radius + 1.6 : LANE;
+      let gx = b.pos.x + ux * off, gz = b.pos.z + uz * off; const gr = Math.hypot(gx, gz); if (gr > 15.5) { gx *= 15.5 / gr; gz *= 15.5 / gr; }
+      h.x = gx; h.z = gz; h.w = 1.4;
+      if (!p.cls.melee && Math.hypot(gx - p.pos.x, gz - p.pos.z) < 3.5) { h.x = p.pos.x; h.z = p.pos.z; } // a caster close enough plants where it stands
+    }
+    // where to look: never at her or a mirror in the last second of a stare; freeze any statue close enough to reach you, let the
+    // far ones walk in (blind: look at her, as if the garden were not there)
+    const toB = angTo(p.pos.x, p.pos.z, b.pos.x, b.pos.z), fire = cs && (cs.name === 'Behold' || cs.name === 'A Thousand Eyes') && cs.time - cs.t < 1.0;
+    const hold = 2.3 + S.statSpeed * (fire ? 1.1 : 0.8) + 0.6, src = fire ? sources(b) : [];
+    let best = toB, bs = -1e9;
+    for (let i = 0; i < 36; i++) { const y = i / 36 * TAU; let s = -Math.abs(angDiff(y, toB)) * 0.05;
+      for (const q of src) { const m = Math.abs(angDiff(y, angTo(p.pos.x, p.pos.z, q.x, q.z))); if (m < VIS_HALF + 0.1) s -= 1000; else s += Math.min(m, 1.3) * 2; }
+      if (blind) s -= Math.abs(angDiff(y, toB)) * 3;
+      else for (const e of L) { const d = Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z), see = d < VIS_NEAR || Math.abs(angDiff(y, angTo(p.pos.x, p.pos.z, e.pos.x, e.pos.z))) < VIS_HALF - 0.06; if (d < hold) s += see ? 10 + (hold - d) * 4 : 0; else if (see && !fire) s -= 1; }
+      if (s > bs) { bs = s; best = y; } }
+    S.botYaw = best;
+    const th = Hz.threat(p.pos.x, p.pos.z); if (th < 3) h.noCast = th - 0.25;
+    return h;
+  }
+  function nmMusic(base) {
+    return Object.assign({}, base, { layers: base.layers.concat([
+      { v: 'choir', from: 3, pat: ['0.......4.......', '5.......1.......'], oct: 1, len: 12, vol: 0.06 }, { v: 'tom', from: 3, pat: 'x..x....x..x..x.', vol: 0.18 },
+      { v: 'taiko', from: 4, pat: 'x.x...x.x.x...xx', vol: 0.26 }, { v: 'bell', from: 4, pat: '0.......7.......', oct: 2, len: 4, vol: 0.06 }, { v: 'hat', from: 4, pat: '..x...x...x...x.', vol: 0.08 },
+    ]) });
+  }
+
   G.bosses.push({
     id: 'gorgon', name: 'EURYALE', title: 'The Stone Garden', hint: 'A glance', color: '#8dff7a', telegraph: 0x7dff8a,
     hp: 28500, radius: 2.2, aimY: 4.2, enrage: 440,
@@ -10798,15 +11041,30 @@ const Hitch = (() => {
         }
       } },
     ],
+    // ---- Nightmare ("The Garden Remembers"): her shell holds (x0.2) until her own Behold crumbles a statue (4 s open each).
+    // One creeping enrage (40 + 4 per second over, every 2 s) and "A Thousand Eyes" 24 s into it.
+    nightmare: {
+      hp: NM_HP, enrage: 345, enrageBase: 40, enrageGrow: 4, lastBlowAt: 24,
+      lastBlow: nmLastBlow, death: nmDeath,
+      phases: [
+        { at: 1, music: 0, run: teachRun },
+        { at: 0.88, music: 1, enter: mirrorEnter, skipTo: mirrorSkip, run: mirrorRun },
+        { at: 0.74, music: 2, enter: gardenEnter, skipTo: gardenSkip, run: gardenRun },
+      ],
+      nmTest: { RAMP, STEP, TEACH, OPEN, WAKE, STONE_NM, stepOf: gardenStepOf, awake, setStep(b, n) { b.state.gardenT = Math.max(b.state.gardenT || 0, n * RAMP + 0.5); },
+        castStep(b) { const S = b.state; return S.finale && !b.transitioning && G.state === 'fight' ? Math.max(0, S.gStep) : undefined; } },
+      bot: nmBot,
+    },
     update(b, dt) {
       const S = b.state, p = G.player, t = G.now;
-      for (const q of S.ped) if (!q.has) { q.regrow -= dt; if (q.regrow <= 0) { q.has = true; q.mesh.visible = true; q.rise = 1; } }
+      for (const q of S.ped) if (!q.has && !S.noRegrow) { q.regrow -= dt; if (q.regrow <= 0) { q.has = true; q.mesh.visible = true; q.rise = 1; } }
       // mirrors drift to wherever they can catch the back of your head; they hold still for the last beat of a stare
       if (S.nMir && !S.locked) {
         const base = angTo(b.pos.x, b.pos.z, p.pos.x, p.pos.z);
         S.mir.forEach((m, k) => { if (!m.on) return; const ta = base + (S.nMir === 1 ? 0 : (k ? 2.1 : -2.1)); m.a += clamp(angDiff(m.a, ta), -0.55 * dt, 0.55 * dt); });
       }
       if (S.stoneT > 0) S.stoneT -= dt;
+      if (S.nmOn) nmSim(b, dt); // Nightmare: the shell, the garden keeper and the finale clock, headless too
       S.pk = damp(S.pk, Math.max(0, b.phase), 0.9, dt); if (b.phase >= 2) S.frostT = Math.min(1, S.frostT + dt / 40);
       if (G.headless) return;
       Post.final.uniforms.uSat.value = Post.cur.sat * (1 - 0.4 * sat(S.stoneT / 0.5));
@@ -10814,7 +11072,7 @@ const Hitch = (() => {
       // vision wedge: follows the character's facing, brightens during a stare and turns venom green while a face is inside it
       { const V = S.vis, show = p.alive && G.state === 'fight' && Cam.cineW < 0.5; V.g.visible = show;
         if (show) { V.g.position.set(p.pos.x, p.pos.y + 0.06, p.pos.z); V.g.rotation.y = p.facing;
-          const danger = S.gaze > 0 && sources(b).some((q) => seen(S, q.x, q.y, q.z)); V.k = damp(V.k, danger ? 1 : 0, 14, dt);
+          const danger = (S.gaze > 0 && sources(b).some((q) => seen(S, q.x, q.y, q.z))) || S.lastEyes > 0.4; V.k = damp(V.k, danger ? 1 : 0, 14, dt);
           const c = V.fill.material.color.setHex(PALE).lerp(_c.setHex(VEN), V.k).multiplyScalar(1 + V.k * 1.5); V.edge.material.color.copy(c);
           V.fill.material.opacity = 0.1 + S.gaze * 0.1 + V.k * 0.12; V.edge.material.opacity = 0.35 + S.gaze * 0.25 + V.k * 0.3; } }
       // environment: blend the phase palettes
@@ -10875,6 +11133,7 @@ const Hitch = (() => {
       const fk = 1 + p1 * 0.5 - p2 * 0.75; _c.setHex(0xffa040).lerp(_c2.setHex(0xd8c050), p2).multiplyScalar(2.2 - p2 * 0.8); for (const f2 of S.fires) f2.mat.color.copy(_c); S.fireL[0].color.setHex(0xff9a40).lerp(_c2.setHex(0xd8b850), p2); S.fireL[1].color.copy(S.fireL[0].color);
       for (const f of S.fires) { f.m.scale.set(0.9, (1.5 + Math.sin(t * 9 + f.x) * 0.25) * fk, 0.9); f.m.position.y = 2.05 + (fk - 1) * 0.25; if (vrand() < dt * 14 * fk) FX.burst(f.x, 2.1, f.z, { n: 1, color: 0xffa040, color2: 0xff3010, speed: [0.2, 0.8], up: 2.6 * fk, life: [0.4, 0.9], size: [0.3, 0.7] }); }
       S.fireL[0].intensity = 45 * fk * (0.9 + Math.sin(t * 8) * 0.06 + Math.sin(t * 13) * 0.04); S.fireL[1].intensity = 45 * fk * (0.9 + Math.sin(t * 9 + 2) * 0.06);
+      if (S.nmOn) nmLook(b, dt);
     },
     bot(b, p) {
       const S = b.state, L = awake(), h = {};
@@ -10889,6 +11148,7 @@ const Hitch = (() => {
       return h;
     },
   });
+  { const d = G.bosses[G.bosses.length - 1]; d.nightmare.music = nmMusic(d.music); }
 })();
 
 // ==== 26_boss_theatre.js ====

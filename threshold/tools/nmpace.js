@@ -3,9 +3,10 @@
 // each phase's live time and damage per second (b.phaseLog), the last phase's share of the fight's time, the highest ramp step
 // reached and the fight time each step started (S.stepAt, written by the boss file), and in REAL mode the death and its source.
 // REAL=1: god mode off (survival). PASSIVE=1: the autopilot never attacks. SWAPBLIND=1: ignores who is awake in Niten (must fail).
-// SIDEBLIND=1: ignores the called half in Chiaroscuro (must fail). SEED sets the page seed (runs continue one random stream).
+// SIDEBLIND=1: ignores the called half in Chiaroscuro (must fail). GARDENBLIND=1: Euryale's autopilot never herds statues into
+// her gaze (looks at her, stands anywhere; must fail). SEED sets the page seed (runs continue one random stream).
 // POCKETBLIND=1: ignores the calm-spot hints (Niten's cut lanes and Eye of the Moon; compare its petal damage with the normal autopilot).
-// CAST BUDGET (boss duelist, Niten only): per ramp step, the share of live Niten time the player spends in a planted cast ("cast"),
+// CAST BUDGET (Niten, or any boss whose nmTest.castStep(b) names the ramp step, e.g. Euryale's garden): per ramp step, the share of live Niten time the player spends in a planted cast ("cast"),
 // planted casts completed per minute ("done/min") and petal damage taken per minute. Printed per run and summed per class.
 // "cast" counts every planted cast, also the ones cancelled by moving; "(finished)" counts only casts that completed.
 // Stormcaller, seeds 7/8/9 x 6 runs (step: cast% (finished%) / casts done per min):
@@ -19,6 +20,9 @@
 //   check noBoltMax): whole fights 0: 61% (53%) 19.9/m  1: 65% (53%) 28.1/m  2: 61% (55%) 20.3/m  3: 56% (40%) 20.4/m
 //   4: 60% (46%) 19.6/m  5: 52% (38%) 14.2/m. Held per step (nitencast STEP=n ONLY=n): 0: 63-70%, 1: 63-70%, 2: 57-65%,
 //   3: 46-51%, 4: 57-64%, 5: 53-59%; moving 12-29% (was 7-16%); no-Bolt stretch at most 2.5 s at every step.
+// Euryale (gorgon), 20,500, seed 7 x 3 runs: duskblade 5:11 (4:57-5:30), stormcaller 5:35 (4:50-5:37), ashwarden 5:24
+//   (5:21-5:35), hexslinger 4:16 (3:55-4:19); last phase 64-79% of the time. GARDENBLIND: OUT for stormcaller, hexslinger,
+//   duskblade. Stormcaller cast budget in the garden 53-60% (finished 41-53%).
 const { launch } = require('./harness.js');
 (async () => {
   const [boss = 'duelist', clsArg = 'all', runs = '4'] = process.argv.slice(2);
@@ -26,7 +30,7 @@ const { launch } = require('./harness.js');
   await page.goto('http://game.local/threshold/?mute=1&quality=low&nm=1&seed=' + (process.env.SEED || 7));
   await page.waitForFunction('window.__game && window.__game.G.state === "menu"', null, { timeout: 90000 });
   const classes = await page.evaluate((c) => c === 'all' ? window.__game.G.classes.map((q) => q.id) : c.split(','), clsArg);
-  const env = { pocket: !!process.env.POCKETBLIND, passive: !!process.env.PASSIVE, real: !!process.env.REAL, swap: !!process.env.SWAPBLIND, side: !!process.env.SIDEBLIND, seed: +(process.env.SEED || 7) };
+  const env = { pocket: !!process.env.POCKETBLIND, passive: !!process.env.PASSIVE, real: !!process.env.REAL, swap: !!process.env.SWAPBLIND, side: !!process.env.SIDEBLIND, garden: !!process.env.GARDENBLIND, seed: +(process.env.SEED || 7) };
   const fmt = (t) => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
   let info = null; const agg = {};
   const cbFmt = (c) => c.map((q, st) => q && q[0] > 1 ? `${st}: ${Math.round(q[1] / q[0] * 100)}% (${Math.round(q[4] / q[0] * 100)}%) ${(q[2] / q[0] * 60).toFixed(1)}/m ${Math.round(q[3] / q[0] * 60)}pd` : null).filter(Boolean).join('  ');
@@ -36,17 +40,17 @@ const { launch } = require('./harness.js');
       // one page evaluation per run keeps each call short
       const r = await page.evaluate(([boss, cls, env, k]) => {
         const g = window.__game, def = g.def(boss); g.G.headless = true; g.bot(3); g.god(!env.real);
-        g.Bot.passive = env.passive; g.Bot.swapBlind = env.swap; g.Bot.sideBlind = env.side; g.Bot.pocketBlind = env.pocket;
+        g.Bot.passive = env.passive; g.Bot.swapBlind = env.swap; g.Bot.sideBlind = env.side; g.Bot.pocketBlind = env.pocket; g.Bot.gardenBlind = env.garden;
         g.start(boss, { cls }); const b = g.G.boss, p = g.G.player; let s;
         // cast budget: per Niten ramp step [live time, time in a planted cast, planted casts completed, petal damage, time in casts that completed]
-        const cb = []; const at = () => (b.state.niten && !b.transitioning && g.G.state === 'fight') ? (cb[b.state.nitenStep] || (cb[b.state.nitenStep] = [0, 0, 0, 0, 0])) : null;
+        const cb = [], T = b.def.nmTest; const at = () => { const st = T && T.castStep ? T.castStep(b) : (b.state.niten && !b.transitioning && g.G.state === 'fight') ? b.state.nitenStep : undefined; return st === undefined || st === null ? null : (cb[st] || (cb[st] = [0, 0, 0, 0, 0])); };
         let lastC = null; const com = p.commit.bind(p); p.commit = (i, tgt, wasCast) => { const c = at(); if (c && wasCast) { c[2]++; if (lastC) c[4] += lastC.time; } return com(i, tgt, wasCast); };
         const hu = p.hurt.bind(p); p.hurt = (amt, o) => { const c = at(), hp0 = p.hp; const r = hu(amt, o); if (c && o && o.src && o.src.petal) c[3] += Math.max(0, hp0 - p.hp) || amt; return r; };
         const onStep = (dt) => { lastC = p.casting; const c = at(); if (!c) return; c[0] += dt; if (p.casting) c[1] += dt; };
         for (let i = 0; i < 260; i++) { s = g.fastForward(2, true, onStep); if (s.state !== 'fight') break; }
         const S = b.state, L = b.phaseLog || [], n = def.phases.length;
         const out = { state: s.state, t: s.t, src: s.src, hp: s.hp, boss: s.boss, err: s.errors, ph: L.map((q) => q && { t: q.time, dps: Math.round(q.dmg / Math.max(1, q.time)) }), stepAt: (S.stepAt || []).slice(), info: { hp: def.hp, enrage: def.enrage, n }, lastBlow: !!b.lastBlowing, cb };
-        g.god(false); g.Bot.passive = g.Bot.swapBlind = g.Bot.sideBlind = g.Bot.pocketBlind = false; return out;
+        g.god(false); g.Bot.passive = g.Bot.swapBlind = g.Bot.sideBlind = g.Bot.pocketBlind = g.Bot.gardenBlind = false; return out;
       }, [boss, cls, env, k]);
       info = r.info; rows.push(r);
       for (let st = 0; st < r.cb.length; st++) if (r.cb[st]) { const A = agg[cls] || (agg[cls] = []), q = A[st] || (A[st] = [0, 0, 0, 0, 0]); for (let j = 0; j < 5; j++) q[j] += r.cb[st][j]; }
