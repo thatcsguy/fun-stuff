@@ -76,11 +76,16 @@ HUD hooks on a skill: `rdy(p)` (glow), `act(p)` (lit while active), `interrupt: 
 
 The door page has a Normal / Nightmare toggle between the classes and the doors (mouse, arrows / d-pad left-right on it, Enter / A flips it).
 On Nightmare, a door without a nightmare version is greyed out, cannot be focused or clicked, and the hall behind the menu dims it.
-Two doors have one so far. Door III, Niten: four phases on the same 23,000 health (sunset, nightfall, the lake with its seam and mirrored
+Three fights have one so far. Door III, Niten: four phases on the same 23,000 health (sunset, nightfall, the lake with its seam and mirrored
 ghosts, then his reflection fighting beside him, where exactly one of the two can be hurt and Stillness is the swap). Door XIX, Chiaroscuro:
 three phases on 24,000 health (Normal: 31,000) (the fight opens in colour, then the Negative, then a turning seam splits the canvas into a white
 half and a black half, and every Critique names a half and a colour, shown as his whole body white or black with the colour as a swirl of
-paint winding up him; under 10% three fast Critiques keep the same answer paint while the half flips). Normal play is untouched by any of this.
+paint winding up him; under 10% three fast Critiques keep the same answer paint while the half flips). The Impresario, "Final Call":
+three phases on 28,000 health (100 / 85 / 68). The Impresario only takes real damage while his lead understudy doll (gold strings and a gold
+shell) stands in the pool of light at his feet (x0.1 otherwise); the dolls mirror your moves, so you steer the lead into it. Every 15 s he
+recasts the lead. Phase 2 adds a second doll, phase 3 ("Final Call") ties strings to you and ramps every 35 s (the Hand, dark Cues where only
+the dolls carry lights, birds and scenery, a faster tempo, then a triple-Cue Curtain call); a passed Cue gives a 4 s Ovation (x2 damage).
+No Encore on Nightmare; the last blow is "Final Curtain". Normal play is untouched by any of this.
 
 A nightmare version is a `nightmare` block on the boss def (see `BOSS_AUTHORING.md`). It has short teaching phases and a long last
 phase that ramps on its own, and one overall enrage: from `enrage` seconds a soft creeping pulse (`enrageBase` 40 + `enrageGrow` 4 per
@@ -109,6 +114,11 @@ Later fights use the ids `clock`, `portal`, `atelier`, `sumi`. `portal` also tak
 - `moonfuzz.js [classes] [runs]`: Issen's Moons (Full Moon = the "in", New Moon = the "out"). Whole fights with the level-3 autopilot; per Moon the share of the deck it leaves safe, whether the player already stood safe when its tell began, the walk to safety otherwise, and the hits. `NM=1` for Nightmare, `REAL=1` god mode off.
 - `critfuzz.js [runs] [classes|all]`: door XIX's finale, where every Critique asks for a half and a paint at the instant it lands. Plays it (god mode; `STEPS=0,3,4` by default, forcing the ramp step so the fast seam and both Critiques of a pair are covered) with the level-3 autopilot and with a lazy one that never washes or fetches paint, and lists every Critique's route check (how long the walk to an answer takes, and the repair the boss made: moving the dish, dropping the missing paint, or stretching the cast). Passes when every Critique has an answer, all 14 calls appear, the level-3 bot needs a repair in under 25% of them and a stretched cast in at most 5% (the signature's stretched gaps are by design and counted apart).
 - `nmshots.js <outDir> [class]`: screenshots of a Nightmare fight through the real menu and the full intro (door page on both settings, title card), then the last phase with one shot per ramp step, the enrage pulse, the last blow, the death table, the kill and the victory table. `BOSS=atelier` for Pentimento.
+- `callcast.js`: the Impresario's Final Call per ramp step: share of time the lead stands in the light, share of time casting, casts per minute, the longest stretch with no Bolt for the autopilot and by design, dps and Ovations. `STEP=n` forces one step, `BLIND=1` a bot that ignores who is the lead (must never kill), `REAL=1` god mode off.
+- `cuefuzz.js [cues] [brackets]`: the Impresario's Cues (each has an answer, decoys never pass, dark Cues only readable from the dolls' lights), bird lanes stay symmetric, and every 15 s bracket leaves a reachable gate spot.
+- `callphase.js`: forces each Impresario nightmare phase change and the last blow in the middle of every mechanic, checks nothing is left behind, then that a restart resets the state.
+- `callentry.js`: the Impresario's Nightmare through the full intro for every class (split stage, pit, one doll), then a whole god-mode fight with ramp step times.
+- `callshots.js <outDir>`: GPU shot list for the Impresario's Nightmare (opening, gate open / closed, recast tell, each ramp step, a dark Cue, an Ovation, the Curtain call, the last blow, the Final Call cinematic, the kill).
 - `menunav.js`: the Difficulty toggle with mouse, keyboard and a simulated controller (values, greyed doors skipped, focus, persistence, Restart keeps Nightmare, Normal still starts Normal). Must print `ALL PASS`.
 - `matrix.js <class,class|all> [runs] [boss,boss]`: autopilot attempts for every door and class, one summary line each (wins, boss health left, dps). `GOD=1` checks instead that each class can finish every fight before the enrage.
 - `sim.js <boss> <class> <botLevel> [runs] [maxSec] [phase]`: full autopilot attempts.
@@ -141,7 +151,7 @@ Run them with `NODE_PATH=<global node_modules with playwright> THREE_DIR=<unpack
 - Mechanic damage and telegraph time: the `delay` and `dmg` arguments of each `Hz.*` call in the boss file.
 - Player health and speed: `Player` in `07_player.js` (1000 hp, speed 7). Class numbers: `08_classes.js`.
 - Look per fight: the `post` block of each boss (bloom, exposure, tint) and its `build()`.
-- Nightmare pace: `NM_HP` in `22_boss_duelist.js` (Issen) and `38_boss_atelier.js` (Pentimento), with the measured table next to it, then the `enrage` time (330 to 360 s), then the ramp (`RAMP` for Niten, `SIT_PER_STEP` for Chiaroscuro). Tune with `tools/nmpace.js`; never touch class numbers or Normal for it.
+- Nightmare pace: `NM_HP` in `22_boss_duelist.js` (Issen), `38_boss_atelier.js` (Pentimento) and `26_boss_theatre.js` (the Impresario), with the measured table next to it, then the `enrage` time (330 to 360 s), then the ramp (`RAMP` for Niten and the Final Call, `SIT_PER_STEP` for Chiaroscuro). Tune with `tools/nmpace.js`; never touch class numbers or Normal for it.
 
 The autopilot is a rough stand-in for a player who already knows the fight. At the time of writing it clears the cathedral and the engine, gets the leviathan and titan into their last phase, and dies in phase two of the duelist. Nothing has been tuned against a human yet.
 

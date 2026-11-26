@@ -4573,9 +4573,9 @@ G.classes.push({
 // theatre (Impresario), wheel (Lady Fortuna), express (Ironjaw), winter (Huntsman), origami (Oriko), lamp (Vesper),
 // chess (Zugzwang), festival (Nian), fall (Anzu), clock (Horologist), portal (Janus), atelier (Pentimento), sumi (Garyo).
 const GROUPS = [
-  { id: 'nightmare', name: 'Nightmare', bosses: ['duelist', 'atelier'] },
+  { id: 'nightmare', name: 'Nightmare', bosses: ['duelist', 'atelier', 'theatre'] },
   { id: 'ready', name: 'Ready', bosses: ['engine'] },
-  { id: 'almost', name: 'Almost', bosses: ['cathedral', 'leviathan', 'gorgon', 'theatre', 'origami', 'lamp', 'chess', 'festival', 'fall', 'portal'] },
+  { id: 'almost', name: 'Almost', bosses: ['cathedral', 'leviathan', 'gorgon', 'origami', 'lamp', 'chess', 'festival', 'fall', 'portal'] },
   { id: 'concept', name: 'Concept', bosses: ['titan', 'wheel', 'express', 'winter', 'clock', 'sumi'] },
 ];
 // the fights of each group, as boss defs (unknown ids are skipped; unlisted bosses fall into the last group)
@@ -10503,7 +10503,7 @@ const Hitch = (() => {
 // ==== 26_boss_theatre.js ====
 // DOOR VII: THE IMPRESARIO, the Paper Theatre. You have an understudy. It goes where you go, on the other side of the stage.
 (() => {
-  const HX = 15, HZ = 9, LIME = 0xfff2c8, ROSE = 0xff3d6e, VIO = 0xc86bff, MID = 1.6, PIT = 2.3;
+  const HX = 15, HZ = 9, LIME = 0xfff2c8, ROSE = 0xff3d6e, VIO = 0xc86bff, MID = 1.6, PIT = 2.3, GOLD = 0xffc24a;
   const _a = new V3(), _b2 = new V3(), _m = new THREE.Object3D(), _w = new V3(), _w2 = new V3(), _c = new THREE.Color(), _c2 = new THREE.Color(), _Y = new V3(0, 1, 0);
   const ROWZ = [-6, 0, 6];
 
@@ -10829,9 +10829,11 @@ const Hitch = (() => {
       ho.position.set(sx * 9, 30, -8); S.giant.add(ho); S.hands.push({ g: ho, sx, home: new V3(sx * 9, 13.5, -9), tgt: new V3(sx * 9, 13.5, -9), fast: 0 });
     }
     S.split = false; S.dark = 0; S.black = null; S.twang = 0; S.dz = 0; S.act = 0; S.gesture = 0; S.pitY = 0; S.a1 = 0; S.a2 = 0; S.lx = 0; S.lz = 0;
-    b.distTo = function (x, z) { if (S.split) x = -x; return Math.max(0, Math.hypot(x - this.pos.x, z - this.pos.z) - this.radius); };
+    if (G.nightmare) buildNM(b, g, S, { goldM, velvetM, coneMat, poolMat, folds });
+    const _dt = {};
+    b.distTo = function (x, z) { if (S.nmOn) { const m = mir(S.dolls[S.lead], x, z, _dt); x = m.x; z = m.z; } else if (S.split) x = -x; return Math.max(0, Math.hypot(x - this.pos.x, z - this.pos.z) - this.radius); };
     return {
-      edge: 'wall', spawn: { x: -5, z: 5 }, bossStart: { x: 0, z: -5, face: 0 }, camDist: 16,
+      edge: 'wall', spawn: G.nightmare ? { x: -7, z: 2 } : { x: -5, z: 5 }, bossStart: G.nightmare ? { x: 8, z: -1, face: -PI / 2 } : { x: 0, z: -5, face: 0 }, camDist: 16,
       contains: (x, z) => Math.abs(x) <= HX - 0.4 && Math.abs(z) <= HZ - 0.4 && (!S.split || x <= -PIT - 0.3),
       clamp(p) { p.x = clamp(p.x, -HX + 0.5, S.split ? -PIT - 0.4 : HX - 0.5); p.z = clamp(p.z, -HZ + 0.5, HZ - 0.5); },
       bulletBounds: (x, z) => Math.abs(x) < 17.5 && Math.abs(z) < 11,
@@ -10848,7 +10850,7 @@ const Hitch = (() => {
       const q = tgtOf(S, i); S.gesture = 1;
       Sound.sfx('sword', 0.6, 1.3);
       if (!G.headless) { const K = S.kn[S.kni++ % S.kn.length], fr = new V3(b.pos.x, 3.4, b.pos.z), to = new V3(q.x, 0.3, q.z); K.userData = { t0: G.now, fr, to, dur: Math.max(0.05, fr.distanceTo(to) / 30), end: G.now + 1.0 }; K.visible = true; }
-      Hz.circle(q.x, q.z, 2.6, 1.0, 260, { name: 'Knife Act', onFire() { FX.burst(q.x, 0.4, q.z, { n: 14, color: 0xffffff, color2: VIO, speed: [2, 8], up: 2, life: [0.2, 0.6] }); Sound.sfx('hit', 0.9, 1.4); } });
+      Hz.circle(q.x, q.z, 2.6, 1.0, NM(260, 300), { name: 'Knife Act', onFire() { FX.burst(q.x, 0.4, q.z, { n: 14, color: 0xffffff, color2: VIO, speed: [2, 8], up: 2, life: [0.2, 0.6] }); Sound.sfx('hit', 0.9, 1.4); } });
       yield gap;
     }
     S.fanOn = 0; yield 0.6;
@@ -10872,7 +10874,7 @@ const Hitch = (() => {
     const rows = shuffle([0, 1, 2]).slice(0, n);
     for (const r of rows) {
       const sx = rnd() < 0.5 ? -1 : 1, len = rnd() < 0.5 ? rnd(9, 12.5) : rnd(17.5, 21), f = S.flats.find((q) => q.row === r && q.sx === sx);
-      Hz.rect(sx * HX, ROWZ[r], sx < 0 ? PI / 2 : -PI / 2, len, 5.8, 1.7, 330, { name: 'Scene Change', color: 0xffb060, quiet: true, onFire() { f.tx = sx * (HX - len + 10); f.hold = 1.3; Sound.sfx('boom', 0.6, 1.5); FX.shake(0.2); } });
+      Hz.rect(sx * HX, ROWZ[r], sx < 0 ? PI / 2 : -PI / 2, len, 5.8, 1.7, NM(330, 340), { name: 'Scene Change', color: 0xffb060, quiet: true, onFire() { f.tx = sx * (HX - len + 10); f.hold = 1.3; Sound.sfx('boom', 0.6, 1.5); FX.shake(0.2); } });
       yield 0.35;
     }
     yield 2.0;
@@ -10881,12 +10883,12 @@ const Hitch = (() => {
     yield* b.cast({ name: 'Paper Birds', time: 0.8 });
     let g0 = rndi(0, 6);
     for (let w = 0; w < waves; w++) {
-      for (let i = 0; i < 9; i++) { if (i === g0 || i === g0 + 1 || i === (g0 + 5) % 9) continue; Bul.fire({ x: side * -16.5, z: -8 + i * 2, dir: side * PI / 2, speed: 8.5, r: 0.42, dmg: 120, color: 0x8a1a40, life: 4.2, bird: 1 }); }
+      for (let i = 0; i < 9; i++) { if (i === g0 || i === g0 + 1 || i === (g0 + 5) % 9) continue; Bul.fire({ x: side * -16.5, z: -8 + i * 2, dir: side * PI / 2, speed: 8.5, r: 0.42, dmg: NM(120, 150), color: 0x8a1a40, life: 4.2, bird: 1 }); }
       Sound.sfx('dash', 0.5, 1.6); g0 = (g0 + rndi(2, 4)) % 8; yield 1.15;
     }
     yield 1.6;
   }
-  function* blackout(b, decoys, time = 4.4) {
+  function* blackout(b, decoys, time = 4.4, o) {
     const S = b.state, p = G.player, dl = dolls(S), R0 = 3.1;
     let q = { x: -8, z: 3 };
     for (let k = 0; k < 40; k++) { q = { x: rnd(S.split ? -12.5 : -12, S.split ? -5 : 12), z: rnd(-6, 6) }; if (Math.abs(q.x) > 4.2 && (dl.length < 2 || Math.abs(q.z) > 3.6)) break; }
@@ -10906,8 +10908,8 @@ const Hitch = (() => {
     if (r !== 'done') return;
     FX.flash(0xffffff, 0.35, 2.5); Sound.sfx('boom', 1, 0.5);
     const ok = lit(p.pos.x, p.pos.z, spots) && dl.every((d) => { const m = dpos(d, {}); return lit(m.x, m.z, spots); });
-    if (!ok) { p.hurt(430, { blockable: false, src: { name: 'Blackout' } }); FX.shake(0.6); } else for (const s of spots.slice(0, 1 + dl.length)) FX.ring(s.x, s.z, { r1: 5, color: LIME, dur: 0.5 });
-    yield 0.6;
+    if (!ok) { p.hurt(NM(430, 380), { blockable: false, src: { name: 'Blackout' } }); FX.shake(0.6); if (o) b.state.heroTwang = 1; } else for (const s of spots.slice(0, 1 + dl.length)) FX.ring(s.x, s.z, { r1: 5, color: LIME, dur: 0.5 });
+    yield 0.6; return ok;
   }
   function* encore(b) {
     const S = b.state, r = yield* b.cast({ name: 'Encore', time: 3.0, onTick: () => { S.gesture = 1; } });
@@ -10918,14 +10920,14 @@ const Hitch = (() => {
   }
   // act two: he works the far half of the stage
   function* flourish(b) {
-    const S = b.state, q = dpos(S.dolls[0], {}), dir = angTo(b.pos.x, b.pos.z, q.x, q.z); b.autoFace = false; yield* b.turnTo(dir, 0.25); S.gesture = 1;
+    const S = b.state, q = dpos(S.dolls[S.nmOn ? S.lead : 0], {}), dir = angTo(b.pos.x, b.pos.z, q.x, q.z); b.autoFace = false; yield* b.turnTo(dir, 0.25); S.gesture = 1;
     Hz.cone(b.pos.x, b.pos.z, dir, 2.0, 8.5, 1.25, 300, { name: 'Flourish', onFire() { FX.slash(b.pos.x, 1.4, b.pos.z, dir, { r: 8.5, color: VIO, dur: 0.3 }); Sound.sfx('slash', 1, 0.7); } });
     yield 1.6; b.autoFace = true;
   }
-  function* pirouette(b) { const S = b.state; S.spin = 1; Hz.circle(b.pos.x, b.pos.z, 6.6, 1.5, 320, { name: 'Pirouette', onFire() { FX.ring(b.pos.x, b.pos.z, { r1: 7, color: VIO, dur: 0.4 }); } }); yield* b.cast({ name: 'Pirouette', time: 1.5 }); S.spin = 0; yield 0.4; }
+  function* pirouette(b) { const S = b.state; S.spin = 1; Hz.circle(b.pos.x, b.pos.z, 6.6, 1.5, NM(320, 340), { name: 'Pirouette', onFire() { FX.ring(b.pos.x, b.pos.z, { r1: 7, color: VIO, dur: 0.4 }); } }); yield* b.cast({ name: 'Pirouette', time: 1.5 }); S.spin = 0; yield 0.4; }
   function* sandbags(b, n) {
     yield* b.cast({ name: 'Sandbags', time: 0.5 });
-    for (let i = 0; i < n; i++) { const p = G.player, x = p.pos.x, z = p.pos.z; Hz.circle(x, z, 2.8, 1.1, 260, { name: 'Sandbag', color: 0xffb060, onFire() { FX.burst(x, 0.3, z, { n: 16, smoke: true, color: 0x8a7a5a, color2: 0x2a2418, speed: [1, 5], life: [0.5, 1.1], size: [0.6, 1.4], alpha: 0.5 }); Sound.sfx('boom', 0.7, 0.9); } }); yield 0.85; }
+    for (let i = 0; i < n; i++) { const p = G.player, x = p.pos.x, z = p.pos.z; Hz.circle(x, z, 2.8, 1.1, NM(260, 300), { name: 'Sandbag', color: 0xffb060, onFire() { FX.burst(x, 0.3, z, { n: 16, smoke: true, color: 0x8a7a5a, color2: 0x2a2418, speed: [1, 5], life: [0.5, 1.1], size: [0.6, 1.4], alpha: 0.5 }); Sound.sfx('boom', 0.7, 0.9); } }); yield 0.85; }
     yield 0.4;
   }
   function* stroll(b) { const S = b.state; if (S.split) yield* b.moveTo(rnd(6.5, 11.5), rnd(-5, 5), 6); else { const p = G.player, a = angTo(p.pos.x, p.pos.z, 0, -2); yield* b.moveTo(clamp(p.pos.x + Math.sin(a) * 6, -9, 9), clamp(p.pos.z + Math.cos(a) * 6, -6, 4), 7); } }
@@ -10956,11 +10958,408 @@ const Hitch = (() => {
     [0xff9a8a, 2.0, [-0.25, 0.8, 0.5], 0x6a3a7a, 0x22060c, 0.5, 120, 0x0c0612, 0xb84848],
   ];
   const _kd = new V3(), _kd2 = new V3();
+  const POST = { bloom: 0.62, threshold: 0.84, radius: 0.65, exposure: 1.08, vig: 1.15, sat: 1.12, tint: [1.05, 0.99, 0.95] };
+
+  // ================================================================ NIGHTMARE ("Final Call")
+  // The understudy has the part: he can only be hurt while the LEAD understudy (gold strings) stands in his pool of light.
+  // Phase I opens on the split stage with one doll; phase II brings the second doll and Recast (the lead swaps every bracket);
+  // phase III, Final Call (from 68% of his health), ramps every RAMP s of live time. Dark Cues: only the dolls get a light, and a
+  // passed Cue earns an Ovation. Plan: threshold-design/impresario-nightmare-plan.md. Normal never reaches any of this: every
+  // hook in the shared code is behind S.nmOn (set by buildNM, which only runs when G.nightmare), and shared numbers use NM().
+  // Levers:
+  const NM_HP = 28000;
+  const GATE = { r: 5.0, off: 0.1 };                 // his light: radius from his centre, and the damage he takes outside it
+  const MARKS = [[8, 4.5], [-8, 4.5], [8, -4.5], [-8, -4.5]], MARK_J = 1.0; // where he stands (never near a stage axis)
+  const RECAST = { tell: [1.4, 1.4, 1.4, 1.4, 1.0, 1.0], breath: 3.0, wind: 1.4, near: 6, far: 12 }; // tell per ramp step; nothing lands for `breath` s after the bell (Move A starts `wind` s after it: its first hit lands 1.5-1.6 s later)
+  const BRACKET = [15, 15, 15, 15, 11.5, 11.5];      // shortest bracket per step (an Ovation does not count)
+  const CUE = { r: 3.1, time: [4.4, 4.4, 4.4, 4.4, 3.4, 3.4], decoys: [1, 1, 2, 2, 3, 3], own: [1, 1, 0, 0, 0, 0], curtain: 2.8, curtainDecoys: 2, dmg: 380 };
+  const OVATION = { t: 4.0, mult: 2.0, short: 2.5, curtain: 6.0, miss: 2.0 };
+  const RAMP = 35, POCKET = 2.0;                    // POCKET: after Move A, nothing new targets you for this long
+  const HAND = { r: 5.2, tell: 1.6, dmg: 380 };
+  const BIRDS = { waves: 3 };
+  const STEP = [ // what each finale ramp step turns on (old layers keep running)
+    { name: 'Strings', hand: 0, pair: false, scenery: false, birds: false },
+    { name: 'The Hand', hand: 1, pair: true, scenery: false, birds: false },
+    { name: 'No light for the understudy', hand: 1, pair: true, scenery: false, birds: false },
+    { name: 'Scenery', hand: 1, pair: true, scenery: true, birds: true },
+    { name: 'Double time', hand: 2, pair: true, scenery: true, birds: true },
+    { name: 'Curtain call', hand: 2, pair: true, scenery: true, birds: true },
+  ];
+  const callStepOf = (S) => Math.min(5, Math.floor(((S.callT || 0) + 1.5) / RAMP)); // a step starts at the first bracket that begins within 1.5 s of its time
+  const _g = {}, _g2 = {}, _hb = {};
+  const leadPos = (S, out) => dpos(S.dolls[S.lead], out);
+  const GATEF = 'uniform vec3 uC; uniform float uA,uT; varying vec2 vUv; void main(){ float r=length(vUv-0.5)*2.0; if(r>1.0) discard; float e=1.0-smoothstep(0.965,1.0,r); float rim=smoothstep(0.86,0.97,r)*e; float body=(0.26+0.24*(1.0-r*r))*e; float a=(body+rim*0.85)*max(uA,0.0); a+=(fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)-0.5)*0.006; a=max(a,0.0); gl_FragColor=vec4(uC*a,a); }';
+  const SHELLF = 'uniform vec3 uC; uniform float uA; varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vec3 n=vN/max(length(vN),1e-4); vec3 v=vV/max(length(vV),1e-4); float f=1.0-clamp(abs(dot(n,v)),0.0,1.0); float y=clamp(vUv.y,0.0,1.0); float a=pow(max(f,0.0),2.0)*(0.3+0.7*smoothstep(0.0,0.2,y)*(1.0-smoothstep(0.7,1.0,y)))*max(uA,0.0); gl_FragColor=vec4(uC*a,a); }';
+  const HOFF = [[0.35, 1.5, 0], [-0.35, 1.5, 0], [0, 2.05, 0], [0, 1.0, -0.2]];
+
+  // everything Nightmare-only is built here, hidden (nothing is created mid-fight)
+  function buildNM(b, g, S, h) {
+    Object.assign(S, { nmOn: true, lead: 0, inLight: false, callT: 0, callStep: 0, stepAt: [], ovUntil: 0, finale: false, heroOn: false, heroK: 0, heroTwang: 0, lift: 0, bow: 0, lean: 0 });
+    // the fight opens on the split stage at sunset: the pit already open
+    S.split = true; S.act = 1; S.a1 = 1; S.pitY = 1; S.back.color.set(0xff5070);
+    S.gpool = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ uniforms: { uC: { value: new THREE.Color(LIME) }, uA: { value: 0.3 }, uT: { value: 0 } }, vertexShader: POOLV, fragmentShader: GATEF, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    S.gpool.rotation.x = -PI / 2; S.gpool.scale.setScalar(GATE.r * 2); S.gpool.renderOrder = 2; g.add(S.gpool);
+    const shellMat = () => new THREE.ShaderMaterial({ uniforms: { uC: { value: new THREE.Color(GOLD).multiplyScalar(1.4) }, uA: { value: 0 } }, vertexShader: CONEV, fragmentShader: SHELLF, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
+    for (const d of S.dolls) {
+      d.col0 = d.ln.material.color.clone(); d.barM = d.bar.children.map((m) => m.material); d.gk = 0;
+      d.shell = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.72, 2.4, 24, 1, true), shellMat()); d.shell.visible = false; d.shell.renderOrder = 5; g.add(d.shell);
+      d.foot = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), h.poolMat(GOLD)); d.foot.rotation.x = -PI / 2; d.foot.scale.setScalar(2.4); d.foot.renderOrder = 2; d.foot.visible = false; g.add(d.foot);
+    }
+    // your strings and crossbar (Final Call): four strings to the bar, and the bar's own line up to the giant's hand
+    { const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(30), 3));
+      S.heroLn = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: new THREE.Color(0xffe8c0).multiplyScalar(1.5), transparent: true, opacity: 0.7 })); S.heroLn.frustumCulled = false; S.heroLn.visible = false; g.add(S.heroLn);
+      S.heroBar = new THREE.Group(); const wood = W.mat({ color: 0x5a3818, roughness: 0.6, emissive: GOLD, emissiveIntensity: 0.12 });
+      for (const r of [0, PI / 2]) { const q = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.08, 0.12), wood); q.rotation.y = r; S.heroBar.add(q); }
+      for (const [x, z] of [[-0.75, 0], [0.75, 0], [0, 0.75], [0, -0.75]]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), h.goldM); k.position.set(x, 0, z); S.heroBar.add(k); }
+      S.heroBar.visible = false; g.add(S.heroBar); }
+    // the follow spot on the lead (Final Call)
+    S.follow = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 2.1, 13.2, 32, 1, true), h.coneMat(0xfff0c8)); S.follow.visible = false; S.follow.renderOrder = 14; g.add(S.follow);
+    S.followPool = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), h.poolMat(0xfff4dc)); S.followPool.rotation.x = -PI / 2; S.followPool.scale.setScalar(4.6); S.followPool.renderOrder = 2; S.followPool.visible = false; g.add(S.followPool);
+    // the heavy curtain for the Final Curtain
+    S.front = new THREE.Mesh(h.folds(36, 17, 18, 0.45), h.velvetM(0x6a0814)); S.front.position.set(0, 26, HZ + 0.9); S.front.visible = false; g.add(S.front); S.frontK = 0;
+    // lit vs silhouette: his own materials dim out of the light (the giant gets copies so it never dims with him)
+    const rigM = new Set(); S.rig.traverse((o) => { if (o.isMesh) rigM.add(o.material); });
+    const copies = new Map(); S.giant.traverse((o) => { if (o.isMesh && rigM.has(o.material)) { let c = copies.get(o.material); if (!c) { c = o.material.clone(); c.onBeforeCompile = o.material.onBeforeCompile; c.customProgramCacheKey = o.material.customProgramCacheKey; copies.set(o.material, c); } o.material = c; } });
+    S.dimM = []; for (const m of rigM) if (m.isMeshStandardMaterial && m !== S.trim) S.dimM.push({ m, c: m.color.clone(), e: m.emissiveIntensity });
+    S.litK = 1; S.gk = 0;
+    // a gold beam from the lead to him on landed blows
+    b.onDamaged = (amt, info) => { if (G.headless || info.src !== 'player' || !S.inLight || G.now < (S.beamT || 0)) return; S.beamT = G.now + 0.12; const q = leadPos(S, _hb); FX.beam(new V3(q.x, 1.3, q.z), b.aim(new V3()), { color: GOLD, width: 0.1, dur: 0.25 }); };
+  }
+  // a Nightmare-only stage setter (setAct stays Normal's): split stage, how many dolls, look (1 sunset, 2 burning), the giant
+  function setNM(b, o) {
+    const S = b.state, p = G.player; S.split = !!o.split; S.act = o.act;
+    const d1 = S.dolls[1]; d1.on = (o.dolls || 1) > 1; d1.M.group.visible = d1.bar.visible = d1.ln.visible = d1.on; if (!d1.on) S.lead = 0;
+    S.giant.visible = !!o.giant;
+    if (S.split && p && p.pos.x > -PIT - 0.6) { FX.burst(p.pos.x, 1, p.pos.z, { n: 20, color: VIO, speed: [1, 5] }); p.pos.x = -6; }
+    if (S.split && b.pos.x < 5) b.pos.set(8, 0, -1);
+  }
+  // Co.stopTag('phase') skips a coroutine's cleanup, so every per-mechanic flag a cut-off mechanic can leave behind is reset here:
+  // in every Nightmare phase, the last blow and the kill. Who the lead is stays (it is not per-mechanic); a half-done Recast is dropped.
+  function resetMech(b) {
+    const S = b.state; S.black = null; S.dark = 0; S.spin = 0; S.fanOn = 0; S.ovUntil = 0; S.bow = 0; S.lift = 0; b.pos.y = 0; S.recast = null; S.heroTwang = 0; S.curtainOn = false;
+    if (!G.headless) { for (const c of S.cones) c.visible = false; for (const pl of S.spotPools) pl.visible = false; }
+    for (const H of S.hands) { H.fast = 0; if (H.tgt.y < 5) H.tgt.copy(H.home); }
+    const q = leadPos(S, _g); S.inLight = Math.hypot(q.x - b.pos.x, q.z - b.pos.z) <= GATE.r; b.dmgTaken = S.inLight ? 1 : GATE.off;
+    b.autoFace = true; G.timeScale = 1;
+    if (S.cine) { S.cine = false; Cam.release(); UI.hud(true); }
+  }
+  // every frame, headless too: the gate and the finale clock
+  function nmSim(b, dt) {
+    const S = b.state, q = leadPos(S, _g);
+    S.inLight = Math.hypot(q.x - b.pos.x, q.z - b.pos.z) <= GATE.r;
+    b.dmgTaken = G.now < S.ovUntil ? OVATION.mult : S.inLight ? 1 : GATE.off;
+    if (S.finale && G.state === 'fight' && !b.transitioning && !b.lastBlowing && b.alive) S.callT += dt;
+    if (S.finale && S.hands[0] && !S.finaleOver) S.hands[0].tgt.set(b.pos.x, 12.2 + b.pos.y, b.pos.z); // the hand that holds his crossbar
+    // a leap at him (Overhead, Lunge: a dash with a landing aimed at his body) goes through the understudy instead, like every
+    // blow: it lands where the lead would stand at his side (never farther than the leap would have gone)
+    const p = G.player, pd = p && p.dash;
+    if (pd && pd !== S.dash0) { S.dash0 = pd; if (pd.done && b.alive && Math.abs(angDiff(Math.atan2(pd.vx, pd.vz), angTo(p.pos.x, p.pos.z, b.pos.x, b.pos.z))) < 0.03) {
+      const d = S.dolls[S.lead], c = dpos(d, _g2); let ux = c.x - b.pos.x, uz = c.z - b.pos.z; const L = Math.hypot(ux, uz) || 1, off = b.radius + 1.6, m = mir(d, b.pos.x + ux / L * off, b.pos.z + uz / L * off, _hb);
+      const dx = m.x - p.pos.x, dz = m.z - p.pos.z, D = Math.hypot(dx, dz) || 1e-3, dur = Math.max(pd.t, 0.05), k = Math.min(1, Math.hypot(pd.vx, pd.vz) * dur / D);
+      pd.vx = dx * k / dur; pd.vz = dz * k / dur; p.facing = Math.atan2(dx, dz); } }
+  }
+
+  // ---- Recast: the lead changes. He goes to a mark that puts your new standing spot 6 to 12 m from where you are.
+  function pickMark(b, li) {
+    const S = b.state, p = G.player, d = S.dolls[li], C = [];
+    for (const [mx, mz] of MARKS) for (let j = 0; j < 3; j++) {
+      const c = { x: mx + rnd(-MARK_J, MARK_J), z: mz + rnd(-MARK_J, MARK_J) };
+      if (Math.hypot(c.x - b.pos.x, c.z - b.pos.z) < 3 || Math.hypot(c.x - p.pos.x, c.z - p.pos.z) < 4) continue;
+      const s = mir(d, c.x, c.z, {}), dd = Math.hypot(s.x - p.pos.x, s.z - p.pos.z);
+      C.push({ c, bad: Math.max(0, RECAST.near - dd, dd - RECAST.far) });
+    }
+    const ok = C.filter((q) => !q.bad); if (ok.length) return ok[rndi(0, ok.length - 1)].c;
+    C.sort((a, c) => a.bad - c.bad); return C.length ? C[0].c : { x: b.pos.x, z: b.pos.z };
+  }
+  function* recast(b) {
+    const S = b.state, st = S.finale ? S.callStep : 0, tell = RECAST.tell[st], to = 1 - S.lead, c = pickMark(b, to);
+    S.recast = { to, x: c.x, z: c.z, t0: G.now, at: G.now + tell, tell };
+    const mk = Hz.mark({ type: 'circle', x: c.x, z: c.z, r: 1.3 }, tell + 0.1, { color: GOLD, alpha: 0.7 });
+    Sound.sfx('charge', 0.5, 1.6); S.gesture = 1;
+    const x0 = b.pos.x, z0 = b.pos.z, carry = !!S.finale;
+    const r = yield* b.cast({ name: 'Recast', time: tell, onTick: (k) => { S.gesture = 1; const e = smooth(clamp((k - 0.2) / 0.7, 0, 1)); b.pos.x = lerp(x0, c.x, e); b.pos.z = lerp(z0, c.z, e); S.lift = carry ? Math.sin(Math.min(1, k / 0.95) * PI) * 2.2 : 0; b.pos.y = S.lift; } });
+    Hz.cancel(mk); b.pos.y = 0; S.lift = 0;
+    if (r !== 'done') { S.recast = null; return; }
+    b.pos.x = c.x; b.pos.z = c.z; S.lead = to; S.recast = null; S.breathUntil = G.now + RECAST.breath; S.recastN = (S.recastN || 0) + 1;
+    Sound.sfx('bell', 0.8, 1.15); S.twang = 1; if (!G.headless) { const q = leadPos(S, _g2); FX.ring(q.x, q.z, { r1: 2.2, color: GOLD, dur: 0.45 }); }
+  }
+  // ---- the free hand (Final Call): it hovers over one of the three bodies, then slams
+  function* handSlam(b, n) {
+    const S = b.state, H = S.hands[1];
+    for (let i = 0; i < n; i++) {
+      S.slamK = (S.slamK || 0) + 1; const q = tgtOf(S, S.slamK), x = clamp(q.x, -11, 11), z = clamp(q.z, -5, 5);
+      H.tgt.set(x, 11, z); H.fast = 0; S.gesture = 1;
+      Hz.circle(x, z, HAND.r, HAND.tell, HAND.dmg, { name: 'The Hand', kb: { dist: 4 }, onFire() { H.tgt.set(x, 0.7, z); H.fast = 1; FX.ring(x, z, { r1: 5.6, color: VIO, dur: 0.45 }); FX.burst(x, 0.3, z, { n: 26, smoke: true, color: 0x8a7a6a, color2: 0x2a2020, speed: [2, 7], up: 1.5, life: [0.5, 1.1], size: [0.8, 1.8], alpha: 0.45, radius: 3 }); FX.shake(0.6); Sound.sfx('bigboom', 0.7); Co.start(function* () { yield 0.6; H.fast = 0; if (H.tgt.y < 5) H.tgt.copy(H.home); }, 'fight'); } });
+      yield HAND.tell + 0.15;
+    }
+    yield 0.4;
+  }
+  // ---- paper birds on Nightmare: open lanes are symmetric front to back (lane g open means lane 8 - g is open), so a lane safe
+  // for you is safe for the blue understudy. No cast: they cross while Move A plays.
+  const birdOpen = (g) => [g, g + 1, 7 - g, 8 - g];
+  function* nmBirds(b, waves) {
+    const S = b.state, side = rnd() < 0.5 ? -1 : 1; let g = rndi(0, 3); S.gesture = 1; Sound.sfx('dash', 0.6, 1.3);
+    yield 0.6;
+    for (let w = 0; w < waves; w++) {
+      const open = birdOpen(g);
+      for (let i = 0; i < 9; i++) { if (open.includes(i)) continue; Bul.fire({ x: side * -16.5, z: -8 + i * 2, dir: side * PI / 2, speed: 8.5, r: 0.42, dmg: 150, color: 0x8a1a40, life: 4.2, bird: 1 }); }
+      Sound.sfx('dash', 0.5, 1.6); g = clamp(g + (rnd() < 0.5 ? -1 : 1) * rndi(1, 2), 0, 3); yield 1.15;
+    }
+  }
+  // ---- the Cue: the stage goes dark and only the understudies get lights. Two real lights L and -L are point mirrors through
+  // centre stage, so two standing spots pass (q = (-L.x, L.z) and -q). Decoys pair with nothing: no two lights within 2 R0 + 1 m
+  // of being point mirrors, no light within R0 + 0.6 of centre (both dolls in one light). Neither real light may overlap his
+  // pool (it must be a trip), and the nearer answer is a walk away but reachable in the Cue's time.
+  function genCue(B, P, decoys, time) {
+    const R0 = CUE.r, need = R0 + GATE.r + 0.3, reach = 7 * Math.max(0.8, time - 0.9);
+    let best = null, bs = 1e9;
+    for (let k = 0; k < 400; k++) {
+      const L = { x: rnd(-12, 12), z: rnd(-6.5, 6.5) };
+      if (Math.hypot(L.x, L.z) < 4.5) continue;
+      const q = { x: -L.x, z: L.z }, q2 = { x: L.x, z: -L.z };
+      const dq = Math.min(Math.hypot(P.x - q.x, P.z - q.z), Math.hypot(P.x - q2.x, P.z - q2.z));
+      let bad = Math.max(0, need - Math.hypot(L.x - B.x, L.z - B.z)) + Math.max(0, need - Math.hypot(L.x + B.x, L.z + B.z));
+      bad += Math.max(0, R0 + 1.5 - Math.min(Math.hypot(q.x - B.x, q.z - B.z), Math.hypot(q2.x - B.x, q2.z - B.z)));
+      bad += Math.max(0, R0 + 1 - dq) + Math.max(0, dq - R0 - reach);
+      if (bad < bs) { bs = bad; best = { L, q, q2 }; } if (!bad) break;
+    }
+    const lights = [best.L, { x: -best.L.x, z: -best.L.z }];
+    for (let k = 0, tries = 0; k < decoys && tries < 300; tries++) {
+      const c = { x: rnd(-12.5, 12.5), z: rnd(-6.5, 6.5) };
+      if (Math.hypot(c.x, c.z) < R0 + 0.6) continue;
+      if (lights.some((s) => Math.hypot(s.x - c.x, s.z - c.z) < 6.4 || Math.hypot(s.x + c.x, s.z + c.z) < 2 * R0 + 1.1)) continue;
+      lights.push(c); k++;
+    }
+    return { lights, q: best.q, q2: best.q2, bad: bs };
+  }
+  // does standing at (x, z) pass the Cue? (both understudies inside one of the dolls' lights; you need no light yourself)
+  function cueOk(S, x, z, lights) {
+    const B = S.black; lights = lights || (B ? B.spots.slice(0, B.n) : []);
+    const lit = (px, pz) => lights.some((s) => Math.hypot(s.x - px, s.z - pz) <= CUE.r);
+    return lit(-x, z) && lit(x, -z);
+  }
+  function* cue(b, o) {
+    const S = b.state, p = G.player, time = o.time, c = genCue(b.pos, p.pos, o.decoys, time), spots = c.lights.slice();
+    const near = Math.hypot(p.pos.x - c.q.x, p.pos.z - c.q.z) <= Math.hypot(p.pos.x - c.q2.x, p.pos.z - c.q2.z) ? c.q : c.q2;
+    let faint; if (o.own) { faint = spots.length; spots.push({ x: near.x, z: near.z }); }
+    S.black = { spots, n: c.lights.length, at: G.now + time, r: CUE.r, q: near, q2: near === c.q ? c.q2 : c.q, cue: true, faint };
+    S.cueN = (S.cueN || 0) + 1; Sound.sfx('bell', 0.8, 0.55);
+    const marks = spots.map((s, i) => Hz.mark({ type: 'circle', x: s.x, z: s.z, r: CUE.r }, time + 0.2, { color: i === faint ? 0xb0a080 : LIME, alpha: i === faint ? 0.3 : 0.9 }));
+    const r = yield* b.cast({ name: o.name || 'Cue', time, onTick: (k) => { S.dark = Math.min(1, k * 5); } });
+    for (const m of marks) Hz.cancel(m); S.black = null; S.dark = 0;
+    if (r !== 'done') return false;
+    const ok = cueOk(S, p.pos.x, p.pos.z, c.lights);
+    FX.flash(0xffffff, 0.35, 2.5); Sound.sfx('boom', 1, 0.5);
+    if (!ok) { S.heroTwang = 1; S.cueMiss = (S.cueMiss || 0) + 1; p.hurt(CUE.dmg, { blockable: false, src: { name: 'Cue' } }); FX.shake(0.6); }
+    else { S.cuePass = (S.cuePass || 0) + 1; for (const s of c.lights.slice(0, 2)) FX.ring(s.x, s.z, { r1: 5, color: GOLD, dur: 0.5 }); }
+    yield 0.3; return ok;
+  }
+  // ---- the Ovation: he is set down by the lead and bows; x1.6 and nothing starts or lands
+  function* ovation(b, t) {
+    const S = b.state, p = G.player; if (t <= 0.05) return;
+    Hz.clear('phase'); Bul.clear('phase'); S.ovUntil = G.now + t; S.ovN = (S.ovN || 0) + 1;
+    const d = leadPos(S, {}), o2 = dpos(S.dolls[1 - S.lead], {}); let best = null, bs = -1;
+    for (let i = 0; i < 12; i++) { const a = i / 12 * TAU, x = d.x + Math.sin(a) * 3, z = d.z + Math.cos(a) * 3; if (Math.abs(x) > 12.5 || Math.abs(z) > 7) continue; const s = Math.min(Math.hypot(x - p.pos.x, z - p.pos.z), S.dolls[1].on ? Math.hypot(x - o2.x, z - o2.z) + 1 : 99); if (s > bs) { bs = s; best = { x, z }; } }
+    if (!best) best = { x: b.pos.x, z: b.pos.z };
+    Sound.sfx('clap', 1); Sound.sfx('bell', 0.6, 1.3); FX.flash(GOLD, 0.18, 3); S.bow = 1;
+    const x0 = b.pos.x, z0 = b.pos.z; let tt = 0;
+    while (tt < 0.5) { tt += G.dt; const k = smooth(Math.min(1, tt / 0.5)); b.pos.x = lerp(x0, best.x, k); b.pos.z = lerp(z0, best.z, k); b.pos.y = S.finale ? Math.sin(k * PI) * 1.4 : 0; yield; }
+    b.pos.y = 0;
+    while (G.now < S.ovUntil) { if (!G.headless) for (let i = 0; i < 2; i++) FX.burst(b.pos.x + (vrand() - 0.5) * 9, 9 + vrand() * 3, b.pos.z + (vrand() - 0.5) * 6, { n: 2, color: ROSE, color2: 0xffd0e0, speed: [0.3, 1.5], grav: 2.5, life: [1.4, 2.2], size: [0.12, 0.24], drag: 0.6 }); yield 0.1; }
+    S.bow = 0;
+  }
+  // ---- the Curtain call: three Cues back to back, the lead flipping between them, your light dark. All three passed: a 6 s
+  // Ovation; each miss is 380 and 2 s off it.
+  function* curtainCall(b) {
+    const S = b.state; let miss = 0; S.curtainOn = true; Sound.sfx('roar', 0.7, 0.6); S.gesture = 1; yield 0.8;
+    for (let i = 0; i < 3; i++) {
+      const ok = yield* cue(b, { time: CUE.curtain, decoys: CUE.curtainDecoys, own: false, name: 'Curtain Call' }); if (!ok) miss++;
+      if (i < 2) { S.lead = 1 - S.lead; S.twang = 1; Sound.sfx('bell', 0.8, 1.15); yield 0.2; }
+    }
+    S.curtainOn = false; S.curtainDone = true; S.curtainMiss = miss;
+    yield* ovation(b, OVATION.curtain - miss * OVATION.miss);
+  }
+
+  // ---- phase I, "The part is not yours": the split stage, one doll (rose), already the lead
+  function* nmStroll(b) { const S = b.state; S.mk = 1 - (S.mk || 0); yield* b.moveTo(8 + rnd(-1, 1), (S.mk ? 4.5 : -4.5) + rnd(-1, 1), 6); }
+  function* splitRun(b) {
+    const S = b.state; resetMech(b); setNM(b, { split: true, dolls: 1, act: 1 }); S.pitY = 1; yield 1.0;
+    while (true) { yield* flourish(b); yield* knives(b, 4); yield 0.8; yield* pirouette(b); yield 0.6; yield* nmStroll(b); yield 0.8; }
+  }
+  // ---- phase II, "Two understudies": the pit closes, the blue doll drops in; Recast every bracket, one classic Blackout
+  function* twoEnter(b) {
+    const S = b.state; resetMech(b); b.autoFace = false; S.gesture = 1; Sound.sfx('bell', 1, 0.7);
+    yield* b.cast({ name: 'Curtain', time: 2.2, onTick: (k) => { FX.shake(k * 0.35); S.gesture = 1; S.pitY = Math.min(S.pitY, 1 - k); } }); S.pitY = 0;
+    setNM(b, { dolls: 2, act: 1 }); Sound.sfx('boom', 0.8, 0.8); FX.shake(0.6);
+    const d1 = S.dolls[1]; d1.drop = 1; Sound.sfx('parry', 0.5, 0.8);
+    yield* W.tween(1.3, (k) => { d1.drop = 1 - k; }); S.twang = 1; b.autoFace = true; yield 0.3;
+  }
+  function twoSkip(b) { const S = b.state; setNM(b, { dolls: 2, act: 1 }); S.pitY = 0; S.dolls[1].drop = 0; if (Math.abs(b.pos.z) < 3) b.pos.set(8, 0, 4.5); }
+  function* twoRun(b) {
+    const S = b.state; setNM(b, { dolls: 2, act: 1 }); S.pitY = 0; S.dolls[1].drop = 0; b.autoFace = true; let k = 0;
+    while (true) {
+      const t0 = G.ft; let ovT = 0;
+      yield* recast(b); yield RECAST.wind;
+      yield* knives(b, 4); yield POCKET - 0.3;
+      yield* flood(b, [rnd() < 0.5 ? 'L' : 'R']); yield* trapdoor(b, 1.7);
+      if (k === 1) { yield 0.4; const ok = yield* blackout(b, 1, 4.4, {}); if (ok) { const t1 = G.ft; yield* ovation(b, OVATION.short); ovT = G.ft - t1; } }
+      while (G.ft - t0 - ovT < BRACKET[0]) yield 0.1;
+      k++;
+    }
+  }
+  // ---- phase III, "Final Call"
+  function* callEnter(b) {
+    const S = b.state; resetMech(b); b.autoFace = false; S.gesture = 1;
+    if (!G.headless) { S.cine = true; UI.hud(false); Co.start(Cam.shot([0, 4.2, 25], [0, 6, -4], [2.5, 7.5, 15.5], [0, 11.5, -16], 6.2, 46), 'phase'); }
+    Sound.sfx('bell', 1, 0.45);
+    yield* b.cast({ name: 'Final Call', time: 1.4, onTick: () => { S.gesture = 1; } });
+    setNM(b, { dolls: 2, act: 2, giant: true }); Sound.sfx('shatter'); Sound.sfx('roar', 0.8, 0.5); FX.flash(VIO, 0.6, 1.2); FX.shake(1.0);
+    for (const L of S.layers) FX.burst(L.m.position.x + rnd(-12, 12), L.m.position.y, L.m.position.z, { n: 40, color: 0xffb060, color2: 0xff3010, speed: [2, 10], up: 4, grav: 5, life: [0.8, 1.8], size: [0.2, 0.6], radius: 8 });
+    Co.start(Post.lerpTo({ tint: [1.08, 0.93, 0.97], bloom: 0.48, threshold: 0.92, exposure: 1.04 }, 2), 'fight'); S.back.color.set(VIO); S.back.intensity = 140;
+    S.hands[0].tgt.set(b.pos.x, 12.2, b.pos.z); S.hands[1].tgt.copy(S.hands[1].home);
+    const b0 = S.burn || 0; yield* W.tween(1.8, (k) => { S.burn = Math.max(b0, k); for (const H of S.hands) if (H.g.position.y > H.tgt.y) H.g.position.y = Math.max(H.tgt.y, lerp(30, H.tgt.y, k)); });
+    yield 0.4;
+    // four strings drop out of the dark and hook onto you
+    S.heroOn = true; Sound.sfx('dash', 0.6, 0.5); const h0 = S.heroK || 0; yield* W.tween(1.1, (k) => { S.heroK = Math.max(h0, k); });
+    S.heroTwang = 1; Sound.sfx('parry', 0.8, 0.6); yield 0.6;
+    if (S.cine) { S.cine = false; Cam.release(); UI.hud(true); }
+    Object.assign(S, { finale: true, callT: 0, callStep: 0, stepAt: [], bk: 0, mA: 0, mB: 0, curtainDone: false }); b.autoFace = true;
+  }
+  function callSkip(b) { const S = b.state; setNM(b, { dolls: 2, act: 2, giant: true }); S.pitY = 0; S.dolls[1].drop = 0; S.burn = 1; S.heroOn = true; S.heroK = 1; for (const H of S.hands) H.g.position.copy(H.home); Object.assign(Post.cur, { tint: [1.08, 0.93, 0.97], bloom: 0.48, threshold: 0.92, exposure: 1.04 }); Post.apply(); S.back.color.set(VIO); }
+  function stepRing(b, st) {
+    const S = b.state; if (S.stepAt[st] !== undefined) return;
+    S.callStep = Math.max(S.callStep, st); S.stepAt[st] = Math.round(G.ft * 10) / 10;
+    if (st > 0) { Sound.sfx('bell', 1, 0.5); Sound.sfx('brass', 0.6, 1); Sound.sfx('roar', 0.45, 0.7); FX.flash(VIO, 0.15, 2); S.lean = st; }
+    if (st >= 4) Music.intensity(4);
+  }
+  function* moveA(b, st) {
+    const S = b.state, k = (S.mA = (S.mA || 0) + 1) % 3;
+    if (STEP[st].birds) Co.start(nmBirds(b, BIRDS.waves), 'phase');
+    if (k === 1) yield* knives(b, 4); else if (k === 2) yield* sandbags(b, 3); else { yield* flourish(b); yield* pirouette(b); }
+  }
+  function* moveB(b, st) {
+    const S = b.state, k = (S.mB = (S.mB || 0) + 1);
+    if (STEP[st].scenery && k % 2 === 0) { yield* scenery(b, 2); return; }
+    const side = rnd() < 0.5 ? 'L' : 'R', fb = rnd() < 0.5 ? 'F' : 'B';
+    if (STEP[st].pair) yield* flood(b, [side, fb], 2.4); else // a pair sends all three bodies to the 3.2 m centre square: 2.4 s reaches it from any corner yield* flood(b, [rnd() < 0.5 ? side : fb]);
+    yield* trapdoor(b, 1.7);
+  }
+  // one bracket: Recast, the breath, Move A (aimed), a pocket, the Hand, then Move B (the stage) or, every second bracket, a Cue
+  function* callBracket(b) {
+    const S = b.state, st = S.callStep, t0 = G.ft, cueNow = (S.bk = (S.bk || 0) + 1) % 2 === 0; let ovT = 0;
+    yield* recast(b); yield RECAST.wind;
+    yield* moveA(b, st); yield POCKET - 0.3;
+    if (STEP[st].hand) yield* handSlam(b, STEP[st].hand);
+    if (cueNow) { const ok = yield* cue(b, { time: CUE.time[st], decoys: CUE.decoys[st], own: !!CUE.own[st] }); if (ok) { const t1 = G.ft; yield* ovation(b, OVATION.t); ovT = G.ft - t1; } }
+    else yield* moveB(b, st);
+    while (G.ft - t0 - ovT < BRACKET[st]) yield 0.1;
+  }
+  function* callRun(b) {
+    const S = b.state; setNM(b, { dolls: 2, act: 2, giant: true }); S.burn = 1; S.pitY = 0; S.heroOn = true; S.heroK = 1; S.finale = true; if (!S.stepAt) S.stepAt = [];
+    yield 0.4;
+    while (true) {
+      const st = callStepOf(S);
+      if (!S.curtainDone && (st >= 5 || b.hp < b.maxHp * 0.1)) { stepRing(b, Math.max(st, S.callStep, 4)); stepRing(b, 5); S.callStep = 5; yield* curtainCall(b); continue; } // early (10% health): the Curtain call, then step 4's loop
+      if (st > S.callStep || !S.stepAt.length) stepRing(b, Math.max(st, S.callStep));
+      yield* callBracket(b);
+    }
+  }
+  // ---- the last blow (24 s into the enrage): the house goes dark, the giant's hand closes over the stage, the curtain drops
+  function* finalCurtain(b) {
+    const S = b.state; resetMech(b); Music.stop(0.1); S.finaleOver = true; S.dark = 1; Sound.sfx('bell', 1, 0.35); Sound.sfx('roar', 0.6, 0.4);
+    S.hands[1].tgt.set(0, 9, 0); S.hands[1].fast = 0; S.hands[0].tgt.set(0, 13, -2);
+    Hz.circle(0, 0, 30, 3.0, 0, { blockable: false, name: 'Final Curtain', color: ROSE, quiet: true, onFire: () => { S.frontK = 1; FX.shake(1.0); Sound.sfx('bigboom', 1); const p = G.player; if (p && p.alive) p.hurt(9999, { blockable: false, src: 'enrage', pierce: true }); } });
+    yield* W.tween(3.0, (k) => { S.frontK = k * k; });
+    while (true) yield 1;
+  }
+  // ---- the kill: his strings go slack one at a time and he folds; yours snap, the hand opens, your crossbar clatters on the boards
+  function* callDeath(b) {
+    const S = b.state; resetMech(b); S.dark = 0; S.finaleOver = true; S.frontK = 0;
+    { const a = Cam.yaw + 0.5, r = 12; Cam.cine = { pos: new V3(b.pos.x - Math.sin(a) * r, 5, b.pos.z - Math.cos(a) * r), look: new V3(b.pos.x, 2.6, b.pos.z), fov: 44 }; }
+    yield 0.3; G.timeScale = 0.7;
+    for (let i = 0; i < 5; i++) { S.bossSnap = i + 1; S.twang = 1; Sound.sfx('parry', 0.5, 0.6 + i * 0.1); yield 0.22; }
+    yield* W.tween(0.8, (k) => { S.fold = k; }); Sound.sfx('boom', 0.6, 0.6);
+    if (S.heroOn) { for (let i = 0; i < 4; i++) { S.heroSnap = i + 1; S.heroTwang = 1; Sound.sfx('parry', 0.6, 1.1 - i * 0.08); yield 0.2; } S.hands[0].tgt.y += 4; }
+    S.barFall = 0.001; yield* W.tween(0.9, (k) => { S.barFall = Math.max(0.001, k); S.houseK = k; }); Sound.sfx('hit', 0.9, 0.5); Sound.sfx('hit', 0.6, 0.7);
+    yield 0.7; G.timeScale = 1;
+  }
+  // ---- the autopilot: stand where the lead doll is in his light (at melee offset for melee, the nearest point well inside it for
+  // ranged), the nearer answer during a Cue,
+  // and never start a planted cast that a hit would land on (noCast). Bot.leadBlind (tests only) always plays the rose doll as
+  // the lead and treats Cues as Normal Blackouts (only goes where its own light is): that autopilot must never kill.
+  function nmDanger(b, x, z) {
+    const S = b.state; let best = Infinity;
+    for (const d of dolls(S)) { const m = mir(d, x, z, _a); best = Math.min(best, Hz.threat(m.x, m.z)); if (Hz.persist(m.x, m.z)) best = 0; if (Bul.threat(m.x, m.z, 0.7)) best = Math.min(best, 0.5); }
+    if (S.black && !(Bot.leadBlind && S.black.cue && S.black.faint === undefined)) { const B = S.black; let d = Math.hypot(x - B.q.x, z - B.q.z); if (B.q2 && !Bot.leadBlind) d = Math.min(d, Math.hypot(x - B.q2.x, z - B.q2.z)); if (d > B.r - 1.0) best = Math.min(best, Math.max(0, B.at - G.now)); }
+    return best;
+  }
+  function nmBot(b, p) {
+    const S = b.state, h = {};
+    if (S.black) { const B = S.black; if (B.cue && Bot.leadBlind) return B.faint !== undefined ? { x: B.q.x, z: B.q.z, w: 3 } : h; return { x: B.q.x, z: B.q.z, w: 3 }; }
+    const rc = S.recast && !Bot.leadBlind ? S.recast : null, li = Bot.leadBlind ? 0 : rc ? rc.to : S.lead, d = S.dolls[li];
+    const bx = rc ? rc.x : b.pos.x, bz = rc ? rc.z : b.pos.z, q = dpos(d, _g2);
+    let ux = q.x - bx, uz = q.z - bz, L = Math.hypot(ux, uz); if (L < 0.5) { ux = -bx; uz = -bz; L = Math.hypot(ux, uz) || 1; } ux /= L; uz /= L;
+    const off = p.cls.melee ? b.radius + 1.6 : clamp(L, 2.2, GATE.r - 1.3), m = mir(d, bx + ux * off, bz + uz * off, {}); // casters: the nearest point well inside the light
+    h.x = clamp(m.x, -HX + 1, HX - 1); h.z = clamp(m.z, -HZ + 1, HZ - 1); h.w = 1.5; if (S.split) h.x = Math.min(h.x, -PIT - 0.8);
+    // a caster already well inside the gate plants where it stands (a player would not walk back to the exact mark)
+    if (!p.cls.melee && !rc && li === S.lead) { const c = dpos(d, _hb); if (Math.hypot(c.x - b.pos.x, c.z - b.pos.z) < GATE.r - 1.2) { h.x = p.pos.x; h.z = p.pos.z; } }
+    const th = Math.min(Hz.threat(p.pos.x, p.pos.z), nmDanger(b, p.pos.x, p.pos.z)); if (th < 3) h.noCast = th - 0.25;
+    return h;
+  }
+  // per frame, not headless: the gate pool, lit or silhouette, the lead in gold, your strings, the follow spot, bow and fold
+  function nmLook(b, dt) {
+    const S = b.state, p = G.player, t = G.now, dk = S.darkK || 0;
+    const open = G.now < S.ovUntil || S.inLight; S.gk = damp(S.gk, open ? 1 : 0, 10, dt);
+    S.bpool.visible = false;
+    { const gp = S.gpool, U = gp.material.uniforms; gp.visible = !S.finaleOver && b.alive; gp.position.set(b.pos.x, 0.036, b.pos.z); U.uA.value = (0.2 + 0.85 * S.gk) * (1 - dk * 0.5); U.uC.value.setHex(LIME).lerp(_c.setHex(0x5a6ab8), (1 - S.gk) * 0.65); U.uT.value = t % 100; }
+    S.litK = damp(S.litK, open || !b.alive ? 1 : 0, 8, dt); { const lk = 0.14 + 0.86 * S.litK; for (const q of S.dimM) { q.m.color.copy(q.c).multiplyScalar(lk); q.m.emissiveIntensity = q.e * (0.3 + 0.7 * S.litK); } }
+    // the lead in gold; during a Recast the old lead's strings go slack and the new lead's pull taut
+    const rc = S.recast, rk = rc ? clamp((G.now - rc.t0) / rc.tell, 0, 1) : 0;
+    S.dolls.forEach((d, i) => {
+      if (!d.on) { d.shell.visible = d.foot.visible = false; return; }
+      const want = rc ? (i === rc.to ? rk : i === S.lead ? 1 - rk * 0.75 : 0) : (i === S.lead && !S.finaleOver ? 1 : 0);
+      d.gk = damp(d.gk, want, 12, dt);
+      d.ln.material.color.copy(d.col0).multiplyScalar(0.55 + 0.45 * d.gk).lerp(_c.setHex(GOLD).multiplyScalar(1.9), d.gk); d.ln.material.opacity = 0.3 + 0.6 * d.gk + S.twang * 0.3;
+      for (const m of d.barM) { m.color.setHex(0x3a2412).lerp(_c.setHex(GOLD), d.gk); m.emissive.setHex(GOLD).multiplyScalar(d.gk * 0.6); }
+      const q = dpos(d, _g2); d.shell.visible = d.foot.visible = d.gk > 0.03; d.shell.position.set(q.x, p.pos.y + 1.15 + (d.drop || 0) * 16, q.z); d.shell.material.uniforms.uA.value = d.gk * (0.75 + 0.5 * dk); d.foot.position.set(q.x, 0.042, q.z); d.foot.material.uniforms.uA.value = d.gk * (0.45 + 0.3 * dk);
+      const face = i === S.lead && S.inLight && p.moveSpeed < 0.5 ? angTo(q.x, q.z, b.pos.x, b.pos.z) : d.M.group.rotation.y;
+      d.face = d.face === undefined ? face : dampAng(d.face, face, 10, dt); d.M.group.rotation.y = d.face;
+    });
+    // your strings and crossbar
+    { const on = S.heroOn; S.heroLn.visible = S.heroBar.visible = on; S.heroTwang = Math.max(0, S.heroTwang - dt * 2.5);
+      if (on) { const fall = S.barFall || 0, top = lerp(30, 8.6, S.heroK) + Math.sin(t * 2) * 0.1, by = lerp(top, 0.15, fall * fall), tw = S.heroTwang * 0.2, c = Math.cos(p.facing), s = Math.sin(p.facing);
+        S.heroBar.position.set(p.pos.x, p.pos.y + by, p.pos.z); S.heroBar.rotation.set(0, p.facing, fall * 0.45);
+        const A = S.heroLn.geometry.attributes.position.array; let k = 0;
+        HOFF.forEach(([ox, oy, oz], i) => { const wx = p.pos.x + ox * c + oz * s, wz = p.pos.z - ox * s + oz * c, gone = i < (S.heroSnap || 0) || fall > 0;
+          A[k++] = wx + (vrand() - 0.5) * tw; A[k++] = p.pos.y + oy; A[k++] = wz;
+          if (gone) { A[k++] = wx; A[k++] = p.pos.y + oy + 0.5; A[k++] = wz; } else { A[k++] = p.pos.x + ox * c * 1.6; A[k++] = p.pos.y + by; A[k++] = p.pos.z - ox * s * 1.6; } });
+        const H = S.hands[0].g.position; A[k++] = p.pos.x; A[k++] = p.pos.y + by; A[k++] = p.pos.z; if (fall > 0) { A[k++] = p.pos.x; A[k++] = p.pos.y + by; A[k++] = p.pos.z; } else { A[k++] = H.x; A[k++] = H.y - 0.6; A[k++] = H.z; }
+        S.heroLn.geometry.attributes.position.needsUpdate = true; S.heroLn.material.opacity = 0.55 + S.heroTwang * 0.45; } }
+    // the follow spot on the lead (dimmed in a Cue, so it is never read as one of the Cue's lights)
+    { const on = S.heroOn && !S.finaleOver; S.follow.visible = S.followPool.visible = on;
+      if (on) { const q = leadPos(S, _g2); S.fx = damp(S.fx === undefined ? q.x : S.fx, q.x, 9, dt); S.fz = damp(S.fz === undefined ? q.z : S.fz, q.z, 9, dt); S.follow.position.set(S.fx, 6.6, S.fz); S.followPool.position.set(S.fx, 0.04, S.fz);
+        const U = S.follow.material.uniforms; U.uA.value = 0.5 * (1 - dk * 0.7); U.uT.value = t % 100; S.followPool.material.uniforms.uA.value = 0.24 * (1 - dk * 0.8); } }
+    // he bows (Ovation), is lifted (Recast), folds (the kill); his strings go slack one at a time
+    S.bowK = damp(S.bowK || 0, S.bow ? 1 : 0, 6, dt); const fold = S.fold || 0;
+    S.rig.rotation.x += S.bowK * 0.5 + fold * 1.1; S.rig.position.y -= fold * 1.5; S.cross.position.y -= fold * 2.5;
+    if (S.bossSnap) { const A = S.bossStr.geometry.attributes.position.array; for (let i = 0; i < Math.min(5, S.bossSnap); i++) { const j = i * 6; A[j] = A[j + 3]; A[j + 1] = A[j + 4] - 1.2; A[j + 2] = A[j + 5]; } S.bossStr.geometry.attributes.position.needsUpdate = true; }
+    // the giant leans in with the ramp; the house lights come up after the kill
+    S.leanK = damp(S.leanK || 0, S.lean || 0, 1.5, dt); const hk = S.houseK || 0;
+    S.gEye.color.multiplyScalar((1 + S.leanK * 0.22) * (1 - hk)); S.gL.intensity *= (1 + S.leanK * 0.12) * (1 - hk * 0.8);
+    if (hk) { S.hallM.color.lerp(_c.setHex(0x4a3020), hk); S.hemi.intensity += hk * 0.6; S.key.intensity += hk * 1.2; }
+    S.front.visible = S.frontK > 0; if (S.front.visible) S.front.position.y = lerp(26, 8.2, S.frontK);
+  }
+  function nmMusic(base) {
+    return Object.assign({}, base, { layers: base.layers.concat([
+      { v: 'choir', from: 3, pat: ['0...............', '5.......4.......'], oct: 1, len: 12, vol: 0.06 }, { v: 'organ', from: 3, pat: '0.....0.4.....4.', oct: 0, len: 2, vol: 0.05 },
+      { v: 'taiko', from: 4, pat: 'x.x...x.x.x...xx', vol: 0.26 }, { v: 'brass', from: 4, pat: ['7.......9.......', '7.....6.5.......'], oct: 1, len: 5, vol: 0.08 }, { v: 'hat', from: 4, pat: '..x...x...x...x.', vol: 0.09 },
+    ]) });
+  }
 
   G.bosses.push({
     id: 'theatre', name: 'THE IMPRESARIO', title: 'The Paper Theatre', hint: 'A performance', color: '#c86bff', telegraph: 0xd070ff,
     hp: 27500, radius: 1.5, aimY: 3.3, enrage: 450,
-    post: { bloom: 0.62, threshold: 0.84, radius: 0.65, exposure: 1.08, vig: 1.15, sat: 1.12, tint: [1.05, 0.99, 0.95] },
+    post: POST,
     music: { bpm: 132, root: 45, scale: [0, 2, 3, 5, 7, 8, 11], prog: [0, 0, 3, 4, 0, 0, 5, 4],
       layers: [
         { v: 'bass', pat: '0.....4.....0...', oct: -1, len: 2, vol: 0.13 }, { v: 'pulse', pat: '....24......24..', oct: 1, len: 1, vol: 0.05 }, { v: 'flute', pat: ['4.....7.6.5.4...', '2.....4.3.2.0...'], oct: 2, len: 3, vol: 0.06 },
@@ -11015,8 +11414,25 @@ const Hitch = (() => {
         }
       } },
     ],
+    // ---- Nightmare ("Final Call"): the lead understudy must stand in his light; Recast every bracket; dark Cues and Ovations.
+    // One creeping enrage (40 + 4 per second over, every 2 s) and the Final Curtain 24 s into it.
+    nightmare: {
+      hp: NM_HP, enrage: 345, enrageBase: 40, enrageGrow: 4, lastBlowAt: 24,
+      post: Object.assign({}, POST, { tint: [1.08, 0.94, 0.98], bloom: 0.58 }),
+      lastBlow: finalCurtain, death: callDeath,
+      // the opening shot shows the gap: the pit is open from the first frame
+      *intro(b) { yield* Cam.shot([-2, 7, 27], [1, 0.5, 0], [-8, 3.4, 9], [6, 2.6, -1], 4.8, 44); },
+      phases: [
+        { at: 1, music: 1, run: splitRun },
+        { at: 0.85, music: 2, enter: twoEnter, skipTo: twoSkip, run: twoRun },
+        { at: 0.68, music: 3, enter: callEnter, skipTo: callSkip, run: callRun },
+      ],
+      nmTest: { RAMP, stepOf: callStepOf, GATE, CUE, BRACKET, OVATION, RECAST, STEP, MARKS, HAND, birdOpen, genCue, cueOk, setStep(b, n) { b.state.callT = Math.max(b.state.callT || 0, n * RAMP + 0.5); } },
+      danger: nmDanger, bot: nmBot,
+    },
     update(b, dt) {
       const S = b.state, p = G.player, t = G.now, dl = dolls(S);
+      if (S.nmOn) nmSim(b, dt); // Nightmare: the gate (his light) and the finale clock, headless too
       // anything that lands on an understudy lands on you
       if (p.alive && G.state === 'fight') {
         for (const h of Hz.list) if (h.state === 'fired' && !h._d && h.dmg) { h._d = 1; if (p.lastHurt === G.now) continue; for (const d of dl) { const q = dpos(d, _b2); if (Hz.inShape(h.shape, q.x, q.z) !== !!h.invert) { dollHurt(b, d, h.dmg, { blockable: h.blockable }); break; } } }
@@ -11073,7 +11489,7 @@ const Hitch = (() => {
       S.hallM.color.setHex(0x0a0508).lerp(_c.setHex(0x0e0820), S.a2);
       _c.setRGB(1, 1, 1).lerp(_c2.setHex(0x18223f), dk * 0.92); S.skyP.material.color.copy(_c); S.skyP.material.emissiveIntensity = 0.5 * (1 - dk * 0.9); for (const L of S.layers) { L.m.material.color.copy(_c).lerp(_c2.setHex(0x5a2010), dk * (S.burn || 0) * 0.6); L.m.material.emissiveIntensity = 0.12 * (1 - dk * 0.85) + dk * (S.burn || 0) * 0.05; } for (const H of S.hung) { H.m.material.color.copy(_c); H.m.material.emissiveIntensity = (H.em || 0.25) * (1 - dk * 0.9); }
       const tu = (G.now % 100);
-      const BS = S.black && S.black.spots; for (let i = 0; i < S.cones.length; i++) { const c = S.cones[i], pl = S.spotPools[i], on = !!BS && i < BS.length; c.visible = pl.visible = on; if (!on) continue; c.position.set(BS[i].x, 6.6, BS[i].z); pl.position.set(BS[i].x, 0.04, BS[i].z); const U = c.material.uniforms; U.uA.value = 0.6 + dk * 0.6 + Math.sin(t * 5 + c.position.x) * 0.04; U.uT.value = tu; pl.material.uniforms.uA.value = 0.16 + dk * 0.3; }
+      const BS = S.black && S.black.spots; for (let i = 0; i < S.cones.length; i++) { const c = S.cones[i], pl = S.spotPools[i], on = !!BS && i < BS.length; c.visible = pl.visible = on; if (!on) continue; c.position.set(BS[i].x, 6.6, BS[i].z); pl.position.set(BS[i].x, 0.04, BS[i].z); const U = c.material.uniforms; U.uA.value = 0.6 + dk * 0.6 + Math.sin(t * 5 + c.position.x) * 0.04; U.uT.value = tu; pl.material.uniforms.uA.value = 0.16 + dk * 0.3; if (i === S.black.faint) { U.uA.value *= 0.35; pl.material.uniforms.uA.value *= 0.4; } }
       S.bpool.position.set(b.pos.x, 0.03, b.pos.z); S.bpool.material.uniforms.uA.value = (0.07 + cast * 0.13 + S.a1 * 0.03) * (1 - dk);
       // scenery: night -> blood sunset -> the theatre burning down
       if (S.skyP.material.map !== S.skyT[S.a1 > 0.5 ? 1 : 0]) S.skyP.material.map = S.skyP.material.emissiveMap = S.skyT[S.a1 > 0.5 ? 1 : 0];
@@ -11100,6 +11516,7 @@ const Hitch = (() => {
           if (!hit) for (const [tx, ty, tz] of [[p.pos.x, 1.2, p.pos.z], [p.pos.x - 3.5, 0, p.pos.z], [p.pos.x + 3.5, 0, p.pos.z], [p.pos.x, 0, p.pos.z + 3], [b.pos.x, 2.5, b.pos.z]]) { const dz = tz - C.z; if (Math.abs(dz) < 1e-3) continue; const k = (zc - C.z) / dz; if (k <= 0 || k >= 1) continue; const x = C.x + (tx - C.x) * k, y = C.y + (ty - C.y) * k; if (x * cu.sx > 12.0 && x * cu.sx < 18.8 && y < 16) { hit = true; break; } }
           cu.a = damp(cu.a, hit ? 0.0 : 1, 6, dt); cu.cutU.value = lerp(7.6, -9.5, cu.a); for (const m of cu.mats) { m.opacity = clamp(cu.a * 1.6 - 0.6, 0, 1); m.depthWrite = cu.a > 0.97; }
           cu.b = damp(cu.b, C.x * cu.sx > 8 && C.z > -2 ? 0.0 : 1, 6, dt); cu.legU.value = lerp(7.6, -9.5, cu.b); cu.wing.visible = cu.b > 0.5; } }
+      if (S.nmOn) nmLook(b, dt);
     },
     danger(b, x, z) {
       const S = b.state; let best = Infinity;
@@ -11114,6 +11531,7 @@ const Hitch = (() => {
       return h;
     },
   });
+  { const d = G.bosses[G.bosses.length - 1]; d.nightmare.music = nmMusic(d.music); }
 })();
 
 // ==== 27_boss_wheel.js ====
