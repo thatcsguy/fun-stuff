@@ -133,7 +133,7 @@ G.classes.push({
         if (!wasCast) p.dropBuff('surge');
         p.model.swing(3, 0.25); Sound.sfx('bolt'); if (!t || !t.alive) return;
         const a = p.hand(_h2); t.aim(_hp); _hp.x += (vrand() - 0.5) * t.radius * 0.6; _hp.y += (vrand() - 0.5) * 1.2;
-        FX.lightning(a, _hp, { color: 0x9fe6ff, width: 0.13 }); FX.light(_hp.x, _hp.y, _hp.z, 0x70d0ff, 40, 0.25); t.damage(148, { src: 'player' }); p.gain(1);
+        FX.lightning(a, _hp, { color: 0x9fe6ff, width: 0.13 }); FX.light(_hp.x, _hp.y, _hp.z, 0x70d0ff, 40, 0.25); t.damage(148, { src: 'player' }); if (!t.immune) p.gain(1); // a Bolt into an immune body builds nothing
       } },
     { id: 'discharge', name: 'Discharge', icon: 'discharge', range: 34, rdy: (p) => p.res >= p.resMax, desc: 'Instant. Releases all Static at once. Usable on the move.',
       usable: (p) => p.res >= 1 || 'res',
@@ -162,7 +162,7 @@ G.classes.push({
       usable: (p) => scGlowNext(p) || 'res',
       fire(p, t) {
         p.model.swing(3, 0.3); Sound.sfx('bolt', 1, 0.8);
-        if (scGlowNext(p)) { p.sc.charged = true; p.gain(1); } // the slot was filled some other way mid-cast (a barrier absorb): just the hit
+        if (scGlowNext(p) && t && t.alive && !t.immune) { p.sc.charged = true; p.gain(1); } // the slot was filled some other way mid-cast (a barrier absorb): just the hit; an immune body fills nothing
         if (!t || !t.alive) return;
         const a = p.hand(_h2); t.aim(_hp); _hp.x += (vrand() - 0.5) * t.radius * 0.5; _hp.y += (vrand() - 0.5) * 1.2;
         FX.lightning(a, _hp, { color: 0xffe070, width: 0.18 }); FX.lightning(a, _hp, { color: 0x9fe6ff, width: 0.08, jag: 1.6 }); FX.light(_hp.x, _hp.y, _hp.z, 0xffd060, 50, 0.3);

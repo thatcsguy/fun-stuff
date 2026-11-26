@@ -475,10 +475,11 @@
       const ob = S.orb.material.clone(); ob.uniforms.uTime = EU.uTime; ob.fragmentShader = ob.fragmentShader.replace('vec3 rim=vec3(1.0,0.34,0.58), body=vec3(0.82,0.1,0.3)', 'vec3 rim=vec3(0.5,0.68,1.0), body=vec3(0.1,0.24,0.78)').replace('core=vec3(1.15,0.78,0.88)', 'core=vec3(0.86,0.96,1.2)');
       S.orbB = new THREE.InstancedMesh(S.orb.geometry, ob, 200); S.orbB.frustumCulled = false; S.orbB.setMatrixAt(0, new THREE.Matrix4().makeScale(0, 0, 0)); S.orbB.count = 1; g.add(S.orbB);
       S.orbHaloB = new THREE.InstancedMesh(S.orbHalo.geometry, haloMat(new THREE.Color(0x3a78ff).multiplyScalar(0.22)), 200); S.orbHaloB.frustumCulled = false; S.orbHaloB.renderOrder = 14; S.orbHaloB.setMatrixAt(0, new THREE.Matrix4().makeScale(0, 0, 0)); S.orbHaloB.count = 1; g.add(S.orbHaloB);
-      // a hit on the still body: no damage, a ripple instead of IMMUNE, and (once per cycle, after the grace) the Counter
+      // a hit on the still body: no damage, a ripple instead of IMMUNE, and the Counter. Every player hit that lands on the still
+      // one counters, whoever is selected when it lands (Patrick 2026-11-26: tabbing away at the bell must not save a cast already
+      // aimed at him). One Counter at a time: hits inside COUNTER_CD of the last one are swallowed, a later hit counters again.
       const still = (act) => (info, ent) => { if (!S.niten || !act.still) return false; if (!G.headless) { FX.ring(ent.pos.x, ent.pos.z, { r0: 0.6, r1: 2.4, color: ICE, dur: 0.45, width: 0.12, mult: 1.2 }); }
-        // only a hit on the still one while he is the selected target counters (a cleave or a stray bolt that catches him does not)
-        if (info.src === 'player' && G.now >= act.graceT && !S.countered && G.player && G.player.target === ent) { S.countered = true; S.cycleClean = false; Co.start(counterN(b, act), 'phase'); } return true; };
+        if (info.src === 'player' && G.now >= act.graceT && counterFree(S)) { S.countered = true; S.counterAt = G.now; S.cycleClean = false; Co.start(counterN(b, act), 'phase'); } return true; };
       b.onImmuneHit = still(S.A); e.onImmuneHit = still(Rr);
       // the calm places: a pale streak of still air on the deck for each cut lane, a pale disc for the Eye of the Moon
       const calmMat = (disc) => new THREE.ShaderMaterial({ uniforms: { uA: { value: 0 }, uLen: { value: 10 }, uC: { value: new THREE.Color(0xffe0ea) }, uT: EU.uTime }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -3,
@@ -490,7 +491,7 @@
       for (let i = 0; i < 8; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-PI / 2), calmMat(false)); m.visible = false; m.renderOrder = 5; m.frustumCulled = false; g.add(m); S.laneM.push(m); }
       S.eyeM = new THREE.Mesh(new THREE.PlaneGeometry(2 * CALM.eyeR, 2 * CALM.eyeR).rotateX(-PI / 2), calmMat(true)); S.eyeM.visible = false; S.eyeM.renderOrder = 5; S.eyeM.frustumCulled = false; g.add(S.eyeM);
     }
-    b.onDamaged = (amt, info) => { if (S.still && !S.countered && G.now >= S.graceT && info.src === 'player') { S.countered = true; Co.start(counter(b), 'phase'); } };
+    b.onDamaged = (amt, info) => { if (S.still && counterFree(S) && G.now >= S.graceT && info.src === 'player') { S.countered = true; S.counterAt = G.now; Co.start(counter(b), 'phase'); } };
     if (G.nightmare) deepenFn(b)(1); // nightmare opens at sunset (its grade comes through nightmare.post), torn haori from the first frame
     return { edge: 'wall', radius: R, spawn: { x: 0, z: 10 }, bossStart: { x: 0, z: -5, face: 0 }, contains: (x, z) => x * x + z * z <= R * R,
       camLimit(x, y, z) { const r = Math.hypot(x, z); if (r > 25) { x *= 25 / r; z *= 25 / r; } return { x, y: Math.min(y, 15), z }; } };
@@ -576,6 +577,8 @@
   // with no grace (STILL_GRACE 0, Patrick 2026-11-25): any hit that lands once he kneels counters, also a cast started before or
   // during the tell that finishes after it. The tell is the cue to stop casting.
   const STILL_TELL = 1.2, STILL_GRACE = 0;
+  // a Counter is 0.22 s of windup and its strike; another hit after COUNTER_CD counters again (a multi-hit burst never chains)
+  const COUNTER_CD = 0.8, counterFree = (S) => G.now >= (S.counterAt || -1e9) + COUNTER_CD;
   function* stillness(b, dur = 2.3) {
     const S = b.state; S.walk = false; b.facing = b.angToPlayer(); S.warn = 0.001; S.kneelAt = G.now + STILL_TELL;
     Sound.sfx('glint', 0.9); FX.flash(0xfff4e0, 0.16, 2.2);
