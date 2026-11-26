@@ -499,7 +499,11 @@
   const MARKS = [[8, 4.5], [-8, 4.5], [8, -4.5], [-8, -4.5]], MARK_J = 1.0; // where he stands (never near a stage axis)
   const RECAST = { tell: [1.4, 1.4, 1.4, 1.4, 1.0, 1.0], breath: 3.0, wind: 1.4, near: 6, far: 12 }; // tell per ramp step; nothing lands for `breath` s after the bell (Move A starts `wind` s after it: its first hit lands 1.5-1.6 s later)
   const BRACKET = [15, 15, 15, 15, 11.5, 11.5];      // shortest bracket per step (an Ovation does not count)
-  const CUE = { r: 3.1, time: [4.4, 4.4, 4.4, 4.4, 3.4, 3.4], decoys: [1, 1, 2, 2, 3, 3], own: [1, 1, 0, 0, 0, 0], curtain: 2.8, curtainDecoys: 2, dmg: 380 };
+  // The Cue (finale only): a 6 x 6 grid of possible spotlights, 3 x 3 per quadrant, symmetric about both stage axes. You and BOTH
+  // dolls (rose: mirrored left to right, blue: front to back) must stand in a light when it lands. Cells group in fours (a cell and
+  // its three mirrors); a four with exactly three lit has one answer, two or fewer have none, so exactly one four has three lit.
+  // two/one: per ramp step, how many of the other eight fours get two lights (the tempting near-misses) or one.
+  const CUE = { xs: [2.4, 7.2, 12.0], zs: [1.6, 4.6, 7.6], r: 1.35, time: [8, 8, 8, 8, 8, 8], two: [4, 4, 5, 5, 6, 6], one: [3, 3, 2, 2, 2, 2], curtain: 8, curtainN: 2, far: 3.5, dmg: 380 };
   const OVATION = { t: 4.0, mult: 2.0, short: 2.5, curtain: 6.0, miss: 2.0 };
   const RAMP = 35, POCKET = 2.0;                    // POCKET: after Move A, nothing new targets you for this long
   const HAND = { r: 5.2, tell: 1.6, dmg: 380 };
@@ -542,6 +546,9 @@
     // the follow spot on the lead (Final Call)
     S.follow = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 2.1, 13.2, 32, 1, true), h.coneMat(0xfff0c8)); S.follow.visible = false; S.follow.renderOrder = 14; g.add(S.follow);
     S.followPool = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), h.poolMat(0xfff4dc)); S.followPool.rotation.x = -PI / 2; S.followPool.scale.setScalar(4.6); S.followPool.renderOrder = 2; S.followPool.visible = false; g.add(S.followPool);
+    // the Cue's grid: a narrow follow spot and a pool over every one of the 36 cells (only the lit ones show)
+    S.pc = CELLS.map((cl) => { const c = new THREE.Mesh(new THREE.CylinderGeometry(0.22, CUE.r, 13.2, 28, 1, true), h.coneMat(LIME)); c.position.set(cl.x, 6.6, cl.z); c.visible = false; c.renderOrder = 14; g.add(c);
+      const pl = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), h.poolMat(LIME)); pl.rotation.x = -PI / 2; pl.position.set(cl.x, 0.04, cl.z); pl.scale.setScalar(CUE.r * 2.3); pl.renderOrder = 2; pl.visible = false; g.add(pl); return { c, pl, x: cl.x, z: cl.z }; });
     // the heavy curtain for the Final Curtain
     S.front = new THREE.Mesh(h.folds(36, 17, 18, 0.45), h.velvetM(0x6a0814)); S.front.position.set(0, 26, HZ + 0.9); S.front.visible = false; g.add(S.front); S.frontK = 0;
     // lit vs silhouette: his own materials dim out of the light (the giant gets copies so it never dims with him)
@@ -564,7 +571,7 @@
   // in every Nightmare phase, the last blow and the kill. Who the lead is stays (it is not per-mechanic); a half-done Recast is dropped.
   function resetMech(b) {
     const S = b.state; S.black = null; S.dark = 0; S.spin = 0; S.fanOn = 0; S.ovUntil = 0; S.bow = 0; S.lift = 0; b.pos.y = 0; S.recast = null; S.heroTwang = 0; S.curtainOn = false; groundAll(S);
-    if (!G.headless) { for (const c of S.cones) c.visible = false; for (const pl of S.spotPools) pl.visible = false; }
+    if (!G.headless) { for (const c of S.cones) c.visible = false; for (const pl of S.spotPools) pl.visible = false; if (S.pc) for (const q of S.pc) q.c.visible = q.pl.visible = false; }
     for (const H of S.hands) { H.fast = 0; if (H.tgt.y < 5) H.tgt.copy(H.home); }
     const q = leadPos(S, _g); S.inLight = Math.hypot(q.x - b.pos.x, q.z - b.pos.z) <= GATE.r; b.dmgTaken = S.inLight ? 1 : GATE.off;
     b.autoFace = true; G.timeScale = 1;
@@ -634,53 +641,49 @@
       Sound.sfx('dash', 0.5, 1.6); g = clamp(g + (rnd() < 0.5 ? -1 : 1) * rndi(1, 2), 0, 3); yield 1.15;
     }
   }
-  // ---- the Cue: the stage goes dark and only the understudies get lights. Two real lights L and -L are point mirrors through
-  // centre stage, so two standing spots pass (q = (-L.x, L.z) and -q). Decoys pair with nothing: no two lights within 2 R0 + 1 m
-  // of being point mirrors, no light within R0 + 0.6 of centre (both dolls in one light). Neither real light may overlap his
-  // pool (it must be a trip), and the nearer answer is a walk away but reachable in the Cue's time.
-  function genCue(B, P, decoys, time) {
-    const R0 = CUE.r, need = R0 + GATE.r + 0.3, reach = 7 * Math.max(0.8, time - 0.9);
-    let best = null, bs = 1e9;
-    for (let k = 0; k < 400; k++) {
-      const L = { x: rnd(-12, 12), z: rnd(-6.5, 6.5) };
-      if (Math.hypot(L.x, L.z) < 4.5) continue;
-      const q = { x: -L.x, z: L.z }, q2 = { x: L.x, z: -L.z };
-      const dq = Math.min(Math.hypot(P.x - q.x, P.z - q.z), Math.hypot(P.x - q2.x, P.z - q2.z));
-      let bad = Math.max(0, need - Math.hypot(L.x - B.x, L.z - B.z)) + Math.max(0, need - Math.hypot(L.x + B.x, L.z + B.z));
-      bad += Math.max(0, R0 + 1.5 - Math.min(Math.hypot(q.x - B.x, q.z - B.z), Math.hypot(q2.x - B.x, q2.z - B.z)));
-      bad += Math.max(0, R0 + 1 - dq) + Math.max(0, dq - R0 - reach);
-      if (bad < bs) { bs = bad; best = { L, q, q2 }; } if (!bad) break;
+  // ---- the Cue: the house goes dark and the grid of spotlights comes up. Find the one spot where you, the rose doll (-x, z) and the
+  // blue doll (x, -z) all stand in a light. Lights are 1.35 m discs 4.8 m apart across and 3.0 m deep, so no point is in two.
+  const CELLS = []; for (const sx of [1, -1]) for (const sz of [1, -1]) for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) CELLS.push({ x: sx * CUE.xs[i], z: sz * CUE.zs[j], i, j });
+  // B: his position (the answer is never under him), P: yours (the answer is at least CUE.far away), st: ramp step
+  function genCue(B, P, st) {
+    const S2 = [[1, 1], [-1, 1], [1, -1], [-1, -1]], lit = [];
+    let best = null;
+    for (let k = 0; k < 200 && !best; k++) {
+      const i = rndi(0, 2), j = rndi(0, 2), [sx, sz] = S2[rndi(0, 3)], q = { x: sx * CUE.xs[i], z: sz * CUE.zs[j] };
+      if (Math.hypot(q.x - B.x, q.z - B.z) < CUE.r + 2.0 || Math.hypot(q.x - P.x, q.z - P.z) < CUE.far) continue;
+      best = { q, i, j };
     }
-    const lights = [best.L, { x: -best.L.x, z: -best.L.z }];
-    for (let k = 0, tries = 0; k < decoys && tries < 300; tries++) {
-      const c = { x: rnd(-12.5, 12.5), z: rnd(-6.5, 6.5) };
-      if (Math.hypot(c.x, c.z) < R0 + 0.6) continue;
-      if (lights.some((s) => Math.hypot(s.x - c.x, s.z - c.z) < 6.4 || Math.hypot(s.x + c.x, s.z + c.z) < 2 * R0 + 1.1)) continue;
-      lights.push(c); k++;
-    }
-    return { lights, q: best.q, q2: best.q2, bad: bs };
+    if (!best) best = { q: { x: -CUE.xs[1], z: CUE.zs[1] }, i: 1, j: 1 };
+    const { q } = best; lit.push({ x: q.x, z: q.z }, { x: -q.x, z: q.z }, { x: q.x, z: -q.z }); // the answer's four: three lit
+    const fours = []; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if (i !== best.i || j !== best.j) fours.push([i, j]);
+    const two = CUE.two[Math.min(st, 5)], one = CUE.one[Math.min(st, 5)];
+    shuffle(fours).forEach(([i, j], n) => {
+      const c = S2.map(([sx, sz]) => ({ x: sx * CUE.xs[i], z: sz * CUE.zs[j] })), k = n < two ? 2 : n < two + one ? 1 : 0;
+      for (const v of shuffle(c).slice(0, k)) lit.push(v);
+    });
+    return { lights: lit, q };
   }
-  // does standing at (x, z) pass the Cue? (both understudies inside one of the dolls' lights; you need no light yourself)
+  // does standing at (x, z) pass the Cue? (you and both understudies each inside a light)
   function cueOk(S, x, z, lights) {
-    const B = S.black; lights = lights || (B ? B.spots.slice(0, B.n) : []);
-    const lit = (px, pz) => lights.some((s) => Math.hypot(s.x - px, s.z - pz) <= CUE.r);
-    return lit(-x, z) && lit(x, -z);
+    const B = S && S.black; lights = lights || (B ? B.spots : []);
+    const on = (px, pz) => lights.some((s) => Math.hypot(s.x - px, s.z - pz) <= CUE.r);
+    return on(x, z) && on(-x, z) && on(x, -z);
   }
+  // the autopilot reads the lights and tries every spot of the grid
+  const solveCue = (lights) => CELLS.filter((c) => cueOk(null, c.x, c.z, lights));
   function* cue(b, o) {
     yield* grounded(b);
-    const S = b.state, p = G.player, time = o.time, c = genCue(b.pos, p.pos, o.decoys, time), spots = c.lights.slice();
-    const near = Math.hypot(p.pos.x - c.q.x, p.pos.z - c.q.z) <= Math.hypot(p.pos.x - c.q2.x, p.pos.z - c.q2.z) ? c.q : c.q2;
-    let faint; if (o.own) { faint = spots.length; spots.push({ x: near.x, z: near.z }); }
-    S.black = { spots, n: c.lights.length, at: G.now + time, r: CUE.r, q: near, q2: near === c.q ? c.q2 : c.q, cue: true, faint };
+    const S = b.state, p = G.player, time = o.time, c = genCue(b.pos, p.pos, S.callStep || 0), spots = c.lights, sol = solveCue(spots)[0] || c.q;
+    S.black = { spots, n: spots.length, at: G.now + time, r: CUE.r, q: { x: sol.x, z: sol.z }, cue: true, puz: true };
     S.cueN = (S.cueN || 0) + 1; Sound.sfx('bell', 0.8, 0.55);
-    const marks = spots.map((s, i) => Hz.mark({ type: 'circle', x: s.x, z: s.z, r: CUE.r }, time + 0.2, { color: i === faint ? 0xb0a080 : LIME, alpha: i === faint ? 0.3 : 0.9 }));
+    const marks = CELLS.map((cl) => { const on = spots.some((s) => s.x === cl.x && s.z === cl.z); return Hz.mark({ type: 'circle', x: cl.x, z: cl.z, r: CUE.r }, time + 0.2, { color: on ? LIME : 0x3a4060, alpha: on ? 0.9 : 0.35 }); });
     const r = yield* b.cast({ name: o.name || 'Cue', time, onTick: (k) => { S.dark = Math.min(1, k * 5); } });
     for (const m of marks) Hz.cancel(m); S.black = null; S.dark = 0;
     if (r !== 'done') return false;
-    const ok = cueOk(S, p.pos.x, p.pos.z, c.lights);
+    const ok = cueOk(S, p.pos.x, p.pos.z, spots);
     FX.flash(0xffffff, 0.35, 2.5); Sound.sfx('boom', 1, 0.5);
     if (!ok) { S.heroTwang = 1; S.cueMiss = (S.cueMiss || 0) + 1; p.hurt(CUE.dmg, { blockable: false, src: { name: 'Cue' } }); FX.shake(0.6); }
-    else { S.cuePass = (S.cuePass || 0) + 1; for (const s of c.lights.slice(0, 2)) FX.ring(s.x, s.z, { r1: 5, color: GOLD, dur: 0.5 }); }
+    else { S.cuePass = (S.cuePass || 0) + 1; for (const s of [sol, { x: -sol.x, z: sol.z }, { x: sol.x, z: -sol.z }]) FX.ring(s.x, s.z, { r1: 2.6, color: GOLD, dur: 0.5 }); }
     yield 0.3; return ok;
   }
   // ---- the Ovation: he is set down by the lead and bows; x1.6 and nothing starts or lands
@@ -697,13 +700,13 @@
     while (G.now < S.ovUntil) { if (!G.headless) for (let i = 0; i < 2; i++) FX.burst(b.pos.x + (vrand() - 0.5) * 9, 9 + vrand() * 3, b.pos.z + (vrand() - 0.5) * 6, { n: 2, color: ROSE, color2: 0xffd0e0, speed: [0.3, 1.5], grav: 2.5, life: [1.4, 2.2], size: [0.12, 0.24], drag: 0.6 }); yield 0.1; }
     S.bow = 0;
   }
-  // ---- the Curtain call: three Cues back to back, the lead flipping between them, your light dark. All three passed: a 6 s
-  // Ovation; each miss is 380 and 2 s off it.
+  // ---- the Curtain call: CUE.curtainN Cues back to back, the lead flipping between them. All passed: a 6 s Ovation; each miss is
+  // 380 and 2 s off it.
   function* curtainCall(b) {
     const S = b.state; let miss = 0; S.curtainOn = true; Sound.sfx('roar', 0.7, 0.6); S.gesture = 1; yield 0.8;
-    for (let i = 0; i < 3; i++) {
-      const ok = yield* cue(b, { time: CUE.curtain, decoys: CUE.curtainDecoys, own: false, name: 'Curtain Call' }); if (!ok) miss++;
-      if (i < 2) { S.lead = 1 - S.lead; S.twang = 1; Sound.sfx('bell', 0.8, 1.15); yield 0.2; }
+    for (let i = 0; i < CUE.curtainN; i++) {
+      const ok = yield* cue(b, { time: CUE.curtain, name: 'Curtain Call' }); if (!ok) miss++;
+      if (i < CUE.curtainN - 1) { S.lead = 1 - S.lead; S.twang = 1; Sound.sfx('bell', 0.8, 1.15); yield 0.2; }
     }
     S.curtainOn = false; S.curtainDone = true; S.curtainMiss = miss;
     yield* ovation(b, OVATION.curtain - miss * OVATION.miss);
@@ -715,7 +718,7 @@
     const S = b.state; resetMech(b); setNM(b, { split: true, dolls: 1, act: 1 }); S.pitY = 1; yield 1.0;
     while (true) { yield* flourish(b); yield* knives(b, 4); yield 0.8; yield* pirouette(b); yield 0.6; yield* nmStroll(b); yield 0.8; }
   }
-  // ---- phase II, "Two understudies": the pit closes, the blue doll drops in; Recast every bracket, one classic Blackout
+  // ---- phase II, "Two understudies": the pit closes, the blue doll drops in; Recast every bracket (the dark Cues are held back for the finale)
   function* twoEnter(b) {
     const S = b.state; resetMech(b); b.autoFace = false; S.gesture = 1; Sound.sfx('bell', 1, 0.7);
     yield* b.cast({ name: 'Curtain', time: 2.2, onTick: (k) => { FX.shake(k * 0.35); S.gesture = 1; S.pitY = Math.min(S.pitY, 1 - k); } }); S.pitY = 0;
@@ -731,7 +734,6 @@
       yield* recast(b); yield RECAST.wind;
       yield* knives(b, 4); yield POCKET - 0.3;
       yield* flood(b, [rnd() < 0.5 ? 'L' : 'R']); yield* trapdoor(b, 1.7);
-      if (k === 1) { yield 0.4; const ok = yield* blackout(b, 1, 4.4, {}); if (ok) { const t1 = G.ft; yield* ovation(b, OVATION.short); ovT = G.ft - t1; } }
       while (G.ft - t0 - ovT < BRACKET[0]) yield 0.1;
       k++;
     }
@@ -779,7 +781,7 @@
     yield* recast(b); yield RECAST.wind;
     yield* moveA(b, st); yield POCKET - 0.3;
     if (STEP[st].hand) yield* handSlam(b, STEP[st].hand);
-    if (cueNow) { const ok = yield* cue(b, { time: CUE.time[st], decoys: CUE.decoys[st], own: !!CUE.own[st] }); if (ok) { const t1 = G.ft; yield* ovation(b, OVATION.t); ovT = G.ft - t1; } }
+    if (cueNow) { const ok = yield* cue(b, { time: CUE.time[st] }); if (ok) { const t1 = G.ft; yield* ovation(b, OVATION.t); ovT = G.ft - t1; } }
     else yield* moveB(b, st);
     while (G.ft - t0 - ovT < BRACKET[st]) yield 0.1;
   }
@@ -840,7 +842,7 @@
     const S = b.state, p = G.player, t = G.now, dk = S.darkK || 0;
     const open = G.now < S.ovUntil || S.inLight; S.gk = damp(S.gk, open ? 1 : 0, 10, dt);
     S.bpool.visible = false;
-    { const gp = S.gpool, U = gp.material.uniforms; gp.visible = !S.finaleOver && b.alive; gp.position.set(b.pos.x, 0.036, b.pos.z); U.uA.value = (0.2 + 0.85 * S.gk) * (1 - dk * 0.5); U.uC.value.setHex(LIME).lerp(_c.setHex(0x5a6ab8), (1 - S.gk) * 0.65); U.uT.value = t % 100; }
+    { const gp = S.gpool, U = gp.material.uniforms; gp.visible = !S.finaleOver && b.alive; gp.position.set(b.pos.x, 0.036, b.pos.z); U.uA.value = (0.2 + 0.85 * S.gk) * (1 - dk * (S.black && S.black.puz ? 0.9 : 0.5)); U.uC.value.setHex(LIME).lerp(_c.setHex(0x5a6ab8), (1 - S.gk) * 0.65); U.uT.value = t % 100; }
     S.litK = damp(S.litK, open || !b.alive ? 1 : 0, 8, dt); { const lk = 0.14 + 0.86 * S.litK; for (const q of S.dimM) { q.m.color.copy(q.c).multiplyScalar(lk); q.m.emissiveIntensity = q.e * (0.3 + 0.7 * S.litK); } }
     // the lead in gold; during a Recast the old lead's strings go slack and the new lead's pull taut
     const rc = S.recast, rk = rc ? clamp((G.now - rc.t0) / rc.tell, 0, 1) : 0;
@@ -864,6 +866,10 @@
           if (gone) { A[k++] = wx; A[k++] = p.pos.y + oy + 0.5; A[k++] = wz; } else { A[k++] = p.pos.x + ox * c * 1.6; A[k++] = p.pos.y + by; A[k++] = p.pos.z - ox * s * 1.6; } });
         const H = S.hands[0].g.position; A[k++] = p.pos.x; A[k++] = p.pos.y + by; A[k++] = p.pos.z; if (fall > 0) { A[k++] = p.pos.x; A[k++] = p.pos.y + by; A[k++] = p.pos.z; } else { A[k++] = H.x; A[k++] = H.y - 0.6; A[k++] = H.z; }
         S.heroLn.geometry.attributes.position.needsUpdate = true; S.heroLn.material.opacity = 0.55 + S.heroTwang * 0.45; } }
+    // the Cue's lit cells
+    { const B = S.black && S.black.puz ? S.black : null;
+      for (const q of S.pc) { const on = !!B && B.spots.some((s) => s.x === q.x && s.z === q.z); q.c.visible = q.pl.visible = on; if (!on) continue;
+        const U = q.c.material.uniforms; U.uA.value = 0.55 + dk * 0.6 + Math.sin(t * 5 + q.x) * 0.04; U.uT.value = t % 100; q.pl.material.uniforms.uA.value = 0.2 + dk * 0.35; } }
     // the follow spot on the lead (dimmed in a Cue, so it is never read as one of the Cue's lights)
     { const on = S.heroOn && !S.finaleOver; S.follow.visible = S.followPool.visible = on;
       if (on) { const q = leadPos(S, _g2); S.fx = damp(S.fx === undefined ? q.x : S.fx, q.x, 9, dt); S.fz = damp(S.fz === undefined ? q.z : S.fz, q.z, 9, dt); S.follow.position.set(S.fx, 6.6, S.fz); S.followPool.position.set(S.fx, 0.04, S.fz);
@@ -956,7 +962,7 @@
         { at: 0.85, music: 2, enter: twoEnter, skipTo: twoSkip, run: twoRun },
         { at: 0.68, music: 3, enter: callEnter, skipTo: callSkip, run: callRun },
       ],
-      nmTest: { RAMP, stepOf: callStepOf, GATE, CUE, BRACKET, OVATION, RECAST, STEP, MARKS, HAND, birdOpen, genCue, cueOk, setStep(b, n) { b.state.callT = Math.max(b.state.callT || 0, n * RAMP + 0.5); } },
+      nmTest: { RAMP, stepOf: callStepOf, GATE, CUE, BRACKET, OVATION, RECAST, STEP, MARKS, HAND, birdOpen, genCue, cueOk, solveCue, CELLS, setStep(b, n) { b.state.callT = Math.max(b.state.callT || 0, n * RAMP + 0.5); } },
       danger: nmDanger, bot: nmBot,
     },
     update(b, dt) {
@@ -1018,7 +1024,7 @@
       S.hallM.color.setHex(0x0a0508).lerp(_c.setHex(0x0e0820), S.a2);
       _c.setRGB(1, 1, 1).lerp(_c2.setHex(0x18223f), dk * 0.92); S.skyP.material.color.copy(_c); S.skyP.material.emissiveIntensity = 0.5 * (1 - dk * 0.9); for (const L of S.layers) { L.m.material.color.copy(_c).lerp(_c2.setHex(0x5a2010), dk * (S.burn || 0) * 0.6); L.m.material.emissiveIntensity = 0.12 * (1 - dk * 0.85) + dk * (S.burn || 0) * 0.05; } for (const H of S.hung) { H.m.material.color.copy(_c); H.m.material.emissiveIntensity = (H.em || 0.25) * (1 - dk * 0.9); }
       const tu = (G.now % 100);
-      const BS = S.black && S.black.spots; for (let i = 0; i < S.cones.length; i++) { const c = S.cones[i], pl = S.spotPools[i], on = !!BS && i < BS.length; c.visible = pl.visible = on; if (!on) continue; c.position.set(BS[i].x, 6.6, BS[i].z); pl.position.set(BS[i].x, 0.04, BS[i].z); const U = c.material.uniforms; U.uA.value = 0.6 + dk * 0.6 + Math.sin(t * 5 + c.position.x) * 0.04; U.uT.value = tu; pl.material.uniforms.uA.value = 0.16 + dk * 0.3; if (i === S.black.faint) { U.uA.value *= 0.35; pl.material.uniforms.uA.value *= 0.4; } }
+      const BS = S.black && !S.black.puz && S.black.spots; for (let i = 0; i < S.cones.length; i++) { const c = S.cones[i], pl = S.spotPools[i], on = !!BS && i < BS.length; c.visible = pl.visible = on; if (!on) continue; c.position.set(BS[i].x, 6.6, BS[i].z); pl.position.set(BS[i].x, 0.04, BS[i].z); const U = c.material.uniforms; U.uA.value = 0.6 + dk * 0.6 + Math.sin(t * 5 + c.position.x) * 0.04; U.uT.value = tu; pl.material.uniforms.uA.value = 0.16 + dk * 0.3; if (i === S.black.faint) { U.uA.value *= 0.35; pl.material.uniforms.uA.value *= 0.4; } }
       S.bpool.position.set(b.pos.x, 0.03, b.pos.z); S.bpool.material.uniforms.uA.value = (0.07 + cast * 0.13 + S.a1 * 0.03) * (1 - dk);
       // scenery: night -> blood sunset -> the theatre burning down
       if (S.skyP.material.map !== S.skyT[S.a1 > 0.5 ? 1 : 0]) S.skyP.material.map = S.skyP.material.emissiveMap = S.skyT[S.a1 > 0.5 ? 1 : 0];
