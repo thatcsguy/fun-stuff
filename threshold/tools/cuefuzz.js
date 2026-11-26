@@ -1,8 +1,8 @@
 // node cuefuzz.js [cues per step] [brackets per step] : the Impresario Nightmare's fairness rules (plan: impresario-nightmare-plan.md).
-// 1. Cues: generated Cues per ramp step (his mark and your gate spot random, the step's time and decoys; step 5 = the Curtain call).
-//    A 0.25 m grid search with the boss file's own cueOk must find exactly two passing discs (q and its point mirror), the nearer
-//    reachable from your spot in the Cue's time at walking speed (7 m/s, 0.9 s to react), neither real light overlapping his pool,
-//    and you not already standing in one. "far" = how often the other answer is also reachable.
+// 1. Cues (the grid puzzle): generated Cues per ramp step (his mark and your spot random; step 5 = the Curtain call). A 0.25 m
+//    grid search over the whole stage with the boss file's own cueOk (you and both dolls lit) must find exactly one passing disc,
+//    the generator's answer; the autopilot's own search of the 36 cells must find only it; it must be reachable in the Cue's time
+//    (7 m/s, 0.9 s to react), not under him, and you not already standing on it.
 // 2. Paper Birds: every open-lane pattern is symmetric front to back (lane g open means lane 8 - g is open).
 // 3. Brackets: whole finale brackets held at each step (god-mode level-3 autopilot), outside Cues. Every 0.1 s some point on the
 //    stage must be clear of every pending telegraph, lingering zone and bird for all three bodies at once; and whenever a new
@@ -16,39 +16,39 @@ const { launch } = require('./harness.js');
   await page.goto('http://game.local/threshold/?mute=1&quality=low&nm=1&seed=' + (process.env.SEED || 7));
   await page.waitForFunction('window.__game && window.__game.G.state === "menu"', null, { timeout: 90000 });
   let fails = 0;
-  // ---- 1. Cues
+  // ---- 1. Cues (the grid puzzle)
   const cues = await page.evaluate((N) => {
     const g = window.__game, G = g.G; G.headless = true; g.start('theatre', { cls: 'stormcaller' }); const T = g.G.boss.def.nmTest, out = [];
     const rnd = (a, b) => a + Math.random() * (b - a);
     for (let st = 0; st < 6; st++) {
-      const time = st === 5 ? T.CUE.curtain : T.CUE.time[st], dec = st === 5 ? T.CUE.curtainDecoys : T.CUE.decoys[st];
-      const r = { step: st, n: 0, two: 0, near: 0, far: 0, pool: 0, standing: 0, genBad: 0, comps: {} };
+      const time = st === 5 ? T.CUE.curtain : T.CUE.time[st];
+      const r = { step: st, n: 0, one: 0, solver: 0, near: 0, under: 0, standing: 0, lit: 0, tempt: 0, comps: {} };
       for (let k = 0; k < N; k++) {
-        const M = T.MARKS[Math.floor(Math.random() * 4)], B = { x: M[0] + rnd(-1, 1), z: M[1] + rnd(-1, 1) }, rose = Math.random() < 0.5;
-        const sx = rose ? -B.x : B.x, sz = rose ? B.z : -B.z, a = Math.random() * Math.PI * 2, rr = Math.random() * 4, P = { x: Math.max(-14, Math.min(14, sx + Math.sin(a) * rr)), z: Math.max(-8, Math.min(8, sz + Math.cos(a) * rr)) };
-        const c = T.genCue(B, P, dec, time); r.n++; if (c.bad > 0) r.genBad++;
-        // grid search and connected components of the passing cells
+        const M = T.MARKS[Math.floor(Math.random() * 4)], B = { x: M[0] + rnd(-1, 1), z: M[1] + rnd(-1, 1) };
+        const P = { x: rnd(-14, 14), z: rnd(-8, 8) };
+        const c = T.genCue(B, P, st); r.n++; r.lit += c.lights.length;
+        // the tempting near-misses: lit cells where you and exactly one doll would be lit
+        for (const L of c.lights) { const on = (x, z) => c.lights.some((s) => Math.hypot(s.x - x, s.z - z) <= T.CUE.r); if ((on(-L.x, L.z) ? 1 : 0) + (on(L.x, -L.z) ? 1 : 0) === 1) r.tempt++; }
+        // grid search over the whole stage and connected components of the passing cells
         const H = 0.25, nx = Math.round(29 / H) + 1, nz = Math.round(17 / H) + 1, pass = new Uint8Array(nx * nz);
         for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) { const x = -14.5 + i * H, z = -8.5 + j * H; if (T.cueOk({}, x, z, c.lights)) pass[i * nz + j] = 1; }
-        const lab = new Int32Array(nx * nz); let comp = 0; const best = [];
-        for (let s = 0; s < pass.length; s++) { if (!pass[s] || lab[s]) continue; comp++; let dmin = Infinity; const st2 = [s]; lab[s] = comp;
-          while (st2.length) { const u = st2.pop(), i = Math.floor(u / nz), j = u % nz, x = -14.5 + i * H, z = -8.5 + j * H; dmin = Math.min(dmin, Math.hypot(x - P.x, z - P.z));
-            for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a2 = i + di, b2 = j + dj; if (a2 < 0 || b2 < 0 || a2 >= nx || b2 >= nz) continue; const v = a2 * nz + b2; if (pass[v] && !lab[v]) { lab[v] = comp; st2.push(v); } } }
-          best.push(dmin); }
+        const lab = new Int32Array(nx * nz); let comp = 0, hasQ = false;
+        for (let s = 0; s < pass.length; s++) { if (!pass[s] || lab[s]) continue; comp++; const st2 = [s]; lab[s] = comp;
+          while (st2.length) { const u = st2.pop(), i = Math.floor(u / nz), j = u % nz, x = -14.5 + i * H, z = -8.5 + j * H; if (Math.hypot(x - c.q.x, z - c.q.z) < 0.3) hasQ = true;
+            for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a2 = i + di, b2 = j + dj; if (a2 < 0 || b2 < 0 || a2 >= nx || b2 >= nz) continue; const v = a2 * nz + b2; if (pass[v] && !lab[v]) { lab[v] = comp; st2.push(v); } } } }
         r.comps[comp] = (r.comps[comp] || 0) + 1;
-        if (comp === 2) r.two++;
-        best.sort((a2, b2) => a2 - b2); const reach = 7 * (time - 0.9);
-        if (best.length && best[0] <= reach) r.near++; if (best.length > 1 && best[1] <= 7 * time) r.far++;
-        if (best.length && best[0] === 0) r.standing++;
-        for (const L of c.lights.slice(0, 2)) if (Math.hypot(L.x - B.x, L.z - B.z) <= T.CUE.r + T.GATE.r) { r.pool++; break; }
+        if (comp === 1 && hasQ) r.one++;
+        const sol = T.solveCue(c.lights); if (sol.length === 1 && Math.hypot(sol[0].x - c.q.x, sol[0].z - c.q.z) < 0.01) r.solver++;
+        const d = Math.hypot(P.x - c.q.x, P.z - c.q.z); if (d <= 7 * (time - 0.9)) r.near++; if (d < T.CUE.r) r.standing++;
+        if (Math.hypot(c.q.x - B.x, c.q.z - B.z) < T.CUE.r + 1.5) r.under++;
       }
-      out.push(r);
+      r.lit = +(r.lit / r.n).toFixed(1); r.tempt = +(r.tempt / r.n).toFixed(1); out.push(r);
     }
     return out;
   }, +nCue);
   for (const r of cues) {
-    const bad = (r.n - r.two) + (r.n - r.near) + r.pool + r.standing; fails += bad;
-    console.log(`cues step ${r.step}: ${r.n} generated, exactly two passing discs ${r.two}, nearer reachable ${r.near}, other also reachable ${r.far}, real light on his pool ${r.pool}, already standing in one ${r.standing}, generator fallbacks ${r.genBad}  components ${JSON.stringify(r.comps)}  ${bad ? 'FAIL ' + bad : 'ok'}`);
+    const bad = (r.n - r.one) + (r.n - r.solver) + (r.n - r.near) + r.under + r.standing; fails += bad;
+    console.log(`cues step ${r.step}: ${r.n} generated, exactly one passing spot (the answer) ${r.one}, autopilot's grid search finds it ${r.solver}, reachable in time ${r.near}, answer under him ${r.under}, already standing on it ${r.standing}, lights ${r.lit} on average (${r.tempt} tempting: you and one doll lit)  components ${JSON.stringify(r.comps)}  ${bad ? 'FAIL ' + bad : 'ok'}`);
   }
   // ---- 2. birds
   const birds = await page.evaluate(() => { const T = window.__game.G.boss.def.nmTest; let bad = 0; for (let gg = 0; gg <= 3; gg++) { const o = T.birdOpen(gg); for (const i of o) if (!o.includes(8 - i)) bad++; } return bad; });
