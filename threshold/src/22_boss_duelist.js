@@ -1,5 +1,13 @@
 // DOOR III: ISSEN, the Last Petal. One swordsman on a lake at dusk. Fast, precise, and he remembers every cut.
 (() => {
+  // the Moons. New Moon hits the disc r < MOON.r round him, Full Moon everything from MOON.r out to the far wall: the two never
+  // overlap, so standing near the line a small step answers either one, but no spot in the room is safe from both and the edge
+  // never outranges a Full Moon. Full Moon's tell gets MOON.oTell s more (not shortened by haste), and from further out it is
+  // long enough to walk in to him (walk time + MOON.oReact s), at most MOON.oMax s: running in costs you casting, never the hit.
+  // The next Moon's tell starts only once the last one has landed (MOON.gap s later), on Normal and Nightmare.
+  const MOON = { r: 5.5, far: 32, oTell: 0.35, oReact: 0.6, oMax: 2.4, gap: 0.2 };
+  const moonTell = (b, base, k, x, z) => { const t = tele(b, base), p = G.player; if (k !== 'o') return t; const d = p ? Math.hypot(p.pos.x - x, p.pos.z - z) : 0, v = p ? p.speed * p.speedMul : 7;
+    return Math.min(MOON.oMax, Math.max(t + MOON.oTell, Math.max(0, d - MOON.r + 0.8) / v + MOON.oReact)); };
   const R = 15, ROSE = 0xff4a6a, PALE = 0xffd8e0, BLUE = 0x8ab4ff, BLUE_T = 0x7aa8ff, ICE = 0xd8ecff; // BLUE: the reflection (nightmare only)
   const edgeLen = (x, z, a) => { let d = 0; while (d < 40) { const nx = x + Math.sin(a) * (d + 0.5), nz = z + Math.cos(a) * (d + 0.5); if (nx * nx + nz * nz > 14.2 * 14.2) break; d += 0.5; } return d; };
 
@@ -427,7 +435,7 @@
     const arcSet = (key, specs) => { S.vfx.arcs[key] = specs.map(([r, w, a0, a1, n]) => { const m = new THREE.Mesh(arcGeo(r, w, a0, a1, n), cutMat()); m.visible = false; m.frustumCulled = false; m.renderOrder = 13; g.add(m); const it = { m, t: 9, dur: 0.5 }; S.vfx.list.push(it); return it; }); };
     arcSet('c', [[3.6, 1.4, -1.75, 1.75, 48], [6.1, 1.8, 1.75, -1.75, 56], [8.5, 1.6, -1.75, 1.75, 64]]);
     arcSet('o', [[5.7, 1.6, 0, TAU, 96], [9.0, 2.0, TAU, 0, 112], [12.4, 2.1, 0, TAU, 128]]);
-    arcSet('n', [[2.8, 1.4, 0, TAU, 64], [5.5, 1.9, TAU, 0, 96]]);
+    arcSet('n', [[2.5, 1.4, 0, TAU, 64], [4.7, 1.5, TAU, 0, 96]]);
     // petal-storm bullets: own blossom orb drawn just over the shared white-hot core (saturated pink body, small pale core, tight halo)
     S.orb = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 16, 12), new THREE.ShaderMaterial({ uniforms: { uTime: EU.uTime },
       vertexShader: 'uniform float uTime; varying float vF; varying vec3 vL; void main(){ vL=position; ' + IMW + 'vec4 wp=mw*vec4(position,1.0); vec3 n=mat3(mw)*normal; n/=max(length(n),1e-5); vec3 v=cameraPosition-wp.xyz; v/=max(length(v),1e-5); vF=clamp(dot(n,v),0.0,1.0); gl_Position=projectionMatrix*viewMatrix*wp; }',
@@ -555,20 +563,21 @@
   function* moon(b, kinds) {
     const S = b.state; S.walk = false;
     for (const k of kinds) {
-      const t = tele(b, 0.95), x = b.pos.x, z = b.pos.z, a = b.angToPlayer(); b.facing = a; S.fake.parryT = 1;
+      const x = b.pos.x, z = b.pos.z, t = moonTell(b, 0.95, k, x, z), a = b.angToPlayer(); b.facing = a; S.fake.parryT = 1;
       const fx = () => { S.model.swing(k === 'c' ? 1 : 0, 0.3); Sound.sfx('sword'); Sound.sfx('boom', 0.5); FX.shake(0.3); };
       if (k === 'c') Hz.cone(x, z, a, 3.5, 9.5, t, 320, { name: 'Crescent', color: ROSE, quiet: true, onFire: () => { fx(); vArcs(b, 'c', x, z, a); petals(x + Math.sin(a) * 4, z + Math.cos(a) * 4, 20); } });
-      else if (k === 'o') Hz.donut(x, z, 4.2, 14, t, 320, { name: 'Full Moon', color: ROSE, quiet: true, onFire: () => { fx(); vArcs(b, 'o', x, z, vrand() * TAU); petals(x, z, 40); } });
-      else Hz.circle(x, z, 6.6, t, 320, { name: 'New Moon', color: ROSE, quiet: true, onFire: () => { fx(); FX.dome(x, 0.5, z, { r: 6.6, color: ROSE, dur: 0.4, mult: 1.1 }); vArcs(b, 'n', x, z, vrand() * TAU); } });
-      yield t * 0.72;
+      else if (k === 'o') (S.fullMoon = { x, z, at: G.now + t }, Hz.donut(x, z, MOON.r, MOON.far, t, 320, { name: 'Full Moon', color: ROSE, quiet: true, onFire: () => { fx(); vArcs(b, 'o', x, z, vrand() * TAU); petals(x, z, 40); } }));
+      else Hz.circle(x, z, MOON.r, t, 320, { name: 'New Moon', color: ROSE, quiet: true, onFire: () => { fx(); FX.dome(x, 0.5, z, { r: MOON.r, color: ROSE, dur: 0.4, mult: 1.1 }); vArcs(b, 'n', x, z, vrand() * TAU); } });
+      yield t + MOON.gap;
     }
-    yield 0.5; S.fake.parryT = 0; yield 0.4;
+    yield 0.3; S.fake.parryT = 0; yield 0.4;
   }
   // tell before Stillness: 1.2 s of blade glint, a closing pale ring and a rising chime, then a short grace when he kneels,
-  // so a 1.5 s Bolt started on the tell still lands safely and in-flight hits are not punished
-  const STILL_TELL = 1.2, STILL_GRACE = 0.35;
+  // with no grace (STILL_GRACE 0, Patrick 2026-11-25): any hit that lands once he kneels counters, also a cast started before or
+  // during the tell that finishes after it. The tell is the cue to stop casting.
+  const STILL_TELL = 1.2, STILL_GRACE = 0;
   function* stillness(b, dur = 2.3) {
-    const S = b.state; S.walk = false; b.facing = b.angToPlayer(); S.warn = 0.001;
+    const S = b.state; S.walk = false; b.facing = b.angToPlayer(); S.warn = 0.001; S.kneelAt = G.now + STILL_TELL;
     Sound.sfx('glint', 0.9); FX.flash(0xfff4e0, 0.16, 2.2);
     if (!G.headless) { FX.ring(b.pos.x, b.pos.z, { r0: 7.5, r1: 1.3, color: 0xfff4e0, dur: STILL_TELL, width: 0.24, mult: 1.7 }); FX.light(b.pos.x, 3, b.pos.z, 0xfff0d0, 45, STILL_TELL, 18); }
     yield STILL_TELL;
@@ -758,7 +767,7 @@
   // kneel spot after a short gather (swapTell). One arm at steps 0-1, two from step 2, three from step 4; turn speed per step
   // (rad/s); from step flipFrom it turns back once per breath.
   const STORM = { arms: [1, 1, 2, 2, 3, 3], turn: [0.7, 0.8, 0.9, 0.9, 1.0, 1.1], flipFrom: 3, width: 3, spread: 0.12, row: 0.4, speed: 5.0, dmg: 85, life: 3.6, tell: 1.2, swapTell: 0.5 };
-  const CALM = { laneLife: 4.0, laneW: 2.6, eyeR: 3.8, eyeAfter: 1.5 };
+  const CALM = { laneLife: 4.0, laneW: 2.6, eyeR: 5.0, eyeAfter: 1.5 };
   // "Standing cuts and the Waking Cut" (option B): every Draw Cut's ghost stays on the deck; the swap's Waking Cut sets them all off.
   //   cuts: Draw Cuts per swap cycle by step, laid in chains of at most `chain` with `breath` s between chains (a Bolt fits).
   //   tell: the Waking Cut's tell, started with the swap tell. From step `twoWaves` every other cut is claimed by the still one (his
@@ -787,6 +796,7 @@
     e.facing = angTo(e.pos.x, e.pos.z, p.pos.x, p.pos.z); A.warn = 0.001;
     Sound.sfx('glint', 0.9); FX.flash(0xfff4e0, 0.16, 2.2);
     const T = S.tellT || STILL_TELL; // 1.2 s, 0.9 s at Niten's last ramp step
+    A.kneelAt = G.now + T;
     if (!G.headless) { FX.ring(e.pos.x, e.pos.z, { r0: 7.5, r1: 1.3, color: 0xfff4e0, dur: T, width: 0.24, mult: 1.7 }); FX.light(e.pos.x, 3, e.pos.z, 0xfff0d0, 45, T, 18); }
     const wk = S.waking = wakingCut(b, B);
     yield T;
@@ -974,8 +984,8 @@
     const e = act.ent, x = e.pos.x, z = e.pos.z, p = G.player, a = angTo(x, z, p.pos.x, p.pos.z), blue = act.col === BLUE; e.facing = a; act.fake.parryT = 1;
     const fx = () => { act.model.swing(k === 'c' ? 1 : 0, 0.3); Sound.sfx('sword'); Sound.sfx('boom', 0.5); FX.shake(0.3); act.fake.parryT = 0; };
     if (k === 'c') Hz.cone(x, z, a, 3.5, 9.5, t, 320, { name: 'Crescent', color: act.col, quiet: true, onFire: () => { fx(); vArcs(b, 'c', x, z, a, blue); petals(x + Math.sin(a) * 4, z + Math.cos(a) * 4, 20, act.ice); } });
-    else if (k === 'o') Hz.donut(x, z, 4.2, 14, t, 320, { name: 'Full Moon', color: act.col, quiet: true, onFire: () => { fx(); vArcs(b, 'o', x, z, vrand() * TAU, blue); petals(x, z, 40, act.ice); } });
-    else Hz.circle(x, z, 6.6, t, 320, { name: 'New Moon', color: act.col, quiet: true, onFire: () => { fx(); FX.dome(x, 0.5, z, { r: 6.6, color: act.col, dur: 0.4, mult: 1.1 }); vArcs(b, 'n', x, z, vrand() * TAU, blue); } });
+    else if (k === 'o') (b.state.fullMoon = { x, z, at: G.now + t }, Hz.donut(x, z, MOON.r, MOON.far, t, 320, { name: 'Full Moon', color: act.col, quiet: true, onFire: () => { fx(); vArcs(b, 'o', x, z, vrand() * TAU, blue); petals(x, z, 40, act.ice); } }));
+    else Hz.circle(x, z, MOON.r, t, 320, { name: 'New Moon', color: act.col, quiet: true, onFire: () => { fx(); FX.dome(x, 0.5, z, { r: MOON.r, color: act.col, dur: 0.4, mult: 1.1 }); vArcs(b, 'n', x, z, vrand() * TAU, blue); } });
   }
   // Moons from the blade, one at a time (step 2, Full Moon first so the Eye is taught) or in sets of two (step 3 on), 1.15 s tell
   // before haste (at 0.95 they caused most autopilot deaths in Niten). Full Moon: its safe hole is also petal-free, from the start of
@@ -984,7 +994,7 @@
   function* nitenMoons(b, kinds) {
     const S = b.state; S.walk = false;
     for (const k of kinds) {
-      const L = S.lead, e = L.ent, t = tele(b, 1.15); S.moonK = k;
+      const L = S.lead, e = L.ent, t = moonTell(b, 1.15, k, e.pos.x, e.pos.z); S.moonK = k;
       if (k === 'o') { S.calmV = (S.calmV || 0) + 1; S.eye = { x: e.pos.x, z: e.pos.z, r: CALM.eyeR, t0: G.now, until: G.now + t + CALM.eyeAfter, blue: L === S.R }; if (S.eyeM) { S.eyeM.position.set(e.pos.x, 0.024, e.pos.z); S.eyeM.material.uniforms.uC.value.set(L === S.R ? 0xb8ccff : 0xffe0ea); } }
       moonAt(b, L, k, t); yield t + 0.3; S.moonK = null;
     }
@@ -1280,12 +1290,19 @@
     },
     bot(b) {
       const S = b.state;
+      // the tell before he kneels: a player stops a cast that would land after it (it would counter; there is no grace)
+      // and a Full Moon from out of reach: stop the cast if finishing it leaves too little time to walk in
+      { const m = S.fullMoon, p = G.player, c = p && p.casting; if (m && c && G.now < m.at) { const d = Math.hypot(p.pos.x - m.x, p.pos.z - m.z), walk = Math.max(0, d - MOON.r + 0.8) / (p.speed * p.speedMul);
+        if (walk > 0 && G.now + (c.time - c.t) + walk > m.at - 0.15) { p.casting = null; p.gcd = Math.min(p.gcd, 0.25); } } }
+      const stopCast = (at) => { const p = G.player, c = p && p.casting; if (c && at && G.now + (c.time - c.t) >= at - 0.05) { p.casting = null; p.gcd = Math.min(p.gcd, 0.25); } };
       // Niten: attack the awake one, never the still one; hold during the tell and the grace; stand in the calm place when there is
       // one (a cut lane while the storm blows, the Eye of the Moon). Bot.pocketBlind (tests only) ignores the calm places.
       // Bot.swapBlind (tests only) ignores swaps and always attacks Issen: that autopilot must fail phase IV.
       if (S.niten && S.lead) { if (Bot.swapBlind) return { target: b }; const L = S.lead, Fo = other(S, L), h = { target: L.ent, holdFire: L.warn > 0 || G.now < Fo.graceT || !L.ent.targetable }; if (S.calmHint && !Bot.pocketBlind) Object.assign(h, S.calmHint);
         // a planted cast is only started when it will finish before the next storm arm arrives
-        if (S.storm && G.player) { const t = armAt(b, G.player.pos.x, G.player.pos.z); if (t < 3) h.noCast = t - 0.25; } return h; }
+        if (S.storm && G.player) { const t = armAt(b, G.player.pos.x, G.player.pos.z); if (t < 3) h.noCast = t - 0.25; }
+        if (L.warn > 0) stopCast(L.kneelAt); return h; }
+      if (S.warn > 0) stopCast(S.kneelAt);
       return { holdFire: S.still || S.warn > 0 };
     },
   });
