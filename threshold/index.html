@@ -12203,7 +12203,7 @@ const Hitch = (() => {
       for (const H of S.hung) { H.m.position.y = H.y + (1 - S.a1) * 16; H.m.visible = S.a1 > 0.02; }
             for (const L of S.layers) { L.m.position.x = L.amp ? Math.sin(t * L.sp) * L.amp * (1 - burn * 0.7) : 0; L.m.position.y = L.y0 + L.dy * burn + Math.sin(t * 0.7 + L.y0) * 0.08 * burn; L.m.rotation.z = L.rz * burn + Math.sin(t * 0.9 + L.y0 * 3) * 0.012 * burn; }
       S.skyP.visible = burn < 0.7; S.lime.visible = S.embers.visible = burn > 0.05; for (const f of S.fires) f.visible = burn > 0.05;
-      S.fireM.uniforms.uA.value = burn * (1 - dk * 0.67); for (const L of S.layers) if (L.fireM) L.fireM.uniforms.uA.value = S.fireM.uniforms.uA.value * (L.m.userData.fadeA === undefined ? 1 : L.m.userData.fadeA); // flames fade with their flat S.fireM.uniforms.uD.value = dk; S.fireM.uniforms.uT.value = tu; S.fireL.intensity = burn * (55 + 22 * Math.sin(t * 13) + 12 * Math.sin(t * 7.3)) * (1 - dk * 0.7);
+      S.fireM.uniforms.uA.value = burn * (1 - dk * 0.67); for (const L of S.layers) if (L.fireM) L.fireM.uniforms.uA.value = S.fireM.uniforms.uA.value * (L.m.userData.fadeA === undefined ? 1 : L.m.userData.fadeA); /* flames fade with their flat */ S.fireM.uniforms.uD.value = dk; S.fireM.uniforms.uT.value = tu; S.fireL.intensity = burn * (55 + 22 * Math.sin(t * 13) + 12 * Math.sin(t * 7.3)) * (1 - dk * 0.7);
       if (S.lime.visible) { S.limeCone.material.uniforms.uA.value = 0.32 * burn * (1 - dk * 0.6); S.limeCone.material.uniforms.uT.value = tu; }
       for (const hp of S.hotPools) { hp.visible = burn > 0.05; hp.material.uniforms.uA.value = 0.1 * burn * (1 - dk); }
       S.gEye.color.setHex(VIO).multiplyScalar(0.1 + burn * (1.8 + Math.sin(t * 2) * 0.5)); S.gL.intensity = burn * 90;
