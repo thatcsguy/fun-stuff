@@ -72,6 +72,7 @@ nightmare: {
 - There are no per-phase clocks. Pressure in the last phase comes from the boss file's own ramp (layers added on a timer or a mechanic count).
 - `G.nightmare` is set before `build()` runs. Use it to build the nightmare-only things in `build()` (and hide them): nothing should be created mid-fight. `NM(normal, nightmare)` picks a number by difficulty.
 - `Co.stopTag('phase')` skips a coroutine's cleanup. Every per-mechanic visual or flag a cut-off mechanic can leave behind (kneel, rings, a hidden or untargetable body, a grade, slow time) must be reset in the next phase's `enter` and in your `lastBlow`. `tools/nmphase.js` checks this.
+- A bot hint's `avoid(x, z)` may return a number instead of `true`: that penalty is used in place of the usual 500 (Parallax uses 5000 for a walk over a hole).
 - `ent.hpOwner = boss` makes a second body share the boss's health (hits on it land on the boss). `ent.onImmuneHit(info, ent)` is called when an immune body is hit; return true to hide the "IMMUNE" text.
 - Give every nightmare phase after the first a `skipTo(b)` that puts the world in the look that phase starts from (its grade, its colour state), even when its `enter` plays the transition: `?phase=N`, the tools and the rehearsal start phases directly, and `skipTo` is all they get of the phases before.
 - Phase results (`b.phaseLog`: each phase's live time and damage) need nothing from the boss file. For `tools/nmpace.js`, write `b.state.stepAt[step] = G.ft` when each ramp step of the last phase starts, and expose a way to force a step in `nmTest`.
@@ -90,7 +91,7 @@ Checklist (from `nightmare-design.md`):
 10. Bot: `bot(b)` reads the gate, and a "wrong" bot that ignores the gate must fail.
 11. Test with a full normal entry (with intro), not only `skipTo`.
 
-Check it with `NM=1 node tools/smoke.js <id>`, `node tools/nmpace.js <id> all 6`, `node tools/nmphase.js <id>` (add a case for your mechanics), `NM=1 node tools/hitch.js <id>` and `NM=1 node tools/nanscan.js <id>`.
+Check it with `NM=1 node tools/smoke.js <id>`, `node tools/nmpace.js <id> all 6`, `node tools/nmphase.js <id>` (add a case for your mechanics), `NM=1 node tools/hitch.js <id>` and `NM=1 node tools/nanscan.js <id>`. A fight with its own rule can add a design check of its own (Parallax has `tools/polfuzz.js` for its colour patterns and `tools/engcast.js` for the Stormcaller cast budget).
 
 ## Scripting
 

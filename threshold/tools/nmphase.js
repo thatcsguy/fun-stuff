@@ -3,6 +3,9 @@
 // Pentimento (atelier): a Roller, a live Blot, a Critique cast, a matched Critique. In the last phase the last blow (the enrage's
 // themed end) cuts off a swap, a Counter, the Verse, paired Moons (Issen) or a Fresh Coat, a Critique, a Roller, a repair, a pair,
 // the signature (Pentimento), and nothing may remain after its first beat. Then a restart must reset the ramp state.
+// Parallax (engine): mid-Polarize, with the beams out, with a Siphon Drone drinking; Blackout also mid-Swallow. Afterwards: no
+// Polarize or core colour left, no drone, no drain, beams relit after an enter (gone after Blackout), dmgTaken 1 or GATE.off, no
+// paint on fallen tiles, no tile both dark and painted, no cinematic camera.
 // Co.stopTag('phase') skips a coroutine's cleanup, so anything a cut-off mechanic set must be reset by the next enter.
 const { launch } = require('./harness.js');
 (async () => {
@@ -31,6 +34,14 @@ const { launch } = require('./harness.js');
       if (S.sig) bad.push('signature'); if (S.varnR < 30) bad.push('varnish ring'); if (S.cine || g.Cam.cine) bad.push('cinematic'); if (b.castState) bad.push('cast ' + b.castState.name);
       if (b.phase < 2 && (S.split || S.fin || S.call || S.seamOn)) bad.push('finale state before the finale'); if (b.phase === 2 && (!S.split || !S.seamOn || !S.fin)) bad.push('finale not set');
       return bad; };
+    // Parallax: what a cut-off mechanic could leave behind (the eclipse and the board are the look of the phase, not per-mechanic)
+    const engineBad = (b, after) => { const S = b.state, bad = [], T = def.nmTest;
+      if (S.pol) bad.push('polarize'); if (S.dangerCol) bad.push('core colour ' + S.dangerCol); if (G.ents.some((e) => e.isAdd && e.alive)) bad.push('drone');
+      if (S.tiles.some((t) => t.drain > 0)) bad.push('drain'); if (S.tiles.some((t) => t.col && !t.present)) bad.push('paint on a fallen tile'); if (S.tiles.some((t) => t.col && t.dead)) bad.push('dark and painted');
+      if (b.dmgTaken !== 1 && b.dmgTaken !== T.GATE.off) bad.push('dmgTaken=' + b.dmgTaken); if (S.cine || g.Cam.cine) bad.push('cinematic');
+      if (after === 'enter') { if (!S.sweep || S.sweep.out) bad.push('beams not relit'); if (b.castState) bad.push('cast ' + b.castState.name); if (b.immune) bad.push('immune'); }
+      if (after === 'blow') { if (S.sweep) bad.push('beams still on'); }
+      return bad; };
     // advance to phase `ph`, wait for `cond` (a mechanic in flight), then push past the next threshold
     const cut = (ph, label, cond, maxSec = 120) => {
       g.start(boss, { cls: 'stormcaller', phase: ph }); G.headless = true; g.bot(3); g.god(true);
@@ -38,11 +49,11 @@ const { launch } = require('./harness.js');
       while (t < maxSec && !(b.phase === ph && !b.transitioning && cond(b))) { step(0.05); b.hp = Math.max(b.hp, b.maxHp * (def.phases[ph + 1].at + 0.02)); t += 0.05; }
       if (t >= maxSec) { out.push('n/a  ' + label + ' (not in this phase)'); return; }
       // door XIX starts a new mechanic on the first frame of the next run, so its state is read at the moment that run starts
-      const P2 = def.phases[ph + 1], run0 = P2.run; let snap = null; if (boss === 'atelier') P2.run = function* (bb) { snap = atelierBad(bb); yield* run0(bb); };
+      const P2 = def.phases[ph + 1], run0 = P2.run; let snap = null; if (boss === 'atelier') P2.run = function* (bb) { snap = atelierBad(bb); yield* run0(bb); }; if (boss === 'engine') P2.run = function* (bb) { snap = engineBad(bb, 'enter'); yield* run0(bb); };
       b.hp = b.maxHp * def.phases[ph + 1].at - 5; let k = 0;
       while (k++ < 600 && (b.phase !== ph + 1 || b.transitioning)) step(0.05);
       P2.run = run0;
-      if (boss === 'atelier') { out.push((snap && snap.length ? 'FAIL ' : snap ? 'ok   ' : 'FAIL ') + label + ` (phase ${ph + 1} -> ${ph + 2})` + (snap ? (snap.length ? ': ' + snap.join(', ') : '') : ': next run never started')); return; }
+      if (boss === 'atelier' || boss === 'engine') { out.push((snap && snap.length ? 'FAIL ' : snap ? 'ok   ' : 'FAIL ') + label + ` (phase ${ph + 1} -> ${ph + 2})` + (snap ? (snap.length ? ': ' + snap.join(', ') : '') : ': next run never started')); return; }
       step(0.1); check(label + ` (phase ${ph + 1} -> ${ph + 2})`);
     };
     for (let ph = 0; ph < n - 1 && boss === 'atelier'; ph++) {
@@ -50,6 +61,11 @@ const { launch } = require('./harness.js');
       cut(ph, 'with a live Blot', (b) => b.state.blotList.length > 0);
       cut(ph, 'during a Critique cast', (b) => b.state.crit > 0);
       cut(ph, 'during a matched Critique (he is down)', (b) => b.state.down > 0);
+    }
+    for (let ph = 0; ph < n - 1 && boss === 'engine'; ph++) {
+      cut(ph, 'during a Polarize cast', (b) => !!b.state.pol && b.state.pol.t < 2);
+      cut(ph, 'with the beams out after a blast', (b) => !b.state.pol && b.state.sweep && b.state.sweep.out && b.state.sweep.relightT > 0);
+      if (ph === 1) cut(ph, 'with a Siphon Drone drinking', (b) => b.state.siphons.some((e) => e.alive && e.drink));
     }
     for (let ph = 0; ph < n - 1 && boss === 'duelist'; ph++) {
       cut(ph, 'during the Stillness tell', (b) => b.state.warn > 0);
@@ -85,6 +101,14 @@ const { launch } = require('./harness.js');
       overA('between the Critiques of a pair (step 4)', (b) => b.state.split && b.state.finStep === 4 && b.state.crit > 0 && b.state.crit < 3.9 && b.state.critLog.length >= 2 && b.state.critLog[b.state.critLog.length - 1].T === 4, (S) => { S.fk = 8; });
       overA('during the signature', (b) => { if (!b.state.sigDone) b.hp = Math.min(b.hp, b.maxHp * 0.095); return b.state.sig > 0; });
     }
+    const overE = (label, cond, force) => over(label, cond, (b) => engineBad(b, 'blow'), force);
+    if (boss === 'engine') {
+      overE('during a Polarize cast', (b) => !!b.state.pol && b.state.pol.t < 2.5);
+      overE('with the beams out after a blast', (b) => !b.state.pol && b.state.sweep && b.state.sweep.out);
+      overE('mid-Swallow (step 1)', (b) => b.state.tiles.some((t) => t.warn > 0), (S) => { S.cyc = 2; });
+      overE('with a Siphon Drone drinking (step 2)', (b) => b.state.siphons.some((e) => e.alive && e.drink), (S) => { S.cyc = 4; });
+      overE('during a Supernova (step 3)', (b) => b.castState && b.castState.name === 'Supernova' || g.Bul.list.length > 20, (S) => { S.cyc = 6; });
+    }
     if (boss === 'duelist') {
     over('during a swap tell', (b) => b.state.niten && b.state.lead && b.state.lead.warn > 0);
     over('during a Counter by the still body', (b) => { const S = b.state; if (!S.niten || !S.lead) return false; const F = S.lead === S.A ? S.R : S.A; if (F.still && G.now >= F.graceT && !S.countered) { G.player.target = F.ent; F.ent.damage(10, { src: 'player' }); } return F.hold; });
@@ -101,9 +125,10 @@ const { launch } = require('./harness.js');
     {
       g.start(boss, { cls: 'stormcaller', phase: last }); G.headless = true; g.bot(3); g.god(true); const b = G.boss; let t = 0;
       while (t < 60 && (b.phase !== last || b.transitioning)) { step(0.1); t += 0.1; }
-      if (boss === 'duelist') b.state.nitenT = 5 * def.nmTest.RAMP; else b.state.fk = 8; step(40);
+      if (boss === 'duelist') b.state.nitenT = 5 * def.nmTest.RAMP; else if (boss === 'engine') def.nmTest.setStep(b, 5); else b.state.fk = 8; step(40);
       g.start(boss, { cls: 'stormcaller' }); step(0.1); const S = G.boss.state, bad = [];
       if (boss === 'duelist') { if (S.nitenT > 0.2 || S.nitenStep || S.tellT !== 1.2 || S.haste > 1) bad.push(`nitenT ${S.nitenT} step ${S.nitenStep} tell ${S.tellT} haste ${S.haste}`); }
+      else if (boss === 'engine') { if (S.cyc || S.step !== -1 || S.stepAt.length || S.swallowed.length || S.holdStep !== undefined || S.ecl3 || S.eclLvl) bad.push(`cyc ${S.cyc} step ${S.step} stepAt ${S.stepAt} ecl3 ${S.ecl3}`); }
       else if (S.fk || Math.abs(S.lineW - def.nmTest.SEAM_W[0]) > 1e-9 || S.finStep) bad.push(`fk ${S.fk} lineW ${S.lineW} step ${S.finStep}`);
       if (G.boss.lastBlowing || G.boss.enraged) bad.push('enrage state');
       out.push((bad.length ? 'FAIL ' : 'ok   ') + 'restart resets the ramp' + (bad.length ? ': ' + bad.join(', ') : ''));

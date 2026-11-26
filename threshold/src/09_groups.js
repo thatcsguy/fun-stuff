@@ -4,8 +4,8 @@
 // theatre (Impresario), wheel (Lady Fortuna), express (Ironjaw), winter (Huntsman), origami (Oriko), lamp (Vesper),
 // chess (Zugzwang), festival (Nian), fall (Anzu), clock (Horologist), portal (Janus), atelier (Pentimento), sumi (Garyo).
 const GROUPS = [
-  { id: 'nightmare', name: 'Nightmare', bosses: ['duelist', 'atelier', 'theatre', 'gorgon'] },
-  { id: 'ready', name: 'Ready', bosses: ['engine'] },
+  { id: 'nightmare', name: 'Nightmare', bosses: ['duelist', 'atelier', 'theatre', 'engine', 'gorgon'] },
+  { id: 'ready', name: 'Ready', bosses: [] },
   { id: 'almost', name: 'Almost', bosses: ['cathedral', 'leviathan', 'origami', 'lamp', 'chess', 'festival', 'fall', 'portal'] },
   { id: 'concept', name: 'Concept', bosses: ['titan', 'wheel', 'express', 'winter', 'clock', 'sumi'] },
 ];
