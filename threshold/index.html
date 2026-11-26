@@ -4573,8 +4573,8 @@ G.classes.push({
 // theatre (Impresario), wheel (Lady Fortuna), express (Ironjaw), winter (Huntsman), origami (Oriko), lamp (Vesper),
 // chess (Zugzwang), festival (Nian), fall (Anzu), clock (Horologist), portal (Janus), atelier (Pentimento), sumi (Garyo).
 const GROUPS = [
-  { id: 'nightmare', name: 'Nightmare', bosses: ['duelist', 'atelier'] },
-  { id: 'ready', name: 'Ready', bosses: ['engine'] },
+  { id: 'nightmare', name: 'Nightmare', bosses: ['duelist', 'atelier', 'engine'] },
+  { id: 'ready', name: 'Ready', bosses: [] },
   { id: 'almost', name: 'Almost', bosses: ['cathedral', 'leviathan', 'gorgon', 'theatre', 'origami', 'lamp', 'chess', 'festival', 'fall', 'portal'] },
   { id: 'concept', name: 'Concept', bosses: ['titan', 'wheel', 'express', 'winter', 'clock', 'sumi'] },
 ];
@@ -8324,7 +8324,7 @@ const Hitch = (() => {
     (ix, iz) => Math.max(Math.abs(ix - 3), Math.abs(iz - 3)) % 2, (ix, iz) => (Math.floor(ix / 2) + Math.floor(iz / 2)) % 2, (ix, iz) => (ix + iz * 2) % 3 === 0 ? 1 : 0,
   ];
   // per-phase accents: rim light on the machinery, distance haze, the core's resting colour
-  const RIM_COL = [0x2f6cff, 0x3a6ae8, 0x5a5cf0], HAZE_COL = [0x070c22, 0x140812, 0x0e0820], CORE_COL = [0x80c0ff, 0xff9040, 0x8a48ff];
+  const RIM_COL = [0x2f6cff, 0x3a6ae8, 0x5a5cf0, 0x5a74ff], HAZE_COL = [0x070c22, 0x140812, 0x0e0820, 0x040410], CORE_COL = [0x80c0ff, 0xff9040, 0x8a48ff];
 
   // ---------- shared shader dressing: fresnel rim + distance haze on standard materials ----------
   const RIM = { uRim: { value: new THREE.Color(RIM_COL[0]) }, uRimS: { value: 0.4 }, uHazeC: { value: new THREE.Color(HAZE_COL[0]) }, uHazeD: { value: new THREE.Vector2(26, 90) } };
@@ -8632,7 +8632,7 @@ const Hitch = (() => {
       mat.color.setHSL(0.6 + (hsh - 0.5) * 0.06, 0.12 + hsh * 0.1, 0.55 + (W.hash2(ix, iz, 5) - 0.5) * 0.18); mat.roughness = 0.85 + W.hash2(ix, iz, 9) * 0.3;
       const sideMat = new THREE.MeshStandardMaterial({ color: 0x0c1018, metalness: 0.8, roughness: 0.5, emissive: IDLE, emissiveMap: stex, emissiveIntensity: 1, envMapIntensity: 0.6 });
       const m = new THREE.Mesh(tgeo, [mat, sideMat]); m.position.set(-HALF + TS * (ix + 0.5), TY, -HALF + TS * (iz + 0.5)); m.receiveShadow = true; g.add(m);
-      S.tiles.push({ m, mat, sideMat, U, ix, iz, x: m.position.x, z: m.position.z, present: true, col: 0, warn: 0, back: 0, y: TY, flash: 0, cur: new THREE.Color(IDLE), rx: 0, rz: 0, sx: 0, sz: 0 });
+      S.tiles.push({ m, mat, sideMat, U, ix, iz, x: m.position.x, z: m.position.z, present: true, col: 0, dead: false, drain: 0, warn: 0, back: 0, y: TY, flash: 0, cur: new THREE.Color(IDLE), rx: 0, rz: 0, sx: 0, sz: 0 });
     }
     // under the grid: a beam lattice the tiles sit on (one instanced draw), glowing seams in the gaps, and a soft haze far below for depth
     { const lm = dress(new THREE.MeshStandardMaterial({ color: 0x2c2650, metalness: 0.85, roughness: 0.66, envMapIntensity: 0.45 }), { rim: 0.45, haze: 0.5 });
@@ -8770,6 +8770,7 @@ const Hitch = (() => {
       fragmentShader: 'varying vec3 vC; varying float vF; void main(){ float f = clamp(vF, 0.0, 1.0); float a = smoothstep(0.0, 0.4, f) * (1.0 - 0.75 * smoothstep(0.8, 0.98, f)) * 0.78; gl_FragColor = vec4(max(vC * 1.25, vec3(0.0)), a); }', transparent: true, depthWrite: false });
     S.bsh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 16, 12), S.bshU, 400); S.bsh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(400 * 3), 3); S.bsh.count = 0; S.bsh.frustumCulled = false; S.bsh.renderOrder = 11; g.add(S.bsh);
     S.sweep = null; S.pol = null; S.coreCol = 0; S.open = 0; S.spin = 1; S.tethers = []; S.dangerCol = 0; S.heat = 0;
+    S.sunDir = sunDir.clone(); S.PR = PR; if (G.nightmare) nmBuild(b, S, g);
     const present = (x, z) => { const i = tIdx(x, z); return i >= 0 && S.tiles[i].present; };
     return {
       edge: 'fall', spawn: { x: 0, z: 11 }, bossStart: { x: 0, z: 0, face: 0 },
@@ -8817,13 +8818,14 @@ const Hitch = (() => {
     for (const t of shuffle(cand)) { if (list.length >= n) break; const i = t.iz * N + t.ix; if (!list.includes(i)) list.push(i); }
     dropTiles(b, list, { back }); yield 1.2;
   }
-  function droneMesh() {
+  function droneMesh(nm) {
     const g = new THREE.Group(), st = dress(new THREE.MeshStandardMaterial({ color: 0x3a4252, metalness: 0.9, roughness: 0.32, flatShading: true, envMapIntensity: 1.2 }), { rim: 1.1 });
-    const amber = new THREE.MeshStandardMaterial({ color: 0x0a0604, emissive: 0xffb030, emissiveIntensity: 1.6, side: THREE.DoubleSide });
+    const amber = new THREE.MeshStandardMaterial({ color: 0x0a0604, emissive: nm ? 0xc060ff : 0xffb030, emissiveIntensity: 1.6, side: THREE.DoubleSide });
     // spindle hull
     const hullPts = [[0, -0.95], [0.22, -0.78], [0.4, -0.38], [0.46, 0], [0.4, 0.34], [0.24, 0.66], [0.08, 0.86], [0, 0.9]].map(([x, y]) => new THREE.Vector2(x, y));
     const body = new THREE.Mesh(new THREE.LatheGeometry(hullPts, 8), st); body.position.y = 1.5; g.add(body);
     const band = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.035, 4, 24), amber); band.rotation.x = PI / 2; band.position.y = 1.5; g.add(band);
+    if (nm) { band.visible = false; for (const [c, y] of [[CY, 1.56], [MG, 1.44]]) { const bb = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.035, 4, 24), new THREE.MeshStandardMaterial({ color: 0x0a0604, emissive: c, emissiveIntensity: 1.9 })); bb.rotation.x = PI / 2; bb.position.y = y; g.add(bb); } } // Siphon Drone: a cyan and a magenta band
     const lens = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 10), new THREE.MeshStandardMaterial({ color: 0x05070a, metalness: 0.2, roughness: 0.05, envMapIntensity: 2 })); lens.position.set(0, 1.62, 0.36); g.add(lens);
     const iris = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.025, 6, 20), W.glow(0xffc050, 2.2)); iris.position.set(0, 1.62, 0.55); g.add(iris);
     const pupil = new THREE.Mesh(new THREE.CircleGeometry(0.04, 10), W.glow(0xfff0c0, 2.4)); pupil.position.set(0, 1.62, 0.56); g.add(pupil);
@@ -8844,7 +8846,7 @@ const Hitch = (() => {
       const vb1 = new THREE.Mesh(vb.body, st); vb1.scale.setScalar(0.45); vb1.rotation.y = PI / 2; v.add(vb1);
       const ve = new THREE.Mesh(vb.edge, amber); ve.scale.setScalar(0.45); ve.rotation.y = PI / 2; v.add(ve); }
     g.userData.ring = petals;
-    const L = new THREE.PointLight(0xffb030, 6, 8, 1.6); L.position.y = 1.6; g.add(L); return g;
+    const L = new THREE.PointLight(nm ? 0xc060ff : 0xffb030, 6, 8, 1.6); L.position.y = 1.6; g.add(L); return g;
   }
   function spawnDrones(b, n) {
     n -= G.ents.filter((q) => q.isAdd && q.alive && q.name === 'Aegis Drone').length; if (n <= 0) return; // never stack past the intended count
@@ -8873,12 +8875,14 @@ const Hitch = (() => {
     S.heat = 0; yield 0.6;
   }
   function* eclipse(b, lvl, dur = 3) {
-    const S = b.state, U = S.sky.material.uniforms; const i0 = S.sun.intensity, i1 = [2.2, 1.0, 1.3][lvl], n0 = U.uNeb.value, n1 = [1.15, 1.15, 1.25][lvl], h0 = S.hemi.intensity, h1 = [0.72, 0.52, 0.62][lvl], g0 = U.uSunGlow.value, g1 = [0.9, 0.3, 0.6][lvl], c0 = U.uSunCol.value.clone(), c1 = new THREE.Color([0xfff0d8, 0xffa070, 0xc8b0ff][lvl]);
-    const hs0 = S.hemi.color.clone(), hs1 = new THREE.Color([0x34448a, 0x5a3438, 0x34306a][lvl]), f0 = S.fog.color.clone(), f1 = new THREE.Color([0x070b1e, 0x120810, 0x08061a][lvl]), fd0 = S.fog.density, fd1 = [0.0065, 0.006, 0.0042][lvl], pz0 = S.planetG.position.clone(), pz1 = S.ppos.clone().multiplyScalar([1, 0.96, 0.86][lvl]), sc0 = S.planetG.scale.x, sc1 = [1, 1.03, 1.1][lvl];
+    const S = b.state, U = S.sky.material.uniforms; const i0 = S.sun.intensity, i1 = [2.2, 1.0, 1.3, ECL3.sun][lvl], n0 = U.uNeb.value, n1 = [1.15, 1.15, 1.25, 1.35][lvl], h0 = S.hemi.intensity, h1 = [0.72, 0.52, 0.62, ECL3.hemi][lvl], g0 = U.uSunGlow.value, g1 = [0.9, 0.3, 0.6, 0.08][lvl], c0 = U.uSunCol.value.clone(), c1 = new THREE.Color([0xfff0d8, 0xffa070, 0xc8b0ff, 0xffc8a0][lvl]);
+    const hs0 = S.hemi.color.clone(), hs1 = new THREE.Color([0x34448a, 0x5a3438, 0x34306a, 0x3a4c98][lvl]), f0 = S.fog.color.clone(), f1 = new THREE.Color([0x070b1e, 0x120810, 0x08061a, 0x030310][lvl]), fd0 = S.fog.density, fd1 = [0.0065, 0.006, 0.0042, 0.0036][lvl], pz0 = S.planetG.position.clone(), pz1 = lvl === 3 ? S.sunDir.clone().multiplyScalar(ECL3.dist) : S.ppos.clone().multiplyScalar([1, 0.96, 0.86][lvl]), sc0 = S.planetG.scale.x, sc1 = [1, 1.03, 1.1, 1.1][lvl];
+    // totality (nightmare): the planet swings across the sun along an arc at its own distance, not through the arena; and back at the kill
+    const arc = lvl === 3 || (S.eclLvl === 3), d0 = pz0.length(), d1 = pz1.length(), u0 = pz0.clone().normalize(), u1 = pz1.clone().normalize(), ca0 = S.coronaU ? S.coronaU.uA.value : 0, ca1 = lvl === 3 ? 1 : 0; S.eclLvl = lvl;
     const r0 = RIM.uRim.value.clone(), r1 = new THREE.Color(RIM_COL[lvl]), z0 = RIM.uHazeC.value.clone(), z1 = new THREE.Color(HAZE_COL[lvl]);
-    const apply = (k) => { S.sun.intensity = lerp(i0, i1, k); U.uNeb.value = lerp(n0, n1, k); S.hemi.intensity = lerp(h0, h1, k); U.uSunGlow.value = lerp(g0, g1, k); W.colorLerp(U.uSunCol.value, c0, c1, k); S.sun.color.copy(U.uSunCol.value); W.colorLerp(RIM.uRim.value, r0, r1, k); W.colorLerp(RIM.uHazeC.value, z0, z1, k); W.colorLerp(S.hemi.color, hs0, hs1, k); W.colorLerp(S.fog.color, f0, f1, k); S.fog.density = lerp(fd0, fd1, k); S.planetG.position.lerpVectors(pz0, pz1, k); S.planetG.scale.setScalar(lerp(sc0, sc1, k)); S.open = lerp(S.open, lvl * 0.5, k * 0.2); };
+    const apply = (k) => { S.sun.intensity = lerp(i0, i1, k); U.uNeb.value = lerp(n0, n1, k); S.hemi.intensity = lerp(h0, h1, k); U.uSunGlow.value = lerp(g0, g1, k); W.colorLerp(U.uSunCol.value, c0, c1, k); S.sun.color.copy(U.uSunCol.value); W.colorLerp(RIM.uRim.value, r0, r1, k); W.colorLerp(RIM.uHazeC.value, z0, z1, k); W.colorLerp(S.hemi.color, hs0, hs1, k); W.colorLerp(S.fog.color, f0, f1, k); S.fog.density = lerp(fd0, fd1, k); if (arc) S.planetG.position.copy(u0).lerp(u1, k).normalize().multiplyScalar(lerp(d0, d1, k)); else S.planetG.position.lerpVectors(pz0, pz1, k); if (S.coronaU) S.coronaU.uA.value = lerp(ca0, ca1, k * k); S.planetG.scale.setScalar(lerp(sc0, sc1, k)); S.open = lerp(S.open, Math.min(1, lvl * 0.5), k * 0.2); };
     if (dur > 0) yield* W.tween(dur, apply); else apply(1);
-    S.open = lvl * 0.5;
+    S.open = Math.min(1, lvl * 0.5);
   }
   // a phase started directly (skipping earlier enters) still shows the full escalation of the phases before it
   function skipLook(b, lvl) {
@@ -8890,17 +8894,368 @@ const Hitch = (() => {
   const clearPol = (b) => { const S = b.state; S.pol = null; for (const t of S.tiles) t.col = 0; if (S.dangerCol) setCore(b, 0); };
   const dropNow = (S, list) => { for (const i of list) { const q = S.tiles[i]; if (!q.present) continue; q.present = false; q.warn = 0; q.col = 0; q.y = -60; q.backT = 0; } };
 
-  G.bosses.push({
-    id: 'engine', name: 'PARALLAX', title: 'The Astral Engine', hint: 'A machine', color: '#20d8ff', telegraph: 0xffb030,
-    hp: 22000, radius: 2.2, aimY: 4.2, enrage: 420,
-    post: { bloom: 0.5, threshold: 0.92, radius: 0.45, exposure: 1.0, vig: 1.05, sat: 1.12, contrast: 1.12, tint: [0.97, 1.0, 1.06] },
-    music: { bpm: 122, root: 41, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 0, 3, 5, 0, 0, 6, 4],
+
+  // ======================== NIGHTMARE: "Totality" (threshold-design/parallax-nightmare-plan.md) ========================
+  // The charge stays: after a Polarize the colour that lived stays lit and the one that died burns out, and your hits only
+  // count from a lit tile (live: present, painted, and not the colour the core shows). Slow always-on Meridian beams go out
+  // during each Polarize cast, Siphon Drones drink lit tiles, and the floor shrinks on a fixed script from 24 tiles to the
+  // 3 by 3 ring while the eclipse goes total. Every piece below is a nightmare-only path: Normal's functions and their random
+  // calls are untouched. Levers:
+  const NM_HP = 20000, NM_AT = [1, 0.86, 0.70];
+  const GATE = { off: 0.15 }; // damage off a live tile (the core and the drones)
+  const POL = { time: [4.2, 4.2, 4.2, 4.0, 4.0, 3.8], flips: [[1, 2], [1, 2], [1, 3], [1, 3], [1, 3], [1, 3]], lastWindow: 1.0, firstAt: 0.9, gap: 0.9, teachTime: [3.8, 4.0] };
+  const SWEEP = { w: 0.17, arms: [2, 2, 2, 3, 3, 3], dmg: 330, outFrom: 0.8, relight: 0.4, armT: 1.3, creep: 0.3 };
+  const DRONE = { innerBias: 6, hp: 450, speed: 2.6, drink: 1.6, fromStep: 2, cap: [0, 0, 1, 1, 1, 1], blastKills: true };
+  const CYCLE = { perStep: 2, breath: 3.5, novaWaves: 2, novaFrom: 1, clockFrom: 6, clockDur: 4 }; // (cast-budget levers pulled: Supernova 3 to 2 waves, Overclock dropped from Totality; it stays in phase II)
+  const FINALE = 0.10; // below this health the breath in each Totality cycle is dropped
+  const ECL3 = { sun: 0.25, hemi: 0.4, dist: 1700 }; // totality: sun light, hemisphere floor (the hero still reads), planet distance
+  const EMBER = 0x5a1608, CTR = 24;
+  const tileAt = (dx, dz) => (3 + dz) * N + (3 + dx);
+  const ring = (i) => Math.max(Math.abs((i % N) - 3), Math.abs(Math.floor(i / N) - 3));
+  const P2_DROP = [0, 6, 42, 48, 3, 21, 27, 45];
+  // Swallow: four tiles at a time, always a symmetric set, removed on entering Totality steps 1 to 4
+  const SWALLOW = [null, [[2, 2], [-2, 2], [2, -2], [-2, -2]], [[2, 0], [-2, 0], [0, 2], [0, -2]], [[2, 1], [-2, -1], [-1, 2], [1, -2]], [[2, -1], [-2, 1], [1, 2], [-1, -2]]].map((l) => l && l.map(([dx, dz]) => tileAt(dx, dz)));
+  // the boards the fight can have (sets of present tile indices), for the tools
+  const BOARDS = (() => {
+    const all = [...Array(N * N).keys()], o = { 'full 7x7': all, 'phase II': all.filter((i) => !P2_DROP.includes(i)) };
+    let cur = all.filter((i) => ring(i) <= 2); o['5x5 (step 0)'] = cur;
+    for (let st = 1; st <= 4; st++) { cur = cur.filter((i) => !SWALLOW[st].includes(i)); o[['', 'no corners (step 1)', 'no edge middles (step 2)', 'pinwheel (step 3)', '3x3 ring (steps 4-5)'][st]] = cur; }
+    return o;
+  })();
+  const live = (S, i) => { const q = S.tiles[i]; return !!q && q.present && q.col > 0 && !q.dead && q.col !== S.dangerCol; };
+  // a pattern is fair on a board when each colour has at least 2 present tiles (3 on boards of 12 or more) and every painted tile
+  // has a tile of the other colour among its 8 neighbours (a flip leaves 1.0 s: about 5 m at run speed). isP(i): tile i is present.
+  function patOk(isP, pat, inv = 0) {
+    const col = (i) => (i === CTR || !isP(i)) ? 0 : ((pat(i % N, Math.floor(i / N)) ^ inv) ? 1 : 2); let n = 0; const c = [0, 0, 0];
+    for (let i = 0; i < N * N; i++) { const k = col(i); if (!k) continue; n++; c[k]++; }
+    const min = n >= 12 ? 3 : 2; if (c[1] < min || c[2] < min) return false;
+    for (let i = 0; i < N * N; i++) { const k = col(i); if (!k) continue; const ix = i % N, iz = Math.floor(i / N); let ok = false;
+      for (let dz = -1; dz <= 1 && !ok; dz++) for (let dx = -1; dx <= 1 && !ok; dx++) { const x = ix + dx, z = iz + dz; if ((dx || dz) && x >= 0 && z >= 0 && x < N && z < N && col(z * N + x) === 3 - k) ok = true; }
+      if (!ok) return false; }
+    return true;
+  }
+  const deckOf = (isP) => PATTERNS.map((p, k) => k).filter((k) => patOk(isP, PATTERNS[k], 0) && patOk(isP, PATTERNS[k], 1));
+  const deckCache = {};
+  function deckFor(S) {
+    const isP = (i) => S.tiles[i].present && S.tiles[i].warn <= 0, key = S.tiles.map((q, i) => isP(i) ? 1 : 0).join('');
+    const d = deckCache[key] || (deckCache[key] = deckOf(isP)); return d.length ? d : [2]; // (the checkerboard, if a board ever had no fair pattern)
+  }
+  // flip times for one cast: n in [lo, hi], the first no earlier than POL.firstAt, at least POL.gap apart, the last leaving lastWindow
+  function flipSchedule(time, lo, hi, r) {
+    let n = lo + Math.floor(r() * (hi - lo + 1)); const a = POL.firstAt, e = time - POL.lastWindow;
+    while (n > 0 && e - a < (n - 1) * POL.gap) n--; if (n <= 0 || e < a) return [];
+    const slack = e - a - (n - 1) * POL.gap, pts = []; for (let i = 0; i < n; i++) pts.push(r() * slack); pts.sort((x, y) => x - y);
+    return pts.map((x, i) => a + x + i * POL.gap);
+  }
+  const nmRnd = () => rnd();
+  const OFFS = [-1.5, 0, 1.5], OFFS_M = [-1.7, -0.85, 0, 0.85, 1.7]; // sample spots on a tile (the autopilot; melee looks closer to the core)
+
+  // ---- everything nightmare shows is built here, hidden (nothing is made mid-fight but the drones, like Normal's)
+  function nmBuild(b, S, g) {
+    Object.assign(S, { nm: true, siphons: [], cyc: 0, step: -1, stepAt: [], swallowed: [], holdStep: undefined, onLive: false, onT: null, ecl3: false, shellK: 1, shellHit: 0, blowK: 0, cine: false });
+    // Aegis shell: a translucent amber hex shell around the core, up whenever the player is not on a live tile
+    S.aegisU = { uA: { value: 1 }, uHit: { value: 0 }, uT: S.tileT || { value: 0 }, uC: { value: new THREE.Color(0xffb030) } };
+    S.aegis = new THREE.Mesh(new THREE.IcosahedronGeometry(2.75, 4), new THREE.ShaderMaterial({ uniforms: S.aegisU,
+      vertexShader: 'varying vec3 vP; varying vec3 vN; varying vec3 vV; void main(){ vP=position; vec4 mv=modelViewMatrix*vec4(position,1.0); vN=normalMatrix*normal; vV=-mv.xyz; gl_Position=projectionMatrix*mv; }',
+      fragmentShader: `uniform vec3 uC; uniform float uA, uHit, uT; varying vec3 vP; varying vec3 vN; varying vec3 vV;
+        float hx(vec2 p){ const float ry = 1.7320508; vec2 h = vec2(0.5, ry * 0.5); vec2 a = mod(p, vec2(1.0, ry)) - h; vec2 c = mod(p - h, vec2(1.0, ry)) - h; vec2 u = abs(dot(a, a) < dot(c, c) ? a : c); return 0.5 - max(u.x, u.x * 0.5 + u.y * 0.866); }
+        void main(){ vec3 n = vN / max(length(vN), 1e-4), v = vV / max(length(vV), 1e-4); float f = 1.0 - clamp(abs(dot(n, v)), 0.0, 1.0);
+          vec3 on = vP / max(length(vP), 1e-4), w = pow(abs(on), vec3(4.0)); w /= max(w.x + w.y + w.z, 1e-4); vec3 q = vP * 1.7;
+          float d = hx(q.yz) * w.x + hx(q.xz) * w.y + hx(q.xy) * w.z; float line = 1.0 - smoothstep(0.0, 0.045, d);
+          float run = 0.7 + 0.3 * sin(vP.y * 3.0 - uT * 2.0);
+          float a = uA * (0.06 + 0.5 * pow(max(f, 0.0), 2.5) + line * (0.22 + 0.45 * f) * run + uHit * (0.25 + 0.6 * line));
+          gl_FragColor = vec4(max(uC * a, vec3(0.0)), 1.0); }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    S.aegis.renderOrder = 3; S.aegis.visible = false; S.rig.add(S.aegis);
+    // conduit: while you stand on a live tile, a thin steady arc in its colour from the tile to the core
+    S.condU = { uC: { value: new THREE.Color(CY) }, uA: { value: 0 }, uT: S.tileT || { value: 0 } };
+    const cg = new THREE.CylinderGeometry(1, 1, 1, 10, 1, true); cg.translate(0, 0.5, 0);
+    S.cond = new THREE.Group(); S.cond.visible = false; g.add(S.cond);
+    S.condCore = new THREE.Mesh(cg, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })); S.condCore.scale.set(0.035, 1, 0.035); S.cond.add(S.condCore);
+    S.condGlow = new THREE.Mesh(cg, new THREE.ShaderMaterial({ uniforms: S.condU, vertexShader: 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv=uv; vec4 mv=modelViewMatrix*vec4(position,1.0); vN=normalMatrix*normal; vV=-mv.xyz; gl_Position=projectionMatrix*mv; }',
+      fragmentShader: 'uniform vec3 uC; uniform float uA, uT; varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vec3 n=vN/max(length(vN),1e-4); vec3 v=vV/max(length(vV),1e-4); float f=pow(clamp(abs(dot(n,v)),0.0,1.0),2.0); float e=smoothstep(0.0,0.08,vUv.y)*smoothstep(1.0,0.85,vUv.y); float pu=0.75+0.25*sin(vUv.y*30.0-uT*6.0); float a=f*e*pu*uA*0.8; gl_FragColor=vec4(max(uC*a,vec3(0.0)),1.0); }',
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false })); S.condGlow.scale.set(0.2, 1, 0.2); S.cond.add(S.condGlow);
+    // corona: a bright ring around the planet's dark disc once it covers the sun (a camera-facing plane through the planet's centre)
+    S.coronaU = { uA: { value: 0 }, uRp: { value: 0.45 }, uT: S.tileT || { value: 0 } };
+    S.corona = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({ uniforms: S.coronaU, vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader: `uniform float uA, uRp, uT; varying vec2 vUv;
+        void main(){ vec2 q = (vUv - 0.5) * 2.0; float r = length(q), ang = atan(q.y, q.x + 1e-5); float d = r - uRp;
+          float st = 0.7 + 0.3 * sin(ang * 13.0 + uT * 0.05) * sin(ang * 7.0 - uT * 0.03);
+          float a = d < -0.004 ? 0.0 : (exp(-max(d, 0.0) * 7.0 / max(st, 0.2)) * 0.55 + exp(-(d / 0.012) * (d / 0.012)) * 1.4) * (1.0 - smoothstep(0.85, 1.0, r));
+          vec3 c = mix(vec3(1.0, 0.86, 0.66), vec3(0.75, 0.82, 1.0), clamp(d * 4.0, 0.0, 1.0)); gl_FragColor = vec4(max(c * a * uA, vec3(0.0)), 1.0); }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    S.corona.scale.setScalar(S.PR * 2.3); S.corona.renderOrder = -1; S.corona.visible = false; S.planetG.add(S.corona);
+    // hits on the shell (off the lit floor) play the shield sound
+    b.onDamaged = (amt) => { if (b.dmgTaken < 1) shieldHit(S); };
+  }
+  function shieldHit(S) { S.shellHit = 1; if (G.headless || G.now - (S.shT || 0) < 0.22) return; S.shT = G.now; Sound.sfx('shield', 0.35, 1.6); }
+
+  // ---- the gate: every frame, from the tile the player stands on
+  function nmUpdate(b, dt) {
+    const S = b.state, p = G.player, i = p ? tIdx(p.pos.x, p.pos.z) : -1, on = !!p && p.alive && i >= 0 && live(S, i);
+    S.onLive = on; S.onT = on ? S.tiles[i] : null;
+    const k = on ? 1 : GATE.off; b.dmgTaken = k;
+    for (let j = S.siphons.length - 1; j >= 0; j--) { const e = S.siphons[j]; if (!e.alive) { S.siphons.splice(j, 1); continue; } e.dmgTaken = k; }
+    S.shellHit = Math.max(0, S.shellHit - dt * 4);
+  }
+  // ---- Meridian: one slow, always-on set of beams; out (harmless tracers, still) from 0.8 s into each Polarize until 0.4 s after
+  // its blast, then a 1.3 s arm-up at the angle where they stopped, creeping the way they will turn (direction re-rolled each relight)
+  function ensureSweep(b) {
+    const S = b.state; if (S.sweep && S.sweep.nm) return S.sweep;
+    const n = 2; S.sweep = { nm: true, n, a: b.angToPlayer() + PI / n, w: 0, tw: SWEEP.w, arm: 0, t: Infinity, len: 24, rev: -1, warn: 0, out: true, relightT: 0, nextDir: 1 };
+    return S.sweep;
+  }
+  const armsNow = (S) => S.step >= 0 ? SWEEP.arms[Math.min(5, S.step)] : 2;
+  function relight(b) {
+    const S = b.state, sw = ensureSweep(b); sw.out = false; sw.relightT = 0; sw.arm = SWEEP.armT; sw.n = armsNow(S); sw.tw = SWEEP.w * (sw.nextDir || 1);
+    for (let i = 0; i < 4; i++) S.lasers[i].grp.visible = i < sw.n; Sound.sfx('charge', 0.7, 0.8);
+  }
+  function beamsOut(S) { const sw = S.sweep; if (sw && sw.nm && !sw.out) { sw.out = true; sw.relightT = 0; Sound.sfx('warn', 0.5, 0.6); } }
+  function nmSweep(b, sw, dt) {
+    const S = b.state, p = G.player;
+    if (G.state === 'win') { S.sweep = null; for (const L of S.lasers) L.grp.visible = false; return; }
+    if (sw.out) { sw.w = damp(sw.w, 0, 6, dt); if (sw.relightT > 0) { sw.relightT -= dt; if (sw.relightT <= 0) relight(b); } }
+    else if (sw.arm > 0) { sw.arm -= dt; sw.w = sw.tw * SWEEP.creep; if (sw.arm <= 0) Sound.sfx('laser'); }
+    else sw.w = damp(sw.w, sw.tw, 3, dt);
+    sw.a += sw.w * dt;
+    if (!sw.out && sw.arm <= 0 && p && p.alive && p.pos.y < 1.6) { const pr = Math.hypot(p.pos.x, p.pos.z), pa = Math.atan2(p.pos.x, p.pos.z); for (let i = 0; i < sw.n; i++) { const L = S.lasers[i]; L.cd -= dt; const da = angDiff(sw.a + i / sw.n * TAU, pa); if (pr < sw.len && Math.abs(Math.sin(da) * pr) < 0.75 && Math.cos(da) > 0 && L.cd <= 0) { L.cd = 1.0; p.hurt(SWEEP.dmg, { blockable: true, src: { name: 'Meridian' } }); FX.impact(p.pos.x, 1.2, p.pos.z, 0xff5030, 1); } } }
+  }
+  // seconds until a beam reaches (x, z) (0 when one is on it). Out: after the relight, in either direction.
+  function beamT(S, x, z) {
+    const sw = S.sweep; if (!sw || !sw.nm) return Infinity;
+    const pr = Math.max(Math.hypot(x, z), 1), pa = Math.atan2(x, z), m = 0.9 / pr, w = SWEEP.w + 0.02;
+    const one = (sg, extra) => { let best = Infinity; for (let k = 0; k < sw.n; k++) { let gap = angDiff(sw.a + k / sw.n * TAU, pa) * sg; if (gap < -0.12 - m) gap += TAU; const tt = Math.max(0, gap - m) / w + extra; if (tt < best) best = tt; } return best; };
+    if (sw.out) { const base = (S.pol ? S.pol.t + SWEEP.relight : Math.max(0, sw.relightT)) + SWEEP.armT; return Math.min(one(1, base), one(-1, base)); }
+    return one(Math.sign(sw.tw) || 1, Math.max(0, sw.arm));
+  }
+  // which wedge between the beams a point is in (-1 when the beams are out or arming: free to cross)
+  function wedge(S, x, z) { const sw = S.sweep; if (!sw || !sw.nm || sw.out || sw.arm > 0.9) return -1; const pa = Math.atan2(x, z), rel = ((pa - sw.a) % TAU + TAU) % TAU; return Math.floor(rel / (TAU / sw.n)); }
+
+  // ---- Polarize, nightmare: survivors keep their colour, the dying colour burns out; flips random per cast; beams out
+  function* polarizeNM(b, time, fl) {
+    const S = b.state, pat = PATTERNS[pick(deckFor(S))], inv = rnd() < 0.5 ? 1 : 0;
+    for (const t of S.tiles) { t.dead = false; t.drain = 0; t.col = t.present && t.warn <= 0 && !(t.ix === 3 && t.iz === 3) ? ((pat(t.ix, t.iz) ^ inv) ? 1 : 2) : 0; }
+    let col = rndi(1, 2); setCore(b, col, true); Sound.sfx('charge', 0.8);
+    const flipAt = flipSchedule(time, fl[0], fl[1], nmRnd); S.pol = { t: time, nm: true, flips: flipAt.length };
+    const sw = S.sweep; if (sw && sw.nm) sw.nextDir = rnd() < 0.5 ? 1 : -1;
+    yield* b.cast({ name: 'Polarize', time, onTick: (k, cs) => { S.pol.t = time - cs.t; if (cs.t >= SWEEP.outFrom) beamsOut(S); if (flipAt.length && cs.t >= flipAt[0]) { flipAt.shift(); col = 3 - col; setCore(b, col, true); FX.flash(col === 1 ? CY : MG, 0.08, 6); } } });
+    S.pol = null; const p = G.player, hex = col === 1 ? CY : MG; let n = 0;
+    if (DRONE.blastKills) for (const e of S.siphons) { if (!e.alive) continue; const j = tIdx(e.pos.x, e.pos.z); if (j >= 0 && S.tiles[j].col === col) { FX.pillar(e.pos.x, e.pos.z, { r: 1.3, h: 10, color: hex, dur: 0.5 }); e.die(); } }
+    for (const t of S.tiles) { if (t.col === col) { t.flash = 1; if (!G.headless && (n++ % 2 === 0 || Math.hypot(t.x - p.pos.x, t.z - p.pos.z) < 7)) FX.pillar(t.x, t.z, { r: 1.9, h: 9, color: hex, dur: 0.45, mult: 1.2 }); FX.burst(t.x, 0.2, t.z, { n: 5, color: hex, speed: [1, 4], up: 6, life: [0.3, 0.8], radius: 1.8 }); } }
+    Sound.sfx('zap'); Sound.sfx('boom', 0.8); FX.shake(0.5); FX.flash(hex, 0.1, 5);
+    const ti = tIdx(p.pos.x, p.pos.z); if (p.alive && ti >= 0 && S.tiles[ti].col === col) p.hurt(380, { blockable: true, src: { name: 'Polarize' } });
+    for (const t of S.tiles) if (t.col === col) { t.col = 0; t.dead = true; }
+    setCore(b, 0); if (S.sweep && S.sweep.nm && S.sweep.out) S.sweep.relightT = SWEEP.relight;
+    yield 0.9;
+  }
+  // a phase change or the last blow in mid-cast: the condemned colour goes dark, the rest stay lit, no damage
+  function clearPolNM(b) { const S = b.state; if (!S.pol && !S.dangerCol) return; const c = S.dangerCol; S.pol = null; if (c) for (const t of S.tiles) if (t.col === c) { t.col = 0; t.dead = true; } if (S.dangerCol) setCore(b, 0); }
+  // every per-mechanic state a cut-off coroutine can leave behind (Co.stopTag('phase') skips cleanup) is reset here
+  function nmReset(b) {
+    const S = b.state; clearPolNM(b); beamsOut(S); if (S.sweep) S.sweep.relightT = 0;
+    for (const e of S.siphons.slice()) if (e.alive) e.die(); S.siphons = []; for (const t of S.tiles) t.drain = 0;
+    S.heat = 0; if (S.cine) { S.cine = false; Cam.release(); }
+  }
+
+  // ---- Siphon Drone: rises from a dead tile away from you, drifts to your tile (or the nearest live one) and drinks it dark
+  function siphon(b, near) {
+    const S = b.state, p = G.player, idx = (t) => t.iz * N + t.ix;
+    const pool = S.tiles.filter((t) => t.present && t.warn <= 0 && idx(t) !== CTR && !live(S, idx(t))), far = (t) => Math.hypot(t.x - p.pos.x, t.z - p.pos.z);
+    let cand = pool.filter((t) => near ? far(t) > 7 && far(t) < 15 : far(t) > 9); if (!cand.length) cand = pool.length ? pool : S.tiles.filter((t) => t.present && idx(t) !== CTR);
+    cand.sort((a, c) => (near ? far(a) - far(c) : far(c) - far(a))); const t = pick(cand.slice(0, Math.max(1, Math.ceil(cand.length / 2)))); if (!t) return null;
+    FX.pillar(t.x, t.z, { r: 1.2, h: 14, color: 0xc060ff, dur: 0.7 }); Sound.sfx('shield', 0.8, 0.6);
+    const e = b.spawnAdd({ name: 'Siphon Drone', hp: DRONE.hp, x: t.x, z: t.z, y: -2.5, radius: 0.9, aimY: 1.5, mesh: droneMesh(true), color: 0xc060ff,
+      onDamaged(amt, info, ent) { if (ent.dmgTaken < 1) shieldHit(S); },
+      update(e) { e.rise = Math.min(1, (e.rise || 0) + G.dt * 1.25); e.pos.y = lerp(-2.5, 0.3, smooth(e.rise)) + Math.sin(G.now * 3 + e.pos.x) * 0.15; if (G.headless) return; const dg = e.group.children[0].userData; dg.ring.rotation.y += G.dt * (e.drink ? 4 : 1.4); dg.flame.value = G.now;
+        if (e.drink && vrand() < G.dt * 40) { const k = vrand(), q = e.drink; FX.burst(lerp(q.x, e.pos.x, k), lerp(0.1, e.pos.y + 1.5, k), lerp(q.z, e.pos.z, k), { n: 1, color: 0xffb030, speed: [0, 0.6], life: [0.2, 0.4], size: [0.15, 0.3] }); } },
+      *run(e) {
+        yield 0.9;
+        while (e.alive) {
+          const pp = G.player, pi = tIdx(pp.pos.x, pp.pos.z), pt = pi >= 0 ? S.tiles[pi] : null; let tgt = null;
+          // the tile you stand on while it is painted (a condemned one too: lead it there and step off late), else the nearest live tile to you
+          // the tile you stand on, unless it is next to the core and an outer live tile is left (melee lives on that ring)
+          const inner = (q) => Math.abs(q.ix - 3) <= 1 && Math.abs(q.iz - 3) <= 1;
+          if (pt && pt.present && pt.col && !pt.dead && pt.warn <= 0 && pi !== CTR && !inner(pt)) tgt = pt;
+          else { let bd = 1e9; for (let i = 0; i < S.tiles.length; i++) { if (!live(S, i) || S.tiles[i].warn > 0 || i === CTR) continue; const q = S.tiles[i], d = Math.hypot(q.x - pp.pos.x, q.z - pp.pos.z) + (inner(q) ? DRONE.innerBias : 0); if (d < bd) { bd = d; tgt = q; } } }
+          if (!tgt) { yield 0.2; continue; }
+          const dx = tgt.x - e.pos.x, dz = tgt.z - e.pos.z, d = Math.hypot(dx, dz);
+          if (d > 0.35) { const s = Math.min(d, DRONE.speed * G.dt); e.pos.x += dx / d * s; e.pos.z += dz / d * s; e.facing = dampAng(e.facing, Math.atan2(dx, dz), 6, G.dt); yield; continue; }
+          if (!live(S, tgt.iz * N + tgt.ix)) { yield; continue; } // hovering over a condemned tile: it waits for you
+          e.drink = tgt; let k = 0; Sound.sfx('charge', 0.5, 1.6);
+          while (e.alive && k < DRONE.drink && live(S, tgt.iz * N + tgt.ix)) { k += G.dt; tgt.drain = k / DRONE.drink; yield; }
+          tgt.drain = 0; e.drink = null;
+          if (e.alive && k >= DRONE.drink) { tgt.col = 0; tgt.dead = true; tgt.flash = 0.6; Sound.sfx('shatter', 0.5, 1.4); if (!G.headless) FX.burst(tgt.x, 0.3, tgt.z, { n: 18, color: 0xffb030, color2: 0xc060ff, speed: [1, 5], up: 4, life: [0.3, 0.7], radius: 1.6 }); yield 0.4; }
+        }
+      } });
+    e.drink = null; S.siphons.push(e); return e;
+  }
+  const siphonsAlive = (S) => S.siphons.filter((e) => e.alive).length;
+
+  // ---- the phases
+  function* chargeRun(b) {
+    const S = b.state; nmReset(b); yield 1;
+    yield* polarizeNM(b, POL.teachTime[0], [0, 0]); // the teaching beat: the survivors stay lit, the shell is up until you stand on one
+    ensureSweep(b).relightT = 0.01; // Meridian lights (2 arms) and stays on
+    while (true) { yield* lance(b); yield* polarizeNM(b, POL.teachTime[0], [1, 1]); yield* lance(b, 2); yield* polarizeNM(b, POL.teachTime[0], [1, 2]); }
+  }
+  function* siphonEnter(b) {
+    const S = b.state; nmReset(b); Sound.sfx('roar', 0.8, 2); FX.flash(0xff6030, 0.3, 1.5); FX.shake(0.7); Co.start(eclipse(b, 1), 'fight'); Co.start(Post.lerpTo({ bloom: 0.58, tint: [1.04, 0.98, 1.0] }, 3), 'fight');
+    dropTiles(b, P2_DROP, { warn: 3.2 }); S.conduitU.uC.value.setHex(0xff6030); S.trim.emissive.setHex(0xff7a30); yield 3.6;
+    ensureSweep(b); relight(b);
+  }
+  function* siphonRun(b) {
+    const S = b.state; siphon(b, true); let k = 0; // straight away, in view
+    // then a drone on every other loop if none is alive (one per loop kept a caster on drones half the phase: 75-90 s)
+    while (true) { yield* polarizeNM(b, POL.teachTime[1], [1, 2]); if (k++ % 2 === 1 && !siphonsAlive(S)) siphon(b); yield* lance(b, 2); yield* overclock(b, 3, CYCLE.clockDur); }
+  }
+  // Totality: Critical Mass, then the planet slides fully across the sun (eclipse level 3) in one shot from the near side of the
+  // board; the outer ring falls away in silhouette and the lit tiles become the light in the scene
+  function* totalityEnter(b) {
+    const S = b.state; nmReset(b); b.immune = true;
+    const outer = []; for (const t of S.tiles) if (t.present && ring(t.iz * N + t.ix) === 3) outer.push(t.iz * N + t.ix); dropTiles(b, outer, { warn: 3.8 });
+    yield* b.cast({ name: 'Critical Mass', time: 2.6, onTick: (k) => { S.heat = k; FX.shake(k * 0.5); } });
+    Sound.sfx('bigboom'); Sound.sfx('shatter'); FX.flash(0xd8c8ff, 0.4, 1.6); FX.shake(1.3); FX.explode(0, 4.2, 0, 0xb080ff, 9, 0xe0d0ff);
+    Co.start(eclipse(b, 3, 3.4), 'fight'); Co.start(Post.lerpTo({ bloom: 0.66, threshold: 0.88, tint: [1.0, 0.97, 1.08], exposure: 1.06 }, 3), 'fight');
+    S.conduitU.uC.value.setHex(0x8a40ff); S.trim.emissive.setHex(0x9a50ff);
+    const sx = -S.sunDir.x, sz = -S.sunDir.z, sl = Math.hypot(sx, sz) || 1, ux = sx / sl, uz = sz / sl, lk = [S.sunDir.x * 40, 4 + S.sunDir.y * 40, S.sunDir.z * 40];
+    S.cine = true; Co.start(Cam.shot([ux * 24 + uz * 6, 6.5, uz * 24 - ux * 6], [0, 4.5, 0], [ux * 19 - uz * 3, 3.2, uz * 19 + ux * 3], lk, 4.4, 50), 'phase');
+    yield 4.4; S.cine = false; Cam.release(); S.ecl3 = true; S.cyc = 0; S.step = 0;
+    relight(b);
+  }
+  function* totalityRun(b) {
+    const S = b.state;
+    while (true) {
+      const st = S.holdStep !== undefined ? S.holdStep : Math.min(5, Math.floor(S.cyc / CYCLE.perStep)); S.step = st;
+      if (S.stepAt[st] === undefined) S.stepAt[st] = Math.round(G.ft * 10) / 10;
+      if (st >= 3) Music.intensity(3);
+      if (st >= 1 && st <= 4 && !S.swallowed[st]) { // Swallow: the red warning with one Lance during it, then the tiles fall
+        S.swallowed[st] = true; dropTiles(b, SWALLOW[st], { warn: 3.2 }); yield* lance(b, 1);
+        let w = 0; while (w < 2 && SWALLOW[st].some((i) => S.tiles[i].present)) { w += G.dt; yield; }
+      }
+      yield* polarizeNM(b, POL.time[st], POL.flips[st]);
+      if (st >= DRONE.fromStep) { const want = DRONE.cap[st] - siphonsAlive(S); for (let i = 0; i < want; i++) siphon(b); }
+      yield* lance(b, 2);
+      const odd = S.cyc % 2 === 1;
+      if (st >= CYCLE.novaFrom && odd) yield* supernova(b, CYCLE.novaWaves);
+      else if (st >= CYCLE.clockFrom && !odd) yield* overclock(b, 3, CYCLE.clockDur);
+      if (b.hp > b.maxHp * FINALE) yield CYCLE.breath; // the guaranteed cast pocket: only the beams run
+      S.cyc++;
+    }
+  }
+  // Blackout (the last blow, 24 s into the enrage): every remaining tile gets the red warning, the lights go out from the
+  // outside in, the floor drops, and the blow lands as your tile goes. He can still be killed until then.
+  function* blackout(b) {
+    const S = b.state; nmReset(b); S.sweep = null; for (const L of S.lasers) L.grp.visible = false; Music.stop(0.3);
+    yield* b.cast({ name: 'Blackout', time: 1.6, onTick: (k) => { S.heat = k; } });
+    Sound.sfx('roar', 0.8, 0.6); FX.flash(0x100018, 0.5, 1.2);
+    const pres = S.tiles.map((t, i) => i).filter((i) => S.tiles[i].present), top = Math.max(0, ...pres.map(ring));
+    for (const i of pres) { const t = S.tiles[i]; t.col = 0; t.dead = false; t.warn = 3.4 + (top - ring(i)) * 0.45; t.back = 0; } Sound.sfx('warn', 1.5, 0.5);
+    let w = 0; const p = G.player;
+    while (w < 8) { w += G.dt; const i = tIdx(p.pos.x, p.pos.z); if (!p.alive) break; if (w > 3.4 && (i < 0 || !S.tiles[i].present)) { FX.flash(0x000000, 0.7, 1.5); Sound.sfx('bigboom', 0.8); p.hurt(9999, { blockable: false, src: 'enrage', pierce: true }); break; } yield; }
+    while (true) yield 1;
+  }
+  // the kill: the core's panels blow off, the planet slides away and sunlight floods back, every tile flashes white and settles
+  function* nmDeath(b) {
+    const S = b.state; nmReset(b); S.sweep = null; for (const L of S.lasers) L.grp.visible = false; S.onT = null; S.onLive = false;
+    for (const t of S.tiles) if (t.present) { t.col = 0; t.dead = false; t.flash = 1.2; t.warn = 0; }
+    const a = Cam.yaw + 0.6, r = 16; Cam.cine = { pos: new V3(-Math.sin(a) * r, 7, -Math.cos(a) * r), look: new V3(0, 4.2, 0), fov: 46 };
+    for (let i = 0; i < 6; i++) { FX.explode((vrand() - 0.5) * 3, 4.2 + (vrand() - 0.5) * 2, (vrand() - 0.5) * 3, 0xb080ff, 3 + i * 0.5, 0xffffff); yield 0.1; }
+    G.timeScale = 1; Sound.sfx('shatter'); Sound.sfx('bigboom', 0.9);
+    Co.start(eclipse(b, 0, 2.0), 'sys'); Co.start(Post.lerpTo(Object.assign({}, b.def.post), 2.0), 'sys');
+    let t = 0; while (t < 1.2) { t += G.dt; S.blowK = 9 * smooth(t / 1.2); yield; }
+    FX.explode(0, 4.2, 0, 0xffffff, 12, 0xffe8c8); FX.flash(0xfff0d8, 0.6, 1); S.rig.visible = false; yield 0.8;
+  }
+  // music: the base layers by phase, and from Totality step 3 a driving bass and snare on top
+  function nmMusic(base) {
+    return Object.assign({}, base, { layers: base.layers.concat([{ v: 'bass', from: 3, pat: '0.0.0.0.0.0.3.5.', oct: 0, len: 1, vol: 0.1 }, { v: 'snare', from: 3, pat: '....x..x....x.xx', vol: 0.17 }, { v: 'lead', from: 3, pat: ['7...5...4..2.0..', '9...7...5..4.2..'], oct: 2, len: 3, vol: 0.05 }]) });
+  }
+
+  // ---- what the nightmare looks like each frame (shell, conduit, corona)
+  function nmLook(b, dt) {
+    const S = b.state, p = G.player;
+    S.shellK = damp(S.shellK, S.onLive || b.transitioning || !b.alive ? 0 : 1, 14, dt);
+    S.aegis.visible = S.shellK > 0.01 && S.rig.visible; S.aegisU.uA.value = S.shellK; S.aegisU.uHit.value = S.shellHit;
+    const on = S.onT && p && b.alive; S.cond.visible = !!on;
+    if (on) { const t = S.onT, hex = t.col === 1 ? CY : MG; S.condU.uC.value.setHex(hex); S.condU.uA.value = 1; S.condCore.material.color.setHex(hex).multiplyScalar(1.6);
+      _v.set(0, S.rig.position.y, 0).sub(_cv.set(t.x, 0.06, t.z)); const L = _v.length(); S.cond.position.copy(_cv); S.cond.quaternion.setFromUnitVectors(_up, _v.normalize()); S.cond.scale.set(1, L, 1); }
+    const cv = S.corona.material.uniforms.uA.value; S.corona.visible = cv > 0.002;
+    if (S.corona.visible) { S.corona.lookAt(camera.position); const D = camera.position.distanceTo(S.planetG.position), R = S.PR * S.planetG.scale.x, k = Math.min(0.98, R / Math.max(D, 1)); S.coronaU.uRp.value = R / Math.sqrt(1 - k * k) / (S.PR * 2.3 * S.planetG.scale.x); }
+  }
+
+  // ---- the autopilot's view of the nightmare
+  function nmDanger(b, x, z) {
+    const S = b.state; let best = Infinity; const i = tIdx(x, z);
+    // (the condemned colour reads as about to fire: a cast started on it is not worth finishing at a sixth of the damage)
+    if (i >= 0) { const q = S.tiles[i]; if (q.warn > 0) best = Math.max(0, q.warn - 0.5); if (S.pol && q.col === S.dangerCol) best = Math.min(best, S.pol.t, 0.6); }
+    return Math.min(best, beamT(S, x, z));
+  }
+  // the bot stands on the best live tile it can reach without crossing a beam (near, far from the next beam, not being drunk),
+  // targets a drone first, and does not start a planted cast it cannot finish before a beam, a Lance or a flip reaches it.
+  // Bot.sideBlind: ignores the lit floor (plays it like Normal: near the core, in the middle of its wedge). Must fail.
+  function nmBot(b, p) {
+    const S = b.state, melee = !!p.cls.melee, pw = wedge(S, p.pos.x, p.pos.z), sw = S.sweep;
+    const h = { avoid: (x, z) => { const i = tIdx(x, z); if (i < 0 || !S.tiles[i].present) return 5000; const wq = wedge(S, x, z); if (pw >= 0 && wq >= 0 && wq !== pw) return true; if (beamT(S, x, z) < 0.15) return true;
+      // the arena's edge test forgives half a metre, so a straight walk can cut a corner over a fallen tile: check the line itself
+      const d = Math.hypot(x - p.pos.x, z - p.pos.z), n = Math.ceil(d / 0.4); for (let k = 1; k < n; k++) { const j = tIdx(lerp(p.pos.x, x, k / n), lerp(p.pos.z, z, k / n)); if (j < 0 || !S.tiles[j].present) return 5000; } return false; } };
+    const ds = S.siphons.filter((e) => e.alive); let drone = null, dd = 1e9;
+    for (const e of ds) { const d = Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z) - (e.drink ? 6 : 0); if (d < dd) { dd = d; drone = e; } }
+    h.target = drone && (!melee || Math.hypot(drone.pos.x - p.pos.x, drone.pos.z - p.pos.z) < 5.5) ? drone : b;
+    const here = tIdx(p.pos.x, p.pos.z); let goal = null;
+    if (!Bot.sideBlind) {
+      let bs = 1e9;
+      // while the beams are out you may cross: prefer a wedge (between the beams where they stopped) that holds more lit tiles
+      const wc = []; if (sw && sw.nm && (sw.out || sw.arm > 0.9)) for (let i = 0; i < S.tiles.length; i++) if (i !== CTR && live(S, i) && S.tiles[i].warn <= 0) { const q = S.tiles[i], pa = Math.atan2(q.x, q.z), k = Math.floor((((pa - sw.a) % TAU) + TAU) % TAU / (TAU / sw.n)); wc[k] = (wc[k] || 0) + 1; }
+      for (let i = 0; i < S.tiles.length; i++) {
+        const q = S.tiles[i]; if (i === CTR || !live(S, i) || q.warn > 0 || ds.some((e) => e.drink === q)) continue;
+        // the spot on the tile with the most time before the trailing beam reaches it (you can ride a tile as the wedge turns)
+        if (melee && ring(i) > 1) continue; const OF = melee ? OFFS_M : OFFS;
+        for (const ox of OF) for (const oz of OF) {
+          let ax = q.x + ox, az = q.z + oz; const r = Math.hypot(ax, az) || 1; if (r < 3.2) continue;
+          if (melee && r > b.radius + MELEE - 0.5) continue;
+          if (pw >= 0 && wedge(S, ax, az) !== pw) continue;
+          const tt = Math.hypot(ax - p.pos.x, az - p.pos.z) / 7, bt = beamT(S, ax, az);
+          if (bt < tt + 1.0) continue;
+          let s = tt * 1.6 - Math.min(bt, 7) * 0.45 + (i === here ? -1.2 : 0) + (melee ? r * 0.15 : 0);
+          if (!melee && r > 24) s += 8;
+          if (wc.length) { const pa = Math.atan2(ax, az), k = Math.floor((((pa - sw.a) % TAU) + TAU) % TAU / (TAU / sw.n)); s -= 0.8 * Math.min(3, wc[k] || 0); }
+          if (s < bs) { bs = s; goal = [ax, az]; }
+        }
+      }
+    }
+    if (goal) { h.x = goal[0]; h.z = goal[1]; h.w = 3; }
+    else if (sw && sw.nm && !sw.out && sw.n) { // no live tile to reach: the middle of the wedge, near the core
+      const cx = p.pos.x, cz = p.pos.z, pa = Math.atan2(cx, cz); let best = 0, bd = 9;
+      for (let k = 0; k < sw.n; k++) { const m = sw.a + (k + 0.5) / sw.n * TAU, d = Math.abs(angDiff(m, pa)); if (d < bd) { bd = d; best = m; } }
+      const sg = Math.sign(sw.tw) || 1, lead = best + sg * 0.25 * TAU / sw.n, r = melee ? 4.3 : 7.5; h.x = Math.sin(lead) * r; h.z = Math.cos(lead) * r; h.w = 1.5;
+    }
+    // planted casts: none while walking to a lit tile, none that a beam, a Lance or a flip would cut off
+    const onLive = here >= 0 && live(S, here), far = goal ? Math.hypot(goal[0] - p.pos.x, goal[1] - p.pos.z) : 0;
+    // (a Lance locks 0.55 s before it fires, so it needs a margin to step out of; bullets close by cut any cast)
+    // hits from a dark tile land at GATE.off: hold every attack (a Discharge above all) until standing on the lit tile it walks to
+    if ((goal && !onLive) || b.immune) h.holdFire = true; // (and nothing into Critical Mass, when he is immune)
+    h.noCast = (goal && far > (onLive ? 1.2 : 0.8)) || Bul.threat(p.pos.x, p.pos.z, 1.8) ? 0 : Math.max(0, Math.min(nmDanger(b, p.pos.x, p.pos.z) - 0.3, Hz.threat(p.pos.x, p.pos.z) - 0.75));
+    return h;
+  }
+  // test hooks for the tools (polfuzz, engcast, nmshots, nmphase)
+  const nmTest = {
+    BOARDS, PATTERNS, POL, SWEEP, DRONE, CYCLE, GATE, N, TS, HALF, CTR, SWALLOW, P2_DROP, patOk, deckOf, flipSchedule, live, tIdx, beamT, wedge,
+    deckFor: (b) => deckFor(b.state),
+    // jump the Totality ramp to step n (the board of that step at once); hold: stay at that step (engcast)
+    setStep(b, n, hold) { const S = b.state; S.cyc = Math.max(S.cyc, n * CYCLE.perStep); for (let st = 1; st <= Math.min(4, n); st++) if (!S.swallowed[st]) { S.swallowed[st] = true; dropNow(S, SWALLOW[st]); } if (hold) S.holdStep = n; },
+  };
+
+  const MUSIC = { bpm: 122, root: 41, scale: [0, 2, 3, 5, 7, 8, 10], prog: [0, 0, 3, 5, 0, 0, 6, 4],
       layers: [
         { v: 'pulse', pat: '0.0.0.0.0.0.0.0.', oct: 0, len: 1, vol: 0.09 }, { v: 'pad', pat: '0...............', oct: 2, len: 16, vol: 0.09 }, { v: 'kick', pat: 'x...x...x...x...', vol: 0.3 },
         { v: 'hat', from: 1, pat: '..x...x...x...x.', vol: 0.14 }, { v: 'arp', from: 1, pat: '0.4.7.4.0.4.7.9.', oct: 2, len: 1, vol: 0.07 }, { v: 'snare', from: 1, pat: '....x.......x...', vol: 0.2 },
         { v: 'bass', from: 1, pat: '0..0..0.0..0..0.', oct: 0, len: 2, vol: 0.14 },
         { v: 'lead', from: 2, pat: ['0...4...7..6.4..', '2...4...9..7.4..'], oct: 2, len: 3, vol: 0.06 }, { v: 'hat', from: 2, pat: 'xxxxxxxxxxxxxxxx', vol: 0.07 }, { v: 'arp', from: 2, pat: '0479047904790479', oct: 3, len: 1, vol: 0.05 },
-      ] },
+      ] };
+  G.bosses.push({
+    id: 'engine', name: 'PARALLAX', title: 'The Astral Engine', hint: 'A machine', color: '#20d8ff', telegraph: 0xffb030,
+    hp: 22000, radius: 2.2, aimY: 4.2, enrage: 420,
+    post: { bloom: 0.5, threshold: 0.92, radius: 0.45, exposure: 1.0, vig: 1.05, sat: 1.12, contrast: 1.12, tint: [0.97, 1.0, 1.06] },
+    music: MUSIC,
     build,
     *intro(b) { yield* Cam.shot([26, 14, 26], [0, 2, 0], [10, 5, 15], [0, 4, 0], 4.4, 50); },
     phases: [
@@ -8933,8 +9288,23 @@ const Hitch = (() => {
         }
       } },
     ],
+    // ---- Nightmare ("Totality"): the charge stays and only lit tiles let you hurt it. Two short teaching phases, then Totality
+    // (70% of his health) on a floor that only shrinks, ramping every two Polarize cycles. One creeping enrage and Blackout 24 s into it.
+    nightmare: {
+      hp: NM_HP, enrage: 345, enrageBase: 40, enrageGrow: 4,
+      music: nmMusic(MUSIC),
+      lastBlow: blackout, death: nmDeath,
+      phases: [
+        { at: NM_AT[0], music: 0, run: chargeRun },
+        { at: NM_AT[1], music: 1, skipTo(b) { skipLook(b, 1); dropNow(b.state, P2_DROP); }, enter: siphonEnter, run: siphonRun },
+        { at: NM_AT[2], music: 2, skipTo(b) { skipLook(b, 2); }, enter: totalityEnter, run: totalityRun },
+      ],
+      danger: nmDanger, bot: nmBot,
+    },
+    nmTest,
     update(b, dt) {
       const S = b.state, p = G.player, t = G.now;
+      if (S.nm) nmUpdate(b, dt);
       // tiles: warning, dropping, returning
       for (const q of S.tiles) {
         if (q.warn > 0) { q.warn -= dt; if (q.warn <= 0) { q.present = false; q.col = 0; if (q.back) q.backT = q.back; Sound.sfx('boom', 0.25, 1.8); q.sx = (vrand() - 0.5) * 2.4; q.sz = (vrand() - 0.5) * 2.4; q.lost = 1; if (!G.headless) FX.burst(q.x, 0, q.z, { n: 14, color: 0xff5020, speed: [2, 6], up: 3, life: [0.3, 0.8], size: [0.1, 0.25], radius: TS * 0.45 }); } }
@@ -8942,7 +9312,8 @@ const Hitch = (() => {
       }
       // lasers
       const sw = S.sweep;
-      if (sw) {
+      if (sw && sw.nm) nmSweep(b, sw, dt);
+      else if (sw) {
         sw.arm -= dt; sw.t -= dt; if (sw.arm <= 0) { if (sw.rev > 0 && sw.t < sw.rev) { sw.rev = -1; sw.warn = 0.9; sw.tw = -sw.tw; Sound.sfx('warn', 2, 1.6); } if (sw.warn > 0) { sw.warn -= dt; sw.w = damp(sw.w, 0, 6, dt); } else sw.w = damp(sw.w, sw.tw, 3, dt); }
         sw.a += sw.w * dt;
         if (sw.arm <= 0 && sw.t > 0 && p.alive && p.pos.y < 1.6) { const pr = Math.hypot(p.pos.x, p.pos.z), pa = Math.atan2(p.pos.x, p.pos.z); for (let i = 0; i < sw.n; i++) { const L = S.lasers[i]; L.cd -= dt; const da = angDiff(sw.a + i / sw.n * TAU, pa); if (pr < sw.len && Math.abs(Math.sin(da) * pr) < 0.75 && Math.cos(da) > 0 && L.cd <= 0) { L.cd = 1.0; p.hurt(270, { blockable: true, src: { name: 'Sweep' } }); FX.impact(p.pos.x, 1.2, p.pos.z, 0xff5030, 1); } } }
@@ -8957,18 +9328,20 @@ const Hitch = (() => {
         const jit = q.warn > 0 && q.warn < 1.4 ? (1.4 - q.warn) * 0.05 : 0;
         q.m.position.set(q.x + (jit ? (vrand() - 0.5) * jit : 0), Math.max(-60, q.y) + (jit ? (vrand() - 0.5) * jit * 0.6 : 0), q.z + (jit ? (vrand() - 0.5) * jit : 0)); q.m.rotation.set(q.rx, 0, q.rz); q.m.visible = q.y > -55;
         q.flash = Math.max(0, q.flash - dt * 2.2);
-        const fall = !q.present, hex = fall ? WARN : q.warn > 0 ? WARN : COLS[q.col]; _c.setHex(hex);
-        const wave = 0.5 + 0.5 * Math.sin(t * 0.9 - Math.hypot(q.x, q.z) * 0.28); const idle = !fall && !q.warn && !q.col, ov = idle && b.phase >= 2 && !S.pol ? 0.9 * Math.pow(Math.max(0, Math.sin(t * 3.0 - Math.hypot(q.x, q.z) * 0.55)), 2) : 0; if (idle) _c.lerp(_c2.setHex(IDLE2), wave * 0.7 * (1 - ov)).lerp(_c2.setHex(0x8a46ff), ov * 0.85); q.cur.lerp(_c, Math.min(1, dt * 10));
+        const fall = !q.present, hex = fall ? WARN : q.warn > 0 ? WARN : q.dead ? EMBER : COLS[q.col]; _c.setHex(hex);
+        const wave = 0.5 + 0.5 * Math.sin(t * 0.9 - Math.hypot(q.x, q.z) * 0.28); const idle = !fall && !q.warn && !q.col && !q.dead, ov = idle && b.phase >= 2 && !S.pol ? 0.9 * Math.pow(Math.max(0, Math.sin(t * 3.0 - Math.hypot(q.x, q.z) * 0.55)), 2) : 0; if (idle) _c.lerp(_c2.setHex(IDLE2), wave * 0.7 * (1 - ov)).lerp(_c2.setHex(0x8a46ff), ov * 0.85); q.cur.lerp(_c, Math.min(1, dt * 10));
         let k; const K = q.U.uK.value;
         if (fall) { k = 2.2 * Math.max(0, 1 + (q.y - TY) / 14); K.set(1, 0.6, 0.2); }
         else if (q.warn > 0) { k = 2.0 + 1.8 * (0.5 + 0.5 * Math.sin(t * 16)); K.set(1, 0.55, 1); }
-        else if (q.col) { k = 1.05 + (S.dangerCol === q.col ? 0.55 * (0.5 + 0.5 * Math.sin(t * 10)) : 0); K.set(1, 0.12, 0.8); }
+        else if (q.dead) { k = (0.34 + 0.1 * Math.sin(t * 1.7 + q.x * 0.7)) * (S.ecl3 ? 0.7 : 1); K.set(0.9, 0.03, 0.06); } // nightmare: a burnt-out tile, a faint ember seam
+        else if (q.col) { k = 1.05 + (S.dangerCol === q.col ? 0.55 * (0.5 + 0.5 * Math.sin(t * 10)) : 0); K.set(1, 0.12, 0.8);
+          if (S.nm) { if (q.col !== S.dangerCol) k *= S.ecl3 ? 1.35 : 1.12; if (q === S.onT) k += 0.9; if (q.drain > 0) k *= 1 - 0.6 * q.drain * (Math.sin(t * 38) > 0 ? 1 : 0.15); } }
         else { k = (1.2 + 0.6 * wave) * (1 + ov * 0.3); K.set(1.1 + ov * 0.8, 0.22 + 0.15 * wave + ov * 0.1, 0.6); }
         k += q.flash * 5; const pol = !fall && !q.warn && q.col ? q.col : 0; q.U.uPol.value = pol; q.U.uPat.value = pol ? 1.1 : 0;
         q.mat.emissive.copy(q.cur); q.mat.emissiveIntensity = k; q.sideMat.emissive.copy(q.cur); q.sideMat.emissiveIntensity = k * 0.75;
       }
-      if (b.phase >= 2 && !S.pol && vrand() < dt * 6) { const c = -HALF + TS * (1 + Math.floor(vrand() * (N - 1))), s0 = -HALF + TS * (1 + Math.floor(vrand() * (N - 2))), A = S.arcV[0], B = S.arcV[1]; if (vrand() < 0.5) { A.set(c, 0.06, s0); B.set(c, 0.06, s0 + TS); } else { A.set(s0, 0.06, c); B.set(s0 + TS, 0.06, c); } FX.lightning(A, B, { color: 0xa070ff, width: 0.065, jag: 0.25, dur: 0.3, mult: 1.6, sparks: false }); }
-      if (sw) { const armed = sw.arm <= 0 && sw.t > 0, fl = sw.warn > 0 ? (Math.sin(t * 40) > 0 ? 1 : 0.25) : 1; for (let i = 0; i < sw.n; i++) { const L = S.lasers[i]; L.grp.rotation.y = sw.a + i / sw.n * TAU; L.mat.color.setHex(sw.warn > 0 ? 0xfff0e0 : 0xffb080).multiplyScalar(armed ? 1.5 * fl : 0.5); L.gU.uA.value = armed ? 0.5 * fl : 0.2; L.gU.uK.value = armed ? 9 : 30; L.fU.uA.value = armed ? 0.28 : 0.12; L.beam.scale.set(armed ? 1 : 0.4, armed ? 1 : 0.4, 1); if (armed && vrand() < dt * 30) { const r = 3 + vrand() * 16, a = L.grp.rotation.y; FX.burst(Math.sin(a) * r, 0.05, Math.cos(a) * r, { n: 1, color: 0xff6030, speed: [0.5, 2.5], up: 2, life: [0.2, 0.5], size: [0.08, 0.2] }); } } }
+      if (b.phase >= 2 && !S.pol && !S.nm && vrand() < dt * 6) { const c = -HALF + TS * (1 + Math.floor(vrand() * (N - 1))), s0 = -HALF + TS * (1 + Math.floor(vrand() * (N - 2))), A = S.arcV[0], B = S.arcV[1]; if (vrand() < 0.5) { A.set(c, 0.06, s0); B.set(c, 0.06, s0 + TS); } else { A.set(s0, 0.06, c); B.set(s0 + TS, 0.06, c); } FX.lightning(A, B, { color: 0xa070ff, width: 0.065, jag: 0.25, dur: 0.3, mult: 1.6, sparks: false }); }
+      if (sw) { const armed = sw.arm <= 0 && sw.t > 0 && !sw.out, fl = sw.warn > 0 ? (Math.sin(t * 40) > 0 ? 1 : 0.25) : 1; for (let i = 0; i < sw.n; i++) { const L = S.lasers[i]; L.grp.rotation.y = sw.a + i / sw.n * TAU; L.mat.color.setHex(sw.warn > 0 ? 0xfff0e0 : 0xffb080).multiplyScalar(armed ? 1.5 * fl : 0.5); L.gU.uA.value = armed ? 0.5 * fl : 0.2; L.gU.uK.value = armed ? 9 : 30; L.fU.uA.value = armed ? 0.28 : 0.12; L.beam.scale.set(armed ? 1 : 0.4, armed ? 1 : 0.4, 1); if (armed && vrand() < dt * 30) { const r = 3 + vrand() * 16, a = L.grp.rotation.y; FX.burst(Math.sin(a) * r, 0.05, Math.cos(a) * r, { n: 1, color: 0xff6030, speed: [0.5, 2.5], up: 2, life: [0.2, 0.5], size: [0.08, 0.2] }); } } }
       { const sh = S.bsh; let n = 0; for (const bb of Bul.list) { if (!bb.shell || n >= 400) continue; const s2 = bb.r * 1.3 * (bb.t < 0.15 ? bb.t / 0.15 : 1); _m4.makeScale(s2, s2, s2); _m4.setPosition(bb.x, bb.y, bb.z); sh.setMatrixAt(n, _m4); sh.setColorAt(n, _c3.setHex(bb.shell)); n++; }
         sh.count = n; if (n) { sh.instanceMatrix.needsUpdate = true; sh.instanceColor.needsUpdate = true; } }
       // core
@@ -8981,7 +9354,7 @@ const Hitch = (() => {
       S.coreL.intensity = 40 + S.heat * 50 + (dc ? 40 : 0) + b.phase * 10; S.halo.scale.setScalar(1 + S.heat * 0.3 + Math.sin(t * 3) * 0.04 + S.open * 0.35);
       S.heart.rotation.y += dt * 1.2; S.heart.rotation.x += dt * 0.5; S.core.rotation.z += dt * 2; S.heart.scale.setScalar(1 + S.open * 0.25 + S.heat * 0.15 + Math.sin(t * 5) * 0.03);
       for (const o of S.orbitL) o.rotation.z += dt * 2.5;
-      for (let pi = 0; pi < S.panels.length; pi++) { const pn = S.panels[pi]; const off = 0.25 + S.open * 0.3 + S.heat * 0.1 + (b.phase >= 2 && pi % 3 === 0 ? 0.9 + 0.3 * Math.sin(t * 0.7 + pi) : 0) + Math.max(0, Math.sin(t * 1.3 + pn.ph)) * 0.05; pn.m.position.copy(pn.cen).addScaledVector(pn.n, off); }
+      for (let pi = 0; pi < S.panels.length; pi++) { const pn = S.panels[pi]; const off = 0.25 + (S.blowK || 0) + S.open * 0.3 + S.heat * 0.1 + (b.phase >= 2 && pi % 3 === 0 ? 0.9 + 0.3 * Math.sin(t * 0.7 + pi) : 0) + Math.max(0, Math.sin(t * 1.3 + pn.ph)) * 0.05; pn.m.position.copy(pn.cen).addScaledVector(pn.n, off); }
       S.rig.position.y = 4.2 + Math.sin(t * 0.9) * 0.25;
       const sp = 0.5 + b.phase * 0.5 + S.heat * 3; S.gyro[0].rotation.x += dt * sp; S.gyro[0].rotation.y += dt * sp * 0.3; S.gyro[1].rotation.y += dt * sp * 0.8; S.gyro[1].rotation.z += dt * sp * 0.4; S.gyro[2].rotation.x -= dt * sp * 0.6; S.gyro[2].rotation.z += dt * sp * 0.7;
       for (let i = 0; i < S.finTrims.length; i++) { const fm = S.finTrims[i]; fm.emissive.copy(S.trim.emissive); fm.emissiveIntensity = i % 2 ? 0.22 + 0.06 * b.phase + S.heat * 0.15 : 0.6 + S.heat * 0.15; } TICKU.uC.value.copy(S.trim.emissive); LAMPU.uC.value.copy(S.trim.emissive).multiplyScalar(0.9); TICKU.uT.value = t % 1000; for (const tm of S.trimClones) tm.emissive.copy(S.trim.emissive);
@@ -9000,6 +9373,7 @@ const Hitch = (() => {
       for (let i = S.tethers.length - 1; i >= 0; i--) { const a = S.tethers[i]; if (!a.alive) { S.tethers.splice(i, 1); continue; } if (vrand() < dt * 30) { const k = vrand(); FX.burst(lerp(a.pos.x, 0, k), lerp(1.6, 4.2, k), lerp(a.pos.z, 0, k), { n: 1, color: 0xffb030, speed: [0, 0.6], life: [0.2, 0.45], size: [0.15, 0.3] }); } }
       S.planet.rotation.y += dt * 0.004; S.planet.material.uniforms.uT.value = t * 0.02 % 100;
       const bl = 0.6 + 0.4 * Math.max(0, Math.sin(t * 2.2)); for (const bc of S.beacons) bc.material.color.setRGB(3 * bl, 0.35 * bl, 0.2 * bl);
+      if (S.nm) nmLook(b, dt);
     },
     danger(b, x, z) {
       const S = b.state; let best = Infinity; const i = tIdx(x, z);
@@ -9019,6 +9393,7 @@ const Hitch = (() => {
     },
   });
   const _c = new THREE.Color(), _c2 = new THREE.Color(), _c3 = new THREE.Color(), _m4 = new THREE.Matrix4(), _v = new V3();
+  const _cv = new V3(), _up = new V3(0, 1, 0);
 })();
 
 // ==== 24_boss_titan.js ====
@@ -21463,7 +21838,7 @@ const Bot = {
         const mx = (x + p.pos.x) / 2, mz = (z + p.pos.z) / 2, tm = danger(mx, mz); if (tm !== Infinity && Math.abs(tm - tt / 2) < 0.3) s += 200;
         if (Bul.threat(x, z, 0.7)) s += 80;
         if (Hz.persist(x, z)) s += 450;
-        if (hint.avoid && hint.avoid(x, z)) s += 500;
+        if (hint.avoid) { const av = hint.avoid(x, z); if (av) s += typeof av === 'number' ? av : 500; } // a number: that penalty instead (e.g. a walk over a hole)
         const dt2 = Math.hypot(x - t.pos.x, z - t.pos.z) - t.radius; if (!melee && dt2 > 32) s += 50; if (melee && dt2 > MELEE - 0.3 && hint.x === undefined) s += 25 + dt2;
         if (s < bs) { bs = s; best = c; }
       }
