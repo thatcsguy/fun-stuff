@@ -30,7 +30,7 @@ const Bot = {
         const mx = (x + p.pos.x) / 2, mz = (z + p.pos.z) / 2, tm = danger(mx, mz); if (tm !== Infinity && Math.abs(tm - tt / 2) < 0.3) s += 200;
         if (Bul.threat(x, z, 0.7)) s += 80;
         if (Hz.persist(x, z)) s += 450;
-        if (hint.avoid && hint.avoid(x, z)) s += 500;
+        if (hint.avoid) { const av = hint.avoid(x, z); if (av) s += typeof av === 'number' ? av : 500; } // a number: that penalty instead (e.g. a walk over a hole)
         const dt2 = Math.hypot(x - t.pos.x, z - t.pos.z) - t.radius; if (!melee && dt2 > 32) s += 50; if (melee && dt2 > MELEE - 0.3 && hint.x === undefined) s += 25 + dt2;
         if (s < bs) { bs = s; best = c; }
       }

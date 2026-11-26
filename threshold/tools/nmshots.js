@@ -1,7 +1,7 @@
 // node nmshots.js <outDir> [cls] : screenshots of a Nightmare fight through the real menu and the full intro (never skipintro):
 // the door page on Normal and Nightmare, the title card, then the last phase with one shot per ramp step (the step is forced
 // through the boss file's test hook), the enrage pulse, the last blow and the death table, then a second run to the kill and the
-// victory table. BOSS=atelier for Pentimento (default Issen). SHOTS=menu,intro limits the menu/intro shots. Use TH_GPU=1 on a
+// victory table. BOSS=atelier for Pentimento, BOSS=engine for Parallax (plus the Totality transition) (default Issen). SHOTS=menu,intro limits the menu/intro shots. Use TH_GPU=1 on a
 // machine with a graphics card.
 const { launch } = require('./harness.js');
 const fs = require('fs'), path = require('path');
@@ -17,11 +17,11 @@ const fs = require('fs'), path = require('path');
   // keeps him above k of his health (0 = off), so the steps can be watched
   const floor = (k) => g((k) => { clearInterval(window.__fl); if (k) window.__fl = setInterval(() => { const b = window.__game.G.boss; if (b && b.alive) b.hp = Math.max(b.hp, b.maxHp * k); }, 100); }, k);
   const ramp = async () => {
-    const duel = (process.env.BOSS || 'duelist') === 'duelist', n = duel ? 6 : 5, last = duel ? 3 : 2;
-    await wait(3000); await toPhase(last); await until(`!${B}.transitioning`, 40000); await floor(0.3);
+    const boss = process.env.BOSS || 'duelist', duel = boss === 'duelist', eng = boss === 'engine', n = duel || eng ? 6 : 5, last = duel ? 3 : 2;
+    await wait(3000); await toPhase(last); if (eng) { await wait(4200); await shot('09-totality'); } await until(`!${B}.transitioning`, 40000); await floor(0.3);
     for (let st = 0; st < n; st++) {
-      await g(([st, duel]) => { const b = window.__game.G.boss, S = b.state, T = b.def.nmTest; if (duel) S.nitenT = Math.max(S.nitenT, st * T.RAMP); else S.fk = Math.max(S.fk, st * T.SIT_PER_STEP); }, [st, duel]);
-      await until(duel ? `${B}.state.nitenStep >= ${st}` : `${B}.state.finStep >= ${st}`, 90000).catch(() => console.log('(step ' + st + ' not reached)'));
+      await g(([st, duel, eng]) => { const b = window.__game.G.boss, S = b.state, T = b.def.nmTest; if (eng) T.setStep(b, st); else if (duel) S.nitenT = Math.max(S.nitenT, st * T.RAMP); else S.fk = Math.max(S.fk, st * T.SIT_PER_STEP); }, [st, duel, eng]);
+      await until(eng ? `${B}.state.step >= ${st}` : duel ? `${B}.state.nitenStep >= ${st}` : `${B}.state.finStep >= ${st}`, 90000).catch(() => console.log('(step ' + st + ' not reached)'));
       await wait(duel ? 4500 : 6000); await shot(`${String(10 + st)}-step-${st}`);
     }
     await g(() => { const G = window.__game.G; G.ft = Math.max(G.ft, G.boss.def.enrage - 0.5); }); await wait(2200); await shot('20-enrage-pulse');
