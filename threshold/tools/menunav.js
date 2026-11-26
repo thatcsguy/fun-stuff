@@ -24,14 +24,14 @@ const fails = []; const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') +
 
   // ---- mouse
   await page.click('#set-diff span[data-v="nightmare"]'); await frames(); s = await st();
-  ok(s.diff === 'nightmare' && s.nm && s.na === 17 && s.nav === 2, `mouse: Nightmare greys 17 fights, leaves Issen and Pentimento (${s.na}/${s.nav})`);
+  ok(s.diff === 'nightmare' && s.nm && s.na === 16 && s.nav === 3, `mouse: Nightmare greys 16 fights, leaves Issen, Pentimento and the Impresario (${s.na}/${s.nav})`);
   const box = await page.locator('#doors .door[data-door="cathedral"]').boundingBox(); await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); await frames(10); s = await st();
   ok(s.state === 'menu', 'mouse: clicking greyed cathedral does nothing');
-  await page.reload(); await menu(); s = await st(); ok(s.diff === 'nightmare' && s.nm && s.na === 17, 'reload: Nightmare is remembered');
+  await page.reload(); await menu(); s = await st(); ok(s.diff === 'nightmare' && s.nm && s.na === 16, 'reload: Nightmare is remembered');
   await page.click('#set-diff span[data-v="normal"]'); await frames(); s = await st(); ok(s.diff === 'normal' && s.na === 0, 'mouse: back to Normal');
   await page.click('#diffrow', { position: { x: 2, y: 2 } }); await frames(); s = await st(); ok(s.diff === 'nightmare', 'mouse: clicking the row edge flips it');
 
-  // ---- keyboard: classes (4) -> difficulty toggle -> 4 group toggles -> the open fights (duelist, atelier) -> Settings -> Fullscreen
+  // ---- keyboard: classes (4) -> difficulty toggle -> 4 group toggles -> the open fights (duelist, atelier, theatre) -> Settings -> Fullscreen
   await page.reload(); await menu();
   for (let i = 0; i < 5; i++) await key('ArrowDown'); s = await st(); ok(s.focus === 'diffrow', `keys: 5 x down reaches the toggle (${s.focus})`);
   await key('ArrowLeft'); s = await st(); ok(s.diff === 'normal' && s.focus === 'diffrow', `keys: left = Normal, focus stays (${s.diff}, ${s.focus})`);
@@ -41,6 +41,7 @@ const fails = []; const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') +
   await key('ArrowDown'); s = await st(); ok(s.focus === 'grp-nightmare', `keys: down from the toggle reaches the group toggles (${s.focus})`);
   for (let i = 0; i < 4; i++) await key('ArrowDown'); s = await st(); ok(s.focus === 'door:duelist', `keys: past the group toggles, greyed fights skipped, lands on duelist (${s.focus})`);
   await key('ArrowDown'); s = await st(); ok(s.focus === 'door:atelier', `keys: next is atelier, no greyed fight in between (${s.focus})`);
+  await key('ArrowDown'); s = await st(); ok(s.focus === 'door:theatre', `keys: then theatre (${s.focus})`);
   await key('ArrowDown'); s = await st(); ok(s.focus === 'btn-settings', `keys: then Settings (${s.focus})`);
 
   // ---- simulated controller
@@ -74,11 +75,11 @@ const fails = []; const ok = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') +
   await page.evaluate(() => window.__game.Game.quit()); await menu();
   // ---- group toggles: hide and show a group, remembered across a reload, no door numbers anywhere
   const grp = () => page.evaluate(() => ({ doors: [...document.querySelectorAll('#doors .door')].map((n) => n.dataset.door), on: [...document.querySelectorAll('#grouptog .gtog.on')].map((n) => n.id), text: document.querySelector('#doors').textContent }));
-  let q = await grp(); ok(q.doors.join() === 'duelist,atelier,engine,cathedral,leviathan,gorgon,theatre,origami,lamp,chess,festival,fall,portal,titan,wheel,express,winter,clock,sumi' && q.on.length === 4, `groups: all four shown in table order (${q.doors.join()})`);
+  let q = await grp(); ok(q.doors.join() === 'duelist,atelier,theatre,engine,cathedral,leviathan,gorgon,origami,lamp,chess,festival,fall,portal,titan,wheel,express,winter,clock,sumi' && q.on.length === 4, `groups: all four shown in table order (${q.doors.join()})`);
   ok(!/\b(XVI|XIX|XX|VIII|IV|IX)\b/.test(q.text) && !q.doors.includes('ballpark'), 'groups: no roman numerals, ballpark gone');
-  await page.click('#grp-almost'); await frames(); q = await grp(); ok(q.doors.length === 9 && !q.doors.includes('cathedral') && !q.on.includes('grp-almost'), `groups: hiding Almost leaves 9 (${q.doors.length})`);
-  await page.click('#grp-concept'); await frames(); q = await grp(); ok(q.doors.join() === 'duelist,atelier,engine', `groups: hiding Concept too leaves Nightmare + Ready (${q.doors.join()})`);
-  await page.reload(); await menu(); q = await grp(); ok(q.doors.join() === 'duelist,atelier,engine', 'groups: hidden groups remembered after reload');
+  await page.click('#grp-almost'); await frames(); q = await grp(); ok(q.doors.length === 10 && !q.doors.includes('cathedral') && !q.on.includes('grp-almost'), `groups: hiding Almost leaves 10 (${q.doors.length})`);
+  await page.click('#grp-concept'); await frames(); q = await grp(); ok(q.doors.join() === 'duelist,atelier,theatre,engine', `groups: hiding Concept too leaves Nightmare + Ready (${q.doors.join()})`);
+  await page.reload(); await menu(); q = await grp(); ok(q.doors.join() === 'duelist,atelier,theatre,engine', 'groups: hidden groups remembered after reload');
   await page.click('#grp-almost'); await page.click('#grp-concept'); await frames(); q = await grp(); ok(q.doors.length === 19, 'groups: shown again');
   await page.evaluate(() => window.__game.Game.start('engine')); await page.waitForFunction('document.querySelector("#title-card .nm").textContent.length > 0', null, { timeout: 60000 });
   ok(await page.evaluate(() => document.querySelector('#title-card .tnum').textContent === ''), 'title card: no door number');
