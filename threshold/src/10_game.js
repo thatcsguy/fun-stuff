@@ -181,8 +181,16 @@ const Game = (() => {
     }, 'sys');
   }
 
+  // One lock for every cinematic in every fight: the intro, the kill, and any shot a boss plays mid-fight (any time Cam.cine is
+  // set while the fight runs). While it holds, Player ignores movement and skills, freezes its timers and gauge and takes no
+  // hits (07_player.js), Input.onSlot/onAction drop presses, Cam ignores mouse look, and the HUD is hidden. Bosses need do nothing.
+  let cineHud = false;
+  function cineLock() { return G.state === 'intro' || G.state === 'win' || (G.state === 'fight' && !!Cam.cine); }
   Hooks.step.push((dt) => {
-    const p = G.player, b = G.boss; if (!p || !b) return;
+    const p = G.player, b = G.boss; if (!p || !b) { G.cineLock = false; cineHud = false; return; }
+    G.cineLock = cineLock();
+    if (G.state !== 'fight') cineHud = false; // the intro, the kill and the result screens run the HUD themselves
+    else if (G.cineLock !== cineHud) { cineHud = G.cineLock; UI.hud(!cineHud); }
     if (G.state === 'fight' || G.state === 'intro' || G.state === 'dead' || G.state === 'win') {
       p.update(dt);
       for (let i = G.ents.length - 1; i >= 0; i--) { const e = G.ents[i]; if (e.alive || e.isBoss) e.update(dt); else { G.world.remove(e.group); disposeTree(e.group); G.ents.splice(i, 1); } }
@@ -191,11 +199,11 @@ const Game = (() => {
       if (G.state === 'fight' && !b.alive) onBossDead();
     }
   });
-  Input.onSlot = (i) => { if (G.state === 'fight' && !G.paused && G.player) G.player.press(i); };
+  Input.onSlot = (i) => { if (G.state === 'fight' && !G.paused && !G.cineLock && G.player) G.player.press(i); };
   Input.onAction = (name, arg) => {
     const p = G.player;
     if (name === 'pause') { if (UI.screen === 'settings') $('#settings [data-act=back]').click(); else pause(); return; }
-    if (G.state !== 'fight' || G.paused || !p) { if (name === 'jump' && G.state === 'intro') skipIntro = true; return; }
+    if (G.state !== 'fight' || G.paused || !p || G.cineLock) { if (name === 'jump' && G.state === 'intro') skipIntro = true; return; }
     if (name === 'jump') p.jump(); else if (name === 'target-next') p.cycleTarget(1); else if (name === 'target-prev') p.cycleTarget(-1);
     else if (name === 'click') p.pickTarget(arg.x, arg.y); else if (name === 'camreset') Cam.reset(p.target ? angTo(p.pos.x, p.pos.z, p.target.pos.x, p.target.pos.z) : p.facing);
   };

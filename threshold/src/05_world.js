@@ -5,8 +5,9 @@ const Cam = {
   reset(yaw) { this.yaw = yaw === undefined ? (G.player ? G.player.facing : 0) : yaw; this.pitch = 0.36; this.tDist = this.dist = 14; if (G.player) this.focus.copy(G.player.pos).y += 1.5; },
   // Cinematic shot: set Cam.cine = {pos: V3, look: V3, fov?} every frame from a script; set to null to blend back to the player camera.
   update(rdt) {
+    if (!this.cine) { // during a cinematic the player's look and zoom are ignored, so the camera comes back where it left
     this.yaw = wrapPi(this.yaw + Input.lookX); this.pitch = clamp(this.pitch + Input.lookY, -0.32, 1.42);
-    if (Input.zoom) this.tDist = clamp(this.tDist * (1 + Input.zoom * 0.12), this.minDist, this.maxDist);
+    if (Input.zoom) this.tDist = clamp(this.tDist * (1 + Input.zoom * 0.12), this.minDist, this.maxDist); }
     this.dist = damp(this.dist, this.tDist, 10, rdt);
     const p = G.player;
     if (p) { const ty = Math.max(p.pos.y, -3) + 1.55; this.focus.x = damp(this.focus.x, p.pos.x, 22, rdt); this.focus.z = damp(this.focus.z, p.pos.z, 22, rdt); this.focus.y = damp(this.focus.y, ty, 10, rdt); }

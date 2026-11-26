@@ -131,6 +131,7 @@ Later fights use the ids `clock`, `portal`, `atelier`, `sumi`. `portal` also tak
 - `gardenphase.js`: forces each Euryale nightmare phase change and the last blow in the middle of every mechanic (a locked Behold, a floor rise, Lash, Vipers, an open window, the second mirror rising), checks nothing is left behind, then that a restart resets the garden.
 - `gardenentry.js`: Euryale's Nightmare through the full intro for every class (the lesson statues rise in real frames), then a whole god-mode fight with garden step times.
 - `gardenshots.js <outDir>`: GPU shot list for Euryale's Nightmare (the lesson, shell shut / open, a Behold with statues in the lane, each garden step, a floor rise, the garden cinematic, A Thousand Eyes, the kill).
+- `cinelock.js [bosses] [classes]`: every cinematic locks the player. Full entry with the intro, holds W and taps 1 (BOT=1: autopilot), pushes the boss through each phase and kills it; per lock reports metres moved, casts, GCD/cooldown/gauge drift and HUD (all 0). NM=0 for normal fights.
 - `menunav.js`: the Difficulty toggle with mouse, keyboard and a simulated controller (values, greyed doors skipped, focus, persistence, Restart keeps Nightmare, Normal still starts Normal). Must print `ALL PASS`.
 - `matrix.js <class,class|all> [runs] [boss,boss]`: autopilot attempts for every door and class, one summary line each (wins, boss health left, dps). `GOD=1` checks instead that each class can finish every fight before the enrage.
 - `sim.js <boss> <class> <botLevel> [runs] [maxSec] [phase]`: full autopilot attempts.

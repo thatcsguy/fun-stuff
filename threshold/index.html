@@ -1354,8 +1354,9 @@ const Cam = {
   reset(yaw) { this.yaw = yaw === undefined ? (G.player ? G.player.facing : 0) : yaw; this.pitch = 0.36; this.tDist = this.dist = 14; if (G.player) this.focus.copy(G.player.pos).y += 1.5; },
   // Cinematic shot: set Cam.cine = {pos: V3, look: V3, fov?} every frame from a script; set to null to blend back to the player camera.
   update(rdt) {
+    if (!this.cine) { // during a cinematic the player's look and zoom are ignored, so the camera comes back where it left
     this.yaw = wrapPi(this.yaw + Input.lookX); this.pitch = clamp(this.pitch + Input.lookY, -0.32, 1.42);
-    if (Input.zoom) this.tDist = clamp(this.tDist * (1 + Input.zoom * 0.12), this.minDist, this.maxDist);
+    if (Input.zoom) this.tDist = clamp(this.tDist * (1 + Input.zoom * 0.12), this.minDist, this.maxDist); }
     this.dist = damp(this.dist, this.tDist, 10, rdt);
     const p = G.player;
     if (p) { const ty = Math.max(p.pos.y, -3) + 1.55; this.focus.x = damp(this.focus.x, p.pos.x, 22, rdt); this.focus.z = damp(this.focus.z, p.pos.z, 22, rdt); this.focus.y = damp(this.focus.y, ty, 10, rdt); }
@@ -4091,6 +4092,7 @@ class Player {
   block(i) {
     const st = this.sk[i]; if (!st) return 'none'; const s = st.def;
     if (!this.alive || this.falling) return 'dead';
+    if (G.cineLock) return 'busy'; // a cinematic is playing: no skill can start (bots and queued presses included)
     if (this.dash || this.kb) return 'busy';
     if (this.lockT > 0 && s.moves) return 'no'; // a boss lock-in (door XIII): no skill may carry you off your square
     if (st.uses <= 0) return 'spent';
@@ -4124,8 +4126,16 @@ class Player {
     s.fire(this, tgt, wasCast);
     if (typeof UI !== 'undefined') UI.slotFlash(i);
   }
+  // The camera is back after a cinematic. A floor that fell away under the frozen hero (Parallax's outer ring) does not drop
+  // them the moment play resumes: they are set on the nearest standing ground, with a short grace.
+  cineLand() {
+    const A = G.arena; if (!A || A.edge !== 'fall' || !this.alive || this.falling || A.contains(this.pos.x, this.pos.z)) return;
+    for (let r = 0.5; r <= 16; r += 0.5) for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2, x = this.pos.x + Math.sin(a) * r, z = this.pos.z + Math.cos(a) * r;
+      if (A.contains(x, z)) { this.pos.x = x; this.pos.z = z; this.offT = 0; this.invuln = Math.max(this.invuln, 0.6); this.group.position.copy(this.pos); return; } }
+  }
   hurt(amt, o = {}) {
-    if (!this.alive || (G.god && !o.pierce) || G.state !== 'fight') return 0; // pierce: a nightmare 'out of time' blow, which even god mode and immunities do not stop
+    if (!this.alive || (G.god && !o.pierce) || G.state !== 'fight') return 0;
+    if (G.cineLock && !o.pierce) return 0; // nothing lands on a hero who cannot move // pierce: a nightmare 'out of time' blow, which even god mode and immunities do not stop
     if (this.invuln > 0 && o.src !== 'fall' && !o.pierce) return 0;
     if (o.blockable && this.dodgeT > 0) { if (this.cls.onDodge) this.cls.onDodge(this, o); return 0; } // roll i-frames: like a parry, they never beat an unblockable
     if (o.blockable && this.parryT > 0) { this.parryT = 0; this.cls.onParry(this, o); return 0; }
@@ -4161,16 +4171,24 @@ class Player {
     for (const e of G.ents) { if (!e.alive || !e.targetable) continue; e.aim(v).project(camera); if (v.z > 1) continue; const px = (v.x * 0.5 + 0.5) * innerWidth, py = (-v.y * 0.5 + 0.5) * innerHeight; const d = Math.hypot(px - sx, py - sy) - e.radius * 26; if (d < bd) { bd = d; best = e; } }
     if (best && bd < 110) { this.target = best; Sound.sfx('ui'); }
   }
-  jump() { if (this.alive && this.grounded && !this.dash && !this.kb && this.rooted <= 0) { this.vy = 7.2; this.grounded = false; } }
+  jump() { if (!G.cineLock && this.alive && this.grounded && !this.dash && !this.kb && this.rooted <= 0) { this.vy = 7.2; this.grounded = false; } }
   update(dt) {
     const A = G.arena;
     this.flashT -= dt; if (this.hintT > 0) this.hintT -= dt;
     if (!this.alive) { this.deathT += dt; const k = Math.min(1, this.deathT / 0.7); this.model.body.rotation.x = -k * 1.45; this.model.body.position.y = -k * 0.1; if (this.falling) { this.vy -= 30 * dt; this.pos.y += this.vy * dt; } this.group.position.copy(this.pos); this.ring.visible = false; return; }
+    // Cinematics (intro, a phase's camera shot, the kill): the hero stands still and the player's side of the fight holds.
+    // Nothing can move, cast or press; a cast in progress is dropped; GCD, cooldowns, buffs, shields and the class's own gauge
+    // (stamina regen and the like) are frozen until the camera comes back. G.cineLock is set by Game each step.
+    const lock = !!G.cineLock;
+    if (lock && !this.cineOn) { this.cineOn = true; if (this.casting) { this.casting = null; this.gcd = Math.min(this.gcd, 0.25); } this.queue = -1; this.attackFaceT = 0; }
+    else if (!lock && this.cineOn) { this.cineOn = false; this.cineLand(); }
     // timers
+    if (lock) { /* frozen */ } else {
     if (this.gcd > 0) this.gcd -= dt; if (this.parryT > 0) this.parryT -= dt; if (this.dodgeT > 0) this.dodgeT -= dt; if (this.rollT > 0) this.rollT -= dt; if (this.aimT > 0) this.aimT -= dt; if (this.loadT > 0) this.loadT -= dt; if (this.invuln > 0) this.invuln -= dt; if (this.rooted > 0) this.rooted -= dt; if (this.lockT > 0) this.lockT -= dt;
     if (this.shieldT > 0) { this.shieldT -= dt; if (this.shieldT <= 0) this.shield = 0; } else this.shield = 0;
     for (const st of this.sk) { if (!st) continue; const s = st.def; if (st.cd > 0) { st.cd -= dt; if (st.cd <= 0) { st.charges = Math.min(s.charges || 1, st.charges + 1); st.cd = st.charges < (s.charges || 1) ? s.cd : 0; } } }
     for (let i = this.buffs.length - 1; i >= 0; i--) { const b = this.buffs[i]; b.t -= dt; if (b.t <= 0) { this.buffs.splice(i, 1); if (this.cls.onBuffEnd) this.cls.onBuffEnd(this, b.id); } }
+    }
     // target upkeep
     if (!this.target || !this.target.alive || !this.target.targetable) { let best = null, bd = 1e9; for (const e of G.ents) { if (!e.alive || !e.targetable) continue; const d = e.distTo(this.pos.x, this.pos.z) - (e.isBoss ? 0 : 3); if (d < bd) { bd = d; best = e; } } this.target = best; }
     // movement intent
@@ -4178,7 +4196,7 @@ class Player {
     if (Input.bot) { mx = Input.bot.moveX; mz = Input.bot.moveZ; }
     else if (G.state === 'fight') { const f = Input.moveZ, r = Input.moveX, sy = Math.sin(Cam.yaw), cy = Math.cos(Cam.yaw); mx = sy * f - cy * r; mz = cy * f + sy * r; }
     let ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; ml = 1; }
-    if (this.rooted > 0) { mx = mz = ml = 0; }
+    if (this.rooted > 0 || lock) { mx = mz = ml = 0; }
     let vx = 0, vz = 0;
     if (this.kb) { vx = this.kb.vx; vz = this.kb.vz; this.kb.t -= dt; if (this.kb.t <= 0) this.kb = null; ml = 0; }
     else if (this.dash) { const d = this.dash, k = Math.min(1, d.t / dt); vx = d.vx * k; vz = d.vz * k; d.t -= dt; if (d.t <= 0) { this.dash = null; if (d.done) d.done(this); } ml = 0; }
@@ -4188,14 +4206,14 @@ class Player {
     const ox = this.pos.x, oz = this.pos.z;
     this.pos.x += vx * dt; this.pos.z += vz * dt;
     // facing
-    if (!Input.bot && Input.steer && G.state === 'fight') this.facing = Cam.yaw;
+    if (!Input.bot && Input.steer && G.state === 'fight' && !lock) this.facing = Cam.yaw;
     else if (this.moving && !this.kb && !this.dash) this.facing = dampAng(this.facing, Math.atan2(mx, mz), 16, dt);
     else if ((this.casting || this.attackFaceT > 0) && this.target) this.facing = dampAng(this.facing, angTo(this.pos.x, this.pos.z, this.target.pos.x, this.target.pos.z), 18, dt);
     if (this.attackFaceT > 0) this.attackFaceT -= dt;
     // arena bounds
     if (A) {
       if (this.pos.y >= -0.01 && !this.falling) {
-        if (A.edge === 'fall') { if (!this.dash && !A.contains(this.pos.x, this.pos.z)) { this.offT = (this.offT || 0) + dt; if (this.offT > 0.15) { if (this.grounded) { this.grounded = false; this.vy = 0; } this.falling = this.pos.y <= 0.02; } } else this.offT = 0; }
+        if (A.edge === 'fall') { if (lock && !this.dash && !this.kb) this.offT = 0; else if (!this.dash && !A.contains(this.pos.x, this.pos.z)) { this.offT = (this.offT || 0) + dt; if (this.offT > 0.15) { if (this.grounded) { this.grounded = false; this.vy = 0; } this.falling = this.pos.y <= 0.02; } } else this.offT = 0; }
         else A.clamp(this.pos, ox, oz);
       }
       if (A.solid) A.solid(this.pos, ox, oz);
@@ -4219,7 +4237,7 @@ class Player {
     // queue + hold-to-repeat
     if (this.queue >= 0) { this.queueT -= dt; if (this.queueT <= 0) this.queue = -1; else if (this.block(this.queue) === '') this.begin(this.queue); }
     else if (!Input.bot && G.state === 'fight') { for (let i = 0; i < this.sk.length; i++) if (Input.slotHeld[i] && this.sk[i] && this.sk[i].def.gcd !== false && this.block(i) === '') { this.begin(i); break; } }
-    if (this.cls.update) this.cls.update(this, dt);
+    if (this.cls.update && !lock) this.cls.update(this, dt);
     // visuals
     this.group.position.copy(this.pos); this.group.rotation.y = this.facing; this.model.update(dt, this);
     const t = this.target;
@@ -5055,8 +5073,16 @@ const Game = (() => {
     }, 'sys');
   }
 
+  // One lock for every cinematic in every fight: the intro, the kill, and any shot a boss plays mid-fight (any time Cam.cine is
+  // set while the fight runs). While it holds, Player ignores movement and skills, freezes its timers and gauge and takes no
+  // hits (07_player.js), Input.onSlot/onAction drop presses, Cam ignores mouse look, and the HUD is hidden. Bosses need do nothing.
+  let cineHud = false;
+  function cineLock() { return G.state === 'intro' || G.state === 'win' || (G.state === 'fight' && !!Cam.cine); }
   Hooks.step.push((dt) => {
-    const p = G.player, b = G.boss; if (!p || !b) return;
+    const p = G.player, b = G.boss; if (!p || !b) { G.cineLock = false; cineHud = false; return; }
+    G.cineLock = cineLock();
+    if (G.state !== 'fight') cineHud = false; // the intro, the kill and the result screens run the HUD themselves
+    else if (G.cineLock !== cineHud) { cineHud = G.cineLock; UI.hud(!cineHud); }
     if (G.state === 'fight' || G.state === 'intro' || G.state === 'dead' || G.state === 'win') {
       p.update(dt);
       for (let i = G.ents.length - 1; i >= 0; i--) { const e = G.ents[i]; if (e.alive || e.isBoss) e.update(dt); else { G.world.remove(e.group); disposeTree(e.group); G.ents.splice(i, 1); } }
@@ -5065,11 +5091,11 @@ const Game = (() => {
       if (G.state === 'fight' && !b.alive) onBossDead();
     }
   });
-  Input.onSlot = (i) => { if (G.state === 'fight' && !G.paused && G.player) G.player.press(i); };
+  Input.onSlot = (i) => { if (G.state === 'fight' && !G.paused && !G.cineLock && G.player) G.player.press(i); };
   Input.onAction = (name, arg) => {
     const p = G.player;
     if (name === 'pause') { if (UI.screen === 'settings') $('#settings [data-act=back]').click(); else pause(); return; }
-    if (G.state !== 'fight' || G.paused || !p) { if (name === 'jump' && G.state === 'intro') skipIntro = true; return; }
+    if (G.state !== 'fight' || G.paused || !p || G.cineLock) { if (name === 'jump' && G.state === 'intro') skipIntro = true; return; }
     if (name === 'jump') p.jump(); else if (name === 'target-next') p.cycleTarget(1); else if (name === 'target-prev') p.cycleTarget(-1);
     else if (name === 'click') p.pickTarget(arg.x, arg.y); else if (name === 'camreset') Cam.reset(p.target ? angTo(p.pos.x, p.pos.z, p.target.pos.x, p.target.pos.z) : p.facing);
   };
