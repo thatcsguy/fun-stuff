@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Who Wins?</title>
+<meta name="description" content="30 tiny satisfying simulations. Pick a ball, watch who wins.">
+<style>
+  :root { --bg: #111318; --panel: #1a1d25; --ink: #f3efe6; --dim: #9aa0ad; --line: #2a2e3a; --acc: #e2a336; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+  button:hover { border-color: var(--acc); }
+  button.on { background: var(--acc); color: #1a1408; border-color: var(--acc); }
+  #app { display: flex; height: 100%; }
+  #picker { flex: 1; overflow-y: auto; padding: 16px 16px 40px; }
+  header h1 { margin: 4px 0 2px; font-size: 1.8rem; letter-spacing: .5px; }
+  header .sub { margin: 0 0 8px; color: var(--dim); }
+  #record { color: var(--acc); font-weight: 700; min-height: 1.2em; margin-bottom: 10px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+  .tile { display: flex; flex-direction: column; padding: 6px; text-align: left; border-radius: 12px; gap: 4px; }
+  .tile canvas { width: 100%; aspect-ratio: 9 / 16; border-radius: 8px; background: #222; display: block; }
+  .tile .nm { font-weight: 700; font-size: .85rem; line-height: 1.15; }
+  .tile .pl { color: var(--dim); font-size: .72rem; }
+  .tile.cur { border-color: var(--acc); }
+  .foot { margin-top: 24px; color: var(--dim); font-size: .85rem; }
+  .foot a { color: var(--dim); }
+  #play { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  #stageWrap { flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+  #cv { display: block; touch-action: manipulation; border-radius: 6px; }
+  #bar { display: flex; gap: 6px; padding: 6px 8px 8px; flex-wrap: nowrap; justify-content: center; width: 100%; }
+  #bar button { padding: 7px 9px; min-width: 40px; font-size: .95rem; }
+  body.playing #picker { display: none; }
+  body.playing #play { display: flex; }
+  @media (min-width: 900px) {
+    #play { display: flex; width: auto; flex: 0 0 auto; padding: 10px 16px 0 0; }
+    body.playing #picker { display: block; }
+    #bBack { display: none; }
+  }
+  #testOut { position: fixed; inset: 0; margin: 0; padding: 12px; overflow: auto; background: #0b0c10; color: #cde; font: 12px/1.4 ui-monospace, Menlo, monospace; z-index: 9; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="picker">
+    <header>
+      <h1>Who Wins?</h1>
+      <p class="sub">30 tiny simulations. Tap a contestant before it starts to back it.</p>
+      <div id="record"></div>
+      <div class="row"><button id="bRandom">🎲 Random</button><button id="bShuffle">▶ Shuffle play</button></div>
+    </header>
+    <div id="grid"></div>
+    <p class="foot">Every round comes from a seed, so a great one can be shared: the seed is in the corner and in the address bar. <a href="../">All fun stuff</a></p>
+  </div>
+  <div id="play">
+    <div id="stageWrap"><canvas id="cv" aria-label="simulation"></canvas></div>
+    <div id="bar">
+      <button id="bBack" title="All sims">☰</button>
+      <button id="bRestart" title="New seed (R)">↻ New</button>
+      <button id="bReplay" title="Same seed">⟲</button>
+      <button id="bNext" title="Next sim (N)">⏭</button>
+      <button id="bSpeed" title="Speed">1x</button>
+      <button id="bShuf2" title="Shuffle play">🔀</button>
+      <button id="bSound" title="Sound">🔇</button>
+    </div>
+  </div>
+</div>
+<pre id="testOut" hidden></pre>
+<script>

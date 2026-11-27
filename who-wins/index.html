@@ -1,0 +1,2370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Who Wins?</title>
+<meta name="description" content="30 tiny satisfying simulations. Pick a ball, watch who wins.">
+<style>
+  :root { --bg: #111318; --panel: #1a1d25; --ink: #f3efe6; --dim: #9aa0ad; --line: #2a2e3a; --acc: #e2a336; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+  button { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+  button:hover { border-color: var(--acc); }
+  button.on { background: var(--acc); color: #1a1408; border-color: var(--acc); }
+  #app { display: flex; height: 100%; }
+  #picker { flex: 1; overflow-y: auto; padding: 16px 16px 40px; }
+  header h1 { margin: 4px 0 2px; font-size: 1.8rem; letter-spacing: .5px; }
+  header .sub { margin: 0 0 8px; color: var(--dim); }
+  #record { color: var(--acc); font-weight: 700; min-height: 1.2em; margin-bottom: 10px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+  .tile { display: flex; flex-direction: column; padding: 6px; text-align: left; border-radius: 12px; gap: 4px; }
+  .tile canvas { width: 100%; aspect-ratio: 9 / 16; border-radius: 8px; background: #222; display: block; }
+  .tile .nm { font-weight: 700; font-size: .85rem; line-height: 1.15; }
+  .tile .pl { color: var(--dim); font-size: .72rem; }
+  .tile.cur { border-color: var(--acc); }
+  .foot { margin-top: 24px; color: var(--dim); font-size: .85rem; }
+  .foot a { color: var(--dim); }
+  #play { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  #stageWrap { flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+  #cv { display: block; touch-action: manipulation; border-radius: 6px; }
+  #bar { display: flex; gap: 6px; padding: 6px 8px 8px; flex-wrap: nowrap; justify-content: center; width: 100%; }
+  #bar button { padding: 7px 9px; min-width: 40px; font-size: .95rem; }
+  body.playing #picker { display: none; }
+  body.playing #play { display: flex; }
+  @media (min-width: 900px) {
+    #play { display: flex; width: auto; flex: 0 0 auto; padding: 10px 16px 0 0; }
+    body.playing #picker { display: block; }
+    #bBack { display: none; }
+  }
+  #testOut { position: fixed; inset: 0; margin: 0; padding: 12px; overflow: auto; background: #0b0c10; color: #cde; font: 12px/1.4 ui-monospace, Menlo, monospace; z-index: 9; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="picker">
+    <header>
+      <h1>Who Wins?</h1>
+      <p class="sub">30 tiny simulations. Tap a contestant before it starts to back it.</p>
+      <div id="record"></div>
+      <div class="row"><button id="bRandom">🎲 Random</button><button id="bShuffle">▶ Shuffle play</button></div>
+    </header>
+    <div id="grid"></div>
+    <p class="foot">Every round comes from a seed, so a great one can be shared: the seed is in the corner and in the address bar. <a href="../">All fun stuff</a></p>
+  </div>
+  <div id="play">
+    <div id="stageWrap"><canvas id="cv" aria-label="simulation"></canvas></div>
+    <div id="bar">
+      <button id="bBack" title="All sims">☰</button>
+      <button id="bRestart" title="New seed (R)">↻ New</button>
+      <button id="bReplay" title="Same seed">⟲</button>
+      <button id="bNext" title="Next sim (N)">⏭</button>
+      <button id="bSpeed" title="Speed">1x</button>
+      <button id="bShuf2" title="Shuffle play">🔀</button>
+      <button id="bSound" title="Sound">🔇</button>
+    </div>
+  </div>
+</div>
+<pre id="testOut" hidden></pre>
+<script>
+'use strict';
+// ---------- constants, seeded rng, palette ----------
+const W = 540, H = 960, TAU = Math.PI * 2, DT = 1 / 120, MAX_T = 75;
+const SIMS = [];
+const PAL = [
+  { n: 'Red', c: '#e5484d' }, { n: 'Orange', c: '#f76b15' }, { n: 'Gold', c: '#e2a336' },
+  { n: 'Green', c: '#30a46c' }, { n: 'Teal', c: '#12a594' }, { n: 'Blue', c: '#3e63dd' },
+  { n: 'Purple', c: '#8e4ec6' }, { n: 'Pink', c: '#d6409f' }
+];
+function hexRgb(h) { const v = parseInt(h.slice(1), 16); return [v >> 16 & 255, v >> 8 & 255, v & 255]; }
+function shade(h, k) { // k<0 darker, k>0 lighter
+  const [r, g, b] = hexRgb(h), f = c => Math.round(k < 0 ? c * (1 + k) : c + (255 - c) * k);
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+function rgba(h, a) { const [r, g, b] = hexRgb(h); return `rgba(${r},${g},${b},${a})`; }
+PAL.forEach(p => { p.d = shade(p.c, -0.35); p.l = shade(p.c, 0.45); p.rgb = hexRgb(p.c); });
+
+function RNG(seed) {
+  let a = seed >>> 0;
+  const r = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  r.range = (lo, hi) => lo + (hi - lo) * r();
+  r.int = (lo, hi) => lo + Math.floor(r() * (hi - lo + 1));
+  r.pick = arr => arr[Math.floor(r() * arr.length)];
+  r.shuffle = arr => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+  r.ang = () => r() * TAU;
+  r.sign = () => r() < 0.5 ? -1 : 1;
+  return r;
+}
+
+// ---------- physics kit ----------
+const K = {
+  clamp: (v, a, b) => v < a ? a : v > b ? b : v,
+  lerp: (a, b, t) => a + (b - a) * t,
+  dist: (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay),
+  angDiff(a, b) { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; },
+  cont(rng, n) { return rng.shuffle(PAL.slice()).slice(0, n); },
+  ball(x, y, r, ang, spd, ci) { return { x, y, r, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, ci, m: r * r, dead: false }; },
+  speed(b, s) { const v = Math.hypot(b.vx, b.vy); if (v < 1e-6) { b.vx = s; b.vy = 0; return; } b.vx *= s / v; b.vy *= s / v; },
+  // keep a ball from bouncing perfectly horizontally/vertically forever
+  nudge(b, minA = 0.14) {
+    const s = Math.hypot(b.vx, b.vy); if (s < 1e-6) return;
+    let a = Math.atan2(b.vy, b.vx);
+    for (let k = -2; k <= 2; k++) {
+      const ax = k * Math.PI / 2, d = a - ax;
+      if (Math.abs(d) < minA) { a = ax + (d >= 0 ? minA : -minA); b.vx = Math.cos(a) * s; b.vy = Math.sin(a) * s; return; }
+    }
+  },
+  // small seeded rotation of a bounce, so circle billiards never settle into a fixed orbit
+  scatter(b, rng, a = 0.15) { const r = rng.range(-a, a), c = Math.cos(r), s = Math.sin(r), vx = b.vx; b.vx = vx * c - b.vy * s; b.vy = vx * s + b.vy * c; },
+  move(b, dt) { b.x += b.vx * dt; b.y += b.vy * dt; },
+  // elastic circle-circle; returns impact speed (0 if no hit)
+  collide(a, b, e = 1) {
+    const dx = b.x - a.x, dy = b.y - a.y, rr = a.r + b.r, d2 = dx * dx + dy * dy;
+    if (d2 >= rr * rr || d2 < 1e-9) return 0;
+    const d = Math.sqrt(d2), nx = dx / d, ny = dy / d, ma = a.m || a.r * a.r, mb = b.m || b.r * b.r;
+    const ia = 1 / ma, ib = 1 / mb, ov = (rr - d) / (ia + ib);
+    a.x -= nx * ov * ia; a.y -= ny * ov * ia; b.x += nx * ov * ib; b.y += ny * ov * ib;
+    const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+    if (vn >= 0) return 0.001;
+    const j = -(1 + e) * vn / (ia + ib);
+    a.vx -= j * ia * nx; a.vy -= j * ia * ny; b.vx += j * ib * nx; b.vy += j * ib * ny;
+    return -vn;
+  },
+  // axis-aligned box walls (inside); returns bitmask 1=left 2=right 4=top 8=bottom
+  box(b, x0, y0, x1, y1, e = 1) {
+    let h = 0;
+    if (b.x - b.r < x0) { b.x = x0 + b.r; if (b.vx < 0) b.vx = -b.vx * e; h |= 1; }
+    if (b.x + b.r > x1) { b.x = x1 - b.r; if (b.vx > 0) b.vx = -b.vx * e; h |= 2; }
+    if (b.y - b.r < y0) { b.y = y0 + b.r; if (b.vy < 0) b.vy = -b.vy * e; h |= 4; }
+    if (b.y + b.r > y1) { b.y = y1 - b.r; if (b.vy > 0) b.vy = -b.vy * e; h |= 8; }
+    return h;
+  },
+  // inside a circular wall; returns true on bounce
+  ringIn(b, cx, cy, R, e = 1) {
+    const dx = b.x - cx, dy = b.y - cy, d = Math.hypot(dx, dy);
+    if (d + b.r <= R || d < 1e-6) return false;
+    const nx = dx / d, ny = dy / d;
+    b.x = cx + nx * (R - b.r); b.y = cy + ny * (R - b.r);
+    const vn = b.vx * nx + b.vy * ny;
+    if (vn > 0) { b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny; }
+    return true;
+  },
+  // outside of a circle (ball bounces off a round obstacle)
+  ringOut(b, cx, cy, R, e = 1) {
+    const dx = b.x - cx, dy = b.y - cy, d = Math.hypot(dx, dy);
+    if (d - b.r >= R || d < 1e-6) return false;
+    const nx = dx / d, ny = dy / d;
+    b.x = cx + nx * (R + b.r); b.y = cy + ny * (R + b.r);
+    const vn = b.vx * nx + b.vy * ny;
+    if (vn < 0) { b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny; }
+    return true;
+  },
+  // closest point on segment; returns [dist, t, cx, cy]
+  segClosest(px, py, ax, ay, bx, by) {
+    const ex = bx - ax, ey = by - ay, l2 = ex * ex + ey * ey;
+    let t = l2 > 0 ? ((px - ax) * ex + (py - ay) * ey) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const cx = ax + ex * t, cy = ay + ey * t;
+    return [Math.hypot(px - cx, py - cy), t, cx, cy];
+  },
+  // circle vs thick segment (capsule); returns impact speed or 0. svx/svy = segment velocity at contact (moving walls)
+  seg(b, ax, ay, bx, by, e = 1, th = 0, svx = 0, svy = 0) {
+    const [d, , cx, cy] = K.segClosest(b.x, b.y, ax, ay, bx, by), rr = b.r + th;
+    if (d >= rr) return 0;
+    let nx, ny;
+    if (d > 1e-6) { nx = (b.x - cx) / d; ny = (b.y - cy) / d; } else { nx = -(by - ay); ny = bx - ax; const l = Math.hypot(nx, ny) || 1; nx /= l; ny /= l; }
+    b.x = cx + nx * rr; b.y = cy + ny * rr;
+    const rvx = b.vx - svx, rvy = b.vy - svy, vn = rvx * nx + rvy * ny;
+    if (vn < 0) { b.vx -= (1 + e) * vn * nx; b.vy -= (1 + e) * vn * ny; return -vn; }
+    return 0.001;
+  },
+  segX(ax, ay, bx, by, cx, cy, dx, dy) { // proper segment intersection -> [t,u] or null
+    const rx = bx - ax, ry = by - ay, sx = dx - cx, sy = dy - cy, den = rx * sy - ry * sx;
+    if (Math.abs(den) < 1e-9) return null;
+    const t = ((cx - ax) * sy - (cy - ay) * sx) / den, u = ((cx - ax) * ry - (cy - ay) * rx) / den;
+    return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? [t, u] : null;
+  },
+  // all-pairs helper
+  pairs(arr, fn) { for (let i = 0; i < arr.length; i++) { const a = arr[i]; if (a.dead) continue; for (let j = i + 1; j < arr.length; j++) { const b = arr[j]; if (!b.dead) fn(a, b); } } },
+  // uniform spatial hash for many bodies
+  hashPairs(arr, cell, fn) {
+    const m = new Map();
+    for (const o of arr) { if (o.dead) continue; const k = (Math.floor(o.x / cell) + 64) * 4096 + Math.floor(o.y / cell) + 64; let l = m.get(k); if (!l) m.set(k, l = []); l.push(o); }
+    for (const [k, l] of m) {
+      const cx = Math.floor(k / 4096), cy = k % 4096;
+      for (let i = 0; i < l.length; i++) for (let j = i + 1; j < l.length; j++) fn(l[i], l[j]);
+      for (const [ox, oy] of [[1, 0], [0, 1], [1, 1], [1, -1]]) {
+        const l2 = m.get((cx + ox) * 4096 + cy + oy); if (!l2) continue;
+        for (const a of l) for (const b of l2) fn(a, b);
+      }
+    }
+  },
+  // the last of `ids` (all dying this step) to keep: deterministic by score fn, tie broken by rng
+  pickOne(rng, ids, scoreFn) { let best = -Infinity, out = []; for (const i of ids) { const s = scoreFn ? scoreFn(i) : 0; if (s > best + 1e-9) { best = s; out = [i]; } else if (Math.abs(s - best) <= 1e-9) out.push(i); } return out.length === 1 ? out[0] : rng.pick(out); },
+  aliveIdx(st) { const r = []; for (let i = 0; i < st.C.length; i++) if (!st.out[i]) r.push(i); return r; },
+  // mark contestants out; settle a winner when one (or none) remains
+  knock(st, ids, scoreFn) {
+    if (!ids.length || st.win != null) { ids.forEach(i => st.out[i] = true); return; }
+    const before = K.aliveIdx(st);
+    ids.forEach(i => { if (!st.out[i]) { st.out[i] = true; st.outT[i] = st.t; } });
+    const left = K.aliveIdx(st);
+    if (left.length === 1) st.win = left[0];
+    else if (left.length === 0) { const w = K.pickOne(st.rng, before, scoreFn); st.out[w] = false; st.outT[w] = 0; st.win = w; }
+  },
+  base(rng, n, extra) { const C = K.cont(rng, n); return Object.assign({ rng, C, out: C.map(() => false), outT: C.map(() => 0), t: 0, win: null }, extra || {}); }
+};
+
+// ---------- visual-only particles (Math.random is fine here: never affects outcomes) ----------
+const FX = {
+  P: [], off: false, sh: 0, flashA: 0, flashC: '#fff',
+  burst(x, y, col, n = 14, spd = 180, life = 0.6, size = 3, g = 0) {
+    if (this.off) return;
+    for (let i = 0; i < n && this.P.length < 400; i++) {
+      const a = Math.random() * TAU, s = spd * (0.3 + Math.random() * 0.8);
+      this.P.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: life * (0.6 + Math.random() * 0.6), max: life, col, size: size * (0.6 + Math.random() * 0.8), g, k: 0 });
+    }
+  },
+  confetti(cols, n = 120) {
+    if (this.off) return;
+    for (let i = 0; i < n && this.P.length < 420; i++) this.P.push({ x: Math.random() * W, y: -20 - Math.random() * 200, vx: (Math.random() - 0.5) * 120, vy: 150 + Math.random() * 250, life: 3, max: 3, col: cols[i % cols.length], size: 5 + Math.random() * 4, g: 120, k: 1, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 12 });
+  },
+  ring(x, y, col, r = 40, life = 0.5) { if (!this.off && this.P.length < 420) this.P.push({ x, y, vx: 0, vy: 0, life, max: life, col, size: r, g: 0, k: 2 }); },
+  shake(a) { if (!this.off) this.sh = Math.max(this.sh, a); },
+  flash(col, a = 0.35) { if (!this.off) { this.flashC = col; this.flashA = a; } },
+  clear() { this.P.length = 0; this.sh = 0; this.flashA = 0; },
+  update(dt) {
+    for (let i = this.P.length - 1; i >= 0; i--) {
+      const p = this.P[i]; p.life -= dt;
+      if (p.life <= 0) { this.P.splice(i, 1); continue; }
+      p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.k === 0) { p.vx *= 1 - 2 * dt; p.vy *= 1 - 2 * dt; }
+      if (p.k === 1) p.rot += p.vr * dt;
+    }
+    this.sh *= Math.pow(0.02, dt); this.flashA *= Math.pow(0.05, dt);
+  },
+  draw(ctx) {
+    for (const p of this.P) {
+      const a = Math.max(0, p.life / p.max);
+      ctx.globalAlpha = p.k === 1 ? Math.min(1, a * 2) : a;
+      if (p.k === 2) { ctx.strokeStyle = p.col; ctx.lineWidth = 3 * a + 1; ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (1.6 - a), 0, TAU); ctx.stroke(); }
+      else if (p.k === 1) { ctx.fillStyle = p.col; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2); ctx.restore(); }
+      else { ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.4 + 0.6 * a), 0, TAU); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1;
+  }
+};
+
+// ---------- drawing kit ----------
+const D = {
+  cache: new Map(),
+  mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; },
+  sprite(col, night) {
+    const key = col + night; let s = this.cache.get(key); if (s) return s;
+    s = this.mk(128, 128); const g = s.getContext('2d');
+    const gr = g.createRadialGradient(46, 42, 4, 64, 64, 62);
+    gr.addColorStop(0, shade(col, 0.55)); gr.addColorStop(0.35, col); gr.addColorStop(1, shade(col, -0.3));
+    g.fillStyle = gr; g.beginPath(); g.arc(64, 64, 60, 0, TAU); g.fill();
+    if (!night) { g.strokeStyle = shade(col, -0.45); g.lineWidth = 5; g.stroke(); }
+    g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.ellipse(44, 38, 16, 10, -0.6, 0, TAU); g.fill();
+    this.cache.set(key, s); return s;
+  },
+  glowS(col) {
+    const key = 'g' + col; let s = this.cache.get(key); if (s) return s;
+    s = this.mk(128, 128); const g = s.getContext('2d');
+    const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, rgba(col, 0.55)); gr.addColorStop(0.4, rgba(col, 0.18)); gr.addColorStop(1, rgba(col, 0));
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128); this.cache.set(key, s); return s;
+  },
+  ball(ctx, x, y, r, col, night) {
+    if (night) { ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(this.glowS(col), x - r * 2.6, y - r * 2.6, r * 5.2, r * 5.2); ctx.globalCompositeOperation = 'source-over'; }
+    ctx.drawImage(this.sprite(col, night), x - r, y - r, r * 2, r * 2);
+  },
+  glow(ctx, x, y, r, col, a = 1) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a; ctx.drawImage(this.glowS(col), x - r, y - r, r * 2, r * 2); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; },
+  text(ctx, s, x, y, size, col, align = 'center', weight = 800) {
+    ctx.font = `${weight} ${size}px system-ui,-apple-system,Segoe UI,Roboto,sans-serif`;
+    ctx.textAlign = align; ctx.textBaseline = 'middle'; ctx.fillStyle = col; ctx.fillText(s, x, y);
+  },
+  circle(ctx, x, y, r, stroke, lw = 2, fill) { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.stroke(); } },
+  line(ctx, ax, ay, bx, by, col, lw = 2) { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); },
+  // persistent offscreen layer kept on the state (not part of the simulation)
+  layer(st, name, w = W, h = H) { st._lay = st._lay || {}; if (!st._lay[name]) st._lay[name] = this.mk(w, h); return st._lay[name]; }
+};
+const INK = '#2b2620', GOLD = '#c9a25a', PAPER = '#f3efe6', NIGHT = '#0e1116';
+
+// ---------- one round without drawing (used by ?test=1 and the Node test) ----------
+function tickSim(sim, st) { st.t += DT; sim.step(st, DT); }
+function leadOf(sim, st) {
+  if (sim.lead) return sim.lead(st);
+  const v = sim.hud(st); let b = -Infinity, w = 0;
+  v.forEach((x, i) => { const n = parseFloat(x); if (!st.out[i] && n > b) { b = n; w = i; } });
+  return w;
+}
+function runRound(sim, seed, maxT = MAX_T) {
+  const st = sim.init(RNG(seed));
+  while (st.win == null && st.t < maxT) tickSim(sim, st);
+  const capped = st.win == null; if (capped) st.win = leadOf(sim, st);
+  return { win: st.win, t: st.t, capped, n: st.C.length };
+}
+// ---------- audio: one context, pentatonic blips, throttled ----------
+const AU = {
+  ctx: null, on: false, master: null, last: {}, voices: 0, noiseBuf: null,
+  PENTA: [0, 2, 4, 7, 9],
+  init() {
+    if (this.ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.gain.value = 0.5; this.master.connect(this.ctx.destination);
+    const n = this.ctx.sampleRate; this.noiseBuf = this.ctx.createBuffer(1, n, n);
+    const d = this.noiseBuf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  },
+  ok(key, gap = 0.03) {
+    if (!this.on || !this.ctx || this.voices >= 8) return false;
+    const t = this.ctx.currentTime; if (this.last[key] && t - this.last[key] < gap) return false;
+    this.last[key] = t; this.voices++; return true;
+  },
+  hz(i) { i = Math.max(0, Math.min(29, Math.round(i))); return 196 * Math.pow(2, (this.PENTA[i % 5] + 12 * Math.floor(i / 5)) / 12); },
+  tone(f, dur, vol, type = 'sine', slide = 0, key) {
+    if (!this.ok(key || ('t' + Math.round(f)))) return;
+    const c = this.ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, f * slide), t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.02);
+  },
+  noise(dur, freq, vol, type = 'bandpass', q = 1, key = 'n') {
+    if (!this.ok(key, 0.04)) return;
+    const c = this.ctx, t = c.currentTime, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+    s.buffer = this.noiseBuf; f.type = type; f.frequency.value = freq; f.Q.value = q;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(this.master); s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
+  },
+  blip(i, v = 0.18) { this.tone(this.hz(i), 0.16, v, 'sine', 0, 'b' + i); },
+  pluck(i, v = 0.16) { this.tone(this.hz(i), 0.35, v, 'triangle', 0, 'p' + i); },
+  tick(v = 0.1) { this.tone(2400, 0.03, v, 'square', 0, 'tick'); },
+  coin(v = 0.12) { this.tone(1320, 0.07, v, 'square', 1.5, 'coin'); },
+  thud(v = 0.3) { this.tone(110, 0.18, Math.min(0.6, v), 'sine', 0.5, 'thud'); },
+  pop(v = 0.25) { this.tone(600, 0.09, v, 'triangle', 0.3, 'pop'); this.noise(0.06, 2000, v * 0.6, 'highpass', 1, 'popn'); },
+  snip(v = 0.15) { this.noise(0.04, 5000, v, 'highpass', 2, 'snip'); },
+  boom(v = 0.5) { this.tone(70, 0.6, v, 'sine', 0.4, 'boom'); this.noise(0.5, 300, v, 'lowpass', 1, 'boomn'); },
+  whoosh(v = 0.2) { this.noise(0.35, 900, v, 'bandpass', 0.8, 'wh'); },
+  zap(v = 0.2) { this.tone(900, 0.2, v, 'sawtooth', 0.2, 'zap'); },
+  ting(v = 0.15) { this.tone(2600, 0.25, v, 'triangle', 0.98, 'ting'); },
+  chime() { [0, 2, 4].forEach((k, j) => setTimeout(() => this.tone(this.hz(12 + k * 2), 0.6, 0.2, 'triangle', 0, 'ch' + j), j * 90)); },
+  frame() { this.voices = 0; }
+};
+// ===================== A. Arena brawls =====================
+const AX = 270, AY = 548, AR = 255; // shared circular arena
+const BX0 = 22, BY0 = 140, BX1 = 518, BY1 = 938; // shared box arena
+function spread(rng, n, R, minD, cx = AX, cy = AY) { // n non-overlapping points in a disc
+  const pts = [];
+  for (let k = 0; pts.length < n && k < 5000; k++) {
+    const a = rng.ang(), r = R * Math.sqrt(rng()), x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+    if (pts.every(p => Math.hypot(p[0] - x, p[1] - y) > minD)) pts.push([x, y]);
+  }
+  while (pts.length < n) pts.push([cx + rng.range(-R, R) * 0.7, cy + rng.range(-R, R) * 0.7]);
+  return pts;
+}
+function spreadBox(rng, n, minD, x0 = BX0 + 30, y0 = BY0 + 30, x1 = BX1 - 30, y1 = BY1 - 30) {
+  const pts = [];
+  for (let k = 0; pts.length < n && k < 5000; k++) { const x = rng.range(x0, x1), y = rng.range(y0, y1); if (pts.every(p => Math.hypot(p[0] - x, p[1] - y) > minD)) pts.push([x, y]); }
+  while (pts.length < n) pts.push([rng.range(x0, x1), rng.range(y0, y1)]);
+  return pts;
+}
+function drawBalls(st, ctx, night, extra) {
+  for (const b of st.balls) {
+    if (b.dead && !(b.fall > 0)) continue;
+    const s = b.dead ? Math.max(0, b.fall) : 1;
+    if (s <= 0) continue;
+    ctx.globalAlpha = b.dead ? s : 1;
+    D.ball(ctx, b.x, b.y, b.r * s, st.C[b.ci].c, night);
+    if (extra) extra(b);
+    ctx.globalAlpha = 1;
+  }
+}
+function fallTick(st, dt, rate = 2) { for (const b of st.balls) if (b.dead && b.fall > 0) b.fall -= dt * rate; }
+
+// ---------- 1. Tether Cutters ----------
+SIMS.push({
+  id: 'tether', name: 'Tether Cutters', caption: 'Last ball with a thread wins', theme: 'paper',
+  init(rng) {
+    const n = rng.int(3, 5), st = K.base(rng, n, { cuts: [], grey: false, cd: {} });
+    const pts = spread(rng, n, 140, 90);
+    st.balls = pts.map((p, i) => {
+      const b = K.ball(p[0], p[1], 12, rng.ang(), 240, i); b.th = []; b.decay = 0;
+      const a0 = Math.atan2(p[1] - AY, p[0] - AX);
+      for (let k = 0; k < 16; k++) { const a = a0 + (k - 7.5) * 0.15; b.th.push({ x: AX + Math.cos(a) * AR, y: AY + Math.sin(a) * AR }); }
+      return b;
+    });
+    return st;
+  },
+  step(st, dt) {
+    const B = st.balls; st.grey = st.t > 30;
+    for (const b of B) {
+      if (b.dead) continue;
+      K.move(b, dt);
+      if (K.ringIn(b, AX, AY, AR)) {
+        K.scatter(b, st.rng);
+        if (!st.grey) { const a = Math.atan2(b.y - AY, b.x - AX); for (let k = -2; k <= 2 && b.th.length < 90; k++) b.th.push({ x: AX + Math.cos(a + k * 0.05) * AR, y: AY + Math.sin(a + k * 0.05) * AR }); AU.pluck(Math.min(24, 4 + b.th.length / 4)); }
+      }
+    }
+    K.pairs(B, (a, b) => { if (K.collide(a, b) > 1) AU.blip(3, 0.1); });
+    for (const b of B) if (!b.dead) K.speed(b, 240);
+    // cutting: a ball's body crossing another ball's thread (away from that ball's hub)
+    for (const a of B) {
+      if (a.dead) continue;
+      for (const o of B) {
+        if (o === a || o.dead) continue;
+        const hub = a.r + o.r + 5, key = a.ci * 8 + o.ci;
+        if (st.cd[key] > st.t) continue;
+        for (let k = o.th.length - 1; k >= 0; k--) {
+          const th = o.th[k], [d, t, cx, cy] = K.segClosest(a.x, a.y, o.x, o.y, th.x, th.y);
+          if (d < a.r && t > 0.3 && Math.hypot(cx - o.x, cy - o.y) > hub) {
+            st.cd[key] = st.t + 0.03;
+            st.cuts.push({ ax: th.x, ay: th.y, bx: cx, by: cy, ci: o.ci, t: st.t }); o.th.splice(k, 1); AU.snip(); break;
+          }
+        }
+      }
+    }
+    // late game: threads decay so it always ends
+    if (st.t > 50) for (const b of B) if (!b.dead && (b.decay -= dt) <= 0) { b.decay = 0.5; const th = b.th.shift(); if (th) st.cuts.push({ ax: th.x, ay: th.y, bx: b.x, by: b.y, ci: b.ci, t: st.t }); }
+    const dying = [];
+    for (const b of B) if (!b.dead && b.th.length === 0) { b.dead = true; b.fall = 1; dying.push(b.ci); FX.burst(b.x, b.y, st.C[b.ci].c, 20); AU.pop(); }
+    if (dying.length) K.knock(st, dying);
+    fallTick(st, dt);
+    if (st.cuts.length && st.t - st.cuts[0].t > 0.7) st.cuts.shift();
+  },
+  draw(st, ctx) {
+    D.circle(ctx, AX, AY, AR, st.grey ? '#a9a49a' : GOLD, 3);
+    for (const b of st.balls) {
+      if (b.dead) continue;
+      ctx.strokeStyle = rgba(st.C[b.ci].c, 0.75); ctx.lineWidth = 1.2; ctx.beginPath();
+      for (const th of b.th) { ctx.moveTo(b.x, b.y); ctx.lineTo(th.x, th.y); }
+      ctx.stroke();
+      ctx.fillStyle = st.C[b.ci].c; for (const th of b.th) ctx.fillRect(th.x - 1.5, th.y - 1.5, 3, 3);
+    }
+    ctx.setLineDash([4, 4]);
+    for (const c of st.cuts) {
+      const k = Math.min(1, (st.t - c.t) / 0.6); ctx.globalAlpha = 1 - k; ctx.strokeStyle = st.C[c.ci].c; ctx.lineWidth = 1.2;
+      const s = k < 0.3 ? 1 : 1 - (k - 0.3) / 0.7; ctx.beginPath(); ctx.moveTo(c.ax, c.ay); ctx.lineTo(c.ax + (c.bx - c.ax) * s, c.ay + (c.by - c.ay) * s); ctx.stroke();
+    }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    drawBalls(st, ctx, false);
+    if (st.grey) D.text(ctx, 'The wall stopped giving threads', W / 2, AY + AR + 40, 15, '#8a7f6c', 'center', 700);
+  },
+  hud: st => st.balls.map(b => b.th.length),
+  lead: st => K.aliveIdx(st).sort((a, b) => st.balls[b].th.length - st.balls[a].th.length)[0]
+});
+
+// ---------- 2. Number Brawl ----------
+SIMS.push({
+  id: 'brawl', name: 'Number Brawl', caption: 'Bigger number steals. Last one wins', theme: 'night',
+  init(rng) {
+    const st = K.base(rng, 6, { cd: {} });
+    st.balls = spreadBox(rng, 6, 90).map((p, i) => { const b = K.ball(p[0], p[1], 20, rng.ang(), 250, i); b.n = 10; b.pz = 0; return b; });
+    st.balls.forEach(b => this.size(b));
+    return st;
+  },
+  size(b) { b.r = 9 + 3.6 * Math.sqrt(Math.max(1, b.n)); b.m = b.r * b.r; b.spd = Math.max(140, 290 - 2.2 * b.n); },
+  step(st, dt) {
+    const late = st.t > 40, B = st.balls;
+    for (const b of B) {
+      if (b.dead) continue; K.move(b, dt);
+      if (K.box(b, BX0, BY0, BX1, BY1)) { K.nudge(b); K.scatter(b, st.rng, 0.05); if (!late) { b.n++; b.pz = 1; this.size(b); AU.coin(0.06); } else if (st.t > 55) { b.n--; b.pz = 1; this.size(b); } }
+      b.pz = Math.max(0, b.pz - dt * 4);
+    }
+    K.pairs(B, (a, b) => {
+      if (K.collide(a, b) < 1) return;
+      const key = a.ci * 8 + b.ci; if (st.cd[key] > st.t) return; st.cd[key] = st.t + 0.15;
+      let big = a.n > b.n ? a : b, sm = big === a ? b : a;
+      if (a.n === b.n) { if (!late) return; if (st.rng() < 0.5) [big, sm] = [sm, big]; }
+      const amt = Math.min(sm.n, Math.max(1, Math.round((late ? 0.4 : 0.2) * big.n)));
+      big.n += amt; sm.n -= amt; big.pz = sm.pz = 1; this.size(big); this.size(sm);
+      AU.thud(0.15 + amt / 40); FX.burst((a.x + b.x) / 2, (a.y + b.y) / 2, st.C[big.ci].c, 6 + amt, 160);
+    });
+    const dying = [];
+    for (const b of B) { if (b.dead) continue; K.speed(b, b.spd); if (b.n <= 0) { b.dead = true; b.fall = 1; dying.push(b.ci); FX.burst(b.x, b.y, st.C[b.ci].c, 26, 260); AU.pop(); } }
+    if (dying.length) K.knock(st, dying);
+    fallTick(st, dt);
+  },
+  draw(st, ctx) {
+    ctx.strokeStyle = st.t > 40 ? '#5a2a2a' : '#2c3342'; ctx.lineWidth = 3; ctx.strokeRect(BX0, BY0, BX1 - BX0, BY1 - BY0);
+    drawBalls(st, ctx, true, b => { if (!b.dead) D.text(ctx, String(b.n), b.x, b.y + 1, b.r * (0.85 + b.pz * 0.35), '#fff', 'center', 900); });
+  },
+  hud: st => st.balls.map(b => b.n)
+});
+
+// ---------- 3. Blade Dancers ----------
+const BLADES = [
+  { nm: 'Swords', bl: [{ o: 0, len: 60, w: 5 }], spin: 3.2, dmg: 9 },
+  { nm: 'Twin daggers', bl: [{ o: 0, len: 34, w: 4 }, { o: Math.PI, len: 34, w: 4 }], spin: 5.5, dmg: 6 },
+  { nm: 'Hammers', bl: [{ o: 0, len: 44, w: 13 }], spin: 2.3, dmg: 15 },
+  { nm: 'Spiked shields', bl: [{ o: 0, len: 40, w: 6 }, { o: 2.1, len: 20, w: 12 }, { o: -2.1, len: 20, w: 12 }], spin: 4, dmg: 7 }
+];
+SIMS.push({
+  id: 'blades', name: 'Blade Dancers', caption: 'Spinning blades. Last one alive', theme: 'night',
+  init(rng) {
+    const st = K.base(rng, 4, { wp: rng.pick(BLADES), cd: {} });
+    st.balls = spread(rng, 4, 150, 120).map((p, i) => { const b = K.ball(p[0], p[1], 17, rng.ang(), 190, i); b.hp = 100; b.ang = rng.ang(); b.dir = rng.sign(); b.grow = 1; b.hit = 0; return b; });
+    return st;
+  },
+  blades(st, b) { return st.wp.bl.map(q => { const a = b.ang + q.o, c = Math.cos(a), s = Math.sin(a), L = q.len * b.grow; return { ax: b.x + c * b.r * 0.8, ay: b.y + s * b.r * 0.8, bx: b.x + c * (b.r + L), by: b.y + s * (b.r + L), w: q.w }; }); },
+  step(st, dt) {
+    const B = st.balls, mult = st.t > 30 ? 1.5 : 1, dm = (st.t > 45 ? 4 : st.t > 30 ? 2 : 1) * 1.5;
+    for (const b of B) { if (b.dead) continue; K.move(b, dt); if (K.ringIn(b, AX, AY, AR)) { K.scatter(b, st.rng); AU.blip(2, 0.06); } b.ang += st.wp.spin * b.dir * mult * dt; b.hit = Math.max(0, b.hit - dt * 4); }
+    K.pairs(B, (a, b) => K.collide(a, b));
+    const bl = B.map(b => b.dead ? null : this.blades(st, b));
+    for (const a of B) {
+      if (a.dead) continue;
+      for (const o of B) {
+        if (o === a || o.dead) continue;
+        for (const s of bl[a.ci]) {
+          const [d] = K.segClosest(o.x, o.y, s.ax, s.ay, s.bx, s.by);
+          const key = a.ci * 8 + o.ci;
+          if (d < o.r + s.w / 2 && !(st.cd[key] > st.t)) {
+            st.cd[key] = st.t + 0.45; o.hp -= st.wp.dmg * dm; o.hit = 1; a.grow = Math.min(1.8, a.grow * 1.05);
+            const nx = o.x - a.x, ny = o.y - a.y, l = Math.hypot(nx, ny) || 1; o.vx = nx / l * 190; o.vy = ny / l * 190;
+            FX.burst(o.x, o.y, st.C[a.ci].c, 10, 220); AU.noise(0.08, 3000, 0.18, 'bandpass', 3, 'slice'); FX.shake(4);
+          }
+        }
+      }
+    }
+    for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
+      if (!bl[i] || !bl[j]) continue; const key = 100 + i * 8 + j; if (st.cd[key] > st.t) continue;
+      let hit = null;
+      for (const s of bl[i]) for (const u of bl[j]) {
+        if (K.segX(s.ax, s.ay, s.bx, s.by, u.ax, u.ay, u.bx, u.by)) hit = [(s.bx + u.bx) / 2, (s.by + u.by) / 2];
+        else { const [d, , cx, cy] = K.segClosest(u.bx, u.by, s.ax, s.ay, s.bx, s.by); if (d < (s.w + u.w) / 2) hit = [cx, cy]; }
+      }
+      if (hit) { st.cd[key] = st.t + 0.3; B[i].dir *= -1; B[j].dir *= -1; FX.burst(hit[0], hit[1], '#ffe9a8', 12, 260, 0.35, 2); AU.ting(); }
+    }
+    const dying = [];
+    for (const b of B) { if (b.dead) continue; K.speed(b, 190); if (b.hp <= 0) { b.dead = true; b.fall = 1; dying.push(b.ci); FX.burst(b.x, b.y, st.C[b.ci].c, 30, 280); AU.boom(0.3); } }
+    if (dying.length) K.knock(st, dying, i => B[i].hp);
+    fallTick(st, dt);
+  },
+  draw(st, ctx) {
+    D.circle(ctx, AX, AY, AR, st.t > 30 ? '#7a3040' : '#3a4256', 3);
+    for (const b of st.balls) {
+      if (b.dead) continue; const col = st.C[b.ci].c;
+      for (const s of this.blades(st, b)) { ctx.lineCap = 'round'; D.line(ctx, s.ax, s.ay, s.bx, s.by, rgba(col, 0.25), s.w + 6); D.line(ctx, s.ax, s.ay, s.bx, s.by, shade(col, 0.6), s.w); }
+      ctx.lineCap = 'butt';
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 6, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 6, -Math.PI / 2, -Math.PI / 2 + TAU * Math.max(0, b.hp) / 100); ctx.stroke();
+    }
+    drawBalls(st, ctx, true, b => { if (b.hit > 0) D.circle(ctx, b.x, b.y, b.r, null, 0, `rgba(255,255,255,${b.hit * 0.7})`); });
+    D.text(ctx, st.wp.nm + (st.t > 30 ? ' · FRENZY' : ''), W / 2, AY + AR + 40, 15, '#6f7686', 'center', 700);
+  },
+  hud: st => st.balls.map(b => Math.max(0, Math.ceil(b.hp)))
+});
+
+// ---------- 4. Spike Garden ----------
+SIMS.push({
+  id: 'spikes', name: 'Spike Garden', caption: 'Every bounce grows a spike', theme: 'paper',
+  init(rng) {
+    const st = K.base(rng, 6, { sp: [] });
+    st.balls = spread(rng, 6, 150, 60).map((p, i) => K.ball(p[0], p[1], 9, rng.ang(), 175, i));
+    return st;
+  },
+  step(st, dt) {
+    const B = st.balls, L = st.t > 40 ? 30 : 18, dying = [];
+    for (const b of B) { if (!b.dead) K.move(b, dt); }
+    K.pairs(B, (a, b) => { if (K.collide(a, b) > 1) AU.blip(6, 0.08); });
+    for (const b of B) {
+      if (b.dead) continue;
+      for (const s of st.sp) {
+        if (s.o === b.ci && st.t - s.t < 0.15) continue;
+        const [d, t] = K.segClosest(b.x, b.y, s.bx, s.by, s.tx, s.ty);
+        if (d < b.r - 1 + 4 * (1 - t)) { b.dead = true; b.fall = 1; dying.push(b.ci); FX.burst(b.x, b.y, st.C[b.ci].c, 24, 240); AU.pop(0.3); break; }
+      }
+      if (b.dead) continue;
+      if (K.ringIn(b, AX, AY, AR)) {
+        K.scatter(b, st.rng);
+        const a = Math.atan2(b.y - AY, b.x - AX), c = Math.cos(a), s = Math.sin(a);
+        st.sp.push({ a, o: b.ci, t: st.t, bx: AX + c * AR, by: AY + s * AR, tx: AX + c * (AR - L), ty: AY + s * (AR - L), L });
+        AU.tick(0.06);
+      }
+      K.speed(b, 175);
+    }
+    if (dying.length) K.knock(st, dying);
+    fallTick(st, dt);
+  },
+  draw(st, ctx) {
+    for (const s of st.sp) {
+      const g = Math.min(1, (st.t - s.t) / 0.12), c = Math.cos(s.a), sn = Math.sin(s.a), px = -sn * 5, py = c * 5;
+      const tx = s.bx + (s.tx - s.bx) * g, ty = s.by + (s.ty - s.by) * g;
+      ctx.fillStyle = st.C[s.o].c; ctx.beginPath(); ctx.moveTo(s.bx + px, s.by + py); ctx.lineTo(tx, ty); ctx.lineTo(s.bx - px, s.by - py); ctx.closePath(); ctx.fill();
+    }
+    D.circle(ctx, AX, AY, AR + 2, INK, 5);
+    drawBalls(st, ctx, false);
+  },
+  hud: st => st.balls.map(b => st.sp.filter(s => s.o === b.ci).length),
+  lead: st => K.aliveIdx(st)[0]
+});
+
+// ---------- 5. Hot Potato ----------
+SIMS.push({
+  id: 'potato', name: 'Hot Potato', caption: 'Don’t be holding it when it blows', theme: 'night',
+  init(rng) {
+    const st = K.base(rng, 8, { hold: -1, fuse: 0, left: 0, prev: -1, passT: -9, next: 0.3, lastFuse: rng.range(6, 9), tk: 0 });
+    st.balls = spreadBox(rng, 8, 80).map((p, i) => K.ball(p[0], p[1], 15, rng.ang(), 210, i));
+    return st;
+  },
+  step(st, dt) {
+    const B = st.balls;
+    if (st.hold < 0 && st.win == null && (st.next -= dt) <= 0) {
+      const alive = B.filter(b => !b.dead); const h = st.rng.pick(alive);
+      st.hold = h.ci; st.fuse = st.left = st.lastFuse; st.lastFuse = Math.max(2.5, st.lastFuse * 0.85 + st.rng.range(-0.3, 0.3)); st.prev = -1;
+      FX.ring(h.x, h.y, '#ff5a3c', 30); AU.zap(0.12);
+    }
+    for (const b of B) { if (b.dead) continue; K.move(b, dt); if (K.box(b, BX0, BY0, BX1, BY1)) { K.nudge(b); AU.blip(st.hold === b.ci ? 12 : 4, 0.05); } }
+    K.pairs(B, (a, b) => {
+      const imp = K.collide(a, b); if (imp < 0.5 || st.hold < 0) return;
+      const h = a.ci === st.hold ? a : b.ci === st.hold ? b : null; if (!h) return;
+      const o = h === a ? b : a;
+      if (o.ci === st.prev && st.t - st.passT < 0.4) return;
+      st.prev = h.ci; st.passT = st.t; st.hold = o.ci; AU.blip(14, 0.15); FX.burst(o.x, o.y, '#ff8a3c', 8, 150);
+    });
+    for (const b of B) if (!b.dead) { K.speed(b, b.ci === st.hold ? 262 : 210); if (b.ci === st.hold) FX.burst(b.x, b.y, Math.random() < 0.5 ? '#ff7a2a' : '#ffc04a', 1, 30, 0.5, 2.5); }
+    if (st.hold >= 0) {
+      st.left -= dt;
+      const k = st.left / st.fuse; st.tk -= dt; if (st.tk <= 0) { st.tk = 0.08 + 0.45 * k; AU.tick(0.07); }
+      if (st.left <= 0) {
+        const h = B[st.hold]; h.dead = true; h.fall = 1; st.hold = -1; st.next = 1.0;
+        FX.burst(h.x, h.y, '#ff6a2a', 40, 420, 0.8, 4); FX.burst(h.x, h.y, st.C[h.ci].c, 20, 300); FX.ring(h.x, h.y, '#ffb070', 70, 0.6); FX.shake(14); AU.boom();
+        for (const o of B) { if (o.dead) continue; const dx = o.x - h.x, dy = o.y - h.y, d = Math.hypot(dx, dy); if (d < 150 && d > 0) { o.vx = dx / d * 210; o.vy = dy / d * 210; } }
+        K.knock(st, [h.ci]);
+      }
+    }
+    fallTick(st, dt);
+  },
+  draw(st, ctx) {
+    ctx.strokeStyle = '#2c3342'; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(BX0, BY0, BX1 - BX0, BY1 - BY0, 40) : ctx.rect(BX0, BY0, BX1 - BX0, BY1 - BY0); ctx.stroke();
+    drawBalls(st, ctx, true, b => {
+      if (b.ci !== st.hold || b.dead) return;
+      const k = st.left / st.fuse, on = Math.sin(st.t * (6 + 60 * (1 - k) * (1 - k))) > 0;
+      D.glow(ctx, b.x, b.y, b.r * 3, '#ff3b1f', on ? 1 : 0.4);
+      D.circle(ctx, b.x, b.y, b.r * 0.45, null, 0, on ? '#ff3b1f' : '#8a1e10');
+      ctx.strokeStyle = on ? '#ffb070' : 'rgba(255,176,112,0.35)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 6, 0, TAU); ctx.stroke();
+    });
+  },
+  hud: st => st.balls.map(b => b.dead ? '💥' : b.ci === st.hold ? '💣' : '·'),
+  lead: st => K.aliveIdx(st).find(i => i !== st.hold) ?? K.aliveIdx(st)[0]
+});
+
+// ---------- 6. Sumo Disc ----------
+SIMS.push({
+  id: 'sumo', name: 'Sumo Disc', caption: 'Last one on the disc', theme: 'paper',
+  init(rng) {
+    const st = K.base(rng, 6, { Rw: new Array(24).fill(235), brk: 0 });
+    st.balls = spread(rng, 6, 140, 70).map((p, i) => { const b = K.ball(p[0], p[1], 19, rng.ang(), 40, i); b.cd = rng.range(1, 2.5); b.ph = rng.ang(); b.wob = rng.range(0.6, 1.4); return b; });
+    return st;
+  },
+  rAt(st, x, y) { const a = Math.atan2(y - AY, x - AX); return st.Rw[((Math.floor((a + Math.PI) / TAU * 24) % 24) + 24) % 24]; },
+  step(st, dt) {
+    const B = st.balls, rng = st.rng;
+    if (st.t > 20) {
+      for (let i = 0; i < 24; i++) st.Rw[i] = Math.max(0, st.Rw[i] - 7 * dt);
+      if ((st.brk -= dt) <= 0) { st.brk = rng.range(1, 2); const i = rng.int(0, 23); st.Rw[i] = Math.max(0, st.Rw[i] - 35); const a = (i + 0.5) / 24 * TAU - Math.PI; FX.burst(AX + Math.cos(a) * st.Rw[i], AY + Math.sin(a) * st.Rw[i], '#b98a5a', 14, 90, 0.8, 5, 300); AU.noise(0.2, 400, 0.15, 'lowpass', 1, 'crack'); }
+    }
+    const alive = B.filter(b => !b.dead);
+    for (const b of alive) {
+      let tg = null, bd = 1e9; for (const o of alive) if (o !== b) { const d = Math.hypot(o.x - b.x, o.y - b.y); if (d < bd) { bd = d; tg = o; } }
+      let ax = 0, ay = 0;
+      if (tg) { const dx = tg.x - b.x, dy = tg.y - b.y, l = Math.hypot(dx, dy) || 1, w = Math.sin(st.t * 2 * b.wob + b.ph) * 0.8; ax = (dx / l - dy / l * w) * 300; ay = (dy / l + dx / l * w) * 300; }
+      const cx = AX - b.x, cy = AY - b.y, cd = Math.hypot(cx, cy) || 1, edge = this.rAt(st, b.x, b.y) - cd;
+      if (edge < 70) { const k = (70 - edge) / 70 * 520; ax += cx / cd * k; ay += cy / cd * k; }
+      b.vx += ax * dt; b.vy += ay * dt;
+      if ((b.cd -= dt) <= 0 && tg) { b.cd = rng.range(1.5, 3); const dx = tg.x - b.x, dy = tg.y - b.y, l = Math.hypot(dx, dy) || 1; b.vx += dx / l * 330; b.vy += dy / l * 330; FX.burst(b.x, b.y, st.C[b.ci].l, 6, 80); }
+      const f = Math.exp(-1.3 * dt); b.vx *= f; b.vy *= f;
+      const s = Math.hypot(b.vx, b.vy); if (s > 430) { b.vx *= 430 / s; b.vy *= 430 / s; }
+      K.move(b, dt);
+    }
+    K.pairs(B, (a, b) => { const i = K.collide(a, b, 1.35); if (i > 40) { AU.thud(i / 600); if (i > 150) FX.burst((a.x + b.x) / 2, (a.y + b.y) / 2, '#fff', 5, 120); } });
+    const dying = [];
+    for (const b of alive) if (Math.hypot(b.x - AX, b.y - AY) > this.rAt(st, b.x, b.y)) { b.dead = true; b.fall = 1; dying.push(b.ci); AU.tone(700, 0.6, 0.15, 'sine', 0.3, 'fall'); }
+    if (dying.length) K.knock(st, dying, i => -Math.hypot(B[i].x - AX, B[i].y - AY));
+    for (const b of B) if (b.dead && b.fall > 0) { b.fall -= dt * 1.5; b.x += b.vx * dt * 0.5; b.y += b.vy * dt * 0.5; }
+  },
+  draw(st, ctx) {
+    ctx.fillStyle = '#d9d0bf'; ctx.beginPath();
+    for (let i = 0; i < 24; i++) { const a0 = i / 24 * TAU - Math.PI, a1 = (i + 1) / 24 * TAU - Math.PI, r = st.Rw[i]; ctx.moveTo(AX, AY); ctx.arc(AX, AY + 10, r, a0, a1); }
+    ctx.fill();
+    ctx.fillStyle = '#c8a77c'; ctx.beginPath();
+    for (let i = 0; i < 24; i++) { const a0 = i / 24 * TAU - Math.PI, a1 = (i + 1) / 24 * TAU - Math.PI + 0.002; ctx.moveTo(AX, AY); ctx.arc(AX, AY, st.Rw[i], a0, a1); }
+    ctx.fill();
+    D.circle(ctx, AX, AY, Math.max(0, Math.min(...st.Rw) * 0.55), 'rgba(90,60,30,0.25)', 2);
+    for (const b of st.balls) if (!b.dead) D.circle(ctx, b.x + 4, b.y + 6, b.r, null, 0, 'rgba(60,40,20,0.22)');
+    drawBalls(st, ctx, false);
+  },
+  hud: st => st.balls.map(b => b.dead ? 'out' : Math.round(Math.max(0, 100 - 100 * Math.hypot(b.x - AX, b.y - AY) / Math.max(1, AR))) + ''),
+  lead: st => K.aliveIdx(st).sort((a, b) => Math.hypot(st.balls[a].x - AX, st.balls[a].y - AY) - Math.hypot(st.balls[b].x - AX, st.balls[b].y - AY))[0]
+});
+
+// ---------- 7. Feeding Frenzy ----------
+SIMS.push({
+  id: 'frenzy', name: 'Feeding Frenzy', caption: 'Eat or be eaten', theme: 'night',
+  init(rng) {
+    const st = K.base(rng, 8, { food: [], sp: 0, box: [BX0, BY0, BX1, BY1], shed: {} });
+    st.balls = spreadBox(rng, 8, 90).map((p, i) => { const b = K.ball(p[0], p[1], 11, rng.ang(), 60, i); b.mass = 80; b.th = 0; return b; });
+    for (let i = 0; i < 150; i++) st.food.push({ x: rng.range(BX0 + 10, BX1 - 10), y: rng.range(BY0 + 10, BY1 - 10), m: 6 });
+    st.balls.forEach(b => this.sz(b));
+    return st;
+  },
+  sz(b) { b.r = Math.sqrt(b.mass) * 1.25; b.m = b.mass; b.vmax = 215 * Math.pow(11 / b.r, 0.5); },
+  step(st, dt) {
+    const B = st.balls, rng = st.rng, alive = B.filter(b => !b.dead);
+    if (st.t > 28) { const k = K.clamp((st.t - 28) / 20, 0, 1) * 0.75, cx = W / 2, cy = (BY0 + BY1) / 2, hw = (BX1 - BX0) / 2 * (1 - k), hh = (BY1 - BY0) / 2 * (1 - k); st.box = [cx - hw, cy - hh, cx + hw, cy + hh]; }
+    const [x0, y0, x1, y1] = st.box;
+    if (st.t < 35 && st.food.length < 150 && (st.sp -= dt) <= 0) { st.sp = 0.12; st.food.push({ x: rng.range(x0 + 10, x1 - 10), y: rng.range(y0 + 10, y1 - 10), m: 6 }); }
+    if (st.t > 35) st.food = st.food.filter(f => f.x > x0 && f.x < x1 && f.y > y0 && f.y < y1);
+    for (const b of alive) {
+      if ((b.th -= dt) <= 0) {
+        b.th = 0.05; let tx = 0, ty = 0, mode = 0, bd = 1e9;
+        for (const o of alive) {
+          if (o === b) continue; const d = Math.hypot(o.x - b.x, o.y - b.y) - o.r - b.r;
+          if (o.r > b.r * 1.15 && d < 110 && d < bd) { bd = d; mode = 1; tx = b.x - o.x; ty = b.y - o.y; }
+        }
+        if (!mode) {
+          for (const o of alive) { if (o !== b && o.r * 1.15 < b.r) { const d = Math.hypot(o.x - b.x, o.y - b.y) - b.r; if (d < 160 && d < bd) { bd = d; mode = 2; tx = o.x - b.x; ty = o.y - b.y; } } }
+          for (const f of st.food) { const d = Math.hypot(f.x - b.x, f.y - b.y) - b.r; if (d < bd * 0.8 || (mode !== 2 && d < bd)) { bd = d; mode = 3; tx = f.x - b.x; ty = f.y - b.y; } }
+        }
+        const l = Math.hypot(tx, ty) || 1; b.dx = mode ? tx / l : Math.cos(st.t + b.ci); b.dy = mode ? ty / l : Math.sin(st.t + b.ci);
+      }
+      const k = Math.min(1, 4 * dt); b.vx += (b.dx * b.vmax - b.vx) * k; b.vy += (b.dy * b.vmax - b.vy) * k;
+      K.move(b, dt); K.box(b, x0, y0, x1, y1);
+      for (let i = st.food.length - 1; i >= 0; i--) { const f = st.food[i]; if (Math.abs(f.x - b.x) < b.r && Math.abs(f.y - b.y) < b.r && Math.hypot(f.x - b.x, f.y - b.y) < b.r) { b.mass += f.m; st.food.splice(i, 1); this.sz(b); AU.blip(8 + Math.min(12, b.r / 5), 0.05); } }
+      if (b.mass > 900) { st.shed[b.ci] = (st.shed[b.ci] || 0) + b.mass * 0.03 * dt; while (st.shed[b.ci] > 6) { st.shed[b.ci] -= 6; b.mass -= 6; const a = rng.ang(), d = b.r + rng.range(12, 40); st.food.push({ x: K.clamp(b.x + Math.cos(a) * d, x0 + 4, x1 - 4), y: K.clamp(b.y + Math.sin(a) * d, y0 + 4, y1 - 4), m: 6 }); } this.sz(b); }
+    }
+    const dying = [];
+    K.pairs(alive, (a, b) => {
+      if (a.dead || b.dead) return;
+      const big = a.r > b.r ? a : b, sm = big === a ? b : a, d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (big.r > sm.r * 1.15 && d < big.r - sm.r * 0.3) { big.mass += sm.mass * 0.9; sm.dead = true; sm.fall = 0; dying.push(sm.ci); this.sz(big); AU.thud(0.35); FX.burst(sm.x, sm.y, st.C[sm.ci].c, 18, 160); }
+      else K.collide(a, b, 0.5);
+    });
+    if (dying.length) K.knock(st, dying, i => B[i].mass);
+    if (st.win == null && st.t >= 50) { st.win = this.lead(st); }
+  },
+  draw(st, ctx) {
+    const [x0, y0, x1, y1] = st.box;
+    ctx.strokeStyle = st.t > 35 ? '#6a3a3a' : '#2c3342'; ctx.lineWidth = 3; ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.fillStyle = '#c8f0d8'; for (const f of st.food) { ctx.globalAlpha = 0.7; ctx.fillRect(f.x - 2, f.y - 2, 4, 4); } ctx.globalAlpha = 1;
+    for (const b of st.balls) {
+      if (b.dead) continue; const c = st.C[b.ci].c;
+      D.glow(ctx, b.x, b.y, b.r * 2, c, 0.6);
+      ctx.fillStyle = rgba(c, 0.45); ctx.strokeStyle = shade(c, 0.4); ctx.lineWidth = 2; ctx.beginPath();
+      for (let k = 0; k <= 24; k++) { const a = k / 24 * TAU, r = b.r * (1 + 0.05 * Math.sin(a * 5 + st.t * 4 + b.ci)); const x = b.x + Math.cos(a) * r, y = b.y + Math.sin(a) * r; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.fill(); ctx.stroke();
+      D.circle(ctx, b.x, b.y, Math.max(2, b.r * 0.22), null, 0, shade(c, 0.5));
+      if (b.r > 16) D.text(ctx, String(Math.round(b.mass)), b.x, b.y + b.r * 0.45, Math.min(22, b.r * 0.45), '#fff', 'center', 800);
+    }
+  },
+  hud: st => st.balls.map(b => b.dead ? 0 : Math.round(b.mass)),
+  lead: st => K.aliveIdx(st).sort((a, b) => st.balls[b].mass - st.balls[a].mass)[0]
+});
+
+// ---------- 8. Rock Paper Scissors ----------
+const RPS = [{ n: 'Rock', c: '#7c7f8a', g: '🪨' }, { n: 'Paper', c: '#3e63dd', g: '📄' }, { n: 'Scissors', c: '#e5484d', g: '✂️' }];
+SIMS.push({
+  id: 'rps', name: 'Rock Paper Scissors', caption: 'Catch your prey, flee your predator', theme: 'paper',
+  init(rng) {
+    const st = K.base(rng, 3); st.C = RPS.map(p => ({ n: p.n, c: p.c, l: shade(p.c, 0.45), d: shade(p.c, -0.35), g: p.g }));
+    st.p = []; st.th = 0;
+    for (let k = 0; k < 120; k++) { const t = k % 3; st.p.push({ x: rng.range(BX0 + 15, BX1 - 15), y: rng.range(BY0 + 15, BY1 - 15), vx: 0, vy: 0, r: 11, t, dx: 0, dy: 0 }); }
+    st.cnt = [40, 40, 40]; return st;
+  },
+  where: st => st.p.map(p => ({ i: p.t, x: p.x, y: p.y, r: p.r })),
+  step(st, dt) {
+    const P = st.p, rng = st.rng, spd = 70 * (st.t > 30 ? Math.pow(1.03, st.t - 30) : 1);
+    if ((st.th -= dt) <= 0) {
+      st.th = 0.05;
+      for (const p of P) {
+        const prey = (p.t + 2) % 3, pred = (p.t + 1) % 3; let db = 1e9, dp = 1e9, bx = 0, by = 0, px = 0, py = 0;
+        for (const q of P) { if (q.t === p.t) continue; const dx = q.x - p.x, dy = q.y - p.y, d = dx * dx + dy * dy; if (q.t === prey && d < db) { db = d; bx = dx; by = dy; } else if (q.t === pred && d < dp) { dp = d; px = dx; py = dy; } }
+        let dx = 0, dy = 0; if (db < 1e9) { const l = Math.sqrt(db) || 1; dx += bx / l; dy += by / l; }
+        if (dp < 1e9) { const l = Math.sqrt(dp) || 1, w = l < 90 ? 1.4 : 0.35; dx -= px / l * w; dy -= py / l * w; }
+        dx += rng.range(-0.5, 0.5); dy += rng.range(-0.5, 0.5); const l = Math.hypot(dx, dy) || 1; p.dx = dx / l; p.dy = dy / l;
+      }
+    }
+    for (const p of P) { const k = Math.min(1, 5 * dt); p.vx += (p.dx * spd - p.vx) * k; p.vy += (p.dy * spd - p.vy) * k; K.move(p, dt); K.box(p, BX0, BY0, BX1, BY1); }
+    K.hashPairs(P, 24, (a, b) => {
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy); if (d >= 22 || d < 1e-6) return;
+      if (a.t !== b.t) {
+        const w = (a.t + 2) % 3 === b.t ? a : b, l = w === a ? b : a; st.cnt[l.t]--; st.cnt[w.t]++; l.t = w.t;
+        AU.tone([330, 440, 550][w.t], 0.05, 0.08, 'square', 0, 'rps' + w.t); FX.burst(l.x, l.y, st.C[w.t].c, 3, 60, 0.3, 2);
+      }
+      const o = (22 - d) / 2, nx = dx / d, ny = dy / d; a.x -= nx * o; a.y -= ny * o; b.x += nx * o; b.y += ny * o;
+    });
+    const alive = st.cnt.filter(c => c > 0).length;
+    st.cnt.forEach((c, i) => { if (c === 0 && !st.out[i]) { st.out[i] = true; st.outT[i] = st.t; } });
+    if (alive === 1 && st.win == null) st.win = st.cnt.findIndex(c => c > 0);
+    if (st.t >= 60 && st.win == null) st.win = this.lead(st);
+  },
+  draw(st, ctx) {
+    ctx.strokeStyle = '#cdbf9f'; ctx.lineWidth = 2; ctx.strokeRect(BX0, BY0, BX1 - BX0, BY1 - BY0);
+    let x = BX0; for (let i = 0; i < 3; i++) { const w = (BX1 - BX0) * st.cnt[i] / 120; ctx.fillStyle = st.C[i].c; ctx.fillRect(x, 128, w, 6); x += w; }
+    if (!st._spr) st._spr = st.C.map(c => { const s = D.mk(48, 48), g = s.getContext('2d'); g.font = '34px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(c.g, 24, 27); return s; });
+    for (const p of st.p) { D.circle(ctx, p.x, p.y, 12, null, 0, rgba(st.C[p.t].c, 0.28)); ctx.drawImage(st._spr[p.t], p.x - 12, p.y - 12, 24, 24); }
+  },
+  hud: st => st.cnt.slice(),
+  lead: st => st.cnt.indexOf(Math.max(...st.cnt))
+});
+// ===================== B. Escape and survival =====================
+function trailPush(b, n = 14) { (b.tr = b.tr || []).push(b.x, b.y); if (b.tr.length > n * 2) b.tr.splice(0, 2); }
+function drawTrail(ctx, b, col, w) { const t = b.tr; if (!t || t.length < 4) return; ctx.lineCap = 'round'; for (let i = 2; i < t.length; i += 2) { ctx.globalAlpha = i / t.length * 0.5; D.line(ctx, t[i - 2], t[i - 1], t[i], t[i + 1], col, w * i / t.length); } ctx.globalAlpha = 1; ctx.lineCap = 'butt'; }
+function dirtyPush(st, v) { if (st.dirty.length > 6000) { st.dirty.length = 0; st.full = true; } else st.dirty.push(v); }
+
+// ---------- 9. Ring Escape ----------
+SIMS.push({
+  id: 'rings', name: 'Ring Escape', caption: 'First ball out of all 8 rings', theme: 'night',
+  init(rng) {
+    const st = K.base(rng, 4);
+    st.R = []; for (let k = 0; k < 8; k++) st.R.push({ r: 58 + k * 27, ph: rng.ang(), w: rng.sign() * rng.range(0.35, 1.1), fc: null, ft: -9 });
+    st.balls = [0, 1, 2, 3].map(i => { const b = K.ball(AX + (i - 1.5) * 18, AY + rng.range(-10, 10), 7, rng.range(-2.6, -0.5), 260, i); b.k = 0; return b; });
+    return st;
+  },
+  half(st, k) { return (16 + Math.max(0, st.t - 40) * 3) / st.R[k].r; },
+  gapA(st, k) { const g = st.R[k]; return g.ph + g.w * st.t; },
+  step(st, dt) {
+    const B = st.balls;
+    for (const b of B) {
+      b.vy += 300 * dt; K.move(b, dt);
+      const s = Math.hypot(b.vx, b.vy); if (s < 200) K.speed(b, 200); else if (s > 430) K.speed(b, 430);
+      if (b.k >= 8) continue;
+      const g = st.R[b.k], dx = b.x - AX, dy = b.y - AY, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx), ga = this.gapA(st, b.k), h = this.half(st, b.k);
+      if (b.k > 0 && K.ringOut(b, AX, AY, st.R[b.k - 1].r)) { K.scatter(b, st.rng, 0.1); AU.blip(b.k * 2 + 2, 0.06); }
+      if (Math.abs(K.angDiff(a, ga)) < h) {
+        for (const e of [-h, h]) { const px = AX + Math.cos(ga + e) * g.r, py = AY + Math.sin(ga + e) * g.r; if (K.seg(b, px, py, px, py) > 1) AU.blip(b.k * 2 + 4, 0.05); }
+        if (d - b.r > g.r) { b.k++; g.fc = st.C[b.ci].c; g.ft = st.t; AU.blip(10 + b.k * 2, 0.2); FX.ring(AX, AY, st.C[b.ci].c, g.r * 0.7, 0.4); if (b.k >= 8 && st.win == null) { st.win = b.ci; FX.burst(b.x, b.y, st.C[b.ci].c, 40, 300); } }
+      } else if (K.ringIn(b, AX, AY, g.r)) { K.scatter(b, st.rng, 0.12); AU.blip(b.k * 2 + 3, 0.06); }
+      trailPush(b, 10);
+    }
+    K.pairs(B, (a, b) => { if (a.k === b.k) K.collide(a, b); });
+    for (const b of B) if (b.k >= 8) K.box(b, 0, 0, W, H);
+  },
+  draw(st, ctx) {
+    ctx.lineCap = 'round';
+    st.R.forEach((g, k) => {
+      const ga = this.gapA(st, k), h = this.half(st, k), f = Math.max(0, 1 - (st.t - g.ft) / 0.6);
+      ctx.strokeStyle = f > 0 ? g.fc : `hsl(${200 + k * 12},60%,${38 + k * 3}%)`; ctx.lineWidth = 4 + f * 3;
+      ctx.beginPath(); ctx.arc(AX, AY, g.r, ga + h, ga - h + TAU); ctx.stroke();
+      if (f > 0) D.glow(ctx, AX, AY, g.r * 1.2, g.fc, f * 0.3);
+    });
+    ctx.lineCap = 'butt';
+    for (const b of st.balls) drawTrail(ctx, b, st.C[b.ci].c, b.r * 1.2);
+    drawBalls(st, ctx, true);
+  },
+  hud: st => st.balls.map(b => b.k)
+});
+
+// ---------- 10. Last One In ----------
+SIMS.push({
+  id: 'lastin', name: 'Last One In', caption: 'Last ball inside the ring wins', theme: 'paper',
+  init(rng) {
+    const st = K.base(rng, 8, { ph: rng.ang(), w: rng.sign() * 0.55, gaps: [0], half: 0.16, second: false });
+    st.balls = spread(rng, 8, 150, 40).map((p, i) => { const b = K.ball(p[0], p[1], 12, rng.ang(), 255, i); b.gone = false; return b; });
+    return st;
+  },
+  step(st, dt) {
+    const B = st.balls, R = 230;
+    if (!st.second && st.t > 30) { st.second = true; st.gaps.push(Math.PI); AU.whoosh(0.15); }
+    const rot = st.ph + st.w * st.t, gone = [];
+    for (const b of B) {
+      K.move(b, dt);
+      if (b.gone) continue;
+      const dx = b.x - AX, dy = b.y - AY, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+      const inGap = st.gaps.some(g => Math.abs(K.angDiff(a, rot + g)) < st.half);
+      if (inGap) {
+        for (const g of st.gaps) for (const e of [-st.half, st.half]) { const px = AX + Math.cos(rot + g + e) * R, py = AY + Math.sin(rot + g + e) * R; if (K.seg(b, px, py, px, py) > 1) AU.blip(12, 0.1); }
+        if (d - b.r > R) { b.gone = true; gone.push(b.ci); st.half += 0.03; AU.whoosh(); FX.burst(b.x, b.y, st.C[b.ci].c, 12, 150); }
+      } else if (K.ringIn(b, AX, AY, R)) { K.scatter(b, st.rng); AU.blip(Math.min(24, 4 + Math.floor(st.t / 3)), 0.08); }
+    }
+    K.pairs(B.filter(b => !b.gone), (a, b) => K.collide(a, b));
+    for (const b of B) if (!b.gone) K.speed(b, 255);
+    if (gone.length) K.knock(st, gone, i => -Math.hypot(B[i].x - AX, B[i].y - AY));
+  },
+  draw(st, ctx) {
+    const rot = st.ph + st.w * st.t;
+    ctx.strokeStyle = INK; ctx.lineWidth = 8; ctx.lineCap = 'round';
+    const gs = st.gaps.map(g => rot + g).sort((a, b) => a - b);
+    if (gs.length === 1) { ctx.beginPath(); ctx.arc(AX, AY, 234, gs[0] + st.half, gs[0] - st.half + TAU); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.arc(AX, AY, 234, gs[0] + st.half, gs[1] - st.half); ctx.stroke(); ctx.beginPath(); ctx.arc(AX, AY, 234, gs[1] + st.half, gs[0] - st.half + TAU); ctx.stroke(); }
+    ctx.lineCap = 'butt';
+    for (const b of st.balls) D.ball(ctx, b.x, b.y, b.r, st.C[b.ci].c, false);
+  },
+  hud: st => st.balls.map(b => b.gone ? 'out' : 'in'),
+  lead: st => K.aliveIdx(st).sort((a, b) => Math.hypot(st.balls[a].x - AX, st.balls[a].y - AY) - Math.hypot(st.balls[b].x - AX, st.balls[b].y - AY))[0]
+});
+
+// ---------- 11. Closing Maze ----------
+const MZ = { c: 9, r: 16, cw: 56, ch: 50, ox: 18, oy: 142 };
+SIMS.push({
+  id: 'maze', name: 'Closing Maze', caption: 'Reach the exit before the dark', theme: 'paper',
+  init(rng) {
+    const { c: C, r: Rr } = MZ, st = K.base(rng, 6, { top: 0, left: 0, right: 0, ev: 7, iv: 3.6, n: 0 });
+    const hw = [], vw = []; for (let r = 0; r <= Rr; r++) { hw.push(new Array(C).fill(1)); vw.push(new Array(C + 1).fill(1)); }
+    const seen = new Uint8Array(C * Rr), stack = [[rng.int(0, C - 1), 0]]; seen[stack[0][1] * C + stack[0][0]] = 1;
+    while (stack.length) {
+      const [x, y] = stack[stack.length - 1], nb = [];
+      if (x > 0 && !seen[y * C + x - 1]) nb.push([x - 1, y, 'l']); if (x < C - 1 && !seen[y * C + x + 1]) nb.push([x + 1, y, 'r']);
+      if (y > 0 && !seen[(y - 1) * C + x]) nb.push([x, y - 1, 'u']); if (y < Rr - 1 && !seen[(y + 1) * C + x]) nb.push([x, y + 1, 'd']);
+      if (!nb.length) { stack.pop(); continue; }
+      const [nx, ny, d] = rng.pick(nb); seen[ny * C + nx] = 1; stack.push([nx, ny]);
+      if (d === 'l') vw[y][x] = 0; else if (d === 'r') vw[y][x + 1] = 0; else if (d === 'u') hw[y][x] = 0; else hw[y + 1][x] = 0;
+    }
+    for (let r = 0; r < Rr; r++) for (let x = 1; x < C; x++) if (vw[r][x] && rng() < 0.25) vw[r][x] = 0;
+    for (let r = 1; r < Rr; r++) for (let x = 0; x < C; x++) if (hw[r][x] && rng() < 0.25) hw[r][x] = 0;
+    st.exit = rng.int(3, 5); hw[Rr][st.exit] = 0;
+    const segs = [], X = x => MZ.ox + x * MZ.cw, Y = y => MZ.oy + y * MZ.ch;
+    for (let r = 0; r <= Rr; r++) for (let x = 0; x < C; x++) if (hw[r][x]) segs.push([X(x), Y(r), X(x + 1), Y(r), r, x, 'h']);
+    for (let r = 0; r < Rr; r++) for (let x = 0; x <= C; x++) if (vw[r][x]) segs.push([X(x), Y(r), X(x), Y(r + 1), r, x, 'v']);
+    // shortest-path distance to the exit, used as a weak hint (balls still bounce blindly)
+    const dist = new Int16Array(C * Rr).fill(-1), q = [(Rr - 1) * C + st.exit]; dist[q[0]] = 0;
+    for (let h = 0; h < q.length; h++) {
+      const i = q[h], x = i % C, y = (i / C) | 0, d = dist[i];
+      const go = (nx, ny, open) => { if (open && nx >= 0 && ny >= 0 && nx < C && ny < Rr && dist[ny * C + nx] < 0) { dist[ny * C + nx] = d + 1; q.push(ny * C + nx); } };
+      go(x - 1, y, !vw[y][x]); go(x + 1, y, !vw[y][x + 1]); go(x, y - 1, !hw[y][x]); go(x, y + 1, !hw[y + 1][x]);
+    }
+    st.nxt = []; st.nb = []; const ctr = (x, y) => [MZ.ox + (x + 0.5) * MZ.cw, MZ.oy + (y + 0.5) * MZ.ch];
+    for (let i = 0; i < C * Rr; i++) { const x = i % C, y = (i / C) | 0; let b = [x, y + 1]; const nb = [];
+      for (const [nx, ny, open] of [[x - 1, y, !vw[y][x]], [x + 1, y, !vw[y][x + 1]], [x, y - 1, !hw[y][x]], [x, y + 1, !hw[y + 1][x]]]) if (open && ny < Rr && nx >= 0 && nx < C && ny >= 0) { nb.push(ctr(nx, ny)); if (dist[ny * C + nx] === dist[i] - 1) b = [nx, ny]; }
+      st.nxt.push(ctr(b[0], b[1])); st.nb.push(nb); }
+    st.segs = segs; st.cs = [];
+    for (let r = 0; r < Rr; r++) for (let x = 0; x < C; x++) st.cs.push(segs.filter(s => s[4] >= r - 1 && s[4] <= r + 2 && s[5] >= x - 1 && s[5] <= x + 2));
+    const cols = rng.shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8]).slice(0, 6);
+    st.balls = cols.map((cx, i) => K.ball(X(cx) + MZ.cw / 2, Y(0) + MZ.ch / 2, 8, rng.range(0.3, 2.8), 215, i));
+    return st;
+  },
+  cell(b) { return [Math.floor((b.y - MZ.oy) / MZ.ch), Math.floor((b.x - MZ.ox) / MZ.cw)]; },
+  step(st, dt) {
+    const B = st.balls, rng = st.rng;
+    if (st.win == null && (st.ev -= dt) <= 0) {
+      st.n++; st.iv = Math.max(0.9, st.iv * 0.94); st.ev = st.iv;
+      const p = rng();
+      if (st.n > 3 && p < 0.2 && st.left < 2) st.left++; else if (st.n > 3 && p < 0.4 && st.right < 2) st.right++; else st.top++;
+      AU.tone(55, 0.5, 0.25, 'sawtooth', 0.7, 'rumble'); FX.shake(3);
+    }
+    const dying = [];
+    K.pairs(B.filter(b => !b.dead && b.y < MZ.oy + MZ.r * MZ.ch), (a, b) => K.collide(a, b));
+    for (const b of B) {
+      if (b.dead) continue;
+      const [r0, c0] = this.cell(b), ci = K.clamp(r0, 0, MZ.r - 1) * MZ.c + K.clamp(c0, 0, MZ.c - 1);
+      if (ci !== b.cc) { b.cc = ci; const nb = st.nb[ci]; b.tg = rng() < 0.16 && nb.length ? rng.pick(nb) : st.nxt[ci]; }
+      const gx = b.tg[0] - b.x, gy = b.tg[1] - b.y, gl = Math.hypot(gx, gy) || 1;
+      b.vx += gx / gl * 650 * dt; b.vy += gy / gl * 650 * dt; K.speed(b, 215);
+      K.move(b, dt);
+      const [r, c] = this.cell(b);
+      if (r >= MZ.r) { if (st.win == null) { st.win = b.ci; FX.burst(b.x, b.y, st.C[b.ci].c, 40, 280); AU.chime(); } continue; }
+      const segs = st.cs[K.clamp(r, 0, MZ.r - 1) * MZ.c + K.clamp(c, 0, MZ.c - 1)];
+      for (const s of segs) if (K.seg(b, s[0], s[1], s[2], s[3], 1, 2.5) > 1) { K.scatter(b, rng, 0.35); AU.tone(500 + 30 * (r % 8), 0.04, 0.06, 'triangle', 0, 'wood'); }
+      K.nudge(b, 0.08);
+      if (r < st.top || c < st.left || c >= MZ.c - st.right) { b.dead = true; b.fall = 1; dying.push(b.ci); FX.burst(b.x, b.y, st.C[b.ci].c, 16, 120); AU.pop(0.2); }
+    }
+    if (dying.length) K.knock(st, dying, i => B[i].y);
+    fallTick(st, dt);
+  },
+  draw(st, ctx) {
+    const L = D.layer(st, 'maze');
+    if (!st._drawn) {
+      st._drawn = 1; const g = L.getContext('2d'); g.strokeStyle = INK; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath();
+      for (const s of st.segs) { g.moveTo(s[0], s[1]); g.lineTo(s[2], s[3]); } g.stroke();
+      const ex = MZ.ox + st.exit * MZ.cw, ey = MZ.oy + MZ.r * MZ.ch; g.fillStyle = '#30a46c'; g.fillRect(ex + 6, ey + 2, MZ.cw - 12, 6);
+    }
+    ctx.drawImage(L, 0, 0);
+    const x0 = MZ.ox, y0 = MZ.oy, x1 = MZ.ox + MZ.c * MZ.cw, y1 = MZ.oy + MZ.r * MZ.ch, wob = k => Math.sin(st.t * 3 + k * 0.08) * 4;
+    ctx.fillStyle = '#111'; ctx.beginPath();
+    const ty = y0 + st.top * MZ.ch, lx = x0 + st.left * MZ.cw, rx = x1 - st.right * MZ.cw;
+    ctx.moveTo(x0 - 4, y0 - 4); ctx.lineTo(x1 + 4, y0 - 4); ctx.lineTo(x1 + 4, y1 + 4);
+    for (let y = y1; y >= ty; y -= 20) ctx.lineTo(rx + (st.right ? wob(y) : 0), y);
+    for (let x = rx; x >= lx; x -= 20) ctx.lineTo(x, ty + (st.top ? wob(x) : 0));
+    for (let y = ty; y <= y1; y += 20) ctx.lineTo(lx + (st.left ? wob(y + 99) : 0), y);
+    ctx.lineTo(x0 - 4, y1 + 4); ctx.closePath(); ctx.fill();
+    D.text(ctx, 'EXIT', MZ.ox + (st.exit + 0.5) * MZ.cw, y1 + 12, 11, '#30a46c', 'center', 800);
+    drawBalls(st, ctx, false);
+  },
+  hud: st => st.balls.map(b => b.dead ? 'out' : Math.max(0, Math.floor((b.y - MZ.oy) / MZ.ch)) + 1),
+  lead: st => K.aliveIdx(st).sort((a, b) => st.balls[b].y - st.balls[a].y)[0]
+});
+
+// ---------- 12. Rising Lava ----------
+SIMS.push({
+  id: 'lava', name: 'Rising Lava', caption: 'Climb or melt', theme: 'night', Y0: 880,
+  init(rng) {
+    const st = K.base(rng, 6, { lava: 1000, cam: 0, led: [] });
+    st.led.push({ x: 30, w: 480, y: this.Y0, t: 0 });
+    let y = this.Y0 - 95, i = 0;
+    while (y > -14000) {
+      const h = this.Y0 - y, n = h < 5000 ? 2 : rng() < 0.6 ? 1 : 2, w0 = Math.max(70, 150 - h * 0.006);
+      const xs = n === 2 ? [rng.range(40, 230 - w0 / 2), rng.range(270, 500 - w0)] : [rng.range(40, 500 - w0)];
+      for (const x of xs) { const p = rng(); st.led.push({ x, w: rng.range(w0 * 0.8, w0 * 1.2), y, t: p < 0.12 ? 2 : p < 0.32 ? 1 : 0, gone: false, crT: -1 }); }
+      y -= Math.min(150, 88 + h * 0.004) * rng.range(0.85, 1.15); i++;
+    }
+    st.balls = [0, 1, 2, 3, 4, 5].map(i => { const b = K.ball(70 + i * 80, this.Y0 - 10, 10, 0, 0, i); b.vy = -rng.range(300, 820); b.tx = b.x; b.top = b.y; return b; });
+    return st;
+  },
+  pickTarget(st, b) {
+    const rng = st.rng; let best = null, bs = 1e9;
+    for (const l of st.led) { if (l.gone || l.y > b.y - 25 || l.y < b.y - 215) continue; const cx = l.x + l.w / 2, s = Math.abs(cx - b.x) + rng.range(0, 90); if (s < bs) { bs = s; best = l; } }
+    b.tx = best ? best.x + best.w * rng.range(0.2, 0.8) : K.clamp(b.x + rng.range(-120, 120), 40, 500);
+  },
+  step(st, dt) {
+    const B = st.balls, dying = [];
+    st.lava -= (30 + 4.6 * st.t) * dt;
+    for (const l of st.led) if (l.crT >= 0 && !l.gone && st.t > l.crT) { l.gone = true; FX.burst(l.x + l.w / 2, l.y - st.cam, '#a0703c', 8, 60, 0.6, 3, 200); }
+    for (const b of B) {
+      if (b.dead) continue;
+      const py = b.y; b.vy += 1500 * dt;
+      b.vx += K.clamp((b.tx - b.x) * 3 - b.vx, -1400 * dt, 1400 * dt); b.vx = K.clamp(b.vx, -280, 280);
+      K.move(b, dt);
+      if (b.x < 40) { b.x = 40; b.vx = Math.abs(b.vx); } if (b.x > 500) { b.x = 500; b.vx = -Math.abs(b.vx); }
+      if (b.vy > 0) for (const l of st.led) {
+        if (l.gone || py + b.r > l.y + 0.5 || b.y + b.r < l.y || b.x < l.x - 4 || b.x > l.x + l.w + 4) continue;
+        b.y = l.y - b.r; b.vy = l.t === 2 ? -1230 : -830;
+        if (l.t === 1 && l.crT < 0) l.crT = st.t + 0.25;
+        AU.tone(AU.hz(Math.min(24, 4 + (this.Y0 - b.y) / 250)), 0.12, 0.08, l.t === 2 ? 'square' : 'sine', 1.6, 'boing' + b.ci);
+        this.pickTarget(st, b); break;
+      }
+      b.top = Math.min(b.top, b.y);
+      if (b.y > st.lava - 4) { b.dead = true; b.fall = 1; dying.push(b.ci); FX.burst(b.x, b.y - st.cam, '#ff7a1a', 26, 220, 0.7, 3, -200); AU.noise(0.4, 2500, 0.25, 'highpass', 1, 'sizzle'); }
+    }
+    if (dying.length) K.knock(st, dying, i => -B[i].y);
+    fallTick(st, dt);
+    const alive = B.filter(b => !b.dead); if (alive.length) { const hy = Math.min(...alive.map(b => b.y)); const tc = Math.min(0, Math.max(hy - 430, Math.min(st.lava - 860, hy - 250))); st.cam += (tc - st.cam) * Math.min(1, 3 * dt); }
+  },
+  draw(st, ctx) {
+    const cam = st.cam;
+    ctx.fillStyle = '#151a22'; ctx.fillRect(26, 0, 488, H);
+    ctx.strokeStyle = '#2a3140'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(28, 0); ctx.lineTo(28, H); ctx.moveTo(512, 0); ctx.lineTo(512, H); ctx.stroke();
+    for (const l of st.led) {
+      const y = l.y - cam; if (l.gone || y < -20 || y > H + 20) continue;
+      ctx.fillStyle = l.t === 2 ? '#3ddc84' : l.t === 1 ? (l.crT >= 0 ? '#5e4024' : '#8a6038') : '#5b6b86';
+      ctx.fillRect(l.x, y, l.w, 8);
+      if (l.t === 2) { ctx.fillStyle = '#9ff5c4'; ctx.fillRect(l.x + l.w / 2 - 10, y - 5, 20, 5); }
+      if (l.t === 1) { ctx.fillStyle = '#151a22'; for (let x = l.x + 14; x < l.x + l.w; x += 22) ctx.fillRect(x, y, 2, 8); }
+    }
+    for (const b of st.balls) { if (b.dead && !(b.fall > 0)) continue; ctx.globalAlpha = b.dead ? b.fall : 1; D.ball(ctx, b.x, b.y - cam, b.r, st.C[b.ci].c, true); ctx.globalAlpha = 1; }
+    const ly = st.lava - cam;
+    if (ly < H) {
+      const g = ctx.createLinearGradient(0, ly, 0, ly + 200); g.addColorStop(0, '#ffb23a'); g.addColorStop(0.15, '#ff5a1a'); g.addColorStop(1, '#7a1408');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(0, H);
+      for (let x = 0; x <= W; x += 18) ctx.lineTo(x, ly + Math.sin(x * 0.04 + st.t * 3) * 5 + Math.sin(x * 0.11 - st.t * 2) * 3);
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fill(); D.glow(ctx, W / 2, ly, 300, '#ff6a1a', 0.35);
+    }
+    // height meter
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(524, 140, 6, 800);
+    const top = Math.max(1, ...st.balls.map(b => this.Y0 - b.top));
+    for (const b of st.balls) { const y = 940 - 800 * (this.Y0 - b.y) / Math.max(1200, top * 1.1); ctx.fillStyle = st.C[b.ci].c; ctx.globalAlpha = b.dead ? 0.3 : 1; ctx.fillRect(520, y - 2, 14, 4); ctx.globalAlpha = 1; }
+  },
+  hud(st) { return st.balls.map(b => Math.max(0, Math.round((this.Y0 - (b.dead ? b.top : b.y)) / 50)) + 'm'); },
+  lead: st => K.aliveIdx(st).sort((a, b) => st.balls[a].y - st.balls[b].y)[0]
+});
+
+// ---------- 13. Crumbling Floor ----------
+SIMS.push({
+  id: 'crumble', name: 'Crumbling Floor', caption: 'Tiles break behind you', theme: 'paper', S: 19,
+  init(rng) {
+    const st = K.base(rng, 6, { tiles: new Map() }), s = this.S;
+    for (let r = -14; r <= 14; r++) for (let q = -14; q <= 14; q++) {
+      const x = AX + s * Math.sqrt(3) * (q + r / 2), y = AY + s * 1.5 * r;
+      if (Math.hypot(x - AX, y - AY) < 236) st.tiles.set(q * 100 + r, { x, y, s: 3, f: 0, hue: rng.int(0, 3) });
+    }
+    st.balls = spread(rng, 6, 160, 50).map((p, i) => { const b = K.ball(p[0], p[1], 9, rng.ang(), 100, i); b.tile = this.key(b.x, b.y); b.hole = 0; return b; });
+    return st;
+  },
+  key(x, y) {
+    const s = this.S, px = x - AX, py = y - AY; let q = (Math.sqrt(3) / 3 * px - py / 3) / s, r = (2 / 3 * py) / s, z = -q - r;
+    let rq = Math.round(q), rr = Math.round(r), rz = Math.round(z); const dq = Math.abs(rq - q), dr = Math.abs(rr - r), dz = Math.abs(rz - z);
+    if (dq > dr && dq > dz) rq = -rr - rz; else if (dr > dz) rr = -rq - rz;
+    return rq * 100 + rr;
+  },
+  step(st, dt) {
+    const B = st.balls, dying = [];
+    for (const b of B) {
+      if (b.dead) continue;
+      K.move(b, dt); if (K.ringIn(b, AX, AY, 248)) K.scatter(b, st.rng, 0.2);
+      const k = this.key(b.x, b.y);
+      if (k !== b.tile) { const old = st.tiles.get(b.tile); if (old && old.s > 0) { old.s = st.t > 30 ? 0 : old.s - 1; if (old.s === 0) { old.f = st.t; AU.tone(330, 0.12, 0.1, 'triangle', 0.5, 'clink'); } else AU.tone(1800, 0.03, 0.06, 'square', 0, 'crk'); } b.tile = k; }
+      const t = st.tiles.get(k);
+      if (!t || t.s === 0) { b.hole += dt; if (b.hole > 0.1) { b.dead = true; b.fall = 1; dying.push(b.ci); AU.tone(500, 0.5, 0.15, 'sine', 0.3, 'fall'); } } else b.hole = 0;
+    }
+    K.pairs(B, (a, b) => K.collide(a, b));
+    for (const b of B) if (!b.dead) K.speed(b, 100);
+    if (dying.length) K.knock(st, dying);
+    for (const b of B) if (b.dead && b.fall > 0) b.fall -= dt * 1.6;
+  },
+  draw(st, ctx) {
+    const s = this.S, hues = ['#f2c9b8', '#c9dcf0', '#cfe8cf', '#efe0b0'], hex = (x, y, k) => { ctx.beginPath(); for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; ctx.lineTo(x + Math.cos(a) * s * k, y + Math.sin(a) * s * k); } ctx.closePath(); };
+    D.circle(ctx, AX, AY, 250, '#cdbf9f', 3, '#2a2420');
+    for (const t of st.tiles.values()) {
+      if (t.s === 0) { const k = (st.t - t.f) / 0.4; if (k > 1 || t.f === 0) continue; ctx.globalAlpha = 1 - k; hex(t.x, t.y + k * 10, 0.94 * (1 - k * 0.5)); ctx.fillStyle = '#b8a890'; ctx.fill(); ctx.globalAlpha = 1; continue; }
+      hex(t.x, t.y, 0.94); ctx.fillStyle = t.s === 3 ? hues[t.hue] : t.s === 2 ? shade(hues[t.hue].replace(/^#/, '#'), -0.12) : '#cbb894'; ctx.fill();
+      if (t.s === 1) { ctx.strokeStyle = '#8a6c4a'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(t.x - 8, t.y - 4); ctx.lineTo(t.x + 1, t.y + 2); ctx.lineTo(t.x + 7, t.y - 6); ctx.moveTo(t.x + 1, t.y + 2); ctx.lineTo(t.x - 2, t.y + 9); ctx.stroke(); }
+    }
+    drawBalls(st, ctx, false);
+  },
+  hud(st) { return st.balls.map(b => b.dead ? 'out' : 'on'); },
+  lead: st => K.aliveIdx(st)[0]
+});
+
+// ---------- 14. Musical Sockets ----------
+SIMS.push({
+  id: 'sockets', name: 'Musical Sockets', caption: 'When the music stops, find a cup', theme: 'paper',
+  init(rng) {
+    const st = K.base(rng, 8, { mode: 'music', mt: rng.range(3, 6), round: 0, ph: rng.ang(), rot: 0, note: 0, nt: 0, socks: [] });
+    st.balls = spread(rng, 8, 150, 45).map((p, i) => { const b = K.ball(p[0], p[1], 14, rng.ang(), 190, i); b.seat = -1; return b; });
+    this.mkSocks(st); return st;
+  },
+  mkSocks(st) { const n = st.balls.filter(b => !b.dead).length - 1; st.socks = Array.from({ length: n }, (_, i) => ({ a: i * TAU / n, occ: -1 })); },
+  sp(st, s) { const a = s.a + st.ph + st.rot; return [AX + Math.cos(a) * 214, AY + Math.sin(a) * 214]; },
+  step(st, dt) {
+    const B = st.balls, rng = st.rng, alive = B.filter(b => !b.dead);
+    if (st.mode === 'music') {
+      st.rot += 0.35 * dt;
+      if ((st.nt -= dt) <= 0) { st.nt = 0.2; st.note = (st.note * 7 + 3) % 11; AU.pluck(8 + st.note, 0.1); }
+      for (const b of alive) { K.move(b, dt); if (K.ringIn(b, AX, AY, 240)) K.scatter(b, rng); }
+      K.pairs(alive, (a, b) => K.collide(a, b)); for (const b of alive) K.speed(b, 190);
+      if ((st.mt -= dt) <= 0) { st.mode = 'race'; st.rt = 0; AU.thud(0.4); }
+    } else if (st.mode === 'race') {
+      st.rt += dt;
+      for (const b of alive) {
+        if (b.seat >= 0) continue;
+        let best = null, bd = 1e9; for (const s of st.socks) { if (s.occ >= 0) continue; const [x, y] = this.sp(st, s), d = Math.hypot(x - b.x, y - b.y); if (d < bd) { bd = d; best = s; } }
+        if (!best) continue;
+        const [x, y] = this.sp(st, best), dx = x - b.x, dy = y - b.y, l = Math.hypot(dx, dy) || 1, k = Math.min(1, 6 * dt);
+        b.vx += (dx / l * 360 - b.vx) * k; b.vy += (dy / l * 360 - b.vy) * k; K.move(b, dt); K.ringIn(b, AX, AY, 240, 0.3);
+        if (l < 12) { best.occ = b.ci; b.seat = st.socks.indexOf(best); b.x = x; b.y = y; b.vx = b.vy = 0; AU.blip(14, 0.15); FX.ring(x, y, st.C[b.ci].c, 20); }
+      }
+      K.pairs(alive.filter(b => b.seat < 0), (a, b) => K.collide(a, b, 0.6));
+      const free = st.socks.filter(s => s.occ < 0).length, lost = alive.filter(b => b.seat < 0);
+      if (free === 0 || st.rt > 6) {
+        let out = lost;
+        if (free > 0) { lost.sort((a, b) => this.near(st, b) - this.near(st, a)); out = lost.slice(0, lost.length - free); }
+        out.forEach(b => { b.dead = true; b.fall = 1; FX.burst(b.x, b.y, st.C[b.ci].c, 22, 200); });
+        AU.boom(0.25); K.knock(st, out.map(b => b.ci)); st.mode = 'pause'; st.pt = 1.2;
+      }
+    } else if (st.mode === 'pause') {
+      if ((st.pt -= dt) <= 0 && st.win == null) {
+        st.round++; this.mkSocks(st); st.mode = 'music'; st.mt = Math.max(1.5, rng.range(3, 6) * Math.pow(0.85, st.round));
+        for (const b of alive) { b.seat = -1; const a = Math.atan2(AY - b.y, AX - b.x) + rng.range(-0.8, 0.8); b.vx = Math.cos(a) * 190; b.vy = Math.sin(a) * 190; }
+      }
+    }
+    fallTick(st, dt);
+  },
+  near(st, b) { let bd = 1e9; for (const s of st.socks) if (s.occ < 0) { const [x, y] = this.sp(st, s); bd = Math.min(bd, Math.hypot(x - b.x, y - b.y)); } return bd; },
+  draw(st, ctx) {
+    D.circle(ctx, AX, AY, 242, INK, 5, st.mode === 'music' ? '#fbf6ea' : '#e0d6c2');
+    for (const s of st.socks) { const [x, y] = this.sp(st, s); D.circle(ctx, x, y, 17, st.mode === 'music' ? '#b9ab90' : INK, 3, s.occ >= 0 ? rgba(st.C[s.occ].c, 0.35) : (st.mode === 'music' ? '#efe6d2' : '#fff')); }
+    drawBalls(st, ctx, false);
+    D.text(ctx, st.mode === 'music' ? '♪ ♫ ♪' : st.mode === 'race' ? 'MUSIC STOPPED!' : '', W / 2, AY + 290, 20, st.mode === 'music' ? '#b9ab90' : '#e5484d', 'center', 900);
+  },
+  hud: st => st.balls.map(b => b.dead ? 'out' : b.seat >= 0 ? '✓' : '·'),
+  lead: st => K.aliveIdx(st)[0]
+});
+
+// ---------- 15. Light Cycles ----------
+const LC = { c: 60, r: 90, s: 8.5, ox: 15, oy: 168 };
+SIMS.push({
+  id: 'cycles', name: 'Light Cycles', caption: 'Don’t hit a trail', theme: 'night',
+  init(rng) {
+    const st = K.base(rng, 6, { g: new Int8Array(LC.c * LC.r), acc: 0, dirty: [], full: true, vis: new Int32Array(LC.c * LC.r), stamp: 0 });
+    const starts = rng.shuffle([[3, 22, 1, 0], [3, 67, 1, 0], [56, 22, -1, 0], [56, 67, -1, 0], [30, 3, 0, 1], [30, 86, 0, -1]]);
+    st.rd = starts.map((s, i) => ({ x: s[0], y: s[1], dx: s[2], dy: s[3], ci: i, dead: false, dt: 0, len: 1 }));
+    st.rd.forEach(r => { st.g[r.y * LC.c + r.x] = r.ci + 1; });
+    return st;
+  },
+  where: st => st.rd.map(r => ({ i: r.ci, x: LC.ox + (r.x + 0.5) * LC.s, y: LC.oy + (r.y + 0.5) * LC.s, r: 10 })),
+  free(st, x, y) { return x >= 0 && y >= 0 && x < LC.c && y < LC.r && st.g[y * LC.c + x] === 0; },
+  space(st, x, y) {
+    if (!this.free(st, x, y)) return 0;
+    const s = ++st.stamp, q = [y * LC.c + x]; st.vis[q[0]] = s; let n = 0;
+    while (n < q.length && q.length < 350) { const i = q[n++], cx = i % LC.c, cy = (i / LC.c) | 0; for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + ox, ny = cy + oy; if (this.free(st, nx, ny)) { const j = ny * LC.c + nx; if (st.vis[j] !== s) { st.vis[j] = s; q.push(j); } } } }
+    return q.length;
+  },
+  step(st, dt) {
+    const rng = st.rng; st.acc += dt * (15 + 0.7 * st.t);
+    for (const r of st.rd) if (r.dead && r.dt && st.t - r.dt > 10 && !r.cl) { r.cl = 1; for (let i = 0; i < st.g.length; i++) if (st.g[i] === r.ci + 1) st.g[i] = 0; st.full = true; }
+    while (st.acc >= 1) {
+      st.acc -= 1;
+      const order = rng.shuffle(st.rd.filter(r => !r.dead)), dying = [];
+      for (const r of order) {
+        const L = [r.dy, -r.dx], Rt = [-r.dy, r.dx];
+        const ahead = this.free(st, r.x + r.dx, r.y + r.dy);
+        let turn = null;
+        if (!ahead || rng() < 0.035) {
+          const sl = this.space(st, r.x + L[0], r.y + L[1]), sr = this.space(st, r.x + Rt[0], r.y + Rt[1]), sa = ahead ? this.space(st, r.x + r.dx, r.y + r.dy) : 0;
+          const m = Math.max(sl, sr); if (m > 0 && (!ahead || m >= sa)) turn = sl > sr ? L : sr > sl ? Rt : rng() < 0.5 ? L : Rt;
+        } else if (st.t % 0.5 < dt * 2) {
+          const sa = this.space(st, r.x + r.dx, r.y + r.dy);
+          if (sa < 120) { const sl = this.space(st, r.x + L[0], r.y + L[1]), sr = this.space(st, r.x + Rt[0], r.y + Rt[1]); if (Math.max(sl, sr) > sa * 1.5) turn = sl > sr ? L : Rt; }
+        }
+        if (turn) { r.dx = turn[0]; r.dy = turn[1]; }
+        const nx = r.x + r.dx, ny = r.y + r.dy;
+        if (!this.free(st, nx, ny)) { r.dead = true; r.dt = st.t || 0.001; dying.push(r.ci); FX.burst(LC.ox + (r.x + 0.5) * LC.s, LC.oy + (r.y + 0.5) * LC.s, st.C[r.ci].c, 30, 260); AU.zap(0.2); continue; }
+        r.x = nx; r.y = ny; r.len++; st.g[ny * LC.c + nx] = r.ci + 1; dirtyPush(st, ny * LC.c + nx);
+      }
+      if (dying.length) K.knock(st, dying);
+      if (st.win != null) break;
+    }
+  },
+  draw(st, ctx) {
+    const L = D.layer(st, 'lc', LC.c, LC.r), g = L.getContext('2d');
+    const paint = i => { const v = st.g[i]; g.fillStyle = v ? st.C[v - 1].c : '#0c1016'; g.fillRect(i % LC.c, (i / LC.c) | 0, 1, 1); };
+    if (st.full) { st.full = false; st.dirty.length = 0; for (let i = 0; i < st.g.length; i++) paint(i); } else { for (const i of st.dirty) paint(i); st.dirty.length = 0; }
+    ctx.fillStyle = '#0c1016'; ctx.fillRect(LC.ox, LC.oy, LC.c * LC.s, LC.r * LC.s);
+    ctx.strokeStyle = 'rgba(80,120,160,0.08)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = 0; x <= LC.c; x += 5) { ctx.moveTo(LC.ox + x * LC.s, LC.oy); ctx.lineTo(LC.ox + x * LC.s, LC.oy + LC.r * LC.s); }
+    for (let y = 0; y <= LC.r; y += 5) { ctx.moveTo(LC.ox, LC.oy + y * LC.s); ctx.lineTo(LC.ox + LC.c * LC.s, LC.oy + y * LC.s); } ctx.stroke();
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(L, LC.ox, LC.oy, LC.c * LC.s, LC.r * LC.s); ctx.imageSmoothingEnabled = true;
+    ctx.strokeStyle = '#3a5a7a'; ctx.lineWidth = 2; ctx.strokeRect(LC.ox, LC.oy, LC.c * LC.s, LC.r * LC.s);
+    for (const r of st.rd) if (!r.dead) { const x = LC.ox + (r.x + 0.5) * LC.s, y = LC.oy + (r.y + 0.5) * LC.s; D.glow(ctx, x, y, 22, st.C[r.ci].c); D.circle(ctx, x, y, 4, null, 0, '#fff'); }
+  },
+  hud: st => st.rd.map(r => r.dead ? 'out' : r.len),
+  lead: st => K.aliveIdx(st).sort((a, b) => st.rd[b].len - st.rd[a].len)[0]
+});
+// ===================== C. Races =====================
+function ordinal(n) { return n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'); }
+
+// ---------- 16. Marble Run ----------
+const MR = { x0: 40, x1: 500, top: 60 };
+const MODS = {
+  zig(rng, y) { const S = []; let L = rng() < 0.5; for (let k = 0; k < 3; k++) { const yy = y + 40 + k * 125; if (L) S.push([MR.x0, yy, 440, yy + 70]); else S.push([MR.x1, yy, 100, yy + 70]); L = !L; } return { h: 420, S }; },
+  pegs(rng, y) { const P = []; const off = rng.range(0, 26); for (let r = 0; r < 6; r++) for (let x = MR.x0 + 30 + (r % 2 ? 26 : 0) + off; x < MR.x1 - 15; x += 52) P.push([x, y + 40 + r * 46, 6]); return { h: 330, P }; },
+  funnel(rng, y) { const g = 26, cx = rng.range(200, 340); return { h: 230, S: [[MR.x0, y + 20, cx - g, y + 170], [MR.x1, y + 20, cx + g, y + 170]] }; },
+  spin(rng, y) { return { h: 300, SP: [[170, y + 140, 70, rng.sign() * rng.range(1.6, 2.6), rng.ang()], [370, y + 140, 70, rng.sign() * rng.range(1.6, 2.6), rng.ang()]], P: [[270, y + 60, 8], [270, y + 230, 8]] }; },
+  split(rng, y) { const P = [], S = [[270, y + 30, 270, y + 290]]; for (let r = 0; r < 5; r++) for (let x = MR.x0 + 28 + (r % 2 ? 22 : 0); x < 250; x += 44) P.push([x, y + 60 + r * 48, 5]); const B = [[300, y + 90, 380, y + 120], [480, y + 170, 400, y + 200], [300, y + 250, 370, y + 270]]; return { h: 320, S, P, B }; },
+  paddle(rng, y) { return { h: 300, PD: [[y + 90, 160, rng.range(1.2, 2), rng.ang()], [y + 210, 160, rng.range(1.2, 2), rng.ang()]] }; },
+  pads(rng, y) { const B = []; for (let k = 0; k < 4; k++) { const yy = y + 50 + k * 70, x = rng.range(80, 400); B.push(k % 2 ? [x, yy, x + 80, yy + 30] : [x + 80, yy, x, yy + 30]); } return { h: 330, B }; }
+};
+SIMS.push({
+  id: 'marbles', name: 'Marble Run', caption: 'First marble to the bottom', theme: 'paper', thumbSteps: 90,
+  init(rng) {
+    const st = K.base(rng, 8, { mods: [], cam: 0, fin: [] });
+    const lib = ['zig', 'pegs', 'funnel', 'spin', 'split', 'paddle', 'pads'];
+    const order = rng.shuffle(lib.slice()).concat(rng.shuffle(lib.slice())).slice(0, 10);
+    let y = 120; order.push('funnel');
+    for (const m of order) { const o = MODS[m](rng, y); o.y = y; o.kind = m; o.S = o.S || []; o.P = o.P || []; o.B = o.B || []; o.SP = o.SP || []; o.PD = o.PD || []; st.mods.push(o); y += o.h; }
+    st.end = y + 40;
+    st.balls = rng.shuffle([0, 1, 2, 3, 4, 5, 6, 7]).map((ci, k) => { const b = K.ball(80 + k * 54 + rng.range(-6, 6), MR.top + rng.range(-8, 8), 9, Math.PI / 2, 10, ci); b.best = b.y; b.bt = 0; b.done = 0; return b; }).sort((a, b) => a.ci - b.ci);
+    return st;
+  },
+  where: st => st.balls.map(b => ({ i: b.ci, x: b.x, y: b.y - st.cam, r: b.r })),
+  modAt(st, y) { for (let i = 0; i < st.mods.length; i++) if (y < st.mods[i].y + st.mods[i].h) return i; return st.mods.length - 1; },
+  step(st, dt) {
+    const B = st.balls.filter(b => !b.done), h = dt / 2, t = st.t;
+    for (let sub = 0; sub < 2; sub++) {
+      for (const b of B) { b.vy += 1100 * h; const s = Math.hypot(b.vx, b.vy); if (s > 750) K.speed(b, 750); K.move(b, h); }
+      K.pairs(B, (a, b) => { const i = K.collide(a, b, 0.6); if (i > 80) AU.tone(900, 0.03, Math.min(0.12, i / 2000), 'triangle', 0, 'clack'); });
+      for (const b of B) {
+        K.box(b, MR.x0, -1e4, MR.x1, 1e6, 0.4);
+        const mi = this.modAt(st, b.y);
+        for (let j = Math.max(0, mi - 1); j <= Math.min(st.mods.length - 1, mi + 1); j++) {
+          const m = st.mods[j];
+          for (const s of m.S) K.seg(b, s[0], s[1], s[2], s[3], 0.35, 3);
+          for (const p of m.P) if (K.ringOut(b, p[0], p[1], p[2], 0.5)) AU.tone(1200, 0.025, 0.05, 'triangle', 0, 'peg');
+          for (const s of m.B) if (K.seg(b, s[0], s[1], s[2], s[3], 1.15, 3) > 50) AU.tone(400, 0.08, 0.1, 'sine', 1.8, 'pad');
+          for (const p of m.SP) { const a = p[4] + p[3] * t; for (let k = 0; k < 2; k++) { const c = Math.cos(a + k * Math.PI / 2) * p[2], s = Math.sin(a + k * Math.PI / 2) * p[2]; const vx = -p[3] * (b.y - p[1]), vy = p[3] * (b.x - p[0]); K.seg(b, p[0] - c, p[1] - s, p[0] + c, p[1] + s, 0.5, 4, vx, vy); } }
+          for (const p of m.PD) { const cx = 270 + Math.sin(t * p[2] + p[3]) * 140, vx = Math.cos(t * p[2] + p[3]) * 140 * p[2]; K.seg(b, cx - p[1] / 2, p[0], cx + p[1] / 2, p[0], 0.5, 4, vx, 0); }
+        }
+      }
+    }
+    for (const b of B) {
+      if (b.y > b.best + 2) { b.best = b.y; b.bt = 0; } else if ((b.bt += dt) > 4) { b.bt = 0; b.vx = st.rng.range(-250, 250); b.vy = -st.rng.range(150, 300); }
+      if (b.y > st.end) { b.done = st.fin.length + 1; st.fin.push(b.ci); if (st.win == null) { st.win = b.ci; FX.burst(b.x, b.y - st.cam, st.C[b.ci].c, 40, 300); } AU.blip(14 - st.fin.length, 0.2); }
+    }
+    const lead = Math.max(...st.balls.filter(b => !b.done).map(b => b.y), st.end - 300);
+    const tc = K.clamp(lead - 420, 0, st.end - 700); st.cam += (tc - st.cam) * Math.min(1, 4 * dt);
+  },
+  draw(st, ctx) {
+    const cam = st.cam, Y = y => y - cam + 0, vis = y => y - cam > -60 && y - cam < H + 60, t = st.t;
+    ctx.fillStyle = '#efe4cf'; ctx.fillRect(MR.x0, 0, MR.x1 - MR.x0, H);
+    ctx.lineCap = 'round';
+    for (const m of st.mods) {
+      if (m.y - cam > H || m.y + m.h - cam < 0) continue;
+      for (const s of m.S) { D.line(ctx, s[0], Y(s[1]), s[2], Y(s[3]), '#7a4f26', 8); D.line(ctx, s[0], Y(s[1]) - 2, s[2], Y(s[3]) - 2, '#b07a44', 3); }
+      for (const s of m.B) D.line(ctx, s[0], Y(s[1]), s[2], Y(s[3]), '#30a46c', 7);
+      for (const p of m.P) D.circle(ctx, p[0], Y(p[1]), p[2], null, 0, '#5a3a1c');
+      for (const p of m.SP) { const a = p[4] + p[3] * t; for (let k = 0; k < 2; k++) { const c = Math.cos(a + k * Math.PI / 2) * p[2], s = Math.sin(a + k * Math.PI / 2) * p[2]; D.line(ctx, p[0] - c, Y(p[1] - s), p[0] + c, Y(p[1] + s), '#c2410c', 8); } D.circle(ctx, p[0], Y(p[1]), 7, null, 0, '#7a2a08'); }
+      for (const p of m.PD) { const cx = 270 + Math.sin(t * p[2] + p[3]) * 140; D.line(ctx, cx - p[1] / 2, Y(p[0]), cx + p[1] / 2, Y(p[0]), '#3e63dd', 8); }
+    }
+    ctx.lineCap = 'butt';
+    if (vis(st.end)) { for (let x = MR.x0; x < MR.x1; x += 20) { ctx.fillStyle = ((x / 20) | 0) % 2 ? '#222' : '#fff'; ctx.fillRect(x, Y(st.end), 20, 10); } }
+    ctx.fillStyle = '#7a4f26'; ctx.fillRect(MR.x0 - 8, 0, 8, H); ctx.fillRect(MR.x1, 0, 8, H);
+    for (const b of st.balls) if (!b.done) { D.ball(ctx, b.x, Y(b.y), b.r, st.C[b.ci].c, false); D.text(ctx, String(b.ci + 1), b.x, Y(b.y) + 1, 10, '#fff', 'center', 900); }
+    // minimap
+    ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(520, 150, 10, 780);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(518, 150 + 780 * cam / st.end, 14, 780 * H / st.end);
+    for (const b of st.balls) { ctx.fillStyle = st.C[b.ci].c; ctx.fillRect(518, 150 + 780 * Math.min(1, b.y / st.end) - 2, 14, 4); }
+    // finish tray
+    st.fin.forEach((ci, k) => { D.ball(ctx, 60 + k * 30, H - 40, 10, st.C[ci].c, false); });
+  },
+  hud(st) { const live = st.balls.filter(b => !b.done).sort((a, b) => b.y - a.y); return st.balls.map(b => ordinal(b.done || st.fin.length + live.indexOf(b) + 1)); },
+  lead: st => st.balls.slice().sort((a, b) => b.y - a.y)[0].ci
+});
+
+// ---------- 17. Brick Drillers ----------
+const BD = { lanes: 5, lw: 100, x0: 20, rows: 12, top: 250, bh: 36, by: 190 };
+SIMS.push({
+  id: 'drill', name: 'Brick Drillers', caption: 'First ball out the bottom', theme: 'night',
+  init(rng) {
+    const st = K.base(rng, BD.lanes);
+    const hp = Array.from({ length: BD.rows * 3 }, () => rng.int(1, 5)), bonus = new Array(BD.rows * 3).fill(0); bonus[0] = bonus[1] = 1; bonus[2] = bonus[3] = 2;
+    st.lanes = []; st.balls = [];
+    for (let L = 0; L < BD.lanes; L++) {
+      const h = rng.shuffle(hp.slice()), bo = rng.shuffle(bonus.slice()), bricks = [];
+      for (let i = 0; i < h.length; i++) { const r = Math.floor(i / 3), c = i % 3; bricks.push({ x: BD.x0 + L * BD.lw + 3 + c * 31.3, y: BD.top + r * BD.bh, w: 29.5, h: BD.bh - 3, hp: h[i], max: h[i], bo: bo[i], fl: 0 }); }
+      st.lanes.push({ bricks, x2: 0 });
+      st.balls.push(this.mk(rng, L, BD.x0 + L * BD.lw + BD.lw / 2 + rng.range(-20, 20), BD.by));
+    }
+    return st;
+  },
+  mk(rng, L, x, y) { const b = K.ball(x, y, 8, 0, 0, L); b.vx = rng.range(-120, 120); b.vy = 0; b.cd = 0; return b; },
+  step(st, dt) {
+    const rng = st.rng, late = st.t > 40;
+    for (const b of st.balls) {
+      if (b.dead) continue;
+      const ln = st.lanes[b.ci], lx = BD.x0 + b.ci * BD.lw;
+      b.vy += 1600 * dt; K.move(b, dt); b.cd -= dt;
+      if (b.x - b.r < lx + 2) { b.x = lx + 2 + b.r; b.vx = Math.abs(b.vx); } if (b.x + b.r > lx + BD.lw - 2) { b.x = lx + BD.lw - 2 - b.r; b.vx = -Math.abs(b.vx); }
+      if (b.y - b.r < 140) { b.y = 140 + b.r; b.vy = Math.abs(b.vy); }
+      for (const k of ln.bricks) {
+        if (k.hp <= 0) continue;
+        const cx = K.clamp(b.x, k.x, k.x + k.w), cy = K.clamp(b.y, k.y, k.y + k.h), dx = b.x - cx, dy = b.y - cy, d = Math.hypot(dx, dy);
+        if (d >= b.r) continue;
+        let nx, ny; if (d > 1e-6) { nx = dx / d; ny = dy / d; } else { nx = 0; ny = -1; }
+        b.x = cx + nx * b.r; b.y = cy + ny * b.r;
+        const vn = b.vx * nx + b.vy * ny; if (vn < 0) { b.vx -= 2 * vn * nx; b.vy -= 2 * vn * ny; }
+        if (ny < -0.5) b.vy = -Math.max(Math.abs(b.vy) * 0.8, 430);
+        b.vx = K.clamp(b.vx + rng.range(-70, 70), -260, 260);
+        if (b.cd > 0) break;
+        b.cd = 0.05; const dmg = (ln.x2 > st.t ? 2 : 1) * (late ? 2 : 1);
+        k.hp -= dmg; k.fl = 1; AU.blip(Math.max(0, k.hp) * 2 + b.ci, 0.08);
+        if (k.hp <= 0) {
+          FX.burst(k.x + k.w / 2, k.y + k.h / 2, st.C[b.ci].c, 10, 120, 0.5, 2.5, 400);
+          if (k.bo === 1) { ln.x2 = st.t + 3; AU.coin(0.15); } else if (k.bo === 2) { st.balls.push(this.mk(rng, b.ci, b.x, b.y - 10)); AU.coin(0.15); }
+        }
+        break;
+      }
+      if (b.y > 950 && st.win == null) { st.win = b.ci; FX.burst(b.x, 930, st.C[b.ci].c, 40, 300); }
+    }
+    for (const ln of st.lanes) for (const k of ln.bricks) if (k.fl > 0) k.fl -= dt * 5;
+  },
+  draw(st, ctx) {
+    for (let L = 0; L < BD.lanes; L++) {
+      const lx = BD.x0 + L * BD.lw, col = st.C[L].c, ln = st.lanes[L];
+      ctx.fillStyle = ln.x2 > st.t ? rgba(col, 0.12) : 'rgba(255,255,255,0.03)'; ctx.fillRect(lx + 2, 140, BD.lw - 4, 810);
+      for (const k of ln.bricks) {
+        if (k.hp <= 0) continue; const a = 0.35 + 0.65 * k.hp / 5;
+        ctx.fillStyle = rgba(col, a); ctx.fillRect(k.x, k.y, k.w, k.h);
+        if (k.fl > 0) { ctx.fillStyle = `rgba(255,255,255,${k.fl * 0.6})`; ctx.fillRect(k.x, k.y, k.w, k.h); }
+        D.text(ctx, k.bo === 1 ? '×2' : k.bo === 2 ? '+●' : String(k.hp), k.x + k.w / 2, k.y + k.h / 2 + 1, k.bo ? 12 : 15, '#fff', 'center', 800);
+      }
+    }
+    ctx.fillStyle = '#2c3342'; for (let L = 0; L <= BD.lanes; L++) ctx.fillRect(BD.x0 + L * BD.lw - 2, 140, 4, 810);
+    for (const b of st.balls) if (!b.dead && b.y < 990) D.ball(ctx, b.x, b.y, b.r, st.C[b.ci].c, true);
+  },
+  hud: st => st.lanes.map(l => l.bricks.reduce((s, k) => s + Math.max(0, k.hp), 0)),
+  lead: st => { const v = st.lanes.map(l => l.bricks.reduce((s, k) => s + Math.max(0, k.hp), 0)); return v.indexOf(Math.min(...v)); }
+});
+
+// ---------- 18. Raindrop Race ----------
+SIMS.push({
+  id: 'rain', name: 'Raindrop Race', caption: 'First drop to the bottom', theme: 'night', FIN: 935,
+  init(rng) {
+    const st = K.base(rng, 6, { gust: false });
+    st.dots = []; for (let i = 0; i < 380; i++) st.dots.push({ x: rng.range(25, 515), y: rng.range(200, 930), r: rng.range(1.2, 3.4), on: true });
+    st.lights = []; for (let i = 0; i < 14; i++) st.lights.push([rng.range(0, W), rng.range(300, H), rng.range(40, 120), rng.pick(['#ffb347', '#ff6b6b', '#7ec8ff', '#ffe08a', '#c58bff'])]);
+    const lane = rng.shuffle([0, 1, 2, 3, 4, 5]);
+    st.balls = [0, 1, 2, 3, 4, 5].map(i => { const b = K.ball(60 + lane[i] * 84 + rng.range(-12, 12), 170, 7.5, 0, 0, i); b.ph = [rng.ang(), rng.ang()]; b.w = [rng.range(0.4, 0.9), rng.range(1.1, 1.9)]; b.stall = 0; b.sx = 0; return b; });
+    return st;
+  },
+  step(st, dt) {
+    const rng = st.rng;
+    if (!st.gust && st.t > 30) { st.gust = true; for (const b of st.balls) b.stall = 0; AU.whoosh(0.3); }
+    for (const b of st.balls) {
+      const g = st.gust && st.t < 33 ? 1.8 : 1;
+      if (b.stall > 0) { b.stall -= dt * g * g; b.vy = 0; }
+      else {
+        b.vy = 20 * Math.pow(b.r / 7.5, 1.6) * g;
+        if (rng() < dt * 0.45 / Math.pow(b.r / 7.5, 1.2) && !(st.gust && st.t < 33)) b.stall = rng.range(0.4, 2.4);
+      }
+      b.vx = (Math.sin(st.t * b.w[0] + b.ph[0]) * 14 + Math.sin(st.t * b.w[1] + b.ph[1]) * 8) * (b.stall > 0 ? 0.1 : 1) + b.sx + (st.gust && st.t < 33 ? 30 : 0);
+      b.sx *= Math.exp(-3 * dt);
+      K.move(b, dt); b.x = K.clamp(b.x, 22, 518);
+      for (const d of st.dots) if (d.on && Math.abs(d.y - b.y) < b.r + 4 && Math.abs(d.x - b.x) < b.r + 4 && Math.hypot(d.x - b.x, d.y - b.y) < b.r + d.r) { d.on = false; b.r = Math.min(16, Math.sqrt(b.r * b.r + d.r * d.r * 0.8)); AU.blip(18 - b.r, 0.05); if (b.stall > 0 && rng() < 0.5) b.stall = 0; }
+      if (b.y >= this.FIN && st.win == null) { st.win = b.ci; FX.burst(b.x, b.y, st.C[b.ci].c, 30, 200); }
+    }
+    K.pairs(st.balls, (a, b) => { const dx = b.x - a.x, d = Math.hypot(dx, b.y - a.y); if (d < a.r + b.r + 2) { const s = dx >= 0 ? 1 : -1; a.sx -= 30 * s; b.sx += 30 * s; } });
+  },
+  draw(st, ctx) {
+    for (const l of st.lights) D.glow(ctx, l[0], l[1], l[2], l[3], 0.35);
+    ctx.fillStyle = 'rgba(170,200,230,0.06)'; ctx.fillRect(18, 150, 504, 790);
+    const L = D.layer(st, 'wet'), g = L.getContext('2d');
+    g.globalCompositeOperation = 'destination-out'; g.fillStyle = 'rgba(0,0,0,0.012)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-over';
+    for (const b of st.balls) { g.fillStyle = rgba(st.C[b.ci].c, 0.08); g.beginPath(); g.arc(b.x, b.y, b.r * 0.7, 0, TAU); g.fill(); }
+    ctx.drawImage(L, 0, 0);
+    ctx.fillStyle = 'rgba(220,235,255,0.35)'; for (const d of st.dots) if (d.on) { ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; for (const d of st.dots) if (d.on && d.r > 2.4) ctx.fillRect(d.x - d.r * 0.4, d.y - d.r * 0.5, 1.2, 1.2);
+    for (const b of st.balls) {
+      const c = st.C[b.ci].c; D.glow(ctx, b.x, b.y, b.r * 3, c, 0.5);
+      ctx.fillStyle = rgba(c, 0.75); ctx.beginPath(); ctx.ellipse(b.x, b.y, b.r * 0.92, b.r * 1.08, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.beginPath(); ctx.ellipse(b.x - b.r * 0.3, b.y - b.r * 0.35, b.r * 0.28, b.r * 0.18, -0.6, 0, TAU); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(18, this.FIN + 3, 504, 2);
+    if (st.gust && st.t < 33) D.text(ctx, 'GUST!', W / 2, 180, 26, '#cfe6ff', 'center', 900);
+  },
+  hud(st) { return st.balls.map(b => Math.round(K.clamp((b.y - 170) / (this.FIN - 170), 0, 1) * 100) + '%'); },
+  lead: st => st.balls.slice().sort((a, b) => b.y - a.y)[0].ci
+});
+
+// ---------- 19. Fuse Race ----------
+SIMS.push({
+  id: 'fuse', name: 'Fuse Race', caption: 'First firework to launch', theme: 'night', L: 1350,
+  init(rng) {
+    const st = K.base(rng, 5, { xs: [] }), N = 5, xs = Array.from({ length: N }, (_, i) => 70 + i * 100), xe = rng.shuffle(xs.slice());
+    st.f = [];
+    for (let i = 0; i < N; i++) {
+      const ph = [rng.ang(), rng.ang(), rng.ang()], kk = [rng.range(1, 2.5), rng.range(2.5, 4.5), rng.range(4.5, 7)], wt = [1, rng.range(0.3, 0.7), rng.range(0.1, 0.3)];
+      const lu = rng.range(0.25, 0.75), lr = rng.range(18, 28), ld = rng.sign();
+      const build = amp => {
+        const pts = [];
+        for (let k = 0; k <= 160; k++) {
+          const u = k / 160; let x = xs[i] + (xe[i] - xs[i]) * u, y = 915 - 705 * u;
+          for (let j = 0; j < 3; j++) x += Math.sin(kk[j] * Math.PI * u + ph[j]) * amp * wt[j] * Math.sin(Math.PI * u);
+          pts.push([K.clamp(x, 30, 510), y]);
+          if (Math.abs(u - lu) < 0.5 / 160) for (let a = 1; a <= 24; a++) { const t = a / 24 * TAU; pts.push([K.clamp(x + ld * (lr - Math.cos(t) * lr), 30, 510), y - Math.sin(t) * lr]); }
+        }
+        return pts;
+      };
+      const len = p => { let s = 0; for (let k = 1; k < p.length; k++) s += Math.hypot(p[k][0] - p[k - 1][0], p[k][1] - p[k - 1][1]); return s; };
+      let lo = 0, hi = 400, pts = build(0);
+      for (let it = 0; it < 30; it++) { const m = (lo + hi) / 2; if (len(build(m)) < this.L) lo = m; else hi = m; }
+      pts = build((lo + hi) / 2);
+      const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+      const sp = rng.shuffle([].concat(new Array(8).fill(1.5), new Array(6).fill(0.55), new Array(12).fill(1)));
+      const br = []; for (let k = 0; k < 3; k++) { const j = rng.int(10, pts.length - 10), a = rng.ang(); br.push([pts[j][0], pts[j][1], pts[j][0] + Math.cos(a) * 26, pts[j][1] + Math.sin(a) * 26]); }
+      st.f.push({ pts, cum, total: cum[cum.length - 1], sp, s: 0, max: 0, done: false, br, fw: 0 });
+    }
+    st.X = [];
+    for (let a = 0; a < N; a++) for (let b = a + 1; b < N; b++) {
+      const A = st.f[a], B = st.f[b];
+      for (let i = 1; i < A.pts.length; i++) for (let j = 1; j < B.pts.length; j++) {
+        const p = A.pts[i - 1], q = A.pts[i], r = B.pts[j - 1], s = B.pts[j];
+        if (Math.max(p[0], q[0]) < Math.min(r[0], s[0]) || Math.max(r[0], s[0]) < Math.min(p[0], q[0]) || Math.max(p[1], q[1]) < Math.min(r[1], s[1]) || Math.max(r[1], s[1]) < Math.min(p[1], q[1])) continue;
+        const x = K.segX(p[0], p[1], q[0], q[1], r[0], r[1], s[0], s[1]);
+        if (x) st.X.push({ a, b, sa: A.cum[i - 1] + (A.cum[i] - A.cum[i - 1]) * x[0], sb: B.cum[j - 1] + (B.cum[j] - B.cum[j - 1]) * x[1], x: p[0] + (q[0] - p[0]) * x[0], y: p[1] + (q[1] - p[1]) * x[0], used: false, jump: rng() < 0.5 });
+      }
+    }
+    return st;
+  },
+  pos(f, s) { let k = 1; while (k < f.cum.length - 1 && f.cum[k] < s) k++; const a = f.pts[k - 1], b = f.pts[k], t = (s - f.cum[k - 1]) / Math.max(1e-6, f.cum[k] - f.cum[k - 1]); return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; },
+  where(st) { return st.f.map((f, i) => { const p = f.pts[0]; return { i, x: p[0], y: p[1], r: 14 }; }); },
+  step(st, dt) {
+    st.f.forEach((f, i) => {
+      if (f.done) { f.fw += dt; return; }
+      const chunk = Math.min(25, Math.floor(f.s / (f.total / 26))), v = 56 * f.sp[chunk], s0 = f.s;
+      f.s += v * dt; f.max = Math.max(f.max, f.s);
+      for (const x of st.X) {
+        if (x.used) continue;
+        const [me, other, sm, so] = x.a === i ? [x.a, x.b, x.sa, x.sb] : x.b === i ? [x.b, x.a, x.sb, x.sa] : [-1];
+        if (me < 0 || !(s0 < sm && f.s >= sm)) continue;
+        x.used = true; const o = st.f[other];
+        if (x.jump && !o.done && o.s < so) { o.s = so; o.max = Math.max(o.max, so); FX.burst(x.x, x.y, '#ffd27a', 24, 220, 0.5, 2.5); AU.zap(0.15); }
+      }
+      if (Math.random() < 0.5) { const [x, y] = this.pos(f, f.s); FX.burst(x, y, Math.random() < 0.5 ? '#ffcf6a' : st.C[i].l, 1, 70, 0.35, 1.8, 120); }
+      AU.noise(0.05, 4000, 0.03, 'highpass', 1, 'hiss');
+      if (f.s >= f.total) { f.done = true; f.s = f.total; const e = f.pts[f.pts.length - 1]; FX.burst(e[0], e[1] - 30, st.C[i].c, 50, 330, 1, 3.5, 60); FX.burst(e[0], e[1] - 30, '#fff', 20, 200, 0.8, 2); AU.boom(0.3); if (st.win == null) st.win = i; }
+    });
+  },
+  draw(st, ctx) {
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    st.f.forEach((f, i) => {
+      for (const b of f.br) D.line(ctx, b[0], b[1], b[2], b[3], '#4a3a28', 3);
+      const seg = f.total / 26;
+      for (let c = 0; c < 26; c++) {
+        ctx.strokeStyle = f.sp[c] < 1 ? '#3b3226' : f.sp[c] > 1 ? '#b5925a' : '#86704e'; ctx.lineWidth = 3.5; ctx.beginPath();
+        let first = true; for (let k = 0; k < f.pts.length; k++) { if (f.cum[k] < c * seg - 3 || f.cum[k] > (c + 1) * seg + 3) continue; first ? ctx.moveTo(f.pts[k][0], f.pts[k][1]) : ctx.lineTo(f.pts[k][0], f.pts[k][1]); first = false; }
+        ctx.stroke();
+      }
+      ctx.strokeStyle = '#5c5c5c'; ctx.lineWidth = 2.5; ctx.beginPath(); let first = true;
+      for (let k = 0; k < f.pts.length && f.cum[k] <= f.max; k++) { first ? ctx.moveTo(f.pts[k][0], f.pts[k][1]) : ctx.lineTo(f.pts[k][0], f.pts[k][1]); first = false; }
+      ctx.stroke();
+      const e = f.pts[f.pts.length - 1], up = f.done ? Math.min(1, f.fw * 2) * 120 : 0, col = st.C[i].c;
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(e[0], e[1] - 34 - up); ctx.lineTo(e[0] - 8, e[1] - 18 - up); ctx.lineTo(e[0] - 8, e[1] - up); ctx.lineTo(e[0] + 8, e[1] - up); ctx.lineTo(e[0] + 8, e[1] - 18 - up); ctx.closePath(); ctx.fill();
+      if (!f.done) { const [x, y] = this.pos(f, f.s); D.glow(ctx, x, y, 26, '#ffb347'); D.circle(ctx, x, y, 3.5, null, 0, '#fff7d6'); }
+      D.circle(ctx, f.pts[0][0], f.pts[0][1] + 10, 8, null, 0, col);
+    });
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    for (const x of st.X) if (!x.used) D.circle(ctx, x.x, x.y, 3, 'rgba(255,220,150,0.35)', 1);
+  },
+  hud: st => st.f.map(f => Math.round(f.s / f.total * 100) + '%'),
+  lead: st => st.f.map((f, i) => [f.s / f.total, i]).sort((a, b) => b[0] - a[0])[0][1]
+});
+
+// ---------- 20. Chaos Pendulums ----------
+SIMS.push({
+  id: 'pend', name: 'Chaos Pendulums', caption: 'First to 20 flips', theme: 'night', PX: 270, PY: 500, LEN: 112, GOAL: 20,
+  init(rng) {
+    const st = K.base(rng, 4), a1 = rng.range(2.1, 2.9) * rng.sign(), a2 = a1 + rng.range(-0.3, 0.6);
+    st.p = [0, 1, 2, 3].map(i => ({ a1, a2: a2 + rng.range(-1, 1) * 1.5e-3, w1: 0, w2: 0, fl: 0, k: 0, tr: [] }));
+    st.p.forEach(p => { p.k = Math.floor((p.a2 - Math.PI) / TAU); });
+    return st;
+  },
+  acc(a1, a2, w1, w2) {
+    const g = 9.81, d = a1 - a2, den = 3 - Math.cos(2 * d);
+    return [(-3 * g * Math.sin(a1) - g * Math.sin(a1 - 2 * a2) - 2 * Math.sin(d) * (w2 * w2 + w1 * w1 * Math.cos(d))) / den,
+      (2 * Math.sin(d) * (2 * w1 * w1 + 2 * g * Math.cos(a1) + w2 * w2 * Math.cos(d))) / den];
+  },
+  step(st, dt) {
+    const h = dt * 1.3;
+    st.p.forEach((p, i) => {
+      const f = (a1, a2, w1, w2) => { const [x, y] = this.acc(a1, a2, w1, w2); return [w1, w2, x, y]; };
+      const k1 = f(p.a1, p.a2, p.w1, p.w2), k2 = f(p.a1 + k1[0] * h / 2, p.a2 + k1[1] * h / 2, p.w1 + k1[2] * h / 2, p.w2 + k1[3] * h / 2);
+      const k3 = f(p.a1 + k2[0] * h / 2, p.a2 + k2[1] * h / 2, p.w1 + k2[2] * h / 2, p.w2 + k2[3] * h / 2), k4 = f(p.a1 + k3[0] * h, p.a2 + k3[1] * h, p.w1 + k3[2] * h, p.w2 + k3[3] * h);
+      p.a1 += h / 6 * (k1[0] + 2 * k2[0] + 2 * k3[0] + k4[0]); p.a2 += h / 6 * (k1[1] + 2 * k2[1] + 2 * k3[1] + k4[1]);
+      p.w1 += h / 6 * (k1[2] + 2 * k2[2] + 2 * k3[2] + k4[2]); p.w2 += h / 6 * (k1[3] + 2 * k2[3] + 2 * k3[3] + k4[3]);
+      const k = Math.floor((p.a2 - Math.PI) / TAU);
+      if (k !== p.k) { p.k = k; p.fl++; AU.tone(AU.hz([10, 12, 14, 17][i] + Math.floor(p.fl / 5)), 0.3, 0.12, 'sine', 0, 'pf' + i); const [, , x, y] = this.pts(p); FX.burst(x, y, st.C[i].c, 8, 120); if (p.fl >= this.GOAL && st.win == null) st.win = i; }
+      const [, , x, y] = this.pts(p); p.tr.push(x, y); if (p.tr.length > 440) p.tr.splice(0, 2);
+    });
+  },
+  pts(p) { const L = this.LEN, x1 = this.PX + Math.sin(p.a1) * L, y1 = this.PY + Math.cos(p.a1) * L; return [x1, y1, x1 + Math.sin(p.a2) * L, y1 + Math.cos(p.a2) * L]; },
+  where(st) { return st.p.map((p, i) => { const q = this.pts(p); return { i, x: q[2], y: q[3], r: 12 }; }); },
+  draw(st, ctx) {
+    ctx.lineCap = 'round';
+    st.p.forEach((p, i) => {
+      const t = p.tr, c = st.C[i].c;
+      for (let k = 2; k < t.length; k += 2) { ctx.globalAlpha = (k / t.length) * 0.8; ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(t[k - 2], t[k - 1]); ctx.lineTo(t[k], t[k + 1]); ctx.stroke(); }
+    });
+    ctx.globalAlpha = 1;
+    st.p.forEach((p, i) => {
+      const [x1, y1, x2, y2] = this.pts(p), c = st.C[i].c;
+      D.line(ctx, this.PX, this.PY, x1, y1, rgba(c, 0.7), 3); D.line(ctx, x1, y1, x2, y2, rgba(c, 0.7), 3);
+      D.circle(ctx, x1, y1, 5, null, 0, c); D.ball(ctx, x2, y2, 10, c, true);
+    });
+    ctx.lineCap = 'butt'; D.circle(ctx, this.PX, this.PY, 6, null, 0, '#ccc');
+  },
+  hud: st => st.p.map(p => p.fl)
+});
+// ===================== D. Territory =====================
+function gridPaint(st, name, cw, ch, colorOf) { // offscreen 1px-per-cell canvas kept in sync via st.dirty / st.full
+  const L = D.layer(st, name, cw, ch), g = L.getContext('2d');
+  if (st.full || !st._img) { st._img = g.createImageData(cw, ch); }
+  const img = st._img, px = img.data, put = i => { const c = colorOf(i); px[i * 4] = c[0]; px[i * 4 + 1] = c[1]; px[i * 4 + 2] = c[2]; px[i * 4 + 3] = 255; };
+  if (st.full) { st.full = false; st.dirty.length = 0; for (let i = 0; i < cw * ch; i++) put(i); } else { for (const i of st.dirty) put(i); st.dirty.length = 0; }
+  g.putImageData(img, 0, 0); return L;
+}
+
+// ---------- 21. Paint War ----------
+const PW = { c: 30, r: 46, s: 17, ox: 15, oy: 158 };
+SIMS.push({
+  id: 'paint', name: 'Paint War', caption: 'Most paint at 45 s, or 60% wins', theme: 'paper',
+  init(rng) {
+    const st = K.base(rng, 4, { g: new Int8Array(PW.c * PW.r), dirty: [], full: true, n: [0, 0, 0, 0], two: false });
+    for (let y = 0; y < PW.r; y++) for (let x = 0; x < PW.c; x++) { const o = (x >= 15 ? 1 : 0) + (y >= 23 ? 2 : 0); st.g[y * PW.c + x] = o; st.n[o]++; }
+    st.balls = [0, 1, 2, 3].map(o => K.ball(PW.ox + ((o & 1) ? 22.5 : 7.5) * PW.s + rng.range(-40, 40), PW.oy + ((o & 2) ? 34.5 : 11.5) * PW.s + rng.range(-60, 60), 7, rng.ang(), 330, o));
+    return st;
+  },
+  at(st, x, y) { const cx = Math.floor((x - PW.ox) / PW.s), cy = Math.floor((y - PW.oy) / PW.s); return cx < 0 || cy < 0 || cx >= PW.c || cy >= PW.r ? -1 : cy * PW.c + cx; },
+  flip(st, i, o) { const p = st.g[i]; st.n[p]--; st.n[o]++; st.g[i] = o; dirtyPush(st, i); AU.tone(AU.hz([5, 7, 9, 12][o]), 0.12, 0.07, 'triangle', 0, 'mar' + o); },
+  step(st, dt) {
+    const rng = st.rng;
+    if (!st.two && st.t > 30) {
+      st.two = true;
+      for (let o = 0; o < 4; o++) { const own = []; for (let i = 0; i < st.g.length; i++) if (st.g[i] === o) own.push(i); if (!own.length) continue; const i = rng.pick(own); st.balls.push(K.ball(PW.ox + (i % PW.c + 0.5) * PW.s, PW.oy + ((i / PW.c | 0) + 0.5) * PW.s, 7, rng.ang(), 330, o)); }
+      AU.chime();
+    }
+    const x0 = PW.ox, y0 = PW.oy, x1 = PW.ox + PW.c * PW.s, y1 = PW.oy + PW.r * PW.s;
+    for (const b of st.balls) {
+      for (let sub = 0; sub < 2; sub++) {
+        const h = dt / 2;
+        b.x += b.vx * h; const ex = b.x + Math.sign(b.vx) * b.r, ix = this.at(st, ex, b.y);
+        if (ix >= 0 && st.g[ix] !== b.ci) { this.flip(st, ix, b.ci); b.vx = -b.vx; b.x -= b.vx * -h; }
+        b.y += b.vy * h; const ey = b.y + Math.sign(b.vy) * b.r, iy = this.at(st, b.x, ey);
+        if (iy >= 0 && st.g[iy] !== b.ci) { this.flip(st, iy, b.ci); b.vy = -b.vy; b.y -= b.vy * -h; }
+        if (K.box(b, x0, y0, x1, y1)) K.scatter(b, rng, 0.08);
+      }
+      K.nudge(b, 0.2);
+    }
+    const tot = PW.c * PW.r, m = Math.max(...st.n);
+    if (st.win == null && (m >= tot * 0.6 || st.t >= 45)) st.win = st.n.indexOf(m);
+  },
+  draw(st, ctx) {
+    const cols = st.C.map(c => c.rgb), L = gridPaint(st, 'pw', PW.c, PW.r, i => cols[st.g[i]]);
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(L, PW.ox, PW.oy, PW.c * PW.s, PW.r * PW.s); ctx.imageSmoothingEnabled = true;
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = 1; x < PW.c; x++) { ctx.moveTo(PW.ox + x * PW.s, PW.oy); ctx.lineTo(PW.ox + x * PW.s, PW.oy + PW.r * PW.s); }
+    for (let y = 1; y < PW.r; y++) { ctx.moveTo(PW.ox, PW.oy + y * PW.s); ctx.lineTo(PW.ox + PW.c * PW.s, PW.oy + y * PW.s); } ctx.stroke();
+    for (const b of st.balls) { D.circle(ctx, b.x, b.y, b.r + 2, null, 0, '#fff'); D.circle(ctx, b.x, b.y, b.r, null, 0, st.C[b.ci].d); }
+    if (st.t < 45) { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(PW.ox, 140, PW.c * PW.s * (1 - st.t / 45), 5); }
+  },
+  hud: st => st.n.map(n => Math.round(n / (PW.c * PW.r) * 100) + '%'),
+  lead: st => st.n.indexOf(Math.max(...st.n))
+});
+
+// ---------- 22. Border War ----------
+const BW = { c: 90, r: 140, s: 5.6, ox: 18, oy: 156 };
+SIMS.push({
+  id: 'border', name: 'Border War', caption: 'Last colour on the map', theme: 'night',
+  init(rng) {
+    const N = 6, st = K.base(rng, N, { g: new Int8Array(BW.c * BW.r), dirty: [], full: true, n: new Array(N + 1).fill(0), mor: [], cap: [], tick: 0 });
+    const g = st.g, blob = (cx, cy, r, v) => { for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) if (x >= 0 && y >= 0 && x < BW.c && y < BW.r && (x - cx) ** 2 + (y - cy) ** 2 <= r * r) g[y * BW.c + x] = v; };
+    for (let k = 0; k < 7; k++) blob(rng.int(5, 84), rng.int(5, 134), rng.int(2, 5), -1);
+    const caps = []; while (caps.length < N) { const x = rng.int(8, 81), y = rng.int(8, 131); if (caps.every(c => Math.hypot(c[0] - x, c[1] - y) > 38)) caps.push([x, y]); if (caps.length < N && rng() < 0.001) caps.push([x, y]); }
+    caps.forEach((c, i) => { blob(c[0], c[1], 3, i + 1); st.cap.push(c[1] * BW.c + c[0]); st.mor.push(1); });
+    for (let i = 0; i < g.length; i++) if (g[i] > 0) st.n[g[i]]++;
+    st.capLost = new Array(N).fill(false);
+    return st;
+  },
+  where: st => st.cap.map((c, i) => ({ i, x: BW.ox + (c % BW.c + 0.5) * BW.s, y: BW.oy + ((c / BW.c | 0) + 0.5) * BW.s, r: 16 })),
+  step(st, dt) {
+    st.tick += dt * 12; if (st.tick < 1) return; st.tick -= 1;
+    const rng = st.rng, g = st.g, C = BW.c, R = BW.r, N = st.C.length, tot = st.n.slice(1).reduce((a, b) => a + b, 0) || 1;
+    const k = 0.6 + Math.max(0, st.t - 25) * 0.25;
+    for (let i = 0; i < N; i++) st.mor[i] = K.clamp(st.mor[i] + rng.range(-0.06, 0.06) + (1 - st.mor[i]) * 0.01, 0.5, 1.6);
+    const ch = [];
+    for (let i = 0; i < g.length; i++) {
+      const o = g[i]; if (o <= 0) continue;
+      const x = i % C, y = (i / C) | 0, d = (rng() * 4) | 0, nx = x + [1, -1, 0, 0][d], ny = y + [0, 0, 1, -1][d];
+      if (nx < 0 || ny < 0 || nx >= C || ny >= R) continue;
+      const j = ny * C + nx, t = g[j]; if (t === o || t < 0) continue;
+      let p;
+      if (t === 0) p = 0.22;
+      else {
+        let own = 0; if (nx > 0 && g[j - 1] === o) own++; if (nx < C - 1 && g[j + 1] === o) own++; if (ny > 0 && g[j - C] === o) own++; if (ny < R - 1 && g[j + C] === o) own++;
+        p = 0.12 * own / 2 * Math.pow(st.n[o] / Math.max(1, st.n[t]), k) * st.mor[o - 1] / st.mor[t - 1] * (st.t > 30 && st.n[t] < 150 ? 3 : 1);
+      }
+      if (rng() < p) ch.push(j, o);
+    }
+    for (let q = 0; q < ch.length; q += 2) { const j = ch[q], o = ch[q + 1], t = g[j]; if (t === o) continue; if (t > 0) st.n[t]--; st.n[o]++; g[j] = o; dirtyPush(st, j); }
+    if (ch.length) AU.noise(0.05, 1500, Math.min(0.08, ch.length / 4000), 'bandpass', 1, 'crack');
+    const dying = [];
+    for (let i = 0; i < N; i++) {
+      if (st.out[i]) continue;
+      if (!st.capLost[i] && g[st.cap[i]] !== i + 1) { st.capLost[i] = true; st.mor[i] *= 0.5; AU.thud(0.3); }
+      if (st.n[i + 1] === 0) dying.push(i);
+    }
+    if (dying.length) { AU.tone(220, 0.6, 0.2, 'sawtooth', 0.5, 'horn'); K.knock(st, dying); }
+  },
+  draw(st, ctx) {
+    const cols = [[44, 48, 58], ...st.C.map(c => c.rgb)], L = gridPaint(st, 'bw', BW.c, BW.r, i => st.g[i] < 0 ? [90, 96, 110] : cols[st.g[i]]);
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(L, BW.ox, BW.oy, BW.c * BW.s, BW.r * BW.s); ctx.imageSmoothingEnabled = true;
+    st.cap.forEach((c, i) => {
+      const x = BW.ox + (c % BW.c + 0.5) * BW.s, y = BW.oy + ((c / BW.c | 0) + 0.5) * BW.s;
+      D.text(ctx, '★', x, y, 18, st.capLost[i] ? 'rgba(0,0,0,0.4)' : '#fff');
+    });
+  },
+  hud(st) { const tot = BW.c * BW.r; return st.C.map((c, i) => (st.n[i + 1] / tot * 100).toFixed(st.n[i + 1] / tot < 0.1 ? 1 : 0) + '%'); },
+  lead: st => { const v = st.C.map((c, i) => st.n[i + 1]); return v.indexOf(Math.max(...v)); }
+});
+
+// ---------- 23. Fortress Breakers ----------
+SIMS.push({
+  id: 'fort', name: 'Fortress Breakers', caption: 'Last core standing', theme: 'night',
+  init(rng) {
+    const st = K.base(rng, 4, { br: [], lost: [0, 0, 0, 0], peel: 0 });
+    st.F = [[BX0, BY0, 0], [BX1, BY0, Math.PI / 2], [BX1, BY1, Math.PI], [BX0, BY1, -Math.PI / 2]].map((f, i) => ({ x: f[0], y: f[1], a0: f[2], alive: true, i }));
+    st.F.forEach((f, i) => [[66, 6], [96, 8], [126, 10]].forEach(([r, n], L) => { for (let k = 0; k < n; k++) st.br.push({ f: i, L, rIn: r - 8, rOut: r + 8, a0: f.a0 + k / n * Math.PI / 2, a1: f.a0 + (k + 1) / n * Math.PI / 2, on: true }); }));
+    st.balls = []; for (let k = 0; k < 8; k++) { const b = K.ball(W / 2 + rng.range(-40, 40), (BY0 + BY1) / 2 + rng.range(-40, 40), 7, rng.ang(), 240, -1); b.col = -1; st.balls.push(b); }
+    return st;
+  },
+  where: st => st.F.map((f, i) => ({ i, x: f.x + Math.cos(f.a0 + Math.PI / 4) * 40, y: f.y + Math.sin(f.a0 + Math.PI / 4) * 40, r: 40 })),
+  step(st, dt) {
+    const rng = st.rng, spd = 270 + st.t * 4;
+    if (st.peel < 1 && st.t > 35) { st.peel = 1; for (const k of st.br) if (k.L > 0 && k.on) { k.on = false; const f = st.F[k.f]; FX.burst(f.x + Math.cos((k.a0 + k.a1) / 2) * k.rIn, f.y + Math.sin((k.a0 + k.a1) / 2) * k.rIn, st.C[k.f].c, 2, 100); } AU.boom(0.3); }
+    if (st.peel < 2 && st.t > 48) { st.peel = 2; for (const k of st.br) k.on = false; }
+    const dying = [];
+    for (const b of st.balls) {
+      K.move(b, dt); if (K.box(b, BX0, BY0, BX1, BY1)) { K.nudge(b); K.scatter(b, rng, 0.1); }
+      for (const f of st.F) {
+        if (!f.alive) continue;
+        const dx = b.x - f.x, dy = b.y - f.y, d = Math.hypot(dx, dy);
+        if (d < 22 + b.r) {
+          if (b.col === f.i) { K.ringOut(b, f.x, f.y, 22); continue; }
+          f.alive = false; dying.push(f.i); FX.burst(f.x, f.y, st.C[f.i].c, 60, 380, 1, 4); FX.shake(12); AU.boom(0.5);
+          for (const k of st.br) if (k.f === f.i && k.on) { k.on = false; }
+          for (const o of st.balls) if (o.col === f.i) o.col = -1;
+          K.ringOut(b, f.x, f.y, 22); continue;
+        }
+        if (d > 140) continue;
+        const a = Math.atan2(dy, dx);
+        for (const k of st.br) {
+          if (!k.on || k.f !== f.i || d < k.rIn - b.r || d > k.rOut + b.r) continue;
+          const m = b.r / d, da = K.angDiff(k.a0, a), span = k.a1 - k.a0;
+          if (da < -m || da > span + m) continue;
+          const nx = dx / d, ny = dy / d, vn = b.vx * nx + b.vy * ny, out = d > (k.rIn + k.rOut) / 2;
+          if (out ? vn < 0 : vn > 0) { b.vx -= 2 * vn * nx; b.vy -= 2 * vn * ny; }
+          const nd = out ? k.rOut + b.r : k.rIn - b.r; b.x = f.x + nx * nd; b.y = f.y + ny * nd;
+          if (b.col !== k.f) {
+            k.on = false; b.col = k.f; st.lost[k.f]++; AU.blip(4 + k.L * 4, 0.1);
+            FX.burst(b.x, b.y, st.C[k.f].c, 8, 140, 0.5, 2.5);
+            if (st.lost[k.f] % 10 === 0 && st.balls.length < 30) { const ang = f.a0 + Math.PI / 4 + rng.range(-0.4, 0.4), nb = K.ball(f.x + Math.cos(ang) * 30, f.y + Math.sin(ang) * 30, 7, ang, spd, k.f); nb.col = k.f; st.balls.push(nb); }
+          } else AU.tick(0.05);
+          break;
+        }
+      }
+      K.speed(b, spd);
+    }
+    K.pairs(st.balls, (a, b) => K.collide(a, b));
+    if (dying.length) K.knock(st, dying, i => st.br.filter(k => k.f === i && k.on).length);
+  },
+  draw(st, ctx) {
+    ctx.strokeStyle = '#2c3342'; ctx.lineWidth = 3; ctx.strokeRect(BX0, BY0, BX1 - BX0, BY1 - BY0);
+    for (const k of st.br) {
+      if (!k.on) continue; const f = st.F[k.f], c = st.C[k.f].c;
+      ctx.strokeStyle = rgba(c, 0.85 - k.L * 0.15); ctx.lineWidth = k.rOut - k.rIn - 3; ctx.beginPath(); ctx.arc(f.x, f.y, (k.rIn + k.rOut) / 2, k.a0 + 0.02, k.a1 - 0.02); ctx.stroke();
+    }
+    for (const f of st.F) {
+      if (!f.alive) continue; const c = st.C[f.i].c, left = st.br.filter(k => k.f === f.i && k.on).length, pulse = 0.6 + 0.4 * Math.sin(st.t * (3 + (24 - left) * 0.6));
+      D.glow(ctx, f.x, f.y, 60, c, pulse); D.circle(ctx, f.x, f.y, 22, null, 0, c); D.circle(ctx, f.x, f.y, 10, null, 0, '#fff');
+    }
+    for (const b of st.balls) D.ball(ctx, b.x, b.y, b.r, b.col < 0 ? '#e8e8e8' : st.C[b.col].c, true);
+  },
+  hud: st => st.F.map(f => f.alive ? st.br.filter(k => k.f === f.i && k.on).length : 0),
+  lead: st => K.aliveIdx(st).sort((a, b) => st.br.filter(k => k.f === b && k.on).length - st.br.filter(k => k.f === a && k.on).length)[0]
+});
+
+// ---------- 24. Ball Soccer ----------
+const SC = { x0: 20, y0: 290, x1: 520, y1: 790, gw: 82 };
+SIMS.push({
+  id: 'soccer', name: 'Ball Soccer', caption: 'Lose 3 goals and you’re out', theme: 'paper',
+  init(rng) {
+    const st = K.base(rng, 4, { lives: [3, 3, 3, 3], goals: 0, ball2: false });
+    const cx = (SC.x0 + SC.x1) / 2, cy = (SC.y0 + SC.y1) / 2;
+    st.G = [[cx, SC.y0, 0, 1], [SC.x1, cy, -1, 0], [cx, SC.y1, 0, -1], [SC.x0, cy, 1, 0]];
+    st.pl = [];
+    for (let i = 0; i < 4; i++) for (let r = 0; r < 2; r++) { const g = st.G[i], p = K.ball(g[0] + g[2] * (r ? 50 : 150) + rng.range(-30, 30) * Math.abs(g[3]), g[1] + g[3] * (r ? 50 : 150) + rng.range(-30, 30) * Math.abs(g[2]), 15, 0, 0, i); p.m = 6; p.role = r; p.aim = 0; p.at = 0; st.pl.push(p); }
+    st.gb = [this.newBall(rng)];
+    return st;
+  },
+  where: st => st.pl.map(p => ({ i: p.ci, x: p.x, y: p.y, r: p.r })),
+  corners: [[SC.x0, SC.y0 + 60, SC.x0 + 60, SC.y0], [SC.x1 - 60, SC.y0, SC.x1, SC.y0 + 60], [SC.x1, SC.y1 - 60, SC.x1 - 60, SC.y1], [SC.x0 + 60, SC.y1, SC.x0, SC.y1 - 60]],
+  newBall(rng) { const b = K.ball((SC.x0 + SC.x1) / 2, (SC.y0 + SC.y1) / 2, 10, rng.ang(), 220, -1); b.m = 1; b.idle = 0; return b; },
+  step(st, dt) {
+    const rng = st.rng;
+    if (st.gb.length < 3 && st.t > (st.gb.length === 1 ? 20 : 40)) { st.gb.push(this.newBall(rng)); AU.tone(1800, 0.3, 0.15, 'square', 0.9, 'whistle'); }
+    const alive = K.aliveIdx(st), maxS = 470 * (1 + 0.08 * st.goals);
+    for (const p of st.pl) {
+      if (p.dead) continue;
+      if ((p.at -= dt) <= 0) { p.at = 1; p.aim = rng.range(-0.3, 0.3); }
+      const g = st.G[p.ci]; let gb = st.gb[0], bd = 1e9; for (const b of st.gb) { const d = Math.hypot(b.x - p.x, b.y - p.y); if (d < bd) { bd = d; gb = b; } }
+      let tx, ty;
+      if (p.role === 1) { const lat = g[2] === 0 ? K.clamp(gb.x - g[0], -55, 55) : K.clamp(gb.y - g[1], -55, 55); tx = g[0] + g[2] * 42 + (g[2] === 0 ? lat : 0); ty = g[1] + g[3] * 42 + (g[3] === 0 ? lat : 0); if (bd < 110) { tx = gb.x; ty = gb.y; } }
+      else {
+        let T = null, td = 1e9; for (const j of alive) { if (j === p.ci) continue; const d = Math.hypot(st.G[j][0] - gb.x, st.G[j][1] - gb.y); if (d < td) { td = d; T = st.G[j]; } }
+        if (!T) T = [W / 2, 540];
+        let dx = T[0] - gb.x, dy = T[1] - gb.y; const l = Math.hypot(dx, dy) || 1, c = Math.cos(p.aim), s = Math.sin(p.aim); [dx, dy] = [(dx * c - dy * s) / l, (dx * s + dy * c) / l];
+        const bx = gb.x - dx * 26, by = gb.y - dy * 26, behind = ((p.x - gb.x) * -dx + (p.y - gb.y) * -dy) / Math.max(1, Math.hypot(p.x - gb.x, p.y - gb.y));
+        if (behind > 0.6) { tx = gb.x + dx * 20; ty = gb.y + dy * 20; } else { tx = bx - dy * 30 * Math.sign(behind || 1); ty = by + dx * 30 * Math.sign(behind || 1); }
+      }
+      const dx = tx - p.x, dy = ty - p.y, l = Math.hypot(dx, dy) || 1, vm = p.role ? 170 : 250;
+      p.vx += (dx / l * vm * Math.min(1, l / 30) - p.vx) * Math.min(1, 5 * dt); p.vy += (dy / l * vm * Math.min(1, l / 30) - p.vy) * Math.min(1, 5 * dt);
+      K.move(p, dt); K.box(p, SC.x0, SC.y0, SC.x1, SC.y1, 0.3); for (const c of this.corners) K.seg(p, c[0], c[1], c[2], c[3], 0.3, 3);
+    }
+    for (const b of st.gb) {
+      const f = Math.exp(-0.35 * dt); b.vx *= f; b.vy *= f; K.move(b, dt);
+      const s = Math.hypot(b.vx, b.vy); if (s > maxS) K.speed(b, maxS);
+      for (const c of this.corners) K.seg(b, c[0], c[1], c[2], c[3], 0.9, 3);
+      if (s < 90) b.slow = (b.slow || 0) + dt; else b.slow = 0;
+      if ((b.idle += dt) > 5 || b.slow > 1.5) { b.idle = 0; b.slow = 0; const a = Math.atan2(540 - b.y, 270 - b.x); b.vx = Math.cos(a) * 250; b.vy = Math.sin(a) * 250; }
+      let goal = -1;
+      for (let i = 0; i < 4; i++) {
+        const g = st.G[i], open = !st.out[i], lat = g[2] === 0 ? b.x - g[0] : b.y - g[1];
+        const past = g[3] === 1 ? b.y < SC.y0 : g[3] === -1 ? b.y > SC.y1 : g[2] === 1 ? b.x < SC.x0 : b.x > SC.x1;
+        if (open && past && Math.abs(lat) < SC.gw) goal = i;
+      }
+      if (goal >= 0) {
+        st.lives[goal]--; st.goals++; FX.burst(b.x, b.y, st.C[goal].c, 30, 260); FX.flash(st.C[goal].c, 0.2); AU.noise(0.8, 700, 0.3, 'bandpass', 0.5, 'crowd'); AU.tone(1800, 0.3, 0.15, 'square', 0.9, 'whistle');
+        Object.assign(b, this.newBall(rng));
+        if (st.lives[goal] <= 0) { st.pl.forEach(p => { if (p.ci === goal) { p.dead = true; FX.burst(p.x, p.y, st.C[goal].c, 14, 150); } }); K.knock(st, [goal]); }
+        continue;
+      }
+      for (let i = 0; i < 4; i++) {
+        const g = st.G[i], lat = g[2] === 0 ? b.x - g[0] : b.y - g[1], open = !st.out[i] && Math.abs(lat) < SC.gw;
+        if (open) continue;
+        if (g[3] === 1 && b.y - b.r < SC.y0) { b.y = SC.y0 + b.r; b.vy = Math.abs(b.vy) * 0.9; AU.thud(0.08); }
+        if (g[3] === -1 && b.y + b.r > SC.y1) { b.y = SC.y1 - b.r; b.vy = -Math.abs(b.vy) * 0.9; AU.thud(0.08); }
+        if (g[2] === 1 && b.x - b.r < SC.x0) { b.x = SC.x0 + b.r; b.vx = Math.abs(b.vx) * 0.9; AU.thud(0.08); }
+        if (g[2] === -1 && b.x + b.r > SC.x1) { b.x = SC.x1 - b.r; b.vx = -Math.abs(b.vx) * 0.9; AU.thud(0.08); }
+      }
+    }
+    const all = st.pl.filter(p => !p.dead).concat(st.gb);
+    K.pairs(all, (a, b) => { const i = K.collide(a, b, 0.9); if (i > 30 && (a.ci < 0 || b.ci < 0)) { AU.thud(0.06 + i / 3000); (a.ci < 0 ? a : b).idle = 0; } });
+  },
+  draw(st, ctx) {
+    ctx.fillStyle = '#e8f0dc'; ctx.fillRect(SC.x0, SC.y0, SC.x1 - SC.x0, SC.y1 - SC.y0);
+    ctx.strokeStyle = 'rgba(80,110,60,0.35)'; ctx.lineWidth = 2; D.circle(ctx, 270, 540, 60, 'rgba(80,110,60,0.35)', 2);
+    ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.strokeRect(SC.x0, SC.y0, SC.x1 - SC.x0, SC.y1 - SC.y0);
+    for (const c of this.corners) { ctx.fillStyle = INK; ctx.beginPath(); ctx.moveTo(c[0], c[1]); ctx.lineTo(c[2], c[3]); ctx.lineTo(c[0] === SC.x0 || c[2] === SC.x0 ? SC.x0 : SC.x1, c[1] === SC.y0 || c[3] === SC.y0 ? SC.y0 : SC.y1); ctx.fill(); }
+    st.G.forEach((g, i) => {
+      const c = st.C[i].c, horiz = g[2] === 0;
+      if (st.out[i]) { ctx.strokeStyle = '#888'; ctx.lineWidth = 8; } else { ctx.strokeStyle = c; ctx.lineWidth = 8; }
+      ctx.beginPath(); if (horiz) { ctx.moveTo(g[0] - SC.gw, g[1]); ctx.lineTo(g[0] + SC.gw, g[1]); } else { ctx.moveTo(g[0], g[1] - SC.gw); ctx.lineTo(g[0], g[1] + SC.gw); } ctx.stroke();
+      for (let k = 0; k < 3; k++) { const px = horiz ? g[0] - 20 + k * 20 : g[0] - g[2] * 22, py = horiz ? g[1] - g[3] * 22 : g[1] - 20 + k * 20; D.circle(ctx, px, py, 6, c, 2, k < st.lives[i] ? c : 'transparent'); }
+    });
+    for (const p of st.pl) if (!p.dead) { D.ball(ctx, p.x, p.y, p.r, st.C[p.ci].c, false); if (p.role) D.circle(ctx, p.x, p.y, 5, null, 0, '#fff'); }
+    for (const b of st.gb) { D.ball(ctx, b.x, b.y, b.r, '#ffffff', false); D.circle(ctx, b.x, b.y, b.r, INK, 1.5); }
+  },
+  hud: st => st.lives.map(l => '♥'.repeat(Math.max(0, l)) || 'out'),
+  lead: st => K.aliveIdx(st).sort((a, b) => st.lives[b] - st.lives[a])[0]
+});
+
+// ---------- 25. Flood Fill ----------
+const FF = { c: 60, r: 88, s: 8.4, ox: 18, oy: 170 };
+SIMS.push({
+  id: 'flood', name: 'Flood Fill', caption: 'Biggest share of the cave', theme: 'paper',
+  init(rng) {
+    const C = FF.c, R = FF.r, N = 4, st = K.base(rng, N, { g: new Int8Array(C * R), dirty: [], full: true, n: [0, 0, 0, 0], tick: 0, still: 0, rock: rng.range(3, 5) });
+    const nw = 13, nh = 19, nz = Array.from({ length: nw * nh }, () => rng()), nz2 = Array.from({ length: 31 * 45 }, () => rng());
+    const smp = (arr, w, x, y) => { const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, s = t => t * t * (3 - 2 * t), a = arr[iy * w + ix], b = arr[iy * w + ix + 1], c = arr[(iy + 1) * w + ix], d = arr[(iy + 1) * w + ix + 1]; return K.lerp(K.lerp(a, b, s(fx)), K.lerp(c, d, s(fx)), s(fy)); };
+    const g = st.g;
+    for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) { const v = smp(nz, nw, x / C * (nw - 1.01), y / R * (nh - 1.01)) * 0.75 + smp(nz2, 31, x / C * 29.9, y / R * 43.9) * 0.25; g[y * C + x] = v > 0.47 ? 0 : -1; }
+    for (let it = 0; it < 3; it++) { const h = Int8Array.from(g); for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) { let o = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < C && yy < R && h[yy * C + xx] === 0) o++; } g[y * C + x] = o >= 5 ? 0 : o <= 2 ? -1 : h[y * C + x]; } }
+    const carve = (cx, cy, r) => { for (let y = cy - r; y <= cy + r; y++) for (let x = cx - r; x <= cx + r; x++) if (x >= 0 && y >= 0 && x < C && y < R && (x - cx) ** 2 + (y - cy) ** 2 <= r * r) g[y * C + x] = 0; };
+    const qs = rng.shuffle([[14, 20], [45, 20], [14, 67], [45, 67]]);
+    st.sp = qs.map(([x, y]) => [x + rng.int(-6, 6), y + rng.int(-8, 8)]);
+    st.sp.forEach(([x, y]) => carve(x, y, 3));
+    for (let i = 1; i < N; i++) { let [x, y] = st.sp[i]; const [tx, ty] = st.sp[(i + rng.int(0, 2)) % N === i ? 0 : (i + 1) % N]; while (Math.abs(x - tx) + Math.abs(y - ty) > 0) { if (rng() < 0.5 && x !== tx) x += Math.sign(tx - x); else if (y !== ty) y += Math.sign(ty - y); else x += Math.sign(tx - x); carve(x, y, 1); } }
+    st.sp.forEach(([x, y], i) => { g[y * C + x] = i + 1; st.n[i]++; });
+    this.dist(st); return st;
+  },
+  dist(st) {
+    const C = FF.c, R = FF.r; st.d = st.sp.map(([sx, sy]) => {
+      const d = new Int16Array(C * R).fill(-1), q = [sy * C + sx]; d[q[0]] = 0;
+      for (let h = 0; h < q.length; h++) { const i = q[h], x = i % C, y = (i / C) | 0; for (const j of [x > 0 ? i - 1 : -1, x < C - 1 ? i + 1 : -1, y > 0 ? i - C : -1, y < R - 1 ? i + C : -1]) if (j >= 0 && d[j] < 0 && st.g[j] >= 0) { d[j] = d[i] + 1; q.push(j); } }
+      return d;
+    });
+  },
+  where: st => st.sp.map(([x, y], i) => ({ i, x: FF.ox + (x + 0.5) * FF.s, y: FF.oy + (y + 0.5) * FF.s, r: 18 })),
+  step(st, dt) {
+    st.tick += dt * 20; if (st.tick < 1) return; st.tick -= 1;
+    const C = FF.c, R = FF.r, g = st.g, rng = st.rng, N = 4, amp = st.t > 30 ? 3 : 1;
+    if (st.t < 30 && (st.rock -= 1 / 20) <= 0) {
+      st.rock = rng.range(3, 5);
+      for (let tries = 0; tries < 200; tries++) { const i = rng.int(0, C * R - 1); if (g[i] !== -1) continue; const x = i % C, y = (i / C) | 0; if (![i - 1, i + 1, i - C, i + C].some(j => j >= 0 && j < C * R && g[j] >= 0)) continue; const r = rng.int(2, 3); for (let yy = y - r; yy <= y + r; yy++) for (let xx = x - r; xx <= x + r; xx++) if (xx >= 0 && yy >= 0 && xx < C && yy < R && (xx - x) ** 2 + (yy - y) ** 2 <= r * r && g[yy * C + xx] === -1) { g[yy * C + xx] = 0; dirtyPush(st, yy * C + xx); } FX.burst(FF.ox + x * FF.s, FF.oy + y * FF.s, '#6b5a48', 12, 80, 0.6, 3, 150); AU.noise(0.25, 300, 0.2, 'lowpass', 1, 'rock'); this.dist(st); break; }
+    }
+    const fr = [[], [], [], []], ct = [];
+    for (let i = 0; i < g.length; i++) {
+      const o = g[i]; if (o <= 0) continue; const x = i % C, y = (i / C) | 0;
+      for (const j of [x > 0 ? i - 1 : -1, x < C - 1 ? i + 1 : -1, y > 0 ? i - C : -1, y < R - 1 ? i + C : -1]) { if (j < 0) continue; const t = g[j]; if (t === 0) fr[o - 1].push(j); else if (t > 0 && t !== o) ct.push(j, o); }
+    }
+    const P = (o, j) => (1 + fr[o].length * 0.01) * 40 / (40 + Math.max(0, st.d[o][j]));
+    let changed = 0;
+    for (let o = 0; o < N; o++) { const f = fr[o]; const k = Math.min(f.length, 2 + Math.floor(f.length * 0.12)); for (let m = 0; m < k; m++) { const j = f[(rng() * f.length) | 0]; if (g[j] === 0) { g[j] = o + 1; st.n[o]++; dirtyPush(st, j); changed++; } } }
+    for (let q = 0; q < ct.length; q += 2) {
+      const j = ct[q], a = ct[q + 1], b = g[j]; if (b <= 0 || b === a) continue;
+      const r = P(a - 1, j) / P(b - 1, j); if (r > 1 && rng() < 0.12 * (r - 1) * amp) { g[j] = a; st.n[a - 1]++; st.n[b - 1]--; dirtyPush(st, j); changed++; }
+    }
+    if (changed) AU.noise(0.08, 900, Math.min(0.06, changed / 300), 'lowpass', 2, 'trickle');
+    st.still = changed ? 0 : st.still + 1 / 20;
+    if (st.win == null && (st.still > 3 || st.t >= 45)) st.win = this.lead(st);
+  },
+  draw(st, ctx) {
+    const cols = st.C.map(c => c.rgb), L = gridPaint(st, 'ff', FF.c, FF.r, i => { const v = st.g[i]; return v < 0 ? [74, 64, 54] : v === 0 ? [239, 231, 214] : cols[v - 1]; });
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(L, FF.ox, FF.oy, FF.c * FF.s, FF.r * FF.s); ctx.imageSmoothingEnabled = true;
+    st.sp.forEach(([x, y], i) => D.circle(ctx, FF.ox + (x + 0.5) * FF.s, FF.oy + (y + 0.5) * FF.s, 7, '#fff', 2, st.C[i].d));
+  },
+  hud(st) { const tot = st.g.reduce((s, v) => s + (v >= 0 ? 1 : 0), 0) || 1; return st.n.map(n => Math.round(n / tot * 100) + '%'); },
+  lead: st => st.n.indexOf(Math.max(...st.n))
+});
+// ===================== E. Growth, gravity, stacking, chain reactions =====================
+
+// ---------- 26. Multiply Escape ----------
+SIMS.push({
+  id: 'multiply', name: 'Multiply Escape', caption: 'Escape and split in two. First to 100', theme: 'night', GOAL: 100,
+  init(rng) {
+    const st = K.base(rng, 4, { ph: rng.ang(), w: rng.sign() * 0.7, half: 0.34, cnt: [1, 1, 1, 1], R: 235 });
+    st.balls = [0, 1, 2, 3].map(i => K.ball(AX + (i - 1.5) * 20, AY, 6, rng.ang(), 260, i));
+    return st;
+  },
+  step(st, dt) {
+    const rng = st.rng, R = st.R, ga = st.ph + st.w * st.t, out = [], nb = [];
+    for (const b of st.balls) {
+      b.vy += 300 * dt; K.move(b, dt);
+      const s = Math.hypot(b.vx, b.vy); if (s < 160) K.speed(b, 160); else if (s > 420) K.speed(b, 420);
+      const dx = b.x - AX, dy = b.y - AY, d = Math.hypot(dx, dy), a = Math.atan2(dy, dx);
+      if (Math.abs(K.angDiff(a, ga)) < st.half) {
+        for (const e of [-st.half, st.half]) { const px = AX + Math.cos(ga + e) * R, py = AY + Math.sin(ga + e) * R; K.seg(b, px, py, px, py); }
+        if (d - b.r > R) { out.push(b); }
+      } else if (K.ringIn(b, AX, AY, R)) K.scatter(b, rng, 0.15);
+    }
+    if (out.length) {
+      for (const b of out) {
+        b.dead = true; st.cnt[b.ci]--;
+        for (let k = 0; k < 2; k++) { nb.push(K.ball(AX + rng.range(-6, 6), AY + rng.range(-6, 6), 6, rng.ang(), 260, b.ci)); st.cnt[b.ci]++; }
+        FX.burst(b.x, b.y, st.C[b.ci].c, 6, 120, 0.4, 2); AU.blip(Math.min(29, 4 + st.cnt[b.ci] / 4), 0.1);
+      }
+      st.balls = st.balls.filter(b => !b.dead).concat(nb);
+    }
+    if (st.balls.length <= 300) K.hashPairs(st.balls, 14, (a, b) => K.collide(a, b));
+    const m = Math.max(...st.cnt);
+    if (st.win == null && (m >= this.GOAL || st.balls.length >= 500)) st.win = this.lead(st);
+  },
+  draw(st, ctx) {
+    const ga = st.ph + st.w * st.t;
+    ctx.strokeStyle = '#6f84b8'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(AX, AY, st.R + 3, ga + st.half, ga - st.half + TAU); ctx.stroke(); ctx.lineCap = 'butt';
+    D.glow(ctx, AX, AY, st.R * 1.3, '#3e63dd', 0.15);
+    const many = st.balls.length > 120;
+    for (const b of st.balls) { if (many) { ctx.fillStyle = st.C[b.ci].c; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill(); } else D.ball(ctx, b.x, b.y, b.r, st.C[b.ci].c, true); }
+  },
+  hud: st => st.cnt.slice(),
+  lead: st => st.cnt.indexOf(Math.max(...st.cnt))
+});
+
+// ---------- 27. Merge Mania ----------
+const MJ = { x0: 120, x1: 420, y0: 210, y1: 930, line: 300 };
+SIMS.push({
+  id: 'merge', name: 'Merge Mania', caption: 'Same colour, same number: merge!', theme: 'paper',
+  init(rng) {
+    const st = K.base(rng, 4, { bag: [], drop: 0.2, open: 0, over: 0, best: [2, 2, 2, 2] });
+    st.balls = []; return st;
+  },
+  rad: v => 8 * Math.pow(1.22, Math.log2(v) - 1),
+  target: st => st.t > 42 ? 32 : st.t > 30 ? 64 : 128,
+  where: st => [0, 1, 2, 3].map(i => ({ i, x: 160 + i * 75, y: 180, r: 20 })),
+  step(st, dt) {
+    const rng = st.rng, B = st.balls;
+    if ((st.drop -= dt) <= 0) {
+      st.drop = 0.16; if (!st.bag.length) st.bag = rng.shuffle([0, 1, 2, 3]);
+      const ci = st.bag.pop(), p = rng(), v = p < 0.4 ? 2 : p < 0.75 ? 4 : 8, b = K.ball(rng.range(MJ.x0 + 20, MJ.x1 - 20), MJ.y0 - 10, this.rad(v), Math.PI / 2, 120, ci); b.v = v; b.pz = 0; B.push(b);
+    }
+    for (const b of B) { b.vy += 1400 * dt; const f = Math.exp(-0.8 * dt); b.vx *= f; b.vy *= f; K.move(b, dt); b.pz = Math.max(0, b.pz - dt * 4); }
+    for (let it = 0; it < 2; it++) {
+      K.hashPairs(B, 70, (a, b) => {
+        if (a.dead || b.dead) return;
+        if (a.ci === b.ci && a.v === b.v && Math.hypot(a.x - b.x, a.y - b.y) < a.r + b.r + 0.5) {
+          b.dead = true; a.x = (a.x + b.x) / 2; a.y = (a.y + b.y) / 2; a.vx = (a.vx + b.vx) / 2; a.vy = (a.vy + b.vy) / 2 - 120; a.v *= 2; a.r = this.rad(a.v); a.m = a.r * a.r; a.pz = 1;
+          st.best[a.ci] = Math.max(st.best[a.ci], a.v); AU.blip(Math.log2(a.v) * 2 + 2, 0.12); FX.burst(a.x, a.y, st.C[a.ci].c, 4 + Math.log2(a.v) * 2, 140, 0.4, 2.5);
+          for (const o of B) { if (o === a || o.dead) continue; const dx = o.x - a.x, dy = o.y - a.y, d = Math.hypot(dx, dy); if (d < a.r * 2.5 && d > 0) { o.vx += dx / d * 120; o.vy += dy / d * 120; } }
+          if (a.v >= this.target(st) && st.win == null) st.win = a.ci;
+          return;
+        }
+        K.collide(a, b, 0.15);
+      });
+      for (const b of B) if (!b.dead) { K.box(b, MJ.x0, -500, MJ.x1, st.open > 0 ? 5000 : MJ.y1, 0.2); }
+    }
+    for (let i = B.length - 1; i >= 0; i--) if (B[i].dead || B[i].y > MJ.y1 + 60) B.splice(i, 1);
+    if (st.open > 0) st.open -= dt;
+    else {
+      const high = B.some(b => b.y - b.r < MJ.line && Math.abs(b.vy) < 40 && b.y > MJ.y0);
+      st.over = high ? st.over + dt : 0;
+      if (st.over > 0.8) { st.open = 0.35; st.over = 0; AU.thud(0.5); FX.shake(6); }
+    }
+  },
+  draw(st, ctx) {
+    ctx.fillStyle = '#fbf8f1'; ctx.fillRect(MJ.x0, MJ.y0, MJ.x1 - MJ.x0, MJ.y1 - MJ.y0);
+    ctx.strokeStyle = INK; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(MJ.x0 - 3, MJ.y0 - 20); ctx.lineTo(MJ.x0 - 3, MJ.y1 + 3); if (st.open <= 0) ctx.lineTo(MJ.x1 + 3, MJ.y1 + 3); else ctx.moveTo(MJ.x1 + 3, MJ.y1 + 3); ctx.lineTo(MJ.x1 + 3, MJ.y0 - 20); ctx.stroke();
+    ctx.setLineDash([8, 6]); D.line(ctx, MJ.x0, MJ.line, MJ.x1, MJ.line, st.over > 0 ? '#e5484d' : 'rgba(229,72,77,0.35)', 2); ctx.setLineDash([]);
+    for (const b of st.balls) { const r = b.r * (1 + b.pz * 0.2); D.ball(ctx, b.x, b.y, r, st.C[b.ci].c, false); D.text(ctx, String(b.v), b.x, b.y + 1, Math.max(9, r * 0.8), '#fff', 'center', 900); }
+    D.text(ctx, `Target ${this.target(st)}`, 470, 240, 15, '#8a7f6c', 'center', 800);
+  },
+  hud: st => st.best.slice(),
+  lead: st => { const sc = st.best.map((b, i) => b * 1000 + st.balls.filter(x => x.ci === i).reduce((s, x) => s + x.v, 0)); return sc.indexOf(Math.max(...sc)); }
+});
+
+// ---------- 28. Pinball Race ----------
+const PB = { cw: 125, x0: 20, top: 150, bot: 900 };
+SIMS.push({
+  id: 'pinball', name: 'Pinball Race', caption: 'First to 450 points', theme: 'night', GOAL: 450,
+  init(rng) {
+    const st = K.base(rng, 4, { sc: [0, 0, 0, 0], col: [] });
+    for (let i = 0; i < 4; i++) { const b = K.ball(this.lx(i) + 105, PB.bot - 40, 7, 0, 0, i); b.wait = rng.range(0, 0.5); b.lf = 0; b.ramp = 0; st.col.push({ b, spin: 0, sa: 0, fl: [0, 0, 0] }); }
+    st.balls = st.col.map(c => c.b);
+    return st;
+  },
+  lx: i => PB.x0 + i * PB.cw,
+  add(st, i, v) { st.sc[i] += v * (st.t > 30 ? 2 : 1); if (st.sc[i] >= this.GOAL && st.win == null) st.win = i; },
+  step(st, dt) {
+    const rng = st.rng;
+    st.col.forEach((c, i) => {
+      const b = c.b, lx = this.lx(i), L = lx + 6, Rr = lx + PB.cw - 6;
+      c.spin *= Math.exp(-1.5 * dt); c.sa += c.spin * dt; c.fl = c.fl.map(f => Math.max(0, f - dt * 4));
+      if (b.wait > 0) { b.wait -= dt; if (b.wait <= 0) { b.x = Rr - 12; b.y = 780; b.vx = -rng.range(60, 160); b.vy = -rng.range(850, 1000); } return; }
+      b.vy += 900 * dt; K.move(b, dt);
+      const s = Math.hypot(b.vx, b.vy); if (s > 950) K.speed(b, 950);
+      if (b.x - b.r < L) { b.x = L + b.r; b.vx = Math.abs(b.vx) * 0.9; } if (b.x + b.r > Rr) { b.x = Rr - b.r; b.vx = -Math.abs(b.vx) * 0.9; }
+      if (b.y - b.r < PB.top) { b.y = PB.top + b.r; b.vy = Math.abs(b.vy) * 0.8; }
+      if (b.y < 200 && b.ramp <= 0) { b.ramp = 1; this.add(st, i, 50); AU.tone(1568, 0.15, 0.12, 'square', 1, 'ramp' + i); FX.burst(b.x, b.y, st.C[i].c, 10, 120); }
+      if (b.y > 420) b.ramp = 0;
+      [[lx + 34, 300], [lx + 91, 300], [lx + 62, 375]].forEach(([x, y], k) => {
+        if (K.ringOut(b, x, y, 15, 1)) { const nx = b.x - x, ny = b.y - y, l = Math.hypot(nx, ny) || 1; const v = Math.max(560, Math.hypot(b.vx, b.vy)); b.vx = nx / l * v + rng.range(-40, 40); b.vy = ny / l * v; c.fl[k] = 1; this.add(st, i, 10); AU.tone(AU.hz(12 + k * 2), 0.08, 0.1, 'square', 0, 'bmp' + i); }
+      });
+      const gy = 520; if ((b.y - b.vy * dt - gy) * (b.y - gy) < 0 && Math.abs(b.x - (lx + 62)) < 24) { const turns = Math.max(1, Math.round(Math.abs(b.vy) / 160)); c.spin += turns * 12; this.add(st, i, 5 * turns); AU.tick(0.08); }
+      for (const sg of [[L, 640, lx + 34, 700], [Rr, 640, lx + PB.cw - 34, 700]]) if (K.seg(b, sg[0], sg[1], sg[2], sg[3], 1.2, 3) > 60) { this.add(st, i, 2); AU.tone(700, 0.04, 0.08, 'triangle', 0, 'sl' + i); }
+      for (const sg of [[L, 820, lx + 47, 858], [Rr, 820, lx + PB.cw - 47, 858]]) if (K.seg(b, sg[0], sg[1], sg[2], sg[3], 0.3, 4) > 1) {
+        if (rng() < 0.82) { b.vy = -rng.range(650, 900); b.vx = rng.range(-180, 180); AU.thud(0.12); } }
+      if (b.y > PB.bot + 20) { b.wait = 1.5; b.x = Rr - 10; b.y = PB.bot + 40; b.vx = b.vy = 0; AU.tone(160, 0.3, 0.12, 'sawtooth', 0.5, 'drain'); }
+    });
+  },
+  draw(st, ctx) {
+    const dbl = st.t > 30;
+    st.col.forEach((c, i) => {
+      const lx = this.lx(i), L = lx + 6, Rr = lx + PB.cw - 6, col = st.C[i].c;
+      ctx.fillStyle = dbl && Math.sin(st.t * 10) > 0 ? rgba(col, 0.12) : 'rgba(255,255,255,0.03)'; ctx.fillRect(L, PB.top, Rr - L, PB.bot + 20 - PB.top);
+      ctx.strokeStyle = rgba(col, 0.6); ctx.lineWidth = 2; ctx.strokeRect(L, PB.top, Rr - L, PB.bot + 20 - PB.top);
+      D.line(ctx, L, 200, Rr, 200, rgba(col, 0.25), 1);
+      [[lx + 34, 300], [lx + 91, 300], [lx + 62, 375]].forEach(([x, y], k) => { D.glow(ctx, x, y, 34, col, 0.4 + c.fl[k]); D.circle(ctx, x, y, 15, shade(col, 0.5), 3, c.fl[k] > 0 ? '#fff' : rgba(col, 0.5)); });
+      const w = 22 * Math.cos(c.sa); D.line(ctx, lx + 62 - w, 520, lx + 62 + w, 520, '#ffe08a', 4);
+      ctx.lineCap = 'round';
+      D.line(ctx, L, 640, lx + 34, 700, col, 5); D.line(ctx, Rr, 640, lx + PB.cw - 34, 700, col, 5);
+      D.line(ctx, L, 820, lx + 47, 858, '#e9e6df', 7); D.line(ctx, Rr, 820, lx + PB.cw - 47, 858, '#e9e6df', 7);
+      ctx.lineCap = 'butt';
+      if (c.b.wait <= 0) D.ball(ctx, c.b.x, c.b.y, c.b.r, '#dfe6f0', true);
+      D.text(ctx, String(st.sc[i]), lx + PB.cw / 2, 175, 22, col, 'center', 900);
+    });
+    if (dbl) D.text(ctx, 'DOUBLE POINTS', W / 2, 935, 16, '#ffe08a', 'center', 900);
+  },
+  where: st => st.col.map((c, i) => ({ i, x: PB.x0 + i * PB.cw + 62, y: 400, r: 60 })),
+  hud: st => st.sc.slice()
+});
+
+// ---------- 29. Last Planet ----------
+SIMS.push({
+  id: 'planet', name: 'Last Planet', caption: 'Last planet in orbit', theme: 'night',
+  init(rng) {
+    const st = K.base(rng, 8, { mu: 4e6, sr: 22, flare: 0 });
+    const orb = rng.shuffle(Array.from({ length: 8 }, (_, k) => 80 + k * 21 + rng.range(-6, 6)));
+    st.balls = orb.map((r, i) => { const a = rng.ang(), dir = rng() < 0.75 ? 1 : -1, v = Math.sqrt(st.mu / r) * rng.range(0.88, 1.1); const b = K.ball(AX + Math.cos(a) * r, AY + Math.sin(a) * r, 7, a + dir * Math.PI / 2, v, i); b.mass = 1; b.oob = 0; b.tr = []; return b; });
+    st.ast = []; for (let k = 0; k < 50; k++) { const r = rng.range(90, 250), a = rng.ang(), v = Math.sqrt(st.mu / r); st.ast.push({ x: AX + Math.cos(a) * r, y: AY + Math.sin(a) * r, vx: -Math.sin(a) * v, vy: Math.cos(a) * v, on: true }); }
+    return st;
+  },
+  step(st, dt) {
+    const B = st.balls.filter(b => !b.dead), dying = [];
+    if (st.t > 20) { st.mu *= Math.pow(1.045, dt); st.sr += 1.3 * dt; }
+    const grav = (o, eps) => { const dx = AX - o.x, dy = AY - o.y, d2 = dx * dx + dy * dy + eps, f = st.mu / (d2 * Math.sqrt(d2)); o.vx += dx * f * dt; o.vy += dy * f * dt; };
+    for (const b of B) {
+      grav(b, 64);
+      for (const o of B) if (o !== b) { const dx = o.x - b.x, dy = o.y - b.y, d2 = dx * dx + dy * dy + 400, f = st.mu * 0.004 * o.mass / (d2 * Math.sqrt(d2)); b.vx += dx * f * dt; b.vy += dy * f * dt; }
+      const s = Math.hypot(b.vx, b.vy); if (s > 900) K.speed(b, 900);
+    }
+    for (const b of B) { K.move(b, dt); b.tr.push(b.x, b.y); if (b.tr.length > 160) b.tr.splice(0, 2); }
+    for (const a of st.ast) { if (!a.on) continue; grav(a, 64); a.x += a.vx * dt; a.y += a.vy * dt; if (Math.hypot(a.x - AX, a.y - AY) < st.sr) a.on = false; for (const b of B) if (Math.abs(a.x - b.x) < b.r + 2 && Math.abs(a.y - b.y) < b.r + 2) { a.on = false; b.mass += 0.15; b.r = 7 * Math.cbrt(b.mass); AU.blip(16, 0.05); break; } }
+    K.pairs(B, (a, b) => {
+      if (a.dead || b.dead || Math.hypot(a.x - b.x, a.y - b.y) > a.r + b.r) return;
+      const big = a.mass > b.mass + 1e-9 ? a : b.mass > a.mass + 1e-9 ? b : (st.rng() < 0.5 ? a : b), sm = big === a ? b : a, M = big.mass + sm.mass;
+      big.vx = (big.vx * big.mass + sm.vx * sm.mass) / M; big.vy = (big.vy * big.mass + sm.vy * sm.mass) / M; big.mass = M; big.r = 7 * Math.cbrt(M);
+      sm.dead = true; dying.push(sm.ci); FX.burst(sm.x, sm.y, st.C[sm.ci].c, 26, 220); AU.thud(0.3);
+    });
+    for (const b of B) {
+      if (b.dead) continue;
+      if (Math.hypot(b.x - AX, b.y - AY) < st.sr + b.r * 0.5) { b.dead = true; dying.push(b.ci); st.flare = 1; FX.burst(b.x, b.y, '#ffd27a', 30, 260); AU.boom(0.3); continue; }
+      if (b.x < -20 || b.x > W + 20 || b.y < 110 || b.y > H + 20) { if ((b.oob += dt) > 3) { b.dead = true; dying.push(b.ci); AU.whoosh(0.2); } } else b.oob = 0;
+    }
+    st.flare = Math.max(0, st.flare - dt * 2);
+    if (dying.length) K.knock(st, dying, i => st.balls[i].mass);
+  },
+  draw(st, ctx) {
+    if (!st._stars) { st._stars = []; for (let k = 0; k < 90; k++) st._stars.push([Math.random() * W, 120 + Math.random() * 840, Math.random()]); }
+    for (const s of st._stars) { ctx.fillStyle = `rgba(255,255,255,${0.2 + s[2] * 0.5})`; ctx.fillRect(s[0], s[1], 1.5, 1.5); }
+    for (const b of st.balls) { if (b.dead) continue; const t = b.tr; ctx.strokeStyle = rgba(st.C[b.ci].c, 0.35); ctx.lineWidth = 1.5; ctx.beginPath(); for (let k = 0; k < t.length; k += 2) k ? ctx.lineTo(t[k], t[k + 1]) : ctx.moveTo(t[k], t[k + 1]); ctx.stroke(); }
+    D.glow(ctx, AX, AY, st.sr * 4, '#ffb347', 0.8 + st.flare); D.circle(ctx, AX, AY, st.sr, null, 0, '#ffd88a'); D.circle(ctx, AX, AY, st.sr * 0.7, null, 0, '#fff3cf');
+    ctx.fillStyle = '#8a8f99'; for (const a of st.ast) if (a.on) ctx.fillRect(a.x - 1.5, a.y - 1.5, 3, 3);
+    for (const b of st.balls) if (!b.dead) D.ball(ctx, b.x, b.y, b.r, st.C[b.ci].c, true);
+  },
+  hud: st => st.balls.map(b => b.dead ? 0 : b.mass.toFixed(1)),
+  lead: st => K.aliveIdx(st).sort((a, b) => st.balls[b].mass - st.balls[a].mass)[0]
+});
+
+// ---------- 30. Chain Reaction ----------
+const CR = { c: 6, r: 10, s: 78, ox: 36, oy: 152 };
+SIMS.push({
+  id: 'chain', name: 'Chain Reaction', caption: 'Last colour on the board', theme: 'night',
+  init(rng) {
+    const n = CR.c * CR.r, st = K.base(rng, 4, { cnt: new Int8Array(n), own: new Int8Array(n).fill(-1), turn: 0, moved: [0, 0, 0, 0], mt: 0.6, wave: null, wt: 0, fly: [], wn: 0 });
+    st.cap = Array.from({ length: n }, (_, i) => { const x = i % CR.c, y = (i / CR.c) | 0; return 4 - (x === 0 || x === CR.c - 1) - (y === 0 || y === CR.r - 1); });
+    return st;
+  },
+  nb(i) { const x = i % CR.c, y = (i / CR.c) | 0, r = []; if (x > 0) r.push(i - 1); if (x < CR.c - 1) r.push(i + 1); if (y > 0) r.push(i - CR.c); if (y < CR.r - 1) r.push(i + CR.c); return r; },
+  ctr(i) { return [CR.ox + (i % CR.c + 0.5) * CR.s, CR.oy + (((i / CR.c) | 0) + 0.5) * CR.s]; },
+  where(st) { return [0, 1, 2, 3].map(i => ({ i, x: 100 + i * 113, y: 540, r: 50 })); },
+  check(st) {
+    const has = [0, 0, 0, 0]; for (let i = 0; i < st.own.length; i++) if (st.own[i] >= 0) has[st.own[i]]++;
+    const dying = []; for (let p = 0; p < 4; p++) if (!st.out[p] && st.moved[p] && has[p] === 0) dying.push(p);
+    if (dying.length) { AU.tone(150, 0.4, 0.2, 'sawtooth', 0.5, 'elim'); K.knock(st, dying, p => has[p]); }
+    if (st.win == null && st.moved.every((m, p) => m || st.out[p])) { const live = [0, 1, 2, 3].filter(p => has[p] > 0); if (live.length === 1) { [0, 1, 2, 3].forEach(p => { if (p !== live[0] && !st.out[p]) { st.out[p] = true; st.outT[p] = st.t; } }); st.win = live[0]; } }
+  },
+  step(st, dt) {
+    const rng = st.rng;
+    st.fly = st.fly.filter(f => st.t - f.t < 0.12);
+    if (st.wave) {
+      if ((st.wt -= dt) > 0) return;
+      st.wt = 0.08; st.wn++;
+      const next = new Set();
+      for (const i of st.wave) {
+        if (st.cnt[i] < st.cap[i]) continue;
+        const p = st.own[i]; st.cnt[i] -= st.cap[i]; if (st.cnt[i] === 0) st.own[i] = -1;
+        for (const j of this.nb(i)) { st.cnt[j]++; st.own[j] = p; st.fly.push({ a: i, b: j, p, t: st.t }); if (st.cnt[j] >= st.cap[j]) next.add(j); }
+        const [x, y] = this.ctr(i); FX.burst(x, y, st.C[p].c, 6, 160, 0.35, 2.5);
+      }
+      AU.blip(Math.min(29, 6 + st.wn), 0.12);
+      this.check(st);
+      st.wave = next.size && st.win == null && st.wn < 300 ? [...next] : null;
+      return;
+    }
+    if (st.win != null || (st.mt -= dt) > 0) return;
+    st.mt = 1 / 6;
+    let p = st.turn; for (let k = 0; k < 4 && st.out[p]; k++) p = (p + 1) % 4; st.turn = (p + 1) % 4;
+    const opts = [], w = [];
+    for (let i = 0; i < st.own.length; i++) if (st.own[i] === -1 || st.own[i] === p) { opts.push(i); w.push(st.own[i] === p ? 1 + 4 * Math.pow(st.cnt[i] / (st.cap[i] - 1 || 1), 2) : 1); }
+    if (!opts.length) return;
+    let r = rng() * w.reduce((a, b) => a + b, 0), k = 0; while (k < opts.length - 1 && (r -= w[k]) > 0) k++;
+    const i = opts[k]; st.cnt[i]++; st.own[i] = p; st.moved[p] = 1; AU.tick(0.05);
+    if (st.cnt[i] >= st.cap[i]) { st.wave = [i]; st.wt = 0.08; st.wn = 0; }
+    this.check(st);
+  },
+  draw(st, ctx) {
+    ctx.strokeStyle = '#2a3040'; ctx.lineWidth = 2;
+    for (let x = 0; x <= CR.c; x++) D.line(ctx, CR.ox + x * CR.s, CR.oy, CR.ox + x * CR.s, CR.oy + CR.r * CR.s, '#2a3040', 2);
+    for (let y = 0; y <= CR.r; y++) D.line(ctx, CR.ox, CR.oy + y * CR.s, CR.ox + CR.c * CR.s, CR.oy + y * CR.s, '#2a3040', 2);
+    for (let i = 0; i < st.cnt.length; i++) {
+      const n = st.cnt[i]; if (!n || st.own[i] < 0) continue;
+      const [x, y] = this.ctr(i), c = st.C[st.own[i]].c, crit = n >= st.cap[i] - 1, j = crit ? 2.5 : 0.8, sp = crit ? 14 : 4;
+      ctx.fillStyle = rgba(c, 0.12); ctx.fillRect(x - CR.s / 2 + 2, y - CR.s / 2 + 2, CR.s - 4, CR.s - 4);
+      const pos = n === 1 ? [[0, 0]] : n === 2 ? [[-9, 0], [9, 0]] : [[-9, 6], [9, 6], [0, -9]];
+      pos.slice(0, Math.min(3, n)).forEach(([ox, oy], k) => D.ball(ctx, x + ox + Math.sin(st.t * sp + k * 2 + i) * j, y + oy + Math.cos(st.t * sp * 1.3 + k + i) * j, 11, c, true));
+    }
+    for (const f of st.fly) { const [ax, ay] = this.ctr(f.a), [bx, by] = this.ctr(f.b), k = Math.min(1, (st.t - f.t) / 0.1); D.ball(ctx, ax + (bx - ax) * k, ay + (by - ay) * k, 9, st.C[f.p].c, true); }
+  },
+  hud(st) { const v = [0, 0, 0, 0]; for (let i = 0; i < st.own.length; i++) if (st.own[i] >= 0) v[st.own[i]] += st.cnt[i]; return v; }
+});
+// ---------- shell: picker, loop, HUD, pre-roll, slow motion, banner, tallies ----------
+(function () {
+  const $ = id => document.getElementById(id);
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  const KEY = 'whowins_v1';
+  let store = { tally: {}, played: {}, right: 0, total: 0 };
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.tally) store = Object.assign(store, s); } catch (e) { }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { } };
+  const wide = () => window.matchMedia('(min-width: 900px)').matches;
+
+  const R = { si: 0, sim: null, st: null, seed: 1, phase: 'pre', preT: 0, slowT: 0, doneT: 0, acc: 0, speed: 1, paused: false, back: -1, shuffle: false, scale: 1 };
+  const PRE = 2.2, SLOW = 1.4, SHUF_WAIT = 4;
+
+  // ----- canvas sizing -----
+  function fit() {
+    const wrap = $('stageWrap'), dpr = Math.min(2, window.devicePixelRatio || 1);
+    let ah = wrap.clientHeight || window.innerHeight - 60, aw = wide() ? Math.max(300, window.innerWidth - 380) : window.innerWidth;
+    let h = ah, w = h * W / H; if (w > aw) { w = aw; h = w * H / W; }
+    cv.style.width = Math.floor(w) + 'px'; cv.style.height = Math.floor(h) + 'px';
+    cv.width = Math.floor(w * dpr); cv.height = Math.floor(h * dpr); R.scale = cv.width / W;
+  }
+  window.addEventListener('resize', fit);
+
+  // ----- rounds -----
+  function newSeed() { return 1 + Math.floor(Math.random() * 999999); }
+  function start(si, seed) {
+    R.si = si; R.sim = SIMS[si]; R.seed = seed == null ? newSeed() : seed;
+    R.st = R.sim.init(RNG(R.seed)); R.phase = 'pre'; R.preT = 0; R.acc = 0; R.paused = false; R.back = -1; R.slowT = 0; R.doneT = 0;
+    FX.clear();
+    document.body.classList.add('playing'); fit();
+    try { history.replaceState(null, '', `?sim=${R.sim.id}&seed=${R.seed}`); } catch (e) { }
+    document.querySelectorAll('.tile').forEach((t, i) => t.classList.toggle('cur', i === si));
+    document.title = R.sim.name + ' · Who Wins?';
+  }
+  function pickNext() { let i; do { i = Math.floor(Math.random() * SIMS.length); } while (SIMS.length > 1 && i === R.si); return i; }
+
+  function finish() {
+    const st = R.st, sim = R.sim, w = st.win, nm = st.C[w].n;
+    const t = store.tally[sim.id] = store.tally[sim.id] || {}; t[nm] = (t[nm] || 0) + 1;
+    store.played[sim.id] = (store.played[sim.id] || 0) + 1;
+    if (R.back >= 0) { store.total++; if (R.back === w) store.right++; }
+    save(); updateRecord(); updateTile(R.si);
+    FX.confetti([st.C[w].c, st.C[w].l || st.C[w].c, '#ffffff']); FX.flash(st.C[w].c, 0.25); AU.chime();
+  }
+
+  // ----- loop -----
+  let last = 0;
+  function frame(ts) {
+    const dtr = Math.min(0.05, last ? (ts - last) / 1000 : 0.016); last = ts;
+    AU.frame();
+    const sim = R.sim, st = R.st;
+    if (sim && !R.paused) {
+      if (R.phase === 'pre') { R.preT += dtr; if (R.preT >= PRE) R.phase = 'run'; }
+      else {
+        const rate = R.phase === 'slow' ? 0.25 : R.phase === 'done' ? 0.6 : R.speed;
+        R.acc += dtr * rate; let n = 0; const cap = 12 * R.speed;
+        while (R.acc >= DT && n < cap) {
+          tickSim(sim, st); R.acc -= DT; n++;
+          if (R.phase === 'run' && st.win == null && st.t >= MAX_T) st.win = leadOf(sim, st);
+          if (R.phase === 'run' && st.win != null) { R.phase = 'slow'; R.slowT = 0; R.acc = 0; break; }
+        }
+        if (n >= cap) R.acc = 0;
+        if (R.phase === 'slow') { R.slowT += dtr; if (R.slowT >= SLOW) { R.phase = 'done'; R.doneT = 0; finish(); } }
+        else if (R.phase === 'done') { R.doneT += dtr; if (R.shuffle && R.doneT > SHUF_WAIT) start(pickNext()); }
+      }
+      FX.update(dtr * (R.phase === 'slow' ? 0.35 : 1));
+    }
+    if (sim) draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ----- drawing -----
+  function chipRects(n) {
+    const gap = 6, cw = Math.min(124, (W - 20 - gap * (n - 1)) / n), x0 = (W - (cw * n + gap * (n - 1))) / 2;
+    return Array.from({ length: n }, (_, i) => ({ x: x0 + i * (cw + gap), y: 76, w: cw, h: 38 }));
+  }
+  function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function draw() {
+    const sim = R.sim, st = R.st, night = sim.theme === 'night', ink = night ? '#e9e6df' : INK;
+    ctx.setTransform(R.scale, 0, 0, R.scale, 0, 0);
+    ctx.fillStyle = night ? NIGHT : PAPER; ctx.fillRect(0, 0, W, H);
+    ctx.save();
+    if (FX.sh > 0.3) ctx.translate((Math.random() - 0.5) * FX.sh, (Math.random() - 0.5) * FX.sh);
+    sim.draw(st, ctx, night);
+    FX.draw(ctx);
+    ctx.restore();
+    if (FX.flashA > 0.01) { ctx.globalAlpha = FX.flashA; ctx.fillStyle = FX.flashC; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+    // HUD
+    const g = ctx.createLinearGradient(0, 0, 0, 128); const bg = night ? '14,17,22' : '243,239,230';
+    g.addColorStop(0, `rgba(${bg},0.96)`); g.addColorStop(0.8, `rgba(${bg},0.85)`); g.addColorStop(1, `rgba(${bg},0)`);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, 128);
+    D.text(ctx, sim.caption, W / 2, 26, 22, ink, 'center', 800);
+    D.text(ctx, sim.name.toUpperCase(), W / 2, 54, 13, night ? '#8b93a3' : '#8a7f6c', 'center', 700);
+    const vals = sim.hud(st), rects = chipRects(st.C.length);
+    rects.forEach((r, i) => {
+      const c = st.C[i], out = st.out[i];
+      ctx.globalAlpha = out ? 0.35 : 1;
+      rr(r.x, r.y, r.w, r.h, 10); ctx.fillStyle = night ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'; ctx.fill();
+      if (R.back === i) { ctx.strokeStyle = c.c; ctx.lineWidth = 3; ctx.stroke(); }
+      if (st.win === i && R.phase !== 'run') { ctx.fillStyle = rgba(c.c, 0.25); ctx.fill(); }
+      const rad = Math.min(11, r.h / 2 - 6);
+      D.ball(ctx, r.x + 6 + rad, r.y + r.h / 2, rad, c.c, false);
+      const fs = r.w < 70 ? 15 : 19;
+      D.text(ctx, String(vals[i]), r.x + 12 + rad * 2 + (r.w - 14 - rad * 2) / 2, r.y + r.h / 2 + 1, fs, out ? (night ? '#777' : '#999') : ink, 'center', 800);
+      if (out) D.line(ctx, r.x + 6, r.y + r.h / 2, r.x + r.w - 6, r.y + r.h / 2, night ? '#888' : '#777', 2);
+      if (R.back === i) D.text(ctx, '★', r.x + r.w - 8, r.y + 8, 12, c.c);
+      ctx.globalAlpha = 1;
+    });
+    // footer: time + seed
+    D.text(ctx, `${st.t.toFixed(1)}s`, 12, H - 14, 13, night ? '#6f7686' : '#9a8f7c', 'left', 700);
+    D.text(ctx, `seed ${R.seed}`, W - 12, H - 14, 13, night ? '#6f7686' : '#9a8f7c', 'right', 600);
+    if (R.speed > 1) D.text(ctx, `${R.speed}x`, W / 2, H - 14, 13, night ? '#6f7686' : '#9a8f7c', 'center', 800);
+
+    if (R.phase === 'pre') {
+      const k = R.preT / PRE;
+      ctx.fillStyle = night ? 'rgba(8,10,14,0.72)' : 'rgba(40,34,26,0.62)'; rr(40, H / 2 - 80, W - 80, 150, 18); ctx.fill();
+      D.text(ctx, sim.caption, W / 2, H / 2 - 38, 28, '#fff', 'center', 900);
+      D.text(ctx, R.back >= 0 ? `You backed ${st.C[R.back].n}` : 'Tap a contestant to back it', W / 2, H / 2 + 4, 18, R.back >= 0 ? st.C[R.back].l : '#e8e2d6', 'center', 700);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'; rr(80, H / 2 + 36, W - 160, 8, 4); ctx.fill();
+      ctx.fillStyle = '#fff'; rr(80, H / 2 + 36, (W - 160) * (1 - k), 8, 4); ctx.fill();
+    }
+    if (R.paused) {
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
+      D.text(ctx, '❚❚ paused', W / 2, H / 2, 34, '#fff');
+    }
+    if (R.phase === 'done') banner(night);
+  }
+  function banner(night) {
+    const st = R.st, c = st.C[st.win], k = Math.min(1, R.doneT / 0.35), e = 1 - Math.pow(1 - k, 3);
+    const y = H / 2 - 150 + (1 - e) * 60;
+    ctx.globalAlpha = e;
+    ctx.fillStyle = 'rgba(12,12,16,0.86)'; rr(30, y, W - 60, 300, 22); ctx.fill();
+    ctx.strokeStyle = c.c; ctx.lineWidth = 4; ctx.stroke();
+    D.ball(ctx, W / 2, y + 46, 24, c.c, true);
+    D.text(ctx, `${c.n.toUpperCase()} WINS`, W / 2, y + 104, 46, c.l || c.c, 'center', 900);
+    D.text(ctx, `in ${st.t.toFixed(1)} s`, W / 2, y + 142, 17, '#c9c4b8', 'center', 600);
+    const t = store.tally[R.sim.id] || {};
+    const list = Object.entries(t).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([n, v]) => `${n} ${v}`).join('  ·  ');
+    D.text(ctx, 'All-time here: ' + list, W / 2, y + 178, 15, '#a9a497', 'center', 600);
+    if (R.back >= 0) {
+      const ok = R.back === st.win;
+      D.text(ctx, ok ? `✓ You called it! (${store.right} of ${store.total})` : `✗ You backed ${st.C[R.back].n} (${store.right} of ${store.total})`, W / 2, y + 214, 18, ok ? '#7ee2a8' : '#f0a0a0', 'center', 800);
+    }
+    D.text(ctx, R.shuffle ? 'Next sim in a moment…' : 'Tap for another round', W / 2, y + 260, 16, '#8f8a80', 'center', 600);
+    ctx.globalAlpha = 1;
+  }
+
+  // ----- input -----
+  cv.addEventListener('pointerdown', ev => {
+    AU.init(); if (!AU.on && !R.userMuted) { AU.on = true; if (AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume(); syncButtons(); }
+    const rect = cv.getBoundingClientRect(), x = (ev.clientX - rect.left) * W / rect.width, y = (ev.clientY - rect.top) * H / rect.height;
+    const st = R.st, sim = R.sim; if (!st) return;
+    if (R.phase === 'pre') {
+      let hit = -1;
+      chipRects(st.C.length).forEach((r, i) => { if (x >= r.x && x <= r.x + r.w && y >= r.y - 6 && y <= r.y + r.h + 6) hit = i; });
+      if (hit < 0) {
+        const pts = sim.where ? sim.where(st) : (st.balls || []).filter(b => !b.dead && b.ci != null).map(b => ({ i: b.ci, x: b.x, y: b.y, r: b.r }));
+        let bd = 1e9; for (const p of pts) { const d = Math.hypot(p.x - x, p.y - y); if (d < Math.max(p.r + 24, 30) && d < bd) { bd = d; hit = p.i; } }
+      }
+      if (hit >= 0) { R.back = hit; AU.blip(10); }
+      return;
+    }
+    if (R.phase === 'done') { start(R.si); return; }
+    if (R.phase === 'run') R.paused = !R.paused;
+  });
+  window.addEventListener('keydown', e => {
+    if (!R.sim) return;
+    if (e.key === 'r' || e.key === 'R') start(R.si);
+    else if (e.key === 'n' || e.key === 'N') start(pickNext());
+    else if (e.key === ' ') { e.preventDefault(); if (R.phase === 'run') R.paused = !R.paused; }
+  });
+  function syncButtons() {
+    $('bSpeed').textContent = R.speed + 'x';
+    $('bSound').textContent = AU.on ? '🔊' : '🔇';
+    $('bShuffle').classList.toggle('on', R.shuffle); $('bShuf2').classList.toggle('on', R.shuffle);
+  }
+  $('bRestart').onclick = () => start(R.si);
+  $('bReplay').onclick = () => start(R.si, R.seed);
+  $('bNext').onclick = () => start(pickNext());
+  $('bSpeed').onclick = () => { R.speed = R.speed === 1 ? 2 : R.speed === 2 ? 4 : 1; syncButtons(); };
+  $('bSound').onclick = () => { AU.init(); AU.on = !AU.on; R.userMuted = !AU.on; if (AU.on && AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume(); syncButtons(); };
+  const toggleShuffle = () => { R.shuffle = !R.shuffle; syncButtons(); if (R.shuffle && (!R.sim || R.phase === 'done' || !document.body.classList.contains('playing'))) start(pickNext()); };
+  $('bShuffle').onclick = toggleShuffle; $('bShuf2').onclick = toggleShuffle;
+  $('bRandom').onclick = () => start(Math.floor(Math.random() * SIMS.length));
+  $('bBack').onclick = () => { document.body.classList.remove('playing'); R.shuffle = false; syncButtons(); try { history.replaceState(null, '', location.pathname); } catch (e) { } };
+
+  // ----- picker -----
+  function updateRecord() { $('record').textContent = store.total ? `Your picks: ${store.right} of ${store.total} right` : ''; }
+  function updateTile(i) { const el = document.querySelector(`.tile[data-i="${i}"] .pl`); if (el) { const n = store.played[SIMS[i].id] || 0; el.textContent = n ? `${n} played` : 'new'; } }
+  function buildGrid() {
+    const grid = $('grid');
+    SIMS.forEach((s, i) => {
+      const b = document.createElement('button'); b.className = 'tile'; b.dataset.i = i;
+      b.innerHTML = `<canvas width="135" height="240"></canvas><span class="nm">${s.name}</span><span class="pl"></span>`;
+      b.onclick = () => start(i); grid.appendChild(b); updateTile(i);
+    });
+    // thumbnails: the real opening frame of each sim, rendered one at a time
+    const off = D.mk(W, H), oc = off.getContext('2d'); let i = 0;
+    const next = () => {
+      if (i >= SIMS.length) return;
+      const s = SIMS[i], c = document.querySelector(`.tile[data-i="${i}"] canvas`);
+      try {
+        const st = s.init(RNG(1000 + i)); for (let k = 0; k < (s.thumbSteps || 60); k++) tickSim(s, st);
+        oc.setTransform(1, 0, 0, 1, 0, 0); oc.fillStyle = s.theme === 'night' ? NIGHT : PAPER; oc.fillRect(0, 0, W, H);
+        s.draw(st, oc, s.theme === 'night');
+        c.getContext('2d').drawImage(off, 0, 0, W, H, 0, 0, c.width, c.height);
+      } catch (e) { console.error('thumb', s.id, e); }
+      i++; setTimeout(next, 16);
+    };
+    setTimeout(next, 50);
+  }
+
+  // ----- dev: headless fairness test (?test=1&n=200&sim=id) -----
+  function runTests(n, only) {
+    const out = $('testOut'); out.hidden = false; out.textContent = `Fairness test, ${n} seeds per sim\n`;
+    const list = SIMS.filter(s => !only || s.id === only); let k = 0;
+    const one = () => {
+      if (k >= list.length) { out.textContent += '\nDONE'; window.__testDone = true; return; }
+      const s = list[k++], wins = {}, ts = []; let capped = 0, slots = 0, err = '';
+      try {
+        for (let j = 0; j < n; j++) { const r = runRound(s, 7000 + j); slots = r.n; wins[r.win] = (wins[r.win] || 0) + 1; ts.push(r.t); if (r.capped) capped++; }
+      } catch (e) { err = ' ERROR ' + e.message; }
+      ts.sort((a, b) => a - b);
+      const shares = Array.from({ length: slots }, (_, i) => ((wins[i] || 0) / n * slots).toFixed(2));
+      out.textContent += `${s.id.padEnd(10)} med ${(ts[ts.length >> 1] || 0).toFixed(1)}s worst ${(ts[ts.length - 1] || 0).toFixed(1)}s capped ${capped}  slot share x fair: ${shares.join(' ')}${err}\n`;
+      setTimeout(one, 0);
+    };
+    setTimeout(one, 0);
+  }
+
+  window.__ww = { R, start, SIMS };
+  // ----- boot -----
+  const q = new URLSearchParams(location.search);
+  buildGrid(); updateRecord(); syncButtons();
+  if (q.get('test')) { runTests(+q.get('n') || 200, q.get('sim')); return; }
+  const qi = SIMS.findIndex(s => s.id === q.get('sim'));
+  if (qi >= 0) start(qi, q.get('seed') ? (+q.get('seed') >>> 0) : null);
+  else if (wide()) start(Math.floor(Math.random() * SIMS.length));
+  fit();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
